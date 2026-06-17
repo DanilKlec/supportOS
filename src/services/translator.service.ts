@@ -1,4 +1,7 @@
-import { useTranslatorStore } from "@/store/translator.store";
+import {
+	DEFAULT_TRANSLATOR_ENDPOINT,
+	useTranslatorStore,
+} from "@/store/translator.store";
 import type { TranslateRequest, TranslateResult } from "@/types/ai";
 
 export interface TranslatorLanguage {
@@ -20,14 +23,19 @@ interface LibreTranslateResponse {
 	message?: string;
 }
 
+interface ProtectedSegment {
+	token: string;
+	value: string;
+}
+
 const LANGUAGE_ALIASES = new Map(
 	Object.entries({
 		auto: "auto",
 		automatic: "auto",
-		russian: "ru",
-		русский: "ru",
 		english: "en",
 		английский: "en",
+		russian: "ru",
+		русский: "ru",
 		german: "de",
 		немецкий: "de",
 		portuguese: "pt",
@@ -46,6 +54,20 @@ const LANGUAGE_ALIASES = new Map(
 		польский: "pl",
 		ukrainian: "uk",
 		украинский: "uk",
+		japanese: "ja",
+		японский: "ja",
+		chinese: "zh",
+		китайский: "zh",
+		korean: "ko",
+		корейский: "ko",
+		arabic: "ar",
+		арабский: "ar",
+		dutch: "nl",
+		нидерландский: "nl",
+		czech: "cs",
+		чешский: "cs",
+		hindi: "hi",
+		хинди: "hi",
 	}),
 );
 
@@ -62,7 +84,56 @@ const FALLBACK_LANGUAGES: TranslatorLanguage[] = [
 	{ code: "tr", name: "Turkish" },
 	{ code: "pl", name: "Polish" },
 	{ code: "uk", name: "Ukrainian" },
+	{ code: "ja", name: "Japanese" },
+	{ code: "zh", name: "Chinese" },
+	{ code: "ko", name: "Korean" },
+	{ code: "ar", name: "Arabic" },
+	{ code: "nl", name: "Dutch" },
+	{ code: "cs", name: "Czech" },
+	{ code: "hi", name: "Hindi" },
 ];
+
+const PROTECTED_PATTERNS = [
+	{ prefix: "FENCE", pattern: /```[\s\S]*?```/g },
+	{ prefix: "TILDE", pattern: /~~~[\s\S]*?~~~/g },
+	{ prefix: "INLINE", pattern: /`[^`\n]+`/g },
+	{ prefix: "URL", pattern: /https?:\/\/[^\s<)]+/g },
+];
+
+function escapeRegExp(value: string) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function protectStaticSegments(input: string) {
+	let text = input;
+	const segments: ProtectedSegment[] = [];
+
+	for (const { prefix, pattern } of PROTECTED_PATTERNS) {
+		text = text.replace(pattern, (value) => {
+			const token = `ZXQ${prefix}${segments.length}ZXQ`;
+
+			segments.push({ token, value });
+
+			return token;
+		});
+	}
+
+	return {
+		text,
+		restore(output: string) {
+			let restored = output;
+
+			for (const segment of segments) {
+				restored = restored.replace(
+					new RegExp(escapeRegExp(segment.token), "gi"),
+					segment.value,
+				);
+			}
+
+			return restored;
+		},
+	};
+}
 
 export class TranslatorServiceError extends Error {
 	constructor(
@@ -81,11 +152,16 @@ class TranslatorService {
 
 	async getLanguages(): Promise<TranslatorLanguage[]> {
 		const endpoint = this.getEndpoint();
-		const response = await this.request(`${endpoint}/languages`, {
-			method: "GET",
-		});
-
-		const data = (await response.json()) as LibreTranslateLanguage[];
+		const response = await this.request(
+			this.createUrl(endpoint, "/languages"),
+			{
+				method: "GET",
+			},
+		);
+		const data = await this.readJson<LibreTranslateLanguage[]>(
+			response,
+			"Translator returned an invalid language list",
+		);
 
 		if (!Array.isArray(data)) {
 			throw new TranslatorServiceError(
@@ -120,11 +196,11 @@ class TranslatorService {
 		fromLanguage,
 		toLanguage,
 	}: TranslateRequest): Promise<TranslateResult> {
-		const sourceText = text.trim();
+		const sourceText = text;
 		const sourceLanguage = this.normalizeLanguage(fromLanguage, true);
 		const targetLanguage = this.normalizeLanguage(toLanguage, false);
 
-		if (!sourceText) {
+		if (!sourceText.trim()) {
 			throw new TranslatorServiceError("Text is required");
 		}
 
@@ -140,24 +216,18 @@ class TranslatorService {
 			throw new TranslatorServiceError("Target language cannot be Auto");
 		}
 
-		const { apiKey } = useTranslatorStore.getState();
 		const endpoint = this.getEndpoint();
-		const formData = new FormData();
-
-		formData.set("q", sourceText);
-		formData.set("source", sourceLanguage);
-		formData.set("target", targetLanguage);
-		formData.set("format", "text");
-
-		if (apiKey.trim()) {
-			formData.set("api_key", apiKey.trim());
-		}
-
-		const response = await this.request(`${endpoint}/translate`, {
-			method: "POST",
-			body: formData,
+		const protectedSource = protectStaticSegments(sourceText);
+		const response = await this.sendTranslateRequest({
+			endpoint,
+			text: protectedSource.text,
+			sourceLanguage,
+			targetLanguage,
 		});
-		const data = (await response.json()) as LibreTranslateResponse;
+		const data = await this.readJson<LibreTranslateResponse>(
+			response,
+			"Translator returned an invalid response",
+		);
 		const translatedText = data.translatedText ?? data.translated_text;
 
 		if (typeof translatedText !== "string") {
@@ -168,11 +238,59 @@ class TranslatorService {
 		}
 
 		return {
-			text: translatedText,
+			text: protectedSource.restore(translatedText),
 			fromLanguage: sourceLanguage,
 			toLanguage: targetLanguage,
-			model: "LibreTranslate",
+			model: this.isBuiltInEndpoint(endpoint)
+				? "LibreTranslate Built-In"
+				: "LibreTranslate",
 		};
+	}
+
+	private async sendTranslateRequest({
+		endpoint,
+		text,
+		sourceLanguage,
+		targetLanguage,
+	}: {
+		endpoint: string;
+		text: string;
+		sourceLanguage: string;
+		targetLanguage: string;
+	}) {
+		const { apiKey } = useTranslatorStore.getState();
+
+		if (this.isBuiltInEndpoint(endpoint)) {
+			return this.request(this.createUrl(endpoint, "/translate"), {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					text,
+					source: sourceLanguage,
+					target: targetLanguage,
+					format: "text",
+					apiKey: apiKey.trim() || undefined,
+				}),
+			});
+		}
+
+		const formData = new FormData();
+
+		formData.set("q", text);
+		formData.set("source", sourceLanguage);
+		formData.set("target", targetLanguage);
+		formData.set("format", "text");
+
+		if (apiKey.trim()) {
+			formData.set("api_key", apiKey.trim());
+		}
+
+		return this.request(this.createUrl(endpoint, "/translate"), {
+			method: "POST",
+			body: formData,
+		});
 	}
 
 	private getEndpoint() {
@@ -185,6 +303,14 @@ class TranslatorService {
 		}
 
 		return endpoint.replace(/\/+$/, "");
+	}
+
+	private createUrl(endpoint: string, path: string) {
+		return `${endpoint}${path}`;
+	}
+
+	private isBuiltInEndpoint(endpoint: string) {
+		return endpoint.replace(/\/+$/, "") === DEFAULT_TRANSLATOR_ENDPOINT;
 	}
 
 	private normalizeLanguage(language: string, allowAuto: boolean) {
@@ -210,7 +336,7 @@ class TranslatorService {
 		} catch (error) {
 			throw new TranslatorServiceError(
 				error instanceof TypeError
-					? "Translator server is unavailable. Check that LibreTranslate is running and CORS is allowed."
+					? "Translator server is unavailable."
 					: error instanceof Error
 						? error.message
 						: "Unable to reach translator server",
@@ -234,6 +360,14 @@ class TranslatorService {
 		}
 
 		return response;
+	}
+
+	private async readJson<T>(response: Response, fallback: string) {
+		try {
+			return (await response.json()) as T;
+		} catch {
+			throw new TranslatorServiceError(fallback, response.status);
+		}
 	}
 
 	private async readError(response: Response) {

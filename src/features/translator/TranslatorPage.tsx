@@ -33,6 +33,12 @@ export function TranslatorPage() {
 		fromLanguage === CUSTOM_LANGUAGE ? customFromLanguage : fromLanguage;
 	const resolvedToLanguage =
 		toLanguage === CUSTOM_LANGUAGE ? customToLanguage : toLanguage;
+	const canTranslate = Boolean(
+		sourceText.trim() &&
+			resolvedFromLanguage.trim() &&
+			resolvedToLanguage.trim() &&
+			resolvedToLanguage.trim().toLowerCase() !== "auto",
+	);
 
 	const languageOptions = useMemo(() => {
 		const byCode = new Map<string, TranslatorLanguage>();
@@ -80,6 +86,11 @@ export function TranslatorPage() {
 
 	const translate = async (event: FormEvent) => {
 		event.preventDefault();
+		if (!canTranslate) {
+			setError("Enter text and choose a target language.");
+			return;
+		}
+
 		setError("");
 		setLoading(true);
 
@@ -136,7 +147,7 @@ export function TranslatorPage() {
 					<div>
 						<h1 className="text-2xl font-bold">Translator</h1>
 						<p className="mt-1 text-sm text-muted">
-							Local LibreTranslate translation with markdown and code block
+							LibreTranslate translation with markdown and code block
 							preservation.
 						</p>
 					</div>
@@ -176,7 +187,7 @@ export function TranslatorPage() {
 
 						<button
 							type="submit"
-							disabled={loading}
+							disabled={loading || !canTranslate}
 							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
