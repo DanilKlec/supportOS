@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { ProjectEmailRecord } from "@/entities/project-email";
 
@@ -41,6 +41,10 @@ export const useProjectEmailStore = create<ProjectEmailState>()(
 		}),
 		{
 			name: "supportos:project-emails:v1",
+			storage: createJSONStorage(() => localStorage),
+			partialize: (state) => ({
+				records: state.records,
+			}),
 		},
 	),
 );

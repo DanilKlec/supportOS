@@ -436,7 +436,7 @@ export function DepositBonusesPage() {
 				upsertProjects(preview.projects);
 			}
 
-			showToast(`Imported ${preview.projects.length} project sheets`);
+			showToast(`Imported and saved ${preview.projects.length} project sheets`);
 			setPreview(undefined);
 		} finally {
 			setCommitting(false);

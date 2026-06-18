@@ -1,0 +1,2705 @@
+{
+  "categories": [
+    {
+      "id": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "name": "Приветствие",
+      "order": 6,
+      "color": "#10B981"
+    },
+    {
+      "id": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Бонусы",
+      "order": 7,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "name": "Выводы",
+      "order": 8,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "name": "Закрытие",
+      "order": 9,
+      "color": "#EF4444"
+    },
+    {
+      "id": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "ownerId": null,
+      "name": "AutoKYC",
+      "color": "#FFFF00",
+      "order": 12
+    },
+    {
+      "id": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "ownerId": null,
+      "name": "Депозит",
+      "color": "#EC4899",
+      "order": 13
+    },
+    {
+      "id": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "ownerId": null,
+      "name": "Полезное",
+      "color": "#8B5CF6",
+      "order": 14
+    },
+    {
+      "id": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "ownerId": null,
+      "name": "Sport",
+      "color": "#1ab1dd",
+      "order": 15
+    }
+  ],
+  "folders": [
+    {
+      "id": "folder-0d7a2ca1-7d81-4c6e-98c7-5ccd8f45705f",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Скриншот бездеп",
+      "order": 1,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Регистрация",
+      "order": 2,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "folder-be432ee6-1cbb-4153-9b16-dca7264aaace",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Бонус зачислен",
+      "order": 3,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "folder-887fe7d2-1089-408f-8c75-dd9db9f16595",
+      "name": "Вывод",
+      "order": 1
+    },
+    {
+      "id": "folder-f8b3e56a-cb90-4f26-bd93-cdce9d008b3b",
+      "name": "к",
+      "order": 2
+    },
+    {
+      "id": "folder-e2a70069-9395-4531-8819-56317a9f0bf6",
+      "name": "3",
+      "order": 3
+    },
+    {
+      "id": "folder-a8ddb304-4397-4487-b537-0cd65330a25e",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Бездеп не сформирован",
+      "order": 4,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "folder-0355c749-6dc0-4804-a699-b2a9fa047f2d",
+      "ownerId": null,
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "name": "Дубль",
+      "color": "#8B5CF6",
+      "order": 1
+    },
+    {
+      "id": "folder-1d588708-adfd-4a0a-b0ce-8fa5a12f81c9",
+      "ownerId": null,
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "name": "Бонус = пройти вериф",
+      "color": "#3B82F6",
+      "order": 5
+    }
+  ],
+  "binds": [
+    {
+      "id": "bind-d0539abd-2d9f-459e-8d51-bd280d5e0795",
+      "slug": "bind-1781465128950",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Привет, чем могу помочь",
+          "content": "Здравствуйте, дорогой игрок! Меня зовут Джош, и я буду рад помочь вам сегодня. Пожалуйста, расскажите, чем могу быть полезен.",
+          "updatedAt": "2026-06-14T19:25:28.950Z"
+        },
+        {
+          "language": "en",
+          "title": "Привет, чем могу помочь",
+          "content": "Hello, dear player! My name is John, and I’ll be glad to assist you today. Please let me know how I can help.",
+          "updatedAt": "2026-06-18T07:23:38.245Z"
+        },
+        {
+          "language": "pt",
+          "title": "Привет, чем могу помочь",
+          "content": "Olá, caro jogador! O meu nome é John e terei todo o prazer em ajudá-lo hoje. Por favor, diga-me como posso ajudar.",
+          "updatedAt": "2026-06-14T19:27:39.345Z"
+        },
+        {
+          "language": "el",
+          "title": "Привет, чем могу помочь",
+          "content": "Γεια σας, αγαπητέ παίκτη! Το όνομά μου είναι John και θα χαρώ να σας βοηθήσω σήμερα. Παρακαλώ πείτε μου πώς μπορώ να σας εξυπηρετήσω.",
+          "updatedAt": "2026-06-14T19:27:49.621Z"
+        },
+        {
+          "language": "de",
+          "title": "Привет, чем могу помочь",
+          "content": "Hallo, lieber Spieler! Mein Name ist John, und ich freue mich, Ihnen heute weiterhelfen zu dürfen. Bitte teilen Sie mir mit, wie ich Ihnen behilflich sein kann.",
+          "updatedAt": "2026-06-14T19:27:54.449Z"
+        }
+      ],
+      "favorite": true,
+      "archived": false,
+      "createdAt": "2026-06-14T19:25:28.950Z",
+      "updatedAt": "2026-06-18T07:23:38.245Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-a1368aeb-5ff4-4d4c-9bd5-d0e229eb3c7e",
+      "slug": "bind-1781465755705",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "en",
+          "title": "Привет, уже проверяю",
+          "content": "Hello, dear player! My name is Josh. Thank you for reaching out — I’m carefully reviewing all the information regarding your request right now. This will take just a couple of minutes, and I’ll get back to you shortly with a clear and detailed response. Thank you very much for your patience and understanding.",
+          "updatedAt": "2026-06-18T07:23:35.676Z"
+        },
+        {
+          "language": "ru",
+          "title": "Привет, уже проверяю",
+          "content": "Здравствуйте, дорогой игрок! Меня зовут Джош. Благодарю вас за обращение — я уже с вниманием проверяю всю информацию по вашему запросу. Это займёт буквально пару минут, после чего я сразу вернусь к вам с точным и подробным ответом. Спасибо за ваше ожидание и понимание.",
+          "updatedAt": "2026-06-14T19:36:07.453Z"
+        },
+        {
+          "language": "el",
+          "title": "Привет, уже проверяю",
+          "content": "Γεια σας, αγαπητέ παίκτη! Το όνομά μου είναι Josh. Σας ευχαριστώ πολύ για την επικοινωνία σας — εξετάζω ήδη με ιδιαίτερη προσοχή όλες τις πληροφορίες σχετικά με το αίτημά σας. Αυτό θα διαρκέσει μόλις λίγα λεπτά και θα επανέλθω σύντομα με μια σαφή και αναλυτική απάντηση. Σας ευχαριστώ θερμά για την υπομονή και την κατανόησή σας.",
+          "updatedAt": "2026-06-14T19:36:20.773Z"
+        },
+        {
+          "language": "de",
+          "title": "Привет, уже проверяю",
+          "content": "Hallo, lieber Spieler! Mein Name ist Josh. Vielen Dank für Ihre Kontaktaufnahme — ich prüfe gerade sorgfältig alle Informationen zu Ihrer Anfrage. Dies dauert nur wenige Minuten, danach melde ich mich umgehend mit einer klaren und detaillierten Antwort bei Ihnen. Vielen Dank für Ihre Geduld und Ihr Verständnis.",
+          "updatedAt": "2026-06-14T19:36:26.665Z"
+        },
+        {
+          "language": "pt",
+          "title": "Привет, уже проверяю",
+          "content": "Olá, caro jogador! O meu nome é Josh. Agradeço o seu contato — já estou a analisar cuidadosamente todas as informações sobre a sua solicitação. Isto levará apenas alguns minutos e voltarei em breve com uma resposta clara e detalhada. Muito obrigado pela sua paciência e compreensão.",
+          "updatedAt": "2026-06-14T19:36:32.045Z"
+        }
+      ],
+      "favorite": true,
+      "archived": false,
+      "createdAt": "2026-06-14T19:35:55.705Z",
+      "updatedAt": "2026-06-18T07:23:35.676Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-ef99d2d4-5cde-4ed0-8fd6-e4e40c3c9d0f",
+      "slug": "bind-1781465812262",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Проверяю",
+          "content": "Позвольте мне немного времени, чтобы внимательно проверить всю информацию по вашему запросу — это займёт всего несколько минут. Я обязательно всё уточню и вернусь к вам в ближайшее время с точным и полным ответом. Спасибо за ваше ожидание.",
+          "updatedAt": "2026-06-14T19:36:52.262Z"
+        },
+        {
+          "language": "en",
+          "title": "Проверяю",
+          "content": "Please allow me a moment to carefully review all the information regarding your request — this will only take a few minutes. I will make sure to verify everything and get back to you shortly with a precise and complete response. Thank you for your patience.",
+          "updatedAt": "2026-06-18T07:23:31.524Z"
+        },
+        {
+          "language": "el",
+          "title": "Проверяю",
+          "content": "Παρακαλώ δώστε μου λίγο χρόνο για να ελέγξω προσεκτικά όλες τις πληροφορίες σχετικά με το αίτημά σας — αυτό θα διαρκέσει μόνο λίγα λεπτά. Θα επιβεβαιώσω όλες τις λεπτομέρειες και θα επανέλθω σύντομα με μια ακριβή και πλήρη απάντηση. Σας ευχαριστώ για την υπομονή σας.",
+          "updatedAt": "2026-06-14T19:37:05.926Z"
+        },
+        {
+          "language": "de",
+          "title": "Проверяю",
+          "content": "Bitte geben Sie mir einen Moment Zeit, um alle Informationen zu Ihrer Anfrage sorgfältig zu prüfen — das dauert nur wenige Minuten. Ich werde alles genau überprüfen und mich in Kürze mit einer präzisen und vollständigen Antwort bei Ihnen melden. Vielen Dank für Ihre Geduld.",
+          "updatedAt": "2026-06-14T19:37:12.177Z"
+        },
+        {
+          "language": "pt",
+          "title": "Проверяю",
+          "content": "Por favor, permita-me um momento para verificar cuidadosamente todas as informações relacionadas à sua solicitação — isso levará apenas alguns minutos. Irei confirmar todos os detalhes e voltarei em breve com uma resposta precisa e completa. Obrigado pela sua paciência.",
+          "updatedAt": "2026-06-14T19:37:17.082Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T19:36:52.262Z",
+      "updatedAt": "2026-06-18T07:23:31.524Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-d53795e7-1d3c-43ad-addf-3b5f7a8b9a83",
+      "slug": "bind-1781465962588",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Есть ли у вас другие вопросы?",
+          "content": "Есть ли у вас другие вопросы? Я буду рад вам помочь!",
+          "updatedAt": "2026-06-14T19:39:22.588Z"
+        },
+        {
+          "language": "en",
+          "title": "Есть ли у вас другие вопросы?",
+          "content": "Do you have any other questions? I'll be happy to help you!",
+          "updatedAt": "2026-06-18T07:23:28.968Z"
+        },
+        {
+          "language": "el",
+          "title": "Есть ли у вас другие вопросы?",
+          "content": "Έχετε άλλες ερωτήσεις; Θα χαρώ να σας βοηθήσω!",
+          "updatedAt": "2026-06-14T19:39:33.068Z"
+        },
+        {
+          "language": "de",
+          "title": "Есть ли у вас другие вопросы?",
+          "content": "Haben Sie noch weitere Fragen? Ich helfe Ihnen gerne weiter!",
+          "updatedAt": "2026-06-14T19:39:37.280Z"
+        },
+        {
+          "language": "pt",
+          "title": "Есть ли у вас другие вопросы?",
+          "content": "Tem mais alguma pergunta? Terei todo o gosto em ajudar!",
+          "updatedAt": "2026-06-14T19:39:41.696Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T19:39:22.588Z",
+      "updatedAt": "2026-06-18T07:23:28.968Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-57b6d931-0790-46b8-bd1a-9428e64c805d",
+      "slug": "bind-1781466015261",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Пожалуйста, дайте знать",
+          "content": "Пожалуйста, дайте знать, если у вас есть какие-либо вопросы- я буду рад помочь!",
+          "updatedAt": "2026-06-14T19:40:15.261Z"
+        },
+        {
+          "language": "en",
+          "title": "Пожалуйста, дайте знать",
+          "content": "Please let me know if you have any questions — I’ll be glad to assist you.",
+          "updatedAt": "2026-06-18T07:23:26.208Z"
+        },
+        {
+          "language": "el",
+          "title": "Пожалуйста, дайте знать",
+          "content": "Παρακαλώ ενημερώστε με αν έχετε οποιεσδήποτε ερωτήσεις - θα χαρώ να σας βοηθήσω.",
+          "updatedAt": "2026-06-14T19:40:26.505Z"
+        },
+        {
+          "language": "de",
+          "title": "Пожалуйста, дайте знать",
+          "content": "Bitte lassen Sie mich wissen, wenn Sie Fragen haben - ich helfe Ihnen gerne weiter.",
+          "updatedAt": "2026-06-14T19:40:31.061Z"
+        },
+        {
+          "language": "pt",
+          "title": "Пожалуйста, дайте знать",
+          "content": "Se tiver alguma dúvida, contacte-me - terei todo o gosto em ajudá-lo.",
+          "updatedAt": "2026-06-14T19:40:37.789Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T19:40:15.261Z",
+      "updatedAt": "2026-06-18T07:23:26.208Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-074b25c3-9196-457e-9a5d-0c0115880fb6",
+      "slug": "bind-1781466067125",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Пока",
+          "content": "Obrigado por entrar em contato conosco. Se você tiver alguma dúvida adicional ou precisar de Ajuda no futuro, não hesite em nos contatar. Desejamos a você tudo de bom!",
+          "updatedAt": "2026-06-17T15:08:18.071Z"
+        },
+        {
+          "language": "ru",
+          "title": "Пока",
+          "content": "Спасибо, что обратились к нам. Если у вас возникнут какие-либо дополнительные вопросы или вам понадобится помощь в будущем, не стесняйтесь обращаться к нам. Мы желаем вам всего наилучшего!",
+          "updatedAt": "2026-06-17T15:08:18.071Z"
+        },
+        {
+          "language": "en",
+          "title": "Пока",
+          "content": "Thank you for contacting us. If you have any further questions or need help in the future, do not hesitate to contact us. We wish you all the best!",
+          "updatedAt": "2026-06-18T07:23:09.972Z"
+        },
+        {
+          "language": "el",
+          "title": "Пока",
+          "content": "Σας ευχαριστούμε που επικοινωνήσατε μαζί μας. Εάν έχετε οποιαδήποτε άλλη ερώτηση ή χρειαστείτε βοήθεια στο μέλλον, μη διστάσετε να επικοινωνήσετε ξανά μαζί μας. Σας ευχόμαστε ό,τι καλύτερο!",
+          "updatedAt": "2026-06-17T15:08:18.071Z"
+        },
+        {
+          "language": "de",
+          "title": "Пока",
+          "content": "Danke, dass Sie uns kontaktiert haben. Wenn Sie weitere Fragen haben oder in der Zukunft Hilfe benötigen, zögern Sie nicht, uns zu kontaktieren. Wir wünschen Ihnen alles Gute!",
+          "updatedAt": "2026-06-17T15:08:18.071Z"
+        }
+      ],
+      "favorite": true,
+      "archived": false,
+      "createdAt": "2026-06-14T19:40:47.469Z",
+      "updatedAt": "2026-06-18T07:23:09.972Z",
+      "imported": false,
+      "color": "#10B981"
+    },
+    {
+      "id": "bind-6f3418c8-b10b-4d52-8d80-af1b2c8b20cf",
+      "slug": "bind-1781466138839",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-0d7a2ca1-7d81-4c6e-98c7-5ccd8f45705f",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Запрос скрина",
+          "content": "Terei todo o gosto em ajudar o mais rapidamente possível!\nEnvie uma captura de ecrã com o conteúdo completo desta oferta e nós verificaremos as informações. Além disso, certifique-se de que a captura de ecrã indica a data em que recebeu a mensagem de correio eletrónico e o seu endereço de correio eletrónico. Se precisar de ajuda ao longo do processo, diga-nos!",
+          "updatedAt": "2026-06-14T19:42:52.147Z"
+        },
+        {
+          "language": "ru",
+          "title": "Запрос скрина",
+          "content": "Я буду рад помочь как можно скорее! \nПришлите, пожалуйста, скриншот с полным содержанием этого предложения, и мы проверим информацию.Также, убедитесь, что наскриншоте видно дату получения эмайла и ваш электронный адрес. \nЕсли нужна будет помощь на этом пути- просто дайте нам знать!",
+          "updatedAt": "2026-06-14T19:42:22.511Z"
+        },
+        {
+          "language": "en",
+          "title": "Запрос скрина на бездеп",
+          "content": "I will be happy to help as quickly as possible! \nPlease send a screenshot with the full content of this offer, and we will check the information. Also, make sure that the screenshot shows the date you received the email and your email address. If you need help along the way, just let us know!",
+          "updatedAt": "2026-06-18T07:24:33.217Z"
+        },
+        {
+          "language": "el",
+          "title": "Запрос скрина",
+          "content": "Θα χαρώ να σας βοηθήσω όσο το δυνατόν γρηγορότερα!\nΠαρακαλούμε στείλτε ένα στιγμιότυπο οθόνης με το πλήρες περιεχόμενο αυτής της προσφοράς και θα ελέγξουμε τις πληροφορίες. Επίσης, βεβαιωθείτε ότι στο στιγμιότυπο οθόνης αναγράφεται η ημερομηνία που λάβατε το μήνυμα ηλεκτρονικού ταχυδρομείου και η διεύθυνση ηλεκτρονικού ταχυδρομείου σας. Αν χρειαστείτε βοήθεια στην πορεία, απλά ενημερώστε μας!",
+          "updatedAt": "2026-06-14T19:42:42.879Z"
+        },
+        {
+          "language": "de",
+          "title": "Запрос скрина",
+          "content": "Ich helfe Ihnen gerne und so schnell wie möglich!\nBitte senden Sie einen Screenshot mit dem vollständigen Inhalt dieses Angebots, und wir werden die Informationen überprüfen. Achten Sie außerdem darauf, dass auf dem Screenshot das Datum, an dem Sie die E-Mail erhalten haben, und Ihre E-Mail-Adresse zu sehen sind. Wenn Sie Hilfe benötigen, lassen Sie es uns einfach wissen!",
+          "updatedAt": "2026-06-14T19:42:47.279Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T19:42:07.394Z",
+      "updatedAt": "2026-06-18T07:24:33.217Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-0753f492-2075-4352-a59f-c5d400c23b52",
+      "slug": "bind-1781467911755",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-0d7a2ca1-7d81-4c6e-98c7-5ccd8f45705f",
+      "tags": [],
+      "translations": [
+        {
+          "language": "en",
+          "title": "Скрин бездеп Нет эмайла и даты",
+          "content": "I will be happy to help as soon as possible! \nSo that we can verify the information, please send another screenshot of this offer showing the date you received the email and your email address.\nIf you need help, just let us know!",
+          "updatedAt": "2026-06-18T07:24:35.412Z"
+        },
+        {
+          "language": "ru",
+          "title": "Скрин бездеп Нет эмайла и даты",
+          "content": "Я буду рад помочь как можно скорее! \nЧтобы мы могли проверить информацию, пожалуйста, пришлите другой скриншот этого предложения, на котором будет видна дата получения эмайла и ваш электронный адрес.\nЕсли нужна будет помощь - просто сообщите!",
+          "updatedAt": "2026-06-14T20:12:13.705Z"
+        },
+        {
+          "language": "el",
+          "title": "Скрин бездеп Нет эмайла и даты",
+          "content": "Θα χαρώ να σας βοηθήσω το συντομότερο δυνατό!\nΓια να μπορέσουμε να επαληθεύσουμε τις πληροφορίες, παρακαλούμε στείλτε ένα άλλο στιγμιότυπο οθόνης αυτής της προσφοράς, στο οποίο θα φαίνεται η ημερομηνία που λάβατε το email και η διεύθυνση email σας.\nΕάν χρειάζεστε βοήθεια, απλά ενημερώστε μας!",
+          "updatedAt": "2026-06-14T20:12:31.498Z"
+        },
+        {
+          "language": "de",
+          "title": "Скрин бездеп Нет эмайла и даты",
+          "content": "Ich werde Ihnen gerne so schnell wie möglich helfen!\nDamit wir die Informationen überprüfen können, senden Sie uns bitte einen weiteren Screenshot dieses Angebots mit dem Datum, an dem Sie die E-Mail erhalten haben, und Ihrer E-Mail-Adresse.\nWenn Sie Hilfe benötigen, lassen Sie es uns einfach wissen!",
+          "updatedAt": "2026-06-14T20:12:41.330Z"
+        },
+        {
+          "language": "pt",
+          "title": "Скрин бездеп Нет эмайла и даты",
+          "content": "Terei todo o gosto em ajudar o mais rapidamente possível!\nPara que possamos verificar as informações, envie-nos outra captura de ecrã desta oferta, indicando a data em que recebeu a mensagem de correio eletrónico e o seu endereço de correio eletrónico.\nSe precisar de ajuda, diga-nos!",
+          "updatedAt": "2026-06-14T20:12:47.378Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:11:51.756Z",
+      "updatedAt": "2026-06-18T07:24:35.412Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-55cd06d1-6e14-4088-8835-86aa4fff78b8",
+      "slug": "bind-1781468183824",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Нет ссылки",
+          "content": "Пожалуйста, обратите внимание, что бонус за регистрацию зачисляется автоматически, если аккаунт зарегистрирован по реферальной ссылке и был указан промокод на момент регистрации. \nСогласно нашим техническим журналам, вы не прошли регистрацию по реферальной ссылке, поэтому бонус не был зачислен. Однако, я не с пустыми руками!",
+          "updatedAt": "2026-06-14T20:16:32.369Z"
+        },
+        {
+          "language": "en",
+          "title": "Нет ссылки",
+          "content": "Please note that the signup bonus is credited automatically if the account is registered via a referral link and a promo code was provided at the time of registration.\nAccording to our technical logs, you did not register using the referral link, so the bonus was not credited. However, I am not empty-handed!",
+          "updatedAt": "2026-06-18T07:24:15.820Z"
+        },
+        {
+          "language": "el",
+          "title": "Нет ссылки",
+          "content": "Παρακαλείστε να σημειώσετε ότι το μπόνους εγγραφής πιστώνεται αυτόματα εάν ο λογαριασμός έχει εγγραφεί μέσω ενός συνδέσμου παραπομπής και έχει δοθεί ένας κωδικός προσφοράς κατά τη στιγμή της εγγραφής.\nΣύμφωνα με τα τεχνικά αρχεία καταγραφής μας, δεν εγγραφείτε χρησιμοποιώντας το σύνδεσμο παραπομπής, οπότε το μπόνους δεν πιστώθηκε. Ωστόσο, δεν είμαι με άδεια χέρια!",
+          "updatedAt": "2026-06-14T20:16:47.629Z"
+        },
+        {
+          "language": "de",
+          "title": "Нет ссылки",
+          "content": "Bitte beachten Sie, dass der Anmeldebonus automatisch gutgeschrieben wird, wenn das Konto über einen Empfehlungslink registriert wurde und zum Zeitpunkt der Registrierung ein Promo-Code angegeben wurde.\nLaut unseren technischen Protokollen haben Sie sich nicht über den Empfehlungslink registriert, daher wurde der Bonus nicht gutgeschrieben. Ich stehe aber nicht mit leeren Händen da!",
+          "updatedAt": "2026-06-14T20:16:54.818Z"
+        },
+        {
+          "language": "pt",
+          "title": "Нет ссылки",
+          "content": "Tenha em atenção que o bónus de inscrição é creditado automaticamente se a conta for registada através de uma ligação de referência e se tiver sido fornecido um código promocional no momento do registo.\nDe acordo com os nossos registos técnicos, não se registou utilizando a ligação de referência, pelo que o bónus não foi creditado. No entanto, não estou de mãos a abanar!",
+          "updatedAt": "2026-06-14T20:17:00.618Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:16:23.824Z",
+      "updatedAt": "2026-06-18T07:24:15.820Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-0e100165-b8ae-4082-bd4b-c8696b43b30e",
+      "slug": "bind-1781468262967",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "en",
+          "title": "Нет промокода",
+          "content": "Please note that the signup bonus is credited automatically if the account is registered via a referral link and a promo code was specified at the time of registration.\nAccording to our technical logs, you did not specify a promo code at the time of registration, so the bonus was not credited. However, I am not empty-handed!",
+          "updatedAt": "2026-06-18T07:24:17.780Z"
+        },
+        {
+          "language": "ru",
+          "title": "Нет промокода",
+          "content": "Пожалуйста, обратите внимание, что бонус за регистрацию зачисляется автоматически, если аккаунт зарегистрирован по реферальной ссылке и был указан промокод на момент регистрации. \nСогласно нашим техническим журналам, вы не указали промокод на момент регистрации, поэтому бонус не был зачислен. Однако, я не с пустыми руками!",
+          "updatedAt": "2026-06-14T20:18:06.327Z"
+        },
+        {
+          "language": "el",
+          "title": "Нет промокода",
+          "content": "Παρακαλείστε να σημειώσετε ότι το μπόνους εγγραφής πιστώνεται αυτόματα εάν ο λογαριασμός έχει εγγραφεί μέσω ενός συνδέσμου παραπομπής και ένας κωδικός προσφοράς έχει καθοριστεί κατά τη στιγμή της εγγραφής.\nΣύμφωνα με τα τεχνικά αρχεία καταγραφής μας, δεν καθορίσατε κωδικό προσφοράς κατά την εγγραφή, οπότε το μπόνους δεν πιστώθηκε. Ωστόσο, δεν είμαι με άδεια χέρια!",
+          "updatedAt": "2026-06-14T20:18:15.283Z"
+        },
+        {
+          "language": "de",
+          "title": "Нет промокода",
+          "content": "Bitte beachten Sie, dass der Anmeldebonus automatisch gutgeschrieben wird, wenn das Konto über einen Empfehlungslink registriert wird und bei der Registrierung ein Promo-Code angegeben wurde.\nUnseren technischen Protokollen zufolge haben Sie bei der Registrierung keinen Promo-Code angegeben, sodass der Bonus nicht gutgeschrieben wurde. Ich stehe aber nicht mit leeren Händen da!",
+          "updatedAt": "2026-06-14T20:18:21.659Z"
+        },
+        {
+          "language": "pt",
+          "title": "Нет промокода",
+          "content": "Tenha em atenção que o bónus de inscrição é creditado automaticamente se a conta for registada através de uma ligação de referência e se tiver sido especificado um código promocional no momento do registo.\nDe acordo com os nossos registos técnicos, não especificou um código promocional no momento do registo, pelo que o bónus não foi creditado. No entanto, não estou de mãos a abanar!",
+          "updatedAt": "2026-06-14T20:18:27.251Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:17:42.967Z",
+      "updatedAt": "2026-06-18T07:24:17.780Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-50622a2b-5cd6-42f5-bbaf-a06aefa47cfd",
+      "slug": "bind-1781469449318",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "de",
+          "title": "Промокод не активен",
+          "content": "Bitte beachten Sie, dass der Registrierungsbonus automatisch gutgeschrieben wird. Im Moment ist der von Ihnen angegebene Promo-Code nicht gültig, so dass der Bonus ohne Einzahlung nicht gutgeschrieben wurde. Aber seien Sie nicht böse, ich habe ein ebenso schönes Angebot für Sie!",
+          "updatedAt": "2026-06-14T20:38:39.500Z"
+        },
+        {
+          "language": "ru",
+          "title": "Промокод не активен",
+          "content": "Пожалуйста, обратите внимание, что бонус за регистрацию зачисляется автоматически. В данный момент указанный вами промокод не действует, поэтому бездепозитный бонус не был зачислен. Но не стоит расстраиваться, у меня есть для вас не менее приятное предложение!",
+          "updatedAt": "2026-06-14T20:37:42.532Z"
+        },
+        {
+          "language": "en",
+          "title": "Промокод не активен",
+          "content": "Please note that the registration bonus is credited automatically. At the moment the promo code you specified is not valid, so the no-deposit bonus has not been credited. But don't be upset, I have an equally nice offer for you!",
+          "updatedAt": "2026-06-18T07:24:20.316Z"
+        },
+        {
+          "language": "el",
+          "title": "Промокод не активен",
+          "content": "Σημειώστε ότι το μπόνους εγγραφής πιστώνεται αυτόματα. Αυτή τη στιγμή ο κωδικός προσφοράς που δηλώσατε δεν ισχύει, οπότε το μπόνους χωρίς κατάθεση δεν έχει πιστωθεί. Αλλά μην αναστατώνεστε, έχω μια εξίσου ωραία προσφορά για εσάς!",
+          "updatedAt": "2026-06-14T20:38:32.164Z"
+        },
+        {
+          "language": "pt",
+          "title": "Промокод не активен",
+          "content": "Tenha em atenção que o bónus de registo é creditado automaticamente. De momento, o código promocional que especificou não é válido, pelo que o bónus sem depósito não foi creditado. Mas não fique chateado, tenho uma oferta igualmente boa para si!",
+          "updatedAt": "2026-06-14T20:38:47.357Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:37:29.319Z",
+      "updatedAt": "2026-06-18T07:24:20.316Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-e0de452e-073b-4c05-8294-9be2c78702b0",
+      "slug": "bind-1781469550885",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Промокод не верный",
+          "content": "Пожалуйста, обратите внимание, что бонус за регистрацию зачисляется автоматически, при условии, что ссылка, по которой прошли регистрацию, и указанный промокод на момент регистрации соответствуют друг другу. \nНасколько вижу, вы указали неверный промокод, поэтому бонус не был зачислен. Но не стоит расстраиваться, у меня есть для вас другое предложение!",
+          "updatedAt": "2026-06-14T20:39:14.445Z"
+        },
+        {
+          "language": "en",
+          "title": "Промокод не верный",
+          "content": "Please note that the bonus for registration is credited automatically, provided that the link used to register and the specified promo code at the time of registration correspond to each other.\nAs far as I can see, you entered the wrong promo code, so the bonus was not credited. But don't be upset, I have another offer for you!",
+          "updatedAt": "2026-06-18T07:24:22.585Z"
+        },
+        {
+          "language": "el",
+          "title": "Промокод не верный",
+          "content": "Παρακαλείστε να σημειώσετε ότι το μπόνους για την εγγραφή πιστώνεται αυτόματα, υπό την προϋπόθεση ότι ο σύνδεσμος που χρησιμοποιήθηκε για την εγγραφή και ο καθορισμένος κωδικός προσφοράς κατά τη στιγμή της εγγραφής αντιστοιχούν μεταξύ τους.\nΑπ' ό,τι βλέπω, καταχωρήσατε λάθος κωδικό προσφοράς, οπότε το μπόνους δεν πιστώθηκε. Αλλά μην αναστατώνεστε, έχω μια άλλη προσφορά για εσάς!",
+          "updatedAt": "2026-06-14T20:39:38.009Z"
+        },
+        {
+          "language": "de",
+          "title": "Промокод не верный",
+          "content": "Bitte beachten Sie, dass der Bonus für die Registrierung automatisch gutgeschrieben wird, sofern der zur Registrierung verwendete Link und der bei der Registrierung angegebene Promo-Code übereinstimmen.\nSoweit ich sehen kann, haben Sie den falschen Promo-Code eingegeben, so dass der Bonus nicht gutgeschrieben wurde. Aber seien Sie nicht böse, ich habe ein anderes Angebot für Sie!",
+          "updatedAt": "2026-06-14T20:39:46.770Z"
+        },
+        {
+          "language": "pt",
+          "title": "Промокод не верный",
+          "content": "Tenha em atenção que o bónus de registo é creditado automaticamente, desde que a ligação utilizada para o registo e o código promocional especificado no momento do registo correspondam um ao outro.\nTanto quanto me é dado ver, introduziu o código promocional errado, pelo que o bónus não foi creditado. Mas não fique chateado, tenho outra oferta para si!",
+          "updatedAt": "2026-06-14T20:39:54.586Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:39:10.885Z",
+      "updatedAt": "2026-06-18T07:24:22.585Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-7336b803-d325-4047-b055-218ca1c3d5f9",
+      "slug": "bind-1781469656725",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "de",
+          "title": "Ссылка неверная",
+          "content": "Bitte beachten Sie, dass der Registrierungsbonus automatisch gutgeschrieben wird, sofern der zur Registrierung verwendete Link und der bei der Registrierung angegebene Promo-Code übereinstimmen.\nSoweit ich sehen kann, haben Sie sich über einen falschen Link registriert, so dass der Bonus nicht gutgeschrieben wurde. Aber seien Sie nicht böse, ich habe ein anderes Angebot für Sie!",
+          "updatedAt": "2026-06-14T20:41:42.851Z"
+        },
+        {
+          "language": "ru",
+          "title": "Ссылка неверная",
+          "content": "Пожалуйста, обратите внимание, что бонус за регистрацию зачисляется автоматически, при условии, что ссылка, по которой прошли регистрацию, и указанный промокод на момент регистрации соответствуют друг другу. \nНасколько вижу, вы зарегистрировались по неверной ссылке, поэтому бонус не был зачислен. Но не стоит расстраиваться, у меня есть для вас другое предложение!",
+          "updatedAt": "2026-06-14T20:41:09.939Z"
+        },
+        {
+          "language": "en",
+          "title": "Ссылка неверная",
+          "content": "Please note that the registration bonus is credited automatically, provided that the link used to register and the specified promo code at the time of registration correspond to each other.\nAs far as I can see, you registered using the wrong link, so the bonus was not credited. But don't be upset, I have another offer for you!",
+          "updatedAt": "2026-06-18T07:24:24.668Z"
+        },
+        {
+          "language": "el",
+          "title": "Ссылка неверная",
+          "content": "Παρακαλείστε να σημειώσετε ότι το μπόνους εγγραφής πιστώνεται αυτόματα, υπό την προϋπόθεση ότι ο σύνδεσμος που χρησιμοποιήθηκε για την εγγραφή και ο καθορισμένος κωδικός προσφοράς κατά τη στιγμή της εγγραφής αντιστοιχούν μεταξύ τους.\nΑπ' ό,τι βλέπω, εγγραφήκατε χρησιμοποιώντας λάθος σύνδεσμο, οπότε το μπόνους δεν πιστώθηκε. Αλλά μην αναστατώνεστε, έχω μια άλλη προσφορά για εσάς!",
+          "updatedAt": "2026-06-14T20:41:32.819Z"
+        },
+        {
+          "language": "pt",
+          "title": "Ссылка неверная",
+          "content": "Tenha em atenção que o bónus de registo é creditado automaticamente, desde que a ligação utilizada para o registo e o código promocional especificado no momento do registo correspondam um ao outro.\nTanto quanto posso ver, registou-se utilizando a ligação errada, pelo que o bónus não foi creditado. Mas não fique chateado, tenho outra oferta para si!",
+          "updatedAt": "2026-06-14T20:41:53.760Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:40:56.726Z",
+      "updatedAt": "2026-06-18T07:24:24.668Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-80d82294-f4e5-4d8a-9e2a-eccb19b7ddf7",
+      "slug": "bind-1781469744292",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Ссылка не активна",
+          "content": "Por favor, note que o bônus de registro é creditado automaticamente. No momento, o link que você utilizou já não está ativo, por isso o bônus sem depósito não foi creditado. Mas não se preocupe, tenho uma oferta igualmente interessante para você!",
+          "updatedAt": "2026-06-14T20:45:20.788Z"
+        },
+        {
+          "language": "en",
+          "title": "Ссылка не активна",
+          "content": "Please note that the registration bonus is credited automatically. At the moment, the link you used is no longer active, which is why the no-deposit bonus was not credited. However, there's no need to worry—I have an equally great offer for you!",
+          "updatedAt": "2026-06-18T07:24:27.196Z"
+        },
+        {
+          "language": "el",
+          "title": "Ссылка не активна",
+          "content": "Παρακαλούμε σημειώστε ότι το μπόνους εγγραφής πιστώνεται αυτόματα. Αυτή τη στιγμή, ο σύνδεσμος που χρησιμοποιήσατε δεν είναι πλέον ενεργός, γι’ αυτό και το μπόνους χωρίς κατάθεση δεν πιστώθηκε. Ωστόσο, μην απογοητεύεστε, έχω μια εξίσου ελκυστική προσφορά για εσάς!",
+          "updatedAt": "2026-06-14T20:43:17.297Z"
+        },
+        {
+          "language": "de",
+          "title": "Ссылка не активна",
+          "content": "Bitte beachten Sie, dass der Registrierungsbonus automatisch gutgeschrieben wird. Der von Ihnen verwendete Link ist derzeit nicht mehr aktiv, weshalb der Bonus ohne Einzahlung nicht gutgeschrieben wurde. Aber keine Sorge – ich habe ein ebenso attraktives Angebot für Sie!",
+          "updatedAt": "2026-06-14T20:45:14.500Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:42:24.292Z",
+      "updatedAt": "2026-06-18T07:24:27.196Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-1642aec5-ae7c-4512-8305-e2ab5803dd73",
+      "slug": "bind-1781470041022",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Не новый клиент",
+          "content": "O bónus para este código promocional é creditado automaticamente e só está disponível para novos utilizadores do nosso casino, pelo que a oferta sem depósito não está disponível. No entanto, estou preparado para lhe oferecer uma proposta mais apelativa!",
+          "updatedAt": "2026-06-14T20:56:45.080Z"
+        },
+        {
+          "language": "ru",
+          "title": "Не новый клиент",
+          "content": "Бонус по этому промокоду зачисляется только автоматически и доступен только для новых пользователей нашего казино, поэтому бездепозитный подарок недоступен. Однако я готов предложить вам более интересное предложение!",
+          "updatedAt": "2026-06-14T20:56:23.472Z"
+        },
+        {
+          "language": "en",
+          "title": "Не новый клиент",
+          "content": "The bonus for this promo code is credited automatically and is only available to new users of our casino, so the no deposit gift is not available. However, I am prepared to offer you a more appealing proposal!",
+          "updatedAt": "2026-06-18T07:24:29.416Z"
+        },
+        {
+          "language": "de",
+          "title": "Не новый клиент",
+          "content": "Der Bonus für diesen Promo-Code wird automatisch gutgeschrieben und ist nur für neue Benutzer unseres Casinos verfügbar, so dass das Geschenk ohne Einzahlung nicht verfügbar ist. Ich bin jedoch bereit, Ihnen ein attraktiveres Angebot zu machen!",
+          "updatedAt": "2026-06-14T20:56:38.756Z"
+        },
+        {
+          "language": "el",
+          "title": "Не новый клиент",
+          "content": "Το μπόνους για αυτόν τον κωδικό προσφοράς πιστώνεται αυτόματα και είναι διαθέσιμο μόνο σε νέους χρήστες του καζίνο μας, οπότε το δώρο χωρίς κατάθεση δεν είναι διαθέσιμο. Ωστόσο, είμαι έτοιμος να σας προσφέρω μια πιο ελκυστική πρόταση!",
+          "updatedAt": "2026-06-14T20:56:50.912Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:47:21.022Z",
+      "updatedAt": "2026-06-18T07:24:29.416Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-da4e3ce7-aa6b-43ca-946b-df2016ade69d",
+      "slug": "bind-1781470658932",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-be432ee6-1cbb-4153-9b16-dca7264aaace",
+      "tags": [],
+      "translations": [
+        {
+          "language": "el",
+          "title": "Бонус зачислен",
+          "content": "Είμαστε στην ευχάριστη θέση να σας ενημερώσουμε ότι το μπόνους έχει πιστωθεί. Παρακαλούμε μεταβείτε στο προφίλ σας - καρτέλα \"Μπόνους\" και ενεργοποιήστε το. Σας ευχόμαστε καλή τύχη και λαμπρές νίκες!",
+          "updatedAt": "2026-06-17T15:17:08.409Z"
+        },
+        {
+          "language": "ru",
+          "title": "Бонус зачислен",
+          "content": "Мы рады сообщить, что бонус был зачислен. Перейдите, пожалуйста, в свой профиль-вкладка \"Бонусы\" и активируйте его. Желаем удачи и ярких побед!",
+          "updatedAt": "2026-06-17T15:17:08.409Z"
+        },
+        {
+          "language": "en",
+          "title": "Бонус зачислен",
+          "content": "We're pleased to inform that the bonus has been credited. Please go to your Profile - \"Bonuses\" tab and activate it. We wish you good luck and bright victories!",
+          "updatedAt": "2026-06-18T07:23:54.564Z"
+        },
+        {
+          "language": "de",
+          "title": "Бонус зачислен",
+          "content": "Wir freuen uns, Ihnen mitteilen zu können, dass der Bonus gutgeschrieben wurde. Bitte gehen Sie zu Ihrem Profil - Registerkarte \"Boni\" und aktivieren Sie ihn. Wir wünschen Ihnen viel Glück und strahlende Siege!",
+          "updatedAt": "2026-06-17T15:17:08.409Z"
+        },
+        {
+          "language": "pt",
+          "title": "Бонус зачислен",
+          "content": "Temos o prazer de informar que o bónus foi creditado. Por favor, vá ao seu perfil - separador \"Bónus\" e active-o. Desejamos-lhe boa sorte e vitórias brilhantes!",
+          "updatedAt": "2026-06-17T15:17:08.409Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:57:38.932Z",
+      "updatedAt": "2026-06-18T07:23:54.564Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-57f08996-761e-4571-a1b0-6aa93b35b9e4",
+      "slug": "fs",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-be432ee6-1cbb-4153-9b16-dca7264aaace",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "FS зачислены",
+          "content": "Informo que as rodadas grátis foram creditadas na sua conta. Por favor, vá ao seu perfil - separador \"Bónus\" e active-os. Desejamos-lhe um bom jogo!",
+          "updatedAt": "2026-06-17T15:17:17.257Z"
+        },
+        {
+          "language": "en",
+          "title": "FS зачислены",
+          "content": "I hasten to inform that free spins have been credited to your account. Please go to your profile -\"Bonuses\" tab and activate them. We wish you successful game!",
+          "updatedAt": "2026-06-18T07:23:56.564Z"
+        },
+        {
+          "language": "el",
+          "title": "FS зачислены",
+          "content": "Σπεύδω να σας ενημερώσω ότι οι δωρεάν περιστροφές έχουν πιστωθεί στο λογαριασμό σας. Παρακαλούμε μεταβείτε στο προφίλ σας - καρτέλα \"Μπόνους\" και ενεργοποιήστε τα. Σας ευχόμαστε επιτυχημένο παιχνίδι!",
+          "updatedAt": "2026-06-17T15:17:17.257Z"
+        },
+        {
+          "language": "de",
+          "title": "FS зачислены",
+          "content": "Ich möchte Ihnen mitteilen, dass Ihrem Konto Freispiele gutgeschrieben worden sind. Bitte gehen Sie zu Ihrem Profil - Registerkarte \"Boni\" und aktivieren Sie sie. Wir wünschen Ihnen ein erfolgreiches Spiel!",
+          "updatedAt": "2026-06-17T15:17:17.257Z"
+        },
+        {
+          "language": "ru",
+          "title": "FS зачислены",
+          "content": "Спешу сообщить, что фриспины были зачислены на ваш счет. Перейдите, пожалуйста, в свой профиль-вкладка \"Бонусы\" и активируйте их. Желаем успешной игры!",
+          "updatedAt": "2026-06-17T15:17:17.257Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T20:59:09.127Z",
+      "updatedAt": "2026-06-18T07:23:56.564Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-95ae2fdc-645c-49cd-a145-90372d395d9e",
+      "slug": "bind-1781470809699",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-be432ee6-1cbb-4153-9b16-dca7264aaace",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Монеты зачислены",
+          "content": "Мы рады сообщить вам, что монеты зачислены на ваш счет. Посетите магазин бонусов, чтобы обменять монеты. Желаем вам удачи и множества ярких выигрышей!",
+          "updatedAt": "2026-06-17T15:17:26.101Z"
+        },
+        {
+          "language": "en",
+          "title": "Монеты зачислены",
+          "content": "We are glad to inform you that the coins have been credited. Please go to the bonus store and use the coins. We wish you luck and bright victories!",
+          "updatedAt": "2026-06-18T07:23:58.592Z"
+        },
+        {
+          "language": "el",
+          "title": "Монеты зачислены",
+          "content": "Με χαρά σας ενημερώνουμε ότι τα νομίσματα έχουν πιστωθεί στον λογαριασμό σας. Παρακαλούμε μεταβείτε στο Κατάστημα Μπόνους και χρησιμοποιήστε τα νομίσματά σας. Σας ευχόμαστε καλή επιτυχία και πολλές μεγάλες νίκες!",
+          "updatedAt": "2026-06-17T15:17:26.101Z"
+        },
+        {
+          "language": "de",
+          "title": "Монеты зачислены",
+          "content": "Wir freuen uns, Ihnen mitteilen zu können, dass die Münzen Ihrem Konto gutgeschrieben wurden. Bitte besuchen Sie den Bonus-Shop und lösen Sie Ihre Münzen ein. Wir wünschen Ihnen viel Glück und viele großartige Gewinne!",
+          "updatedAt": "2026-06-17T15:17:26.101Z"
+        },
+        {
+          "language": "pt",
+          "title": "Монеты зачислены",
+          "content": "Temos o prazer de informar que as moedas foram creditadas na sua conta. Por favor, acesse a Loja de Bónus e utilize as suas moedas. Desejamos-lhe boa sorte e muitas vitórias emocionantes!",
+          "updatedAt": "2026-06-17T15:17:26.101Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T21:00:09.699Z",
+      "updatedAt": "2026-06-18T07:23:58.592Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-c7929f72-e47e-4f8f-89cb-5441bd08b19b",
+      "slug": "fs-2",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-be432ee6-1cbb-4153-9b16-dca7264aaace",
+      "tags": [],
+      "translations": [
+        {
+          "language": "en",
+          "title": "FS зачислены в другой слот",
+          "content": "We have credited the free spins to another game. Please re-activate them in the bonus section of your profile. Enjoy the game!",
+          "updatedAt": "2026-06-18T07:24:00.688Z"
+        },
+        {
+          "language": "ru",
+          "title": "FS зачислены в другой слот",
+          "content": "Мы зачислили фриспины в другую игры. Пожалуйста активируйте их повторно в бонусном разделе вашего профиля. Наслаждайтесь игрой!",
+          "updatedAt": "2026-06-17T15:17:34.725Z"
+        },
+        {
+          "language": "el",
+          "title": "FS зачислены в другой слот",
+          "content": "Πιστώσαμε τις δωρεάν περιστροφές σε άλλο παιχνίδι. Παρακαλούμε ενεργοποιήστε τις εκ νέου στην ενότητα μπόνους του προφίλ σας. Απολαύστε το παιχνίδι!",
+          "updatedAt": "2026-06-17T15:17:34.725Z"
+        },
+        {
+          "language": "de",
+          "title": "FS зачислены в другой слот",
+          "content": "Wir haben die Freispiele einem anderen Spiel gutgeschrieben. Bitte reaktivieren Sie sie im Bonusbereich Ihres Profils. Viel Spaß mit dem Spiel!",
+          "updatedAt": "2026-06-17T15:17:34.725Z"
+        },
+        {
+          "language": "pt",
+          "title": "FS зачислены в другой слот",
+          "content": "Seus giros grátis foram creditados em outro jogo. Reative-os na seção de bônus do seu perfil. Divirta-se!",
+          "updatedAt": "2026-06-17T15:17:34.725Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T21:02:06.025Z",
+      "updatedAt": "2026-06-18T07:24:00.688Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-d49688d3-d025-41eb-9cfb-9bb56a4b05a9",
+      "slug": "bind-1781471347628",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-0d7a2ca1-7d81-4c6e-98c7-5ccd8f45705f",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Не видно в какую игру ФС",
+          "content": "Я буду рад помочь как можно скорее! \nПожалуйста, пришлите другой скриншот этого предложения, на котором будет видно всё содержание письма, чтобы мы могли проверить информацию.",
+          "updatedAt": "2026-06-14T21:09:31.245Z"
+        },
+        {
+          "language": "en",
+          "title": "Не видно в какую игру ФС",
+          "content": "I will be happy to help as soon as possible! \nPlease send another screenshot of this offer showing the entire content of the email, so that we can check the information.",
+          "updatedAt": "2026-06-18T07:24:37.532Z"
+        },
+        {
+          "language": "el",
+          "title": "Не видно в какую игру ФС",
+          "content": "Θα χαρώ να σας βοηθήσω το συντομότερο δυνατό!\nΠαρακαλούμε στείλτε ένα άλλο στιγμιότυπο οθόνης αυτής της προσφοράς που δείχνει ολόκληρο το περιεχόμενο του email, ώστε να μπορέσουμε να ελέγξουμε τις πληροφορίες.",
+          "updatedAt": "2026-06-14T21:09:44.561Z"
+        },
+        {
+          "language": "de",
+          "title": "Не видно в какую игру ФС",
+          "content": "Ich werde Ihnen gerne so schnell wie möglich helfen!\nBitte senden Sie einen weiteren Screenshot dieses Angebots mit dem gesamten Inhalt der E-Mail, damit wir die Informationen überprüfen können.",
+          "updatedAt": "2026-06-14T21:09:50.821Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не видно в какую игру ФС",
+          "content": "Terei todo o gosto em ajudar o mais rapidamente possível!\nEnvie outra captura de ecrã desta oferta com todo o conteúdo da mensagem de correio eletrónico, para que possamos verificar as informações.",
+          "updatedAt": "2026-06-14T21:09:56.213Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-14T21:09:07.629Z",
+      "updatedAt": "2026-06-18T07:24:37.532Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-27986d1a-021a-4cc9-ba7d-bb6ba955d6e5",
+      "slug": "bind-1781488891023",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "en",
+          "title": "Нужен авто кус",
+          "content": "Before you can submit a withdrawal request, you need to pass autoverification.This process is simple and will not take much time!\nTo verify your identity automatically on our website, please go to your profile and open the \"Verification\" tab. There, you'll find detailed instructions and all the information needed to complete the process successfully. \n \nPlease ensure that your documents meet the following requirements: \n- High quality, clear, and legible.\n- Ensure the photo/scan has no glare, frames, or foreign objects.\n \nProperly submitted documents will help speed up the verification process. Let us know if you need any help along the way!",
+          "updatedAt": "2026-06-18T07:24:42.328Z"
+        },
+        {
+          "language": "ru",
+          "title": "Нужен авто кус",
+          "content": "Прежде чем вы сможете отправить запрос на вывод средств, вам необходимо пройти автоверификацию. Этот процесс прост и не займет много времени!\nЧтобы автоматически подтвердить свою личность на нашем сайте, перейдите в свой профиль и откройте вкладку «Верификация». Там вы найдете подробные инструкции и всю информацию, необходимую для успешного завершения процесса.\n\nУбедитесь, что ваши документы соответствуют следующим требованиям:\n- Высокое качество, четкость и разборчивость.\n- Убедитесь, что на фото/скане нет бликов, рамок или посторонних предметов.\n\nПравильно отправленные документы помогут ускорить процесс верификации. Сообщите нам, если вам понадобится помощь!",
+          "updatedAt": "2026-06-17T15:17:52.893Z"
+        },
+        {
+          "language": "de",
+          "title": "Нужен авто кус",
+          "content": "Bevor Sie einen Auszahlungsantrag stellen können, müssen Sie sich automatisch verifizieren lassen - ein einfacher Vorgang, der nicht viel Zeit in Anspruch nimmt!\nUm Ihre Identität automatisch auf unserer Website zu verifizieren, gehen Sie bitte zu Ihrem Profil und öffnen Sie die Registerkarte \"Verifizierung\". Dort finden Sie eine ausführliche Anleitung und alle Informationen, die Sie benötigen, um den Vorgang erfolgreich abzuschließen.\n\nBitte stellen Sie sicher, dass Ihre Dokumente die folgenden Anforderungen erfüllen:\n- Hohe Qualität, klar und gut lesbar.\n- Stellen Sie sicher, dass das Foto/Scan keine Blendung, Rahmen oder Fremdkörper enthält.\n\nOrdnungsgemäß eingereichte Dokumente tragen dazu bei, den Überprüfungsprozess zu beschleunigen. Lassen Sie es uns wissen, wenn Sie Hilfe benötigen .",
+          "updatedAt": "2026-06-17T15:17:52.893Z"
+        },
+        {
+          "language": "pt",
+          "title": "Нужен авто кус",
+          "content": "Antes de poder apresentar um pedido de levantamento, tem de passar pela autoverificação. Este processo é simples e não demora muito tempo!\nPara verificar a sua identidade automaticamente no nosso sítio Web, aceda ao seu perfil e abra o separador \"Verificação\". Aí, encontrará instruções pormenorizadas e todas as informações necessárias para concluir o processo com êxito.\n\nCertifique-se de que os seus documentos cumprem os seguintes requisitos:\n- Alta qualidade, claros e legíveis.\n- Certifique-se de que a fotografia/digitalização não tem reflexos, molduras ou objectos estranhos.\n\nOs documentos apresentados corretamente ajudarão a acelerar o processo de verificação. Informe-nos se precisar de ajuda durante o processo!",
+          "updatedAt": "2026-06-17T15:17:52.893Z"
+        },
+        {
+          "language": "el",
+          "title": "Нужен авто кус",
+          "content": "Πριν μπορέσετε να υποβάλετε αίτημα ανάληψης, πρέπει να περάσετε την αυτόματη επαλήθευση.Αυτή η διαδικασία είναι απλή και δεν θα σας πάρει πολύ χρόνο!\nΓια να επαληθεύσετε την ταυτότητά σας αυτόματα στην ιστοσελίδα μας, μεταβείτε στο προφίλ σας και ανοίξτε την καρτέλα \"Επαλήθευση\". Εκεί, θα βρείτε λεπτομερείς οδηγίες και όλες τις πληροφορίες που χρειάζεστε για να ολοκληρώσετε τη διαδικασία με επιτυχία.\n\nΒεβαιωθείτε ότι τα έγγραφά σας πληρούν τις ακόλουθες απαιτήσεις:\n- Υψηλής ποιότητας, σαφή και ευανάγνωστα.\n- Βεβαιωθείτε ότι η φωτογραφία/σάρωση δεν έχει θάμβωση, πλαίσια ή ξένα αντικείμενα.\n\nΤα σωστά υποβληθέντα έγγραφα θα συμβάλουν στην επιτάχυνση της διαδικασίας επαλήθευσης. Ενημερώστε μας αν χρειαστείτε βοήθεια κατά τη διάρκεια της διαδικασίας!",
+          "updatedAt": "2026-06-17T15:17:52.893Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:01:31.023Z",
+      "updatedAt": "2026-06-18T07:24:42.328Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-bbdf414d-7ec8-4713-9d7c-4ee03de88c94",
+      "slug": "bind-1781488933500",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "el",
+          "title": "Как оформить",
+          "content": "Παρακαλείστε να σημειώσετε ότι σύμφωνα με τους κανόνες, οι αναλήψεις διεκπεραιώνονται με τη μέθοδο πληρωμής που χρησιμοποιήσατε για την κατάθεση. Για να υποβάλετε αίτημα ανάληψης, ακολουθήστε τα παρακάτω βήματα:\n\n1. Κάντε κλικ στο εικονίδιο του πορτοφολιού στην επάνω δεξιά γωνία για να ανοίξει το ταμείο.\n2. Μεταβείτε στην καρτέλα \"Αναλήψεις\" και επιλέξτε τη μέθοδο πληρωμής.\n3. Συμπληρώστε τα απαιτούμενα στοιχεία στη φόρμα και κάντε κλικ στο κουμπί \"Ανάληψη\".\n4. Παρακολουθήστε την κατάσταση του αιτήματός σας στην καρτέλα \"Ιστορικό\".\n\nΕνημερώστε μας αν χρειαστείτε οποιαδήποτε βοήθεια στην πορεία! 😊",
+          "updatedAt": "2026-06-15T02:02:37.117Z"
+        },
+        {
+          "language": "ru",
+          "title": "Как оформить",
+          "content": "Пожалуйста, обратите внимание, что согласно правилам вывод средств осуществляется на платежный метод, который вы использовали для пополнения. Чтобы оформить заявку на вывод, пожалуйста, воспользуйтесь инструкцией: \n1. В правом верхнем углу нажмите на значок кошелька, чтобы перейти в кассу.\n2. Нажмите вкладку \"Выводы\" и выберите необходимый платежный метод. \n3. Введите данные в форму и нажмите \"вывести\" \n4. Следите за статусом заявки во вкладке \"История\". \n\nДайте нам знать, если вам понадобится помощь! 😊",
+          "updatedAt": "2026-06-15T02:02:18.025Z"
+        },
+        {
+          "language": "en",
+          "title": "Как оформить",
+          "content": "Please note that according to the rules, withdrawals are processed to the payment method you used for making a deposit. To submit a withdrawal request, please follow these steps:\n\n1. Click on the wallet icon in the top right corner to open the cashier.\n2. Go to the \"Withdrawals\" tab and select the payment method.\n3. Fill in the required details in the form and click \"Withdraw.\"\n4. Monitor the status of your request in the \"History\" tab. \n\nLet us know if you need any help along the way! 😊",
+          "updatedAt": "2026-06-18T07:24:44.541Z"
+        },
+        {
+          "language": "de",
+          "title": "Как оформить",
+          "content": "Bitte beachten Sie, dass Abhebungen gemäß den Regeln mit der Zahlungsmethode bearbeitet werden, die Sie für die Einzahlung verwendet haben. Um eine Auszahlung zu beantragen, gehen Sie bitte folgendermaßen vor:\n\n1. Klicken Sie auf das Portemonnaie-Symbol in der oberen rechten Ecke, um die Kasse zu öffnen.\n2. Gehen Sie auf die Registerkarte „Abhebungen“ und wählen Sie die Zahlungsmethode aus.\n3. Geben Sie die erforderlichen Daten in das Formular ein und klicken Sie auf „Abheben“.\n4. Überwachen Sie den Status Ihres Antrags auf der Registerkarte „Verlauf“. \n\nLassen Sie es uns wissen, wenn Sie Hilfe benötigen 😊.",
+          "updatedAt": "2026-06-15T02:02:41.553Z"
+        },
+        {
+          "language": "pt",
+          "title": "Как оформить",
+          "content": "Tenha em atenção que, de acordo com as regras, os levantamentos são processados para o método de pagamento que utilizou para efetuar um depósito. Para enviar um pedido de levantamento, siga estes passos:\n\n1. Clique no ícone da carteira no canto superior direito para abrir o caixa.\n2. Vá para o separador \"Levantamentos\" e selecione o método de pagamento.\n3. Preencha os dados necessários no formulário e clique em \"Levantar\".\n4. Acompanhe o estado do seu pedido no separador \"Histórico\".\n\nInforme-nos se precisar de ajuda ao longo do processo! 😊",
+          "updatedAt": "2026-06-15T02:02:45.997Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:02:13.500Z",
+      "updatedAt": "2026-06-18T07:24:44.541Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-21ee8556-95dd-4b49-8def-5678ece40b9e",
+      "slug": "bind-1781488989428",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Только оформил ожидай",
+          "content": "Финансовый отдел рассматривает заявки на вывод каждый день с 9:00 до 18:00 GMT+3. Время обработки зависит от загруженности отдела. Не волнуйтесь, как только ваш запрос будет рассмотрен, вы получите уведомление по электронной почте.",
+          "updatedAt": "2026-06-15T02:03:12.289Z"
+        },
+        {
+          "language": "en",
+          "title": "Только оформил ожидай",
+          "content": "The Financial Department reviews withdrawal requests every day from 9:00 to 18:00 GMT+3. The processing time depends on the department's workload. Don’t worry, as soon as your request is reviewed, you will be notified by email.",
+          "updatedAt": "2026-06-18T07:24:46.613Z"
+        },
+        {
+          "language": "de",
+          "title": "Только оформил ожидай",
+          "content": "Die Finanzabteilung prüft Abhebungsanträge täglich von 9:00 bis 18:00 Uhr GMT+3. Die Bearbeitungszeit hängt von der Arbeitsbelastung der Abteilung ab. Keine Sorge, sobald Ihr Antrag geprüft wurde, werden Sie per E-Mail benachrichtigt.",
+          "updatedAt": "2026-06-15T02:03:21.710Z"
+        },
+        {
+          "language": "pt",
+          "title": "Только оформил ожидай",
+          "content": "O Departamento Financeiro analisa os pedidos de levantamento todos os dias das 9:00 às 18:00 GMT+3. O tempo de processamento depende do volume de trabalho do departamento. Não se preocupe, assim que o seu pedido for analisado, será notificado por correio eletrónico.",
+          "updatedAt": "2026-06-15T02:03:26.750Z"
+        },
+        {
+          "language": "el",
+          "title": "Только оформил ожидай",
+          "content": "Το Οικονομικό Τμήμα εξετάζει τα αιτήματα ανάληψης καθημερινά από τις 9:00 έως τις 18:00 GMT+3. Ο χρόνος επεξεργασίας εξαρτάται από τον φόρτο εργασίας του τμήματος. Μην ανησυχείτε, μόλις το αίτημά σας εξεταστεί, θα ενημερωθείτε μέσω email.",
+          "updatedAt": "2026-06-15T02:03:36.850Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:03:09.428Z",
+      "updatedAt": "2026-06-18T07:24:46.613Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-39894e6d-67d6-4fb3-8058-645ab01cadc5",
+      "slug": "b2b-rl-cj-cb-jb",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "el",
+          "title": "Вывод B2B RL, CJ, CB, JB",
+          "content": "Все запросы на вывод средств обрабатываются финансовым отделом в течение 24-48 часов после успешной идентификации и верификации учетной записи, с понедельника по пятницу, с 09:00 до 17:00 (GMT+1). Не волнуйтесь, как только ваш запрос будет рассмотрен, вы получите уведомление по электронной почте.",
+          "updatedAt": "2026-06-15T02:04:23.189Z"
+        },
+        {
+          "language": "en",
+          "title": "Вывод B2B RL, CJ, CB, JB",
+          "content": "All withdrawal requests are processed by the financial department within 24-48 hours after the successful identity and account verification, from Monday to Friday, 09:00-17:00 (GMT+1). Don’t worry, as soon as your request is reviewed, you will be notified by email. ",
+          "updatedAt": "2026-06-18T07:24:48.869Z"
+        },
+        {
+          "language": "de",
+          "title": "Вывод B2B RL, CJ, CB, JB",
+          "content": "Alle Auszahlungsanträge werden von der Finanzabteilung innerhalb von 24-48 Stunden nach der erfolgreichen Identitäts- und Kontoüberprüfung von Montag bis Freitag, 09:00-17:00 Uhr (GMT+1), bearbeitet. Keine Sorge, sobald Ihre Anfrage geprüft wurde, werden Sie per E-Mail benachrichtigt.",
+          "updatedAt": "2026-06-15T02:04:43.278Z"
+        },
+        {
+          "language": "pt",
+          "title": "Вывод B2B RL, CJ, CB, JB",
+          "content": "Todos os pedidos de levantamento são processados pelo Departamento Financeiro no prazo de 24-48 horas após a verificação bem sucedida da identidade e da conta, de segunda a sexta-feira, das 09:00h às 17:00h (GMT+1). Não se preocupe, assim que o seu pedido for analisado, será notificado por e-mail.",
+          "updatedAt": "2026-06-15T02:04:53.166Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:04:23.189Z",
+      "updatedAt": "2026-06-18T07:24:48.869Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-b0151e6d-ba4c-47b6-9733-9836e6d0d666",
+      "slug": "bind-1781489115270",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "В очереди на рассмотрении",
+          "content": "Вижу, что ваш заявка активна и находится в очереди на рассмотрение. Наш финансовый отдел рассматривает заявки на вывод ежедневно с 09:00 до 18:00 GMT+3 по очереди. Как только вашу заявку рассмотрят, вы обязательно получите уведомление по эмайлу. Ожидайте, пожалуйста.",
+          "updatedAt": "2026-06-15T02:05:15.270Z"
+        },
+        {
+          "language": "en",
+          "title": "В очереди на рассмотрении",
+          "content": "I see that your withdrawal request is active and is in the queue for review. Our finance department reviews requests daily from 09:00 to 18:00 GMT+3 in turn. As soon as your withdrawal is reviewed, you will be notified via email.",
+          "updatedAt": "2026-06-18T07:24:51.144Z"
+        },
+        {
+          "language": "de",
+          "title": "В очереди на рассмотрении",
+          "content": "Wie ich sehe, ist Ihr Abhebungsantrag aktiv und befindet sich in der Warteschlange zur Überprüfung. Unsere Finanzabteilung prüft die Anträge täglich von 09:00 bis 18:00 GMT+3 im Wechsel. Sobald Ihre Auszahlung geprüft wurde, werden Sie per E-Mail benachrichtigt.",
+          "updatedAt": "2026-06-15T02:05:25.762Z"
+        },
+        {
+          "language": "pt",
+          "title": "В очереди на рассмотрении",
+          "content": "Vejo que o seu pedido de levantamento está ativo e está na fila de espera para revisão. O nosso departamento financeiro analisa os pedidos diariamente, das 09:00 às 18:00 GMT+3. Assim que a sua retirada for analisada, será notificado por correio eletrónico.",
+          "updatedAt": "2026-06-15T02:05:30.346Z"
+        },
+        {
+          "language": "el",
+          "title": "В очереди на рассмотрении",
+          "content": "Βλέπω ότι το αίτημά σας για ανάληψη είναι ενεργό και βρίσκεται στην ουρά εξέτασης. Το οικονομικό μας τμήμα εξετάζει τα αιτήματα καθημερινά από τις 09:00 έως τις 18:00 GMT+3 με τη σειρά. Μόλις η ανάληψή σας επανεξεταστεί, θα ειδοποιηθείτε μέσω email.",
+          "updatedAt": "2026-06-15T02:05:36.374Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:05:15.270Z",
+      "updatedAt": "2026-06-18T07:24:51.144Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-b996f4bb-cc0a-4a01-865c-789c032e227e",
+      "slug": "3-kyc",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "tags": [],
+      "translations": [
+        {
+          "language": "el",
+          "title": "Вывод 3 дня если что в KYC",
+          "content": "Παρακαλώ λάβετε υπόψη ότι όλες οι χρηματοοικονομικές συναλλαγές διεκπεραιώνονται από το οικονομικό μας τμήμα, το οποίο επεξεργάζεται όλα τα αιτήματα ανάληψης εντός 3 τραπεζικών εργάσιμων ημερών. Ωστόσο, σε ορισμένες περιπτώσεις οι προθεσμίες αυτές μπορεί να είναι μεγαλύτερες, ανάλογα με τα κανάλια πληρωμής, τους πρόσθετους ελέγχους του λογαριασμού και τις αργίες.\n\nΜπορείτε πάντα να επικοινωνήσετε με το οικονομικό τμήμα μέσω email στη διεύθυνση ##email## και να υποβάλετε οποιαδήποτε ερώτηση σας ενδιαφέρει σχετικά με πληρωμές ή άλλες οικονομικές λεπτομέρειες.\nΤο οικονομικό τμήμα προσπαθεί πάντα να απαντά το συντομότερο δυνατό.",
+          "updatedAt": "2026-06-15T02:07:03.032Z"
+        },
+        {
+          "language": "en",
+          "title": "Вывод 3 дня если что в KYC",
+          "content": "Please note that our financial department is responsible for all financial transactions and processes all withdrawal requests within 3 banking days, but in some cases these deadlines may be longer, depending on payment channels, additional account checks and holidays.\n\nYou can always write to the finance department by email ##email## and ask your question about payments and other financial details. \nThe Finance Department always tries to respond as quickly as possible.",
+          "updatedAt": "2026-06-18T07:24:53.313Z"
+        },
+        {
+          "language": "pt",
+          "title": "Вывод 3 дня если что в KYC",
+          "content": "Por favor, note que o nosso Departamento Financeiro é responsável por todas as transações financeiras e processa todos os pedidos de levantamento no prazo de 3 dias úteis, mas em alguns casos estes prazos podem ser mais longos, dependendo dos canais de pagamento, verificações de conta adicionais e feriados.\n\nVocê sempre pode escrever para o departamento financeiro por e-mail ##email## e faça sua pergunta sobre os pagamentos e outros detalhes financeiros. \nO Departamento Financeiro tenta sempre responder o mais rapidamente possível.",
+          "updatedAt": "2026-06-15T02:07:43.316Z"
+        },
+        {
+          "language": "de",
+          "title": "Вывод 3 дня если что в KYC",
+          "content": "Bitte beachten Sie, dass unsere Finanzabteilung für alle Finanztransaktionen verantwortlich ist und alle Auszahlungsanträge innerhalb von 3 Bankarbeitstagen bearbeitet.In einigen Fällen können diese Fristen jedoch länger sein, abhängig von Zahlungskanälen, zusätzlichen Kontoprüfungen und Feiertagen.\n\nSie können jederzeit per E-Mail an die Finanzabteilung schreiben ##E-Mail ## und Ihre Frage zu Zahlungen und anderen finanziellen Details stellen. \nDie Finanzabteilung versucht immer, so schnell wie möglich zu reagieren.",
+          "updatedAt": "2026-06-15T02:07:51.872Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:06:14.983Z",
+      "updatedAt": "2026-06-18T07:24:53.313Z",
+      "imported": false,
+      "color": "#F59E0B"
+    },
+    {
+      "id": "bind-c27a525d-8c30-415b-a53e-530490be54d1",
+      "slug": "bind-1781489297671",
+      "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "tags": [],
+      "translations": [
+        {
+          "language": "de",
+          "title": "Почему",
+          "content": "Wir helfen Ihnen gerne bei allen Ihren Anliegen. Könnten Sie uns bitte mitteilen, was Sie zu einer solchen Entscheidung veranlasst hat, damit wir Ihre Anfrage schneller bearbeiten können?",
+          "updatedAt": "2026-06-15T02:08:32.785Z"
+        },
+        {
+          "language": "ru",
+          "title": "Почему",
+          "content": "Будем рады помочь вам с любыми вашими запросами. Для более быстрого выполнения запроса, не могли бы вы поделиться тем, что побудило вас принять такое решение?",
+          "updatedAt": "2026-06-15T02:08:21.925Z"
+        },
+        {
+          "language": "en",
+          "title": "Почему",
+          "content": "Will be glad to assist you with any of your requests. In order to proceed such request faster, could you, please, share what caused you to make such a decision?",
+          "updatedAt": "2026-06-18T07:24:57.257Z"
+        },
+        {
+          "language": "pt",
+          "title": "Почему",
+          "content": "Teremos todo o gosto em ajudar-vos com qualquer um dos vossos pedidos. Para podermos dar seguimento a esse pedido mais rapidamente, poderia, por favor, partilhar o que o levou a tomar essa decisão?",
+          "updatedAt": "2026-06-15T02:08:36.881Z"
+        },
+        {
+          "language": "el",
+          "title": "Почему",
+          "content": "Θα χαρούμε να σας βοηθήσουμε με οποιοδήποτε αίτημά σας. Προκειμένου να προχωρήσει ταχύτερα ένα τέτοιο αίτημα, θα μπορούσατε, παρακαλώ, να μοιραστείτε μαζί μας τι σας ώθησε να πάρετε μια τέτοια απόφαση;",
+          "updatedAt": "2026-06-15T02:08:41.585Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:08:17.671Z",
+      "updatedAt": "2026-06-18T07:24:57.257Z",
+      "imported": false,
+      "color": "#EF4444"
+    },
+    {
+      "id": "bind-37214c29-6581-41f0-be5e-7a746758daba",
+      "slug": "bind-1781489337178",
+      "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "tags": [],
+      "translations": [
+        {
+          "language": "el",
+          "title": "Не хочу играть",
+          "content": "Σεβόμαστε την απόφασή σας και είμαστε πάντα έτοιμοι να σας παρέχουμε την καλύτερη δυνατή υποστήριξη. Ωστόσο, η ύπαρξη λογαριασμού δεν σας υποχρεώνει σε τίποτα! Μπορείτε απλώς να μην επισκέπτεστε τον ιστότοπο όσο συχνά θέλετε, και μόλις νιώσετε ότι θέλετε να παίξετε ξανά, μπορείτε να επιστρέψετε εδώ ανά πάσα στιγμή. Τι πιστεύετε; 🙂",
+          "updatedAt": "2026-06-15T02:09:22.886Z"
+        },
+        {
+          "language": "en",
+          "title": "Не хочу играть",
+          "content": "We respect your decision and are always ready to provide the best support. However, having an account does not oblige you to anything! You can simply not visit the site as much as you want, and as soon as you feel like playing again, you can come back here at any time. What do you think? 🙂",
+          "updatedAt": "2026-06-18T07:24:59.405Z"
+        },
+        {
+          "language": "de",
+          "title": "Не хочу играть",
+          "content": "Wir respektieren Ihre Entscheidung und sind immer bereit, Ihnen die beste Unterstützung zu bieten. Ein Konto zu haben, verpflichtet Sie jedoch zu nichts! Sie können die Seite einfach nicht so oft besuchen, wie Sie wollen, und sobald Sie wieder Lust zum Spielen haben, können Sie jederzeit hierher zurückkommen. Was denkst du? 🙂",
+          "updatedAt": "2026-06-15T02:09:07.850Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не хочу играть",
+          "content": "Respeitamos a sua decisão e estamos sempre prontos a prestar o melhor apoio. No entanto, o facto de ter uma conta não o obriga a nada! Pode simplesmente não visitar o site as vezes que quiser, e assim que tiver vontade de jogar novamente, pode voltar aqui a qualquer altura. O que achas? 🙂",
+          "updatedAt": "2026-06-15T02:09:17.670Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:08:57.178Z",
+      "updatedAt": "2026-06-18T07:24:59.405Z",
+      "imported": false,
+      "color": "#EF4444"
+    },
+    {
+      "id": "bind-6ef1f84e-6ade-4168-9094-daefdd521627",
+      "slug": "bind-1781489396311",
+      "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Разочарован проигрышами",
+          "content": "Я крайне сожалею о Ваших проигрышах в нашем казино, но хочу обратить также Ваше внимание, что никто не может повлиять на Ваш проигрыш или выигрыш.\nИсход абсолютно каждой Вашей ставки в нашем казино зависит только от ваших действий, тактики и выбора игры. Все результаты игр формируются именно на стороне разработчика игр и если Вы видите что Вам не везёт в определённой игре или же провайдере, попробуйте изменить Ваш выбор и Вам обязательно повезёт. Обращаю Ваше внимание, что в нашем казино представлено более 7000 игр. Дадите ещё один шанс на победу?",
+          "updatedAt": "2026-06-15T02:09:56.311Z"
+        },
+        {
+          "language": "en",
+          "title": "Разочарован проигрышами",
+          "content": "I am very sorry about your losses at our casino, but I would also like to draw your attention to the fact that no one can influence your losses or winnings.\nThe outcome of absolutely every bet you place at our casino depends solely on your actions, tactics and choice of game. All game results are generated by the game developer, and if you feel that you are unlucky in a particular game or with a particular provider, try changing your selection and you will surely have better luck. Please note that our casino offers over 7,000 games. Will you give yourself another chance to win?",
+          "updatedAt": "2026-06-18T07:25:02.113Z"
+        },
+        {
+          "language": "el",
+          "title": "Разочарован проигрышами",
+          "content": "Λυπάμαι πολύ για τις απώλειές σας στο καζίνο μας, αλλά θα ήθελα επίσης να επιστήσω την προσοχή σας στο γεγονός ότι κανείς δεν μπορεί να επηρεάσει τις απώλειες ή τα κέρδη σας.\nΤο αποτέλεσμα απολύτως κάθε στοιχήματος που τοποθετείτε στο καζίνο μας εξαρτάται αποκλειστικά από τις δικές σας ενέργειες, την τακτική και την επιλογή του παιχνιδιού. Όλα τα αποτελέσματα των παιχνιδιών παράγονται από τον προγραμματιστή του παιχνιδιού και αν αισθάνεστε ότι είστε άτυχοι σε ένα συγκεκριμένο παιχνίδι ή με έναν συγκεκριμένο πάροχο, δοκιμάστε να αλλάξετε την επιλογή σας και σίγουρα θα έχετε καλύτερη τύχη. Σημειώστε ότι το καζίνο μας προσφέρει πάνω από 7.000 παιχνίδια. Θα δώσετε στον εαυτό σας άλλη μια ευκαιρία για να κερδίσετε;",
+          "updatedAt": "2026-06-15T02:10:06.255Z"
+        },
+        {
+          "language": "de",
+          "title": "Разочарован проигрышами",
+          "content": "Es tut mir sehr leid, dass Sie in unserem Casino Verluste erlitten haben, aber ich möchte Sie auch darauf aufmerksam machen, dass niemand Ihre Verluste oder Gewinne beeinflussen kann.\nDer Ausgang absolut jeder Wette, die Sie in unserem Casino platzieren, hängt einzig und allein von Ihrem Handeln, Ihrer Taktik und der Wahl des Spiels ab. Alle Spielergebnisse werden vom Spielentwickler generiert, und wenn Sie das Gefühl haben, dass Sie in einem bestimmten Spiel oder bei einem bestimmten Anbieter Pech haben, versuchen Sie, Ihre Auswahl zu ändern, und Sie werden sicher mehr Glück haben. Bitte beachten Sie, dass unser Casino über 7.000 Spiele anbietet. Werden Sie sich selbst eine weitere Chance geben, um zu gewinnen?",
+          "updatedAt": "2026-06-15T02:10:10.203Z"
+        },
+        {
+          "language": "pt",
+          "title": "Разочарован проигрышами",
+          "content": "Lamento muito as suas perdas no nosso casino, mas também gostaria de chamar a sua atenção para o facto de que ninguém pode influenciar as suas perdas ou ganhos.\nO resultado de absolutamente todas as apostas que fizer no nosso casino depende apenas das suas acções, tácticas e escolha de jogo. Todos os resultados dos jogos são gerados pelo criador do jogo e se sentir que não tem sorte num determinado jogo ou com um determinado fornecedor, tente mudar a sua seleção e terá certamente mais sorte. Note que o nosso casino oferece mais de 7.000 jogos. Quer dar a si mesmo outra oportunidade de ganhar?",
+          "updatedAt": "2026-06-15T02:10:14.667Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:09:56.311Z",
+      "updatedAt": "2026-06-18T07:25:02.113Z",
+      "imported": false,
+      "color": "#EF4444"
+    },
+    {
+      "id": "bind-8dbef219-ae26-4249-a5ac-19e3239897a1",
+      "slug": "bind-1781489445506",
+      "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Бездеп не сформирован разочарован проигрышами",
+          "content": "Благодарю за ожидание! В данный момент новый бездепозитный бонус ещё не был сформирован, однако мы сделали запрос в компетентный отдел- как только бонус будет сформирован, сразу вам сообщим по эмайлу. Однако я не с пустыми руками! \n(акция на депозит)",
+          "updatedAt": "2026-06-15T02:10:50.608Z"
+        },
+        {
+          "language": "en",
+          "title": "Бездеп не сформирован разочарован проигрышами",
+          "content": "Thank you for waiting! At the moment the new no deposit bonus has not been generated yet, but we have made a request to the competent department - as soon as the bonus is generated, we will inform you by email. However, I am not empty-handed!",
+          "updatedAt": "2026-06-18T07:25:04.829Z"
+        },
+        {
+          "language": "de",
+          "title": "Бездеп не сформирован разочарован проигрышами",
+          "content": "Danke, dass Sie gewartet haben! Im Moment ist der neue No Deposit Bonus noch nicht generiert worden, aber wir haben eine Anfrage an die zuständige Abteilung gestellt - sobald der Bonus generiert ist, werden wir Sie per E-Mail informieren. Ich stehe aber nicht mit leeren Händen da!",
+          "updatedAt": "2026-06-15T02:11:01.324Z"
+        },
+        {
+          "language": "pt",
+          "title": "Бездеп не сформирован разочарован проигрышами",
+          "content": "Obrigado por esperar! De momento, o novo bónus sem depósito ainda não foi gerado, mas fizemos um pedido ao departamento competente - assim que o bónus for gerado, informá-lo-emos por e-mail. No entanto, não estou de mãos vazias!",
+          "updatedAt": "2026-06-15T02:11:05.376Z"
+        },
+        {
+          "language": "el",
+          "title": "Бездеп не сформирован разочарован проигрышами",
+          "content": "Σας ευχαριστούμε που περιμένατε! Αυτή τη στιγμή το νέο μπόνους χωρίς κατάθεση δεν έχει δημιουργηθεί ακόμα, αλλά έχουμε κάνει ένα αίτημα στο αρμόδιο τμήμα - μόλις δημιουργηθεί το μπόνους, θα σας ενημερώσουμε με email. Ωστόσο, δεν είμαι με άδεια χέρια!",
+          "updatedAt": "2026-06-15T02:11:09.652Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:10:45.506Z",
+      "updatedAt": "2026-06-18T07:25:04.829Z",
+      "imported": false,
+      "color": "#EF4444"
+    },
+    {
+      "id": "bind-407bafa3-8f62-45d7-ae56-f222c64a6433",
+      "slug": "bind-1781489514097",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-a8ddb304-4397-4487-b537-0cd65330a25e",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Отказ",
+          "content": "Очень сожалеем, но мы не можем начислить вам бездепозитный бонус. Понимаем, что это неприятно — однако, не стоит расстраиваться, ведь я не с пустыми руками!",
+          "updatedAt": "2026-06-15T02:11:54.097Z"
+        },
+        {
+          "language": "en",
+          "title": "Отказ",
+          "content": "We are very sorry, but we cannot grant you a no deposit bonus. We understand that this is unpleasant - however, there is no need to be upset, because I am not coming empty-handed!",
+          "updatedAt": "2026-06-18T07:24:06.436Z"
+        },
+        {
+          "language": "el",
+          "title": "Отказ",
+          "content": "Λυπούμαστε πολύ, αλλά δεν μπορούμε να σας πιστώσουμε μπόνους χωρίς κατάθεση. Κατανοούμε ότι αυτό είναι δυσάρεστο — ωστόσο, δεν χρειάζεται να απογοητεύεστε, καθώς δεν έρχομαι με άδεια χέρια!",
+          "updatedAt": "2026-06-15T02:12:02.509Z"
+        },
+        {
+          "language": "de",
+          "title": "Отказ",
+          "content": "Es tut uns leid, aber wir können Ihnen den No-Deposit-Bonus nicht gewähren. Wir verstehen, dass das unangenehm ist – aber seien Sie nicht enttäuscht, denn ich komme nicht mit leeren Händen!",
+          "updatedAt": "2026-06-15T02:12:06.421Z"
+        },
+        {
+          "language": "pt",
+          "title": "Отказ",
+          "content": "Lamentamos muito, mas não podemos conceder a você um bônus sem depósito. Entendemos que isso é desagradável - no entanto, não há necessidade de ficar chateado, porque eu não estou vindo de mãos vazias!",
+          "updatedAt": "2026-06-15T02:12:10.541Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:11:54.097Z",
+      "updatedAt": "2026-06-18T07:24:06.436Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-fb8d46c0-32d5-479f-8956-5e3f86b8d0e9",
+      "slug": "bind-1781489547017",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-a8ddb304-4397-4487-b537-0cd65330a25e",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Отказ АДМ",
+          "content": "Por decisão da administração, foi negada a concessão deste presente sem depósito, no entanto, não se apresse em ficar chateado, pois eu não venho com as mãos vazias!",
+          "updatedAt": "2026-06-15T02:12:54.082Z"
+        },
+        {
+          "language": "en",
+          "title": "Отказ АДМ",
+          "content": "By the decision of the administration, this no deposit gift was refused, however, do not rush to get upset, because I am not empty-handed!",
+          "updatedAt": "2026-06-18T07:24:08.824Z"
+        },
+        {
+          "language": "el",
+          "title": "Отказ АДМ",
+          "content": "Με απόφαση της διοίκησης, η πίστωση αυτού του μπόνους χωρίς κατάθεση απορρίφθηκε. Ωστόσο, μην βιαστείτε να απογοητευτείτε, γιατί δεν είμαι άδειος χεριών!",
+          "updatedAt": "2026-06-15T02:12:45.841Z"
+        },
+        {
+          "language": "de",
+          "title": "Отказ АДМ",
+          "content": "Auf Entscheidung der Verwaltung wurde die Vergabe dieses No-Deposit-Geschenks abgelehnt, aber beeilen Sie sich nicht, enttäuscht zu sein, denn ich komme nicht mit leeren Händen!",
+          "updatedAt": "2026-06-15T02:12:49.333Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:12:27.017Z",
+      "updatedAt": "2026-06-18T07:24:08.824Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-bbb2367c-909f-4ebb-86f1-f31745777b85",
+      "slug": "bind-1781489775497",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-a8ddb304-4397-4487-b537-0cd65330a25e",
+      "tags": [],
+      "translations": [
+        {
+          "language": "pt",
+          "title": "Почему отказ",
+          "content": "Gostaria de esclarecer que a disponibilidade de bônus é determinada pela administração do cassino, dependendo da atividade da conta do jogo e da porcentagem de bônus recebidos na conta, por favor, não se preocupe, garanto que assim que sua atividade aumentar, os bônus sem depósito estarão novamente disponíveis para você.",
+          "updatedAt": "2026-06-15T02:16:44.949Z"
+        },
+        {
+          "language": "ru",
+          "title": "Почему отказ",
+          "content": "Хотел бы уточнить, что доступность бонусов определяется администрацией казино в зависимости от активности игрового счёта и процента полученных бонусов на счёт, прошу вас не переживать, уверяю, как только ваша активность вырастет, бездепозитные бонусы снова станут вам доступны.",
+          "updatedAt": "2026-06-15T02:16:20.665Z"
+        },
+        {
+          "language": "en",
+          "title": "Почему отказ",
+          "content": "I would like to clarify that the availability of bonuses is determined by the casino administration based on the activity of the gaming account and the percentage of bonuses received in the account. Please do not worry, I assure you that as soon as your activity increases, no deposit bonuses will become available to you again.",
+          "updatedAt": "2026-06-18T07:24:11.072Z"
+        },
+        {
+          "language": "de",
+          "title": "Почему отказ",
+          "content": "Ich möchte klarstellen, dass die Verfügbarkeit von Boni von der Verwaltung des Casinos in Abhängigkeit von der Aktivität des Spielkontos und dem Prozentsatz der erhaltenen Boni auf das Konto bestimmt wird. Ich bitte Sie, sich keine Sorgen zu machen. Ich versichere Ihnen, dass, sobald Ihre Aktivität steigt, die No-Deposit-Boni Ihnen wieder zur Verfügung stehen werden.",
+          "updatedAt": "2026-06-15T02:16:29.177Z"
+        },
+        {
+          "language": "el",
+          "title": "Почему отказ",
+          "content": "Θα ήθελα να διευκρινίσω ότι η διαθεσιμότητα των μπόνους καθορίζεται από τη διοίκηση του καζίνο, ανάλογα με τη δραστηριότητα του λογαριασμού σας και το ποσοστό των μπόνους που έχουν ήδη πιστωθεί σε αυτόν. Παρακαλώ μην ανησυχείτε — σας διαβεβαιώνω ότι μόλις αυξηθεί η δραστηριότητά σας, τα μπόνους χωρίς κατάθεση θα γίνουν ξανά διαθέσιμα για εσάς.",
+          "updatedAt": "2026-06-15T02:16:33.465Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-15T02:16:15.497Z",
+      "updatedAt": "2026-06-18T07:24:11.072Z",
+      "imported": false,
+      "color": "#3B82F6"
+    },
+    {
+      "id": "bind-1e7bc33e-d572-4646-a0e0-31919ccd1ae0",
+      "ownerId": null,
+      "sourceHash": "0c0a88d4a2717899baeeded6c4f27b233a758f5715a90ddb459718c848e45d2e",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-0c0a88d4",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Как пройти верификацию?",
+          "content": "Чтобы автоматически подтвердить свою личность на нашем сайте, перейдите в свой профиль и откройте вкладку «Верификация». Там вы найдете подробные инструкции и всю информацию, необходимую для успешного завершения процесса.  Убедитесь, что ваши документы соответствуют следующим требованиям: - Высокое качество, четкость и разборчивость. - Убедитесь, что на фото/скане нет бликов, рамок или посторонних предметов.  Правильно отправленные документы помогут ускорить процесс верификации. Сообщите нам, если вам понадобится помощь! 😊",
+          "updatedAt": "2026-06-17T10:51:32.778Z"
+        },
+        {
+          "language": "en",
+          "title": "Как пройти верификацию?",
+          "content": "To automatically verify your identity on our site, go to your profile and open the Verification tab. There you will find detailed instructions and all the information you need to successfully complete the process.  Make sure your documents meet the following requirements: - High quality, clarity, and legibility. - Ensure that there are no glare, frames, or foreign objects in the photo/scan.  Properly submitted documents will help speed up the verification process. Let us know if you need assistance! 😊",
+          "updatedAt": "2026-06-18T07:25:15.037Z"
+        },
+        {
+          "language": "de",
+          "title": "Как пройти верификацию?",
+          "content": "Um Ihre Identität automatisch auf unserer Website zu verifizieren, gehen Sie bitte zu Ihrem Profil und öffnen Sie die Registerkarte Verifizierung. Dort finden Sie eine ausführliche Anleitung und alle Informationen, die Sie benötigen, um den Vorgang erfolgreich abzuschließen.  Bitte stellen Sie sicher, dass Ihre Dokumente die folgenden Anforderungen erfüllen: - Hohe Qualität, klar und gut lesbar. - Stellen Sie sicher, dass das Foto/Scan keine Blendung, Rahmen oder Fremdkörper enthält.  Ordnungsgemäß eingereichte Dokumente tragen dazu bei, den Überprüfungsprozess zu beschleunigen. Lassen Sie es uns wissen, wenn Sie Hilfe benötigen 😊.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Как пройти верификацию?",
+          "content": "Para verificar automaticamente a sua identidade no nosso sítio Web, aceda ao seu perfil e abra o separador Verificação. Aí, encontrará instruções pormenorizadas e todas as informações necessárias para concluir o processo com êxito.  Certifique-se de que os seus documentos cumprem os seguintes requisitos: - Alta qualidade, claros e legíveis. - Certifique-se de que a fotografia/digitalização não tem reflexos, molduras ou objectos estranhos.  Os documentos apresentados corretamente ajudarão a acelerar o processo de verificação. Informe-nos se precisar de ajuda durante o processo! 😊",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Как пройти верификацию?",
+          "content": "Για να επαληθεύσετε την ταυτότητά σας αυτόματα στον ιστότοπό μας, μεταβείτε στο προφίλ σας και ανοίξτε την καρτέλα Επαλήθευση. Εκεί, θα βρείτε λεπτομερείς οδηγίες και όλες τις πληροφορίες που απαιτούνται για την επιτυχή ολοκλήρωση της διαδικασίας.  Βεβαιωθείτε ότι τα έγγραφά σας πληρούν τις ακόλουθες απαιτήσεις: - Υψηλής ποιότητας, σαφή και ευανάγνωστα. - Βεβαιωθείτε ότι η φωτογραφία/σάρωση δεν έχει θάμβωση, πλαίσια ή ξένα αντικείμενα.  Τα σωστά υποβληθέντα έγγραφα θα συμβάλουν στην επιτάχυνση της διαδικασίας επαλήθευσης. Ενημερώστε μας αν χρειαστείτε βοήθεια κατά τη διάρκεια της διαδικασίας! 😊",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.778Z",
+      "updatedAt": "2026-06-18T07:25:15.037Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-d8eeb7fc-e882-46be-937e-5459f0bc0130",
+      "ownerId": null,
+      "sourceHash": "ad96baff15ad9cacdd1234aee64f3ef24f9c8fbf7e808b5e492b51d79c0c725b",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "1-ad96baff",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Не могу пройти, что делать? 1",
+          "content": "Если у вас не получается пройти автоверификацию на сайте, пожалуйста, свяжитесь с нашей финансовой службой по эмайлу: #E-MAIL# и опишите свою проблему. Наши сотрдуники рассмотрят ваш запрос и помогут в самое короткое время.",
+          "updatedAt": "2026-06-17T10:51:32.780Z"
+        },
+        {
+          "language": "en",
+          "title": "Не могу пройти, что делать? 1",
+          "content": "If you are unable to pass auto-verification on the website, please contact our financial department by email: #E-MAIL# and describe your problem. Our team will review your request and help you as soon as possible.",
+          "updatedAt": "2026-06-18T07:25:17.145Z"
+        },
+        {
+          "language": "de",
+          "title": "Не могу пройти, что делать? 1",
+          "content": "Wenn Sie die automatische Überprüfung auf der Website nicht bestehen können, wenden Sie sich bitte per E-Mail an unsere Finanzabteilung: #E-MAIL# und beschreiben Sie Ihr Problem. Unser Team wird Ihre Anfrage prüfen und Ihnen so schnell wie möglich helfen.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не могу пройти, что делать? 1",
+          "content": "Se não conseguir passar a verificação automática no sítio Web, contacte o nosso departamento financeiro por correio eletrónico: #E-MAIL# e descreva o seu problema. A nossa equipa analisará o seu pedido e ajudá-lo-á o mais rapidamente possível.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Не могу пройти, что делать? 1",
+          "content": "Εάν δεν μπορείτε να περάσετε την αυτόματη επαλήθευση στον ιστότοπο, παρακαλούμε επικοινωνήστε με το οικονομικό μας τμήμα μέσω ηλεκτρονικού ταχυδρομείου: #E-MAIL# και περιγράψτε το πρόβλημά σας. Η ομάδα μας θα εξετάσει το αίτημά σας και θα σας βοηθήσει το συντομότερο δυνατό.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.780Z",
+      "updatedAt": "2026-06-18T07:25:17.145Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-cc66de1e-7ba9-4db6-adbd-02220bf24b7d",
+      "ownerId": null,
+      "sourceHash": "b76c033740a52c91836ba1a044ea2cdbdbaa5628a22827fe216429727d24cee4",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "2-b76c0337",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Не могу пройти, что делать? 2",
+          "content": "Пожалуйста, обратите внимание, что вопросами верификации занимается финансовый департамент, поэтому любезно просим вас отправить запрос в финансовую службу по эмайлу: #E-MAIL# и описать свою проблему. Наши специалисты рассмотрят запрос в самое короткое время и ответят также по эмайлу.",
+          "updatedAt": "2026-06-17T10:51:32.782Z"
+        },
+        {
+          "language": "en",
+          "title": "Не могу пройти, что делать? 2",
+          "content": "Please note that verification issues are handled by the Finance Department, so we kindly ask you to send a request to the Finance Department by email: #E-MAIL# and describe your issue. Our specialists will review the issue as soon as possible and reply by email.",
+          "updatedAt": "2026-06-18T07:25:19.546Z"
+        },
+        {
+          "language": "de",
+          "title": "Не могу пройти, что делать? 2",
+          "content": "Bitte beachten Sie, dass Verifizierungsfragen von der Finanzabteilung bearbeitet werden. Wir bitten Sie daher, eine Anfrage per E-Mail an die Finanzabteilung zu senden: #E-MAIL# und beschreiben Sie Ihr Problem. Unsere Spezialisten werden das Problem so schnell wie möglich prüfen und per E-Mail antworten.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не могу пройти, что делать? 2",
+          "content": "Tenha em atenção que as questões de verificação são tratadas pelo Departamento Financeiro, pelo que lhe pedimos que envie um pedido ao Departamento Financeiro por correio eletrónico: #E-MAIL# e descreva o seu problema. Os nossos especialistas analisarão a questão o mais rapidamente possível e responderão por correio eletrónico.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Не могу пройти, что делать? 2",
+          "content": "Σημειώστε ότι τα θέματα επαλήθευσης χειρίζεται το Τμήμα Οικονομικών, γι' αυτό σας παρακαλούμε να στείλετε αίτημα στο Τμήμα Οικονομικών μέσω ηλεκτρονικού ταχυδρομείου: #E-MAIL# και περιγράψτε το πρόβλημά σας. Οι ειδικοί μας θα εξετάσουν το ζήτημα το συντομότερο δυνατό και θα σας απαντήσουν μέσω email.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.782Z",
+      "updatedAt": "2026-06-18T07:25:19.546Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-faaa6cc2-2947-4742-9953-c1b0af898657",
+      "ownerId": null,
+      "sourceHash": "fc1b5d92ef3fdf945b9edb36ca81e8cca6c5d36978350289d30f8d505c3fbb81",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-fc1b5d92",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "НЕ может пройти/просит проверить документы",
+          "content": "Понимаю как вы обеспокоены-буду рад(а)оперативно помочь! Пожалуйста, обратите внимание, что вопросами верификации занимается финансовый департамент, и служба поддержки не имеет доступа к загруженным документом. Любезно просим вас отправить запрос в финансовую службу по эмайлу: #E-MAIL# и описать свою проблему. Наши специалисты рассмотрят запрос в самое короткое время и ответят также по эмайлу.",
+          "updatedAt": "2026-06-17T10:51:32.783Z"
+        },
+        {
+          "language": "en",
+          "title": "НЕ может пройти/просит проверить документы",
+          "content": "I understand your worries - I'll be happy to help promptly! Please note that verification issues are handled by the finance department and the support team does not have access to the uploaded document. We kindly ask you to send a request to the finance department by email: #E-MAIL# and describe your issue. Our specialists will consider the request in the shortest possible time and will reply by email as well.",
+          "updatedAt": "2026-06-18T07:25:21.478Z"
+        },
+        {
+          "language": "de",
+          "title": "НЕ может пройти/просит проверить документы",
+          "content": "Ich verstehe Ihre Sorgen - ich helfe Ihnen gerne und schnell! Bitte beachten Sie, dass Verifizierungsfragen von der Finanzabteilung bearbeitet werden und das Support-Team keinen Zugriff auf das hochgeladene Dokument hat. Wir bitten Sie, eine Anfrage per E-Mail an die Finanzabteilung zu senden: #E-MAIL# und beschreiben Sie Ihr Problem. Unsere Spezialisten werden Ihre Anfrage so schnell wie möglich prüfen und Ihnen ebenfalls per E-Mail antworten.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "НЕ может пройти/просит проверить документы",
+          "content": "Compreendo as suas preocupações - terei todo o gosto em ajudar prontamente! Tenha em atenção que as questões de verificação são tratadas pelo departamento financeiro e que a equipa de apoio não tem acesso ao documento carregado. Pedimos-lhe que envie um pedido ao departamento financeiro por correio eletrónico: #E-MAIL# e descreva o seu problema. Os nossos especialistas analisarão o pedido no mais curto espaço de tempo possível e responderão também por correio eletrónico.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "НЕ может пройти/просит проверить документы",
+          "content": "Καταλαβαίνω τις ανησυχίες σας - θα χαρώ να σας βοηθήσω άμεσα! Λάβετε υπόψη ότι τα θέματα επαλήθευσης χειρίζεται το οικονομικό τμήμα και η ομάδα υποστήριξης δεν έχει πρόσβαση στο έγγραφο που έχει μεταφορτωθεί. Σας παρακαλούμε να στείλετε αίτημα στο οικονομικό τμήμα μέσω ηλεκτρονικού ταχυδρομείου: #E-MAIL# και να περιγράψετε το πρόβλημά σας. Οι ειδικοί μας θα εξετάσουν το αίτημα στο συντομότερο δυνατό χρόνο και θα απαντήσουν επίσης μέσω email.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.783Z",
+      "updatedAt": "2026-06-18T07:25:21.478Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-e27868f3-5ae7-4c59-90a9-f24c6edc9e83",
+      "ownerId": null,
+      "sourceHash": "632ff4fe842122eefd6675c240a8270081c46cff8299dd1e70ede4fed3845d4e",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-632ff4fe",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "поч не можешь?",
+          "content": "Уточните пожалуйста с какой проблемой вы столкнулись при верификации аккаунта?📄",
+          "updatedAt": "2026-06-17T10:51:32.785Z"
+        },
+        {
+          "language": "en",
+          "title": "поч не можешь?",
+          "content": "Please specify what problem you encountered during account verification?📄",
+          "updatedAt": "2026-06-18T07:25:23.589Z"
+        },
+        {
+          "language": "pt",
+          "title": "поч не можешь?",
+          "content": "Por favor, esclareça qual problema você enfrentou ao verificar a conta?📄",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "поч не можешь?",
+          "content": "Παρακαλούμε διευκρινίστε ποιο πρόβλημα αντιμετωπίσατε κατά την επαλήθευση του λογαριασμού σας. 📄",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.785Z",
+      "updatedAt": "2026-06-18T07:25:23.589Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-a05de884-c55a-4300-b90a-d2a753380012",
+      "ownerId": null,
+      "sourceHash": "b819a389716f1d10313b5837e4b7b353e62864ddbcbf346440448fdd4d84130b",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-b819a389",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "корректные данные",
+          "content": "Пожалуйста, напишите мне ваши корректные данные, которые вы хотели бы изменить.",
+          "updatedAt": "2026-06-18T07:25:25.705Z"
+        },
+        {
+          "language": "el",
+          "title": "корректные данные",
+          "content": "Παρακαλώ γράψτε μου τα σωστά στοιχεία που θα θέλατε να αλλάξουν.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.787Z",
+      "updatedAt": "2026-06-18T07:25:25.705Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-cb145d34-365c-4bfb-b9e8-a1bb347b7cdb",
+      "ownerId": null,
+      "sourceHash": "58df72beb72bce1dad3af6e264ceffec1225d1612008ed352b8f7eb0d0a8c0a5",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-58df72be",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "прошел самсамб",
+          "content": "По данным из нашего технического журнала, вы успешно прошли автоматическую верификацию на нашем сайте.✔️",
+          "updatedAt": "2026-06-17T10:51:32.790Z"
+        },
+        {
+          "language": "en",
+          "title": "прошел самсамб",
+          "content": "According to the data from our technical journal, you have successfully passed the automatic verification on our website.✔️",
+          "updatedAt": "2026-06-18T07:25:27.921Z"
+        },
+        {
+          "language": "el",
+          "title": "прошел самсамб",
+          "content": "Σύμφωνα με τα δεδομένα από το τεχνικό μας αρχείο, έχετε ολοκληρώσει με επιτυχία την αυτόματη επαλήθευση στον ιστότοπό μας. ✔️",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.790Z",
+      "updatedAt": "2026-06-18T07:25:27.921Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-f6c9d544-58fe-451a-b6b4-2d1baeed2c06",
+      "ownerId": null,
+      "sourceHash": "e0e78e2de2e48c326e9d17f78200777bdb615e39a9acaf868351c64cb4c3279e",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-e0e78e2d",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "отправка на кус",
+          "content": "Пожалуйста, обратите внимание, что финансовыми вопросами занимается финансовый департамент, поэтому любезно просим вас отправить запрос в финансовую службу по эмайлу: #E-MAIL# и описать свою проблему. Наши специалисты рассмотрят запрос в самое короткое время и ответят также по эмайлу.",
+          "updatedAt": "2026-06-18T07:25:30.521Z"
+        },
+        {
+          "language": "el",
+          "title": "отправка на кус",
+          "content": "Παρακαλώ σημειώστε ότι τα οικονομικά ζητήματα χειρίζεται το οικονομικό τμήμα, επομένως σας παρακαλούμε ευγενικά να στείλετε το αίτημά σας στην οικονομική υπηρεσία μέσω email: #E-MAIL# και να υποβάλετε εκεί τις ερωτήσεις σας σχετικά με τα όριά σας. Οι ειδικοί μας θα εξετάσουν το αίτημα το συντομότερο δυνατό και θα σας απαντήσουν επίσης μέσω email.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.794Z",
+      "updatedAt": "2026-06-18T07:25:30.521Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-763490e2-4fe6-4ae9-aa3d-88e4b768dc05",
+      "ownerId": null,
+      "sourceHash": "a35fae8277d02c4c2acf377ea06fc9492a2e1220eb26c50865563e8460679120",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-a35fae82",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Исправил данные верификацию на почту",
+          "content": "Дорогой игрок, я успешно внес пометку с нашей стороны. Она не изменяет ваши текущие данные, но будет доступна для всех наших департаментов. Хочу уточнить, что пройти верификацию вам необходимо через почту нашего финансового отдела: [Email]. Пожалуйста, направьте запрос на верификацию, и наши специалисты свяжутся с вами с дальнейшими инструкциями. Спасибо!",
+          "updatedAt": "2026-06-17T10:51:32.796Z"
+        },
+        {
+          "language": "en",
+          "title": "Исправил данные верификацию на почту",
+          "content": "Dear player, I have successfully added a note on our side. It does not change your current data, but it will be available to all our departments. I would like to clarify that you need to complete the verification via the email of our financial department: [Email]. Please send a verification request, and our specialists will contact you with further instructions. Thank you!",
+          "updatedAt": "2026-06-18T07:25:33.049Z"
+        },
+        {
+          "language": "de",
+          "title": "Исправил данные верификацию на почту",
+          "content": "Sehr geehrter Spieler, ich habe erfolgreich eine Notiz von unserer Seite hinzugefügt. Diese ändert Ihre aktuellen Daten nicht, ist jedoch für alle unsere Abteilungen sichtbar. Ich möchte darauf hinweisen, dass die Verifizierung über die E-Mail-Adresse unserer Finanzabteilung erfolgen muss: [Email]. Bitte senden Sie eine Verifizierungsanfrage, und unsere Spezialisten werden sich mit weiteren Anweisungen bei Ihnen melden. Vielen Dank!",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Исправил данные верификацию на почту",
+          "content": "Caro jogador, registrei com sucesso uma observação do nosso lado. Ela não altera os seus dados atuais, mas ficará disponível para todos os nossos departamentos. Gostaria de esclarecer que a verificação deve ser realizada através do email do nosso departamento financeiro: [Email]. Por favor, envie um pedido de verificação e os nossos especialistas entrarão em contacto consigo com mais instruções. Obrigado!",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Исправил данные верификацию на почту",
+          "content": "Αγαπητέ παίκτη, έχω προσθέσει με επιτυχία μια σημείωση από την πλευρά μας. Δεν αλλάζει τα τρέχοντα στοιχεία σας, αλλά θα είναι διαθέσιμη σε όλα τα τμήματά μας. Θα ήθελα να διευκρινίσω ότι η επαλήθευση πρέπει να πραγματοποιηθεί μέσω του email του οικονομικού μας τμήματος: [Email]. Παρακαλώ στείλτε αίτημα επαλήθευσης και οι ειδικοί μας θα επικοινωνήσουν μαζί σας με περαιτέρω οδηγίες. Σας ευχαριστούμε!",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.796Z",
+      "updatedAt": "2026-06-18T07:25:33.049Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-ce60db79-bab6-4173-855d-5a95027c55c7",
+      "ownerId": null,
+      "sourceHash": "4ae44f432224d01a30f9d5078ff87d951b75e9b735c31706a53781dc8d6fdfeb",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "imported-bind-4ae44f43",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Если отправил данные жди",
+          "content": "Дорогой игрок, благодарим вас за обращение и доверие. Если вы уже отправили запрос в наш финансовый департамент, позвольте попросить вас немного подождать их ответа.  Ваше обращение обрабатывается вручную специалистами высокого уровня, и каждому запросу уделяется персональное внимание, чтобы обеспечить вам сервис премиум-класса. В периоды повышенной загруженности возможна небольшая задержка, однако ваш запрос находится в приоритетной очереди и будет рассмотрен в ближайшее время.  Мы искренне ценим ваше терпение и уверяем вас, что делаем всё возможное, чтобы предоставить вам максимально комфортный и быстрый результат. Если вам потребуется дополнительная помощь — я всегда рядом и готов поддержать вас в любой момент.",
+          "updatedAt": "2026-06-17T10:51:32.797Z"
+        },
+        {
+          "language": "en",
+          "title": "Если отправил данные жди",
+          "content": "Dear player, thank you for your message and for the trust you place in us. If you have already reached out to our Finance Department, please allow them a little time to respond.  Your request is being handled manually by highly qualified specialists, each inquiry receiving personal attention to ensure a truly premium experience. During periods of increased activity, slight delays may occur, but rest assured — your request is placed in priority status and will be reviewed as soon as possible.  We sincerely appreciate your patience and assure you that we are doing everything to deliver the smoothest and most efficient outcome for you. Should you need any further assistance, I am here for you at any moment.",
+          "updatedAt": "2026-06-18T07:25:35.593Z"
+        },
+        {
+          "language": "de",
+          "title": "Если отправил данные жди",
+          "content": "Lieber Spieler, vielen Dank für Ihre Nachricht und Ihr Vertrauen. Wenn Sie bereits eine Anfrage an unsere Finanzabteilung gesendet haben, bitten wir Sie um etwas Geduld.  Ihr Anliegen wird von hochqualifizierten Spezialisten manuell bearbeitet, wobei jeder Anfrage individuelle Aufmerksamkeit geschenkt wird, um Ihnen ein erstklassiges Premium-Erlebnis zu bieten. In Zeiten hoher Auslastung kann es zu kleinen Verzögerungen kommen, doch Ihr Anliegen hat Priorität und wird so schnell wie möglich geprüft.  Wir schätzen Ihre Geduld sehr und versichern Ihnen, dass wir alles tun, um Ihnen einen reibungslosen und effizienten Ablauf zu gewährleisten. Wenn Sie darüber hinaus Unterstützung benötigen, stehe ich Ihnen jederzeit gerne zur Verfügung.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Если отправил данные жди",
+          "content": "Caro jogador, agradecemos a sua mensagem e a confiança que deposita em nós. Se já entrou em contacto com o nosso departamento financeiro, pedimos apenas um pouco de paciência enquanto aguardamos a resposta.  O seu pedido está a ser tratado manualmente por especialistas altamente qualificados, com atenção individual a cada detalhe, garantindo uma experiência verdadeiramente premium. Em períodos de grande volume, podem ocorrer ligeiros atrasos, mas fique tranquilo — o seu pedido está em prioridade e será analisado o mais rapidamente possível.  Agradecemos sinceramente a sua compreensão e garantimos que estamos a fazer tudo para lhe oferecer o melhor e mais eficiente serviço. Se precisar de qualquer outra assistência, estou sempre à sua disposição.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Если отправил данные жди",
+          "content": "Αγαπητέ παίκτη, σας ευχαριστούμε θερμά για το μήνυμά σας και για την εμπιστοσύνη που μας δείχνετε. Αν έχετε ήδη επικοινωνήσει με το οικονομικό μας τμήμα, παρακαλούμε δώστε λίγο χρόνο για την απάντησή τους.  Το αίτημά σας εξετάζεται χειροκίνητα από εξειδικευμένους επαγγελματίες, με προσωπική προσοχή σε κάθε λεπτομέρεια, ώστε να σας προσφέρουμε μια πραγματικά premium εμπειρία. Κατά περιόδους αυξημένου φόρτου, μπορεί να υπάρξουν μικρές καθυστερήσεις, όμως το αίτημά σας βρίσκεται σε προτεραιότητα και θα εξεταστεί το συντομότερο δυνατό.  Εκτιμούμε βαθύτατα την υπομονή σας και σας διαβεβαιώνουμε ότι κάνουμε ό,τι είναι δυνατόν για να σας προσφέρουμε την πιο ομαλή και άμεση εξυπηρέτηση. Είμαι πάντα στη διάθεσή σας για οποιαδήποτε επιπλέον βοήθεια χρειαστείτε.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.797Z",
+      "updatedAt": "2026-06-18T07:25:35.593Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-af080448-88da-48f4-857b-c1d47fc5bdf8",
+      "ownerId": null,
+      "sourceHash": "cedd918bd8d6184a9b7d091fe42f33d774e57934be3c73c22965439879291564",
+      "importBatchId": "sheet-f157801d91bb7c7e",
+      "imported": true,
+      "slug": "2-new-cedd918b",
+      "categoryId": "category-89c7873b-667d-4312-af47-22fd41cb3782",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Статус верификации не меняется (2) NEW",
+          "content": "Статус «in progress», который Вы видите в игровом аккаунте, отображается в связи с тем, что Вы ещё не осуществляли вывод средств на сайте. Тем не менее, на данный момент все в порядке и Вы можете уже оформить запрос на вывод средств. После первого вывода средств, который будет завершен успешно, данный статус автоматически изменится на успешную верификацию. Обращаем ваше внимание, что при подаче заявки на вывод финансовый отдел в отдельных случаях может запросить дополнительные документы для подтверждения используемых платёжных методов, но Вам не стоит переживать, ведь это стандартная процедура на сайте, которую проходят игроки.  В случае, если у Вас возникнут какие-то дополнительные вопросы, Вы всегда можете их задать напрямую в финансовый департамент по емейлу - #E-MAIL#.",
+          "updatedAt": "2026-06-17T10:51:32.798Z"
+        },
+        {
+          "language": "en",
+          "title": "Статус верификации не меняется (2) NEW",
+          "content": "The in progress status that you see in your gaming account is displayed due to the fact that you have not yet made a withdrawal on the site. However, everything is fine at the moment and you can already make a withdrawal request. After the first successful withdrawal, this status will automatically change to successful verification. Please note that when applying for withdrawal, the finance department may in some cases request additional documents to confirm the payment methods used, but you should not worry, because this is a standard procedure on the site that players go through.  If you have any additional questions, you can always ask them directly to the Finance department by email - #E-MAIL#.",
+          "updatedAt": "2026-06-18T07:25:38.162Z"
+        },
+        {
+          "language": "de",
+          "title": "Статус верификации не меняется (2) NEW",
+          "content": "Der Status In Bearbeitung, den Sie in Ihrem Spielkonto sehen, wird angezeigt, da Sie noch keine Auszahlung auf der Website vorgenommen haben. Im Moment ist jedoch alles in Ordnung und Sie können bereits eine Auszahlungsanfrage stellen. Nach der ersten erfolgreichen Auszahlung ändert sich dieser Status automatisch in erfolgreiche Überprüfung. Bitte beachten Sie, dass die Finanzabteilung bei der Beantragung einer Auszahlung in einigen Fällen zusätzliche Dokumente anfordern kann, um die verwendeten Zahlungsmethoden zu bestätigen. Sie sollten sich jedoch keine Sorgen machen, da dies ein Standardverfahren auf der Website ist, das die Spieler durchlaufen.  Wenn Sie weitere Fragen haben, können Sie diese jederzeit direkt per E-Mail an die Finanzabteilung richten - #E-MAIL#.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "pt",
+          "title": "Статус верификации не меняется (2) NEW",
+          "content": "O status em andamento que você vê em sua conta de jogo é exibido devido ao fato de você ainda não ter feito um saque no site. No entanto, está tudo bem no momento e você já pode fazer um pedido de Saque. Após a primeira retirada bem-sucedida, esse status mudará automaticamente para verificação bem-sucedida. Por favor, note que ao solicitar a retirada, o Departamento Financeiro pode, em alguns casos, solicitar documentos adicionais para confirmar os métodos de pagamento utilizados, mas você não deve se preocupar, porque este é um procedimento padrão no site que os jogadores passam.  Se você tiver alguma dúvida adicional, você sempre pode perguntar diretamente ao Departamento Financeiro por e - mail-#E-MAIL#.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        },
+        {
+          "language": "el",
+          "title": "Статус верификации не меняется (2) NEW",
+          "content": "Η κατάσταση σε εξέλιξη  που βλέπετε στον λογαριασμό παιχνιδιού σας εμφανίζεται λόγω του γεγονότος ότι δεν έχετε κάνει ακόμη ανάληψη στον ιστότοπο. Ωστόσο, όλα είναι καλά αυτή τη στιγμή και μπορείτε ήδη να υποβάλετε αίτημα ανάληψης. Μετά την πρώτη επιτυχή απόσυρση, αυτή η κατάσταση θα αλλάξει αυτόματα σε επιτυχή επαλήθευση. Λάβετε υπόψη ότι κατά την υποβολή αίτησης απόσυρσης, το τμήμα Οικονομικών μπορεί σε ορισμένες περιπτώσεις να ζητήσει πρόσθετα έγγραφα για να επιβεβαιώσει τους τρόπους πληρωμής που χρησιμοποιούνται, αλλά δεν πρέπει να ανησυχείτε, επειδή πρόκειται για μια τυπική διαδικασία στον ιστότοπο που περνούν οι παίκτες.  Εάν έχετε επιπλέον ερωτήσεις, μπορείτε πάντα να τις ρωτήσετε απευθείας στο Τμήμα Οικονομικών μέσω email - #E-MAIL#.",
+          "updatedAt": "2026-06-17T10:51:26.025Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T10:51:32.798Z",
+      "updatedAt": "2026-06-18T07:25:38.162Z",
+      "color": "#FFFF00"
+    },
+    {
+      "id": "bind-8fef043a-d146-4580-bdd6-048b368d33d9",
+      "ownerId": null,
+      "sourceHash": "a7897a619c2935cfc93aca88eb4b69b34404082b97f5ab084e4c83fb0c42fdc8",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "imported-bind-a7897a61",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Запрос",
+          "content": "Ответ",
+          "updatedAt": "2026-06-18T07:25:44.853Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.870Z",
+      "updatedAt": "2026-06-18T07:25:44.853Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-9241b3c3-49d2-4602-ae90-979efff54704",
+      "ownerId": null,
+      "sourceHash": "00a1f0c868c48095ffe7726310f1a4ae9b7e6fdf772573f082f3751fc4fa1d96",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "15-00a1f0c8",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Депозит не поступил- НЕ прошло 15 мин",
+          "content": "В настоящее время ваш депозит обрабатывается платежной системой. Иногда могут быть задержки, и обработка может занять до 15 минут. Если в течение этого времени депозит все еще не поступит на игровой счет, свяжитесь с нами еще раз с деталями транзакции, и мы отправим его на проверку. Что скажете?",
+          "updatedAt": "2026-06-17T17:07:58.871Z"
+        },
+        {
+          "language": "en",
+          "title": "Депозит не поступил- НЕ прошло 15 мин",
+          "content": "Currently, your deposit is being processed by the payment system. Occasionally, there may be delays, and processing can take up to 15 minutes.  If within this time the deposit still has not arrived in the game account, please contact us again with the details of the transaction and we will send it for verification. Sounds good?",
+          "updatedAt": "2026-06-18T07:25:46.905Z"
+        },
+        {
+          "language": "de",
+          "title": "Депозит не поступил- НЕ прошло 15 мин",
+          "content": "Ihre Einzahlung wird derzeit vom Zahlungssystem bearbeitet. Gelegentlich kann es zu Verzögerungen kommen, und die Bearbeitung kann bis zu 15 Minuten dauern. Wenn die Einzahlung in dieser Zeit immer noch nicht auf dem Spielkonto eingegangen ist, kontaktieren Sie uns bitte erneut mit den Details der Transaktion und wir werden sie zur Überprüfung senden. Klingt gut?",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "pt",
+          "title": "Депозит не поступил- НЕ прошло 15 мин",
+          "content": "Atualmente, o seu depósito está a ser processado pelo sistema de pagamento. Ocasionalmente, podem ocorrer atrasos e o processamento pode demorar até 15 minutos. Se, durante este período, o depósito ainda não tiver sido recebido na conta de jogo, contacte-nos novamente com os detalhes da transação e enviaremos o depósito para verificação. Parece-lhe bem?",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "el",
+          "title": "Депозит не поступил- НЕ прошло 15 мин",
+          "content": "Επί του παρόντος, η κατάθεσή σας επεξεργάζεται από το σύστημα πληρωμών. Περιστασιακά, ενδέχεται να υπάρχουν καθυστερήσεις και η επεξεργασία μπορεί να διαρκέσει έως και 15 λεπτά. Εάν μέσα σε αυτό το χρονικό διάστημα η κατάθεση δεν έχει ακόμα εισέλθει στο λογαριασμό του παιχνιδιού, παρακαλούμε επικοινωνήστε ξανά μαζί μας με τα στοιχεία της συναλλαγής και θα σας τα στείλουμε για επαλήθευση. Ακούγεται καλό;",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.871Z",
+      "updatedAt": "2026-06-18T07:25:46.905Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-37c64fbd-adf9-4207-86a3-60c12df79666",
+      "ownerId": null,
+      "sourceHash": "ddb3127699c6f3fd61be97c1f4fe01d3a705ceffef3697ad8a96b66b4afde93a",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "15-ddb31276",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Депозит не поступил- ПРОШЛО 15 мин",
+          "content": "В данный момент средства ещё не поступили в нашу сторону и могут быть  в обработке платёжной системой. Для более детальной проверки статуса транзакции, пожалуйста, пришлите скриншот с её деталями из вашего банк аккаунта, и мы передадим в финансовый отдел.  Как только сотрудники финансовой службы проверят депозит и предоставят результаты проверки, мы сразу же сообщим вам о результатах по эмайлу. Что скажете?",
+          "updatedAt": "2026-06-17T17:07:58.871Z"
+        },
+        {
+          "language": "en",
+          "title": "Депозит не поступил- ПРОШЛО 15 мин",
+          "content": "At the moment the funds have not been received by us yet and may be being processed by the payment system. For a more detailed check of the transaction status, please send a screenshot with its details from your bank account and we will forward it to the finance department.  As soon as the finance department checks the deposit and provides the results of the check, we will immediately notify you of the results via email. Sounds good?",
+          "updatedAt": "2026-06-18T07:25:49.330Z"
+        },
+        {
+          "language": "de",
+          "title": "Депозит не поступил- ПРОШЛО 15 мин",
+          "content": "Im Moment ist der Betrag noch nicht bei uns eingegangen und wird möglicherweise noch vom Zahlungssystem bearbeitet. Für eine genauere Überprüfung des Transaktionsstatus senden Sie uns bitte einen Screenshot mit den Details Ihres Bankkontos, den wir an die Finanzabteilung weiterleiten werden. Sobald die Finanzabteilung die Einzahlung überprüft hat und das Ergebnis der Überprüfung vorliegt, werden wir Sie umgehend per E-Mail über das Ergebnis informieren. Klingt gut?",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "pt",
+          "title": "Депозит не поступил- ПРОШЛО 15 мин",
+          "content": "De momento, os fundos ainda não foram recebidos por nós e podem estar a ser processados pelo sistema de pagamento. Para uma verificação mais pormenorizada do estado da transação, envie uma captura de ecrã com os respectivos dados da sua conta bancária e nós transmiti-la-emos ao departamento financeiro. Assim que o departamento financeiro verificar o depósito e fornecer os resultados da verificação, notificá-lo-emos imediatamente por correio eletrónico. Parece-lhe bem?",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "el",
+          "title": "Депозит не поступил- ПРОШЛО 15 мин",
+          "content": "Προς το παρόν, τα χρήματα δεν έχουν ακόμη κατατεθεί στον λογαριασμό μας και ενδέχεται να βρίσκονται σε επεξεργασία από το σύστημα πληρωμών. Για πιο λεπτομερή έλεγχο της κατάστασης της συναλλαγής, παρακαλούμε στείλτε μας ένα screenshot με τα στοιχεία της συναλλαγής από τον τραπεζικό σας λογαριασμό και θα το προωθήσουμε στο οικονομικό τμήμα. Μόλις το οικονομικό τμήμα ελέγξει την κατάθεση και μας δώσει τα αποτελέσματα του ελέγχου, θα σας ενημερώσουμε αμέσως μέσω email. Σας φαίνεται εντάξει;",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.871Z",
+      "updatedAt": "2026-06-18T07:25:49.330Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-e5febef6-40af-4ee6-89a8-1637a5103981",
+      "ownerId": null,
+      "sourceHash": "b90f00bb3cc41b8f30769f27920389e7136104104a6a63ea4bcb47a81297a8ad",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "imported-bind-b90f00bb",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Депозит с крипты",
+          "content": "В данный момент средства ещё не поступили в нашу сторону, но не стоит беспокиться-такие платежи могут доходить до часа. Проверить транзакцию вы можете на сайте: https://www.blockchain.com/ru/explorer Просто вставьте хэш транзакции в поисковую строку и проверьте статус платежа.  Если на указанном сайте статус вашей транзакции показывает успешно, отправьте ссылку на транзакцию из блокчейна, и мы отправим ее в наш финансовый отдел для проверки. Дайте нам знать, если вам понадобится помощь! 😊",
+          "updatedAt": "2026-06-17T17:07:58.872Z"
+        },
+        {
+          "language": "en",
+          "title": "Депозит с крипты",
+          "content": "At the moment the funds have not been received by us yet, but don't worry, such payments can take up to an hour. You can check the transaction on the website: https://www.blockchain.com/en/explorer Just paste the transaction hash into the search box and check the payment status. If the status of your transaction shows “successful” on the specified website, then please send a link to the transaction from the blockchain and we will send it to our finance department for verification. Let us know if you need any help along the way! 😊",
+          "updatedAt": "2026-06-18T07:25:51.530Z"
+        },
+        {
+          "language": "de",
+          "title": "Депозит с крипты",
+          "content": "Im Moment ist das Geld noch nicht bei uns eingegangen, aber keine Sorge, solche Zahlungen können bis zu einer Stunde dauern. Sie können die Transaktion auf der Website https://www.blockchain.com/en/explorer überprüfen. Geben Sie einfach den Transaktions-Hash in das Suchfeld ein und prüfen Sie den Zahlungsstatus. Wenn der Status Ihrer Transaktion auf der angegebenen Website erfolgreich anzeigt, senden Sie uns bitte einen Link zu der Transaktion aus der Blockchain und wir werden ihn zur Überprüfung an unsere Finanzabteilung senden. Lassen Sie es uns wissen, wenn Sie dabei Hilfe benötigen 😊.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "pt",
+          "title": "Депозит с крипты",
+          "content": "De momento, os fundos ainda não foram recebidos por nós, mas não se preocupe, estes pagamentos podem demorar até uma hora. Pode verificar a transação no sítio Web: https://www.blockchain.com/en/explorer",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.872Z",
+      "updatedAt": "2026-06-18T07:25:51.530Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-2a5e5332-5594-49ec-af20-9964d37d63f2",
+      "ownerId": null,
+      "sourceHash": "8e10c236a764c48bad560167673226818559f24bb07732a5d6c71f4acc0ca890",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "imported-bind-8e10c236",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Спасибо за скриншот!",
+          "content": "Спасибо за предоставленную информацию! Мы передали транзакцию на проверку в финансовый отдел. Как только мы получим информацию о результатах проверки, сразу уведомим вас по эмайлу, любезно просим вас ожидать.",
+          "updatedAt": "2026-06-18T07:26:30.198Z"
+        },
+        {
+          "language": "en",
+          "title": "Спасибо за скриншот!",
+          "content": "Thank you for the information provided! We have passed the transaction to the finance department for verification. As soon as we receive information about the results of the verification, we will notify you by email, please kindly wait for us.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "de",
+          "title": "Спасибо за скриншот!",
+          "content": "Vielen Dank für die bereitgestellten Informationen! Wir haben die Transaktion zur Überprüfung an die Finanzabteilung weitergeleitet. Sobald wir Informationen über die Ergebnisse der Überprüfung erhalten, werden wir Sie per E-Mail benachrichtigen, bitte warten Sie auf uns.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "pt",
+          "title": "Спасибо за скриншот!",
+          "content": "Obrigado pelas informações fornecidas! Transmitimos a transação ao departamento financeiro para verificação. Assim que recebermos informações sobre os resultados da verificação, notificá-lo-emos por correio eletrónico.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "el",
+          "title": "Спасибо за скриншот!",
+          "content": "Σας ευχαριστούμε για τις πληροφορίες που μας δώσατε! Έχουμε διαβιβάσει τη συναλλαγή στο οικονομικό τμήμα για επαλήθευση. Μόλις λάβουμε πληροφορίες σχετικά με τα αποτελέσματα της επαλήθευσης, θα σας ειδοποιήσουμε μέσω email, παρακαλούμε να μας περιμένετε.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.874Z",
+      "updatedAt": "2026-06-18T07:26:30.198Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-7678b6a1-479b-4a14-8b22-83ec429a2cc7",
+      "ownerId": null,
+      "sourceHash": "4d771256fe163a249f4b88075091fd77902c4670034486871891a301557026c2",
+      "importBatchId": "sheet-c589edb6021cb285",
+      "imported": true,
+      "slug": "imported-bind-4d771256",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Недостаточно деталей",
+          "content": "К сожалению, этих данных недостаточно для детальной проверки. Пожалуйста, пришлите скриншот квитанции об оплате и мы передадим его на проверку.",
+          "updatedAt": "2026-06-18T07:26:33.134Z"
+        },
+        {
+          "language": "en",
+          "title": "Недостаточно деталей",
+          "content": "Unfortunately, these data are insufficient for detailed verification. Please send a screenshot of the payment receipt and we will pass it on for verification.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "de",
+          "title": "Недостаточно деталей",
+          "content": "Leider sind diese Daten für eine detaillierte Überprüfung nicht ausreichend. Bitte senden Sie uns einen Screenshot des Zahlungseingangs, den wir zur Überprüfung weiterleiten werden.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "pt",
+          "title": "Недостаточно деталей",
+          "content": "Infelizmente, estes dados são insuficientes para uma verificação pormenorizada. Envie-nos uma captura de ecrã do recibo de pagamento e nós passá-la-emos para verificação.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        },
+        {
+          "language": "el",
+          "title": "Недостаточно деталей",
+          "content": "Δυστυχώς, τα στοιχεία αυτά δεν επαρκούν για λεπτομερή επαλήθευση. Παρακαλούμε στείλτε ένα στιγμιότυπο οθόνης της απόδειξης πληρωμής και θα το διαβιβάσουμε για επαλήθευση.",
+          "updatedAt": "2026-06-17T17:07:49.471Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T17:07:58.875Z",
+      "updatedAt": "2026-06-18T07:26:33.134Z",
+      "color": "#EC4899"
+    },
+    {
+      "id": "bind-b0bc594c-6e4e-494f-9284-738f7dca1199",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1781725809869",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "color": "#10B981",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Я рад, что смог помочь. Скажите, есть ли у вас ещё вопросы?",
+          "content": "Я рад, что смог помочь. Скажите, есть ли у вас ещё вопросы?",
+          "updatedAt": "2026-06-17T19:50:25.933Z"
+        },
+        {
+          "language": "en",
+          "title": "I'm glad I could help. Do you have any other questions?",
+          "content": "I'm glad I could help. Do you have any other questions?",
+          "updatedAt": "2026-06-18T07:23:13.696Z"
+        },
+        {
+          "language": "de",
+          "title": "Ich freue mich, dass ich helfen konnte. Sagen Sie, haben Sie noch Fragen?",
+          "content": "Ich freue mich, dass ich helfen konnte. Sagen Sie, haben Sie noch Fragen?",
+          "updatedAt": "2026-06-17T19:50:09.869Z"
+        },
+        {
+          "language": "pt",
+          "title": "Ainda bem que pude ajudar. Tem mais alguma pergunta?",
+          "content": "Ainda bem que pude ajudar. Tem mais alguma pergunta?",
+          "updatedAt": "2026-06-17T19:50:09.869Z"
+        },
+        {
+          "language": "el",
+          "title": "Χαίρομαι που μπόρεσα να βοηθήσω. Έχετε άλλες ερωτήσεις;",
+          "content": "Χαίρομαι που μπόρεσα να βοηθήσω. Έχετε άλλες ερωτήσεις;",
+          "updatedAt": "2026-06-17T19:50:09.869Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-17T19:49:52.701Z",
+      "updatedAt": "2026-06-18T07:23:13.696Z"
+    },
+    {
+      "id": "bind-be3e724b-8306-4ced-b097-d9bdf44fff1f",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1781764390138",
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "color": "#10B981",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "не нашел в црм",
+          "content": "Отправьте пожалуйста почту с которой вы зарегистрировались на нашем сайте и юзернейм из личного кабинета, пример Игрок12345.",
+          "updatedAt": "2026-06-18T06:33:10.138Z"
+        },
+        {
+          "language": "en",
+          "title": "не нашел в црм",
+          "content": "Please send us the email address you used to register on our website and your username from your personal account, for example: Player12345.",
+          "updatedAt": "2026-06-18T07:23:23.604Z"
+        },
+        {
+          "language": "de",
+          "title": "не нашел в црм",
+          "content": "Bitte senden Sie uns die E-Mail-Adresse, mit der Sie sich auf unserer Website registriert haben, sowie Ihren Benutzernamen aus Ihrem persönlichen Konto, zum Beispiel: Spieler12345.",
+          "updatedAt": "2026-06-18T06:33:10.137Z"
+        },
+        {
+          "language": "pt",
+          "title": "не нашел в црм",
+          "content": "Por favor, envie-nos o e-mail que utilizou para se registrar em nosso site e o seu nome de utilizador da conta pessoal, por exemplo: Jogador12345.",
+          "updatedAt": "2026-06-18T06:33:10.137Z"
+        },
+        {
+          "language": "el",
+          "title": "не нашел в црм",
+          "content": "Παρακαλούμε στείλτε μας το email με το οποίο εγγραφήκατε στον ιστότοπό μας και το όνομα χρήστη από τον προσωπικό σας λογαριασμό, για παράδειγμα: Παίκτης12345.",
+          "updatedAt": "2026-06-18T06:33:10.137Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T06:33:10.138Z",
+      "updatedAt": "2026-06-18T07:23:23.604Z"
+    },
+    {
+      "id": "bind-36be1405-bd4d-419e-af57-8b19f2e7ddcb",
+      "ownerId": null,
+      "imported": false,
+      "slug": "1",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-0355c749-6dc0-4804-a699-b2a9fa047f2d",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "дубль 1 сообщение",
+          "content": "Уважаемый пользователь, бонус недоступен для вашего аккаунта. Обращаю ваше внимание, что ваш аккаунт признан ДУБЛИРУЮЩИМ, что противоречит правилам нашего проекта. В связи с этим аккаунт будет закрыт. Это решение является окончательным и не подлежит пересмотру.",
+          "updatedAt": "2026-06-18T07:36:59.748Z"
+        },
+        {
+          "language": "en",
+          "title": "дубль 1 сообщение",
+          "content": "Dear user, the bonus is not available for your account. I would like to draw your attention to the fact that your account has been recognized as DUPLICATING, which contradicts the rules of our project. As a result, the account will be closed. This decision is final and not subject to review.",
+          "updatedAt": "2026-06-18T07:37:03.400Z"
+        },
+        {
+          "language": "de",
+          "title": "дубль 1 сообщение",
+          "content": "Lieber Nutzer, der Bonus ist für Ihr Konto nicht verfügbar. Ich möchte Ihre Aufmerksamkeit darauf lenken, dass Ihr Konto als DUPLICATING anerkannt wurde, was den Regeln unseres Projekts widerspricht. Daher wird das Konto geschlossen. Diese Entscheidung ist endgültig und kann nicht überprüft werden.",
+          "updatedAt": "2026-06-18T07:36:59.747Z"
+        },
+        {
+          "language": "pt",
+          "title": "дубль 1 сообщение",
+          "content": "Caro usuário, o bônus não está disponível para a sua conta. Chamo a sua atenção para o fato de que a sua conta foi considerada DUBLANTE, o que contraria as regras do nosso projeto. Em decorrência disso, a conta será fechada. Esta decisão é definitiva e não pode ser contestada.",
+          "updatedAt": "2026-06-18T07:36:59.747Z"
+        },
+        {
+          "language": "el",
+          "title": "дубль 1 сообщение",
+          "content": "Αξιότιμε χρήστη, το μπόνους δεν είναι διαθέσιμο για τον λογαριασμό σας. Θα θέλαμε να σας ενημερώσουμε ότι ο λογαριασμός σας αναγνωρίστηκε ως ΔΙΠΛΟΤΥΠΟΣ, κάτι που παραβιάζει τους κανόνες του έργου μας. Σε σχέση με αυτό, ο λογαριασμός θα κλείσει. Η απόφαση αυτή είναι οριστική και δεν υπόκειται σε αναθεώρηση.",
+          "updatedAt": "2026-06-18T07:36:59.747Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:36:59.748Z",
+      "updatedAt": "2026-06-18T07:37:03.400Z"
+    },
+    {
+      "id": "bind-b84a7bf9-e225-43bc-9ace-5f095885470a",
+      "ownerId": null,
+      "imported": false,
+      "slug": "2",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-0355c749-6dc0-4804-a699-b2a9fa047f2d",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "дубль 2 сообщение",
+          "content": "Желаю вам удачи и всего самого доброго! Пожалуйста, продолжайте играть со своего основного аккаунта.\nДо свидания!",
+          "updatedAt": "2026-06-18T07:37:38.872Z"
+        },
+        {
+          "language": "en",
+          "title": "дубль 2 сообщение",
+          "content": "I wish you good luck and all the best! Please continue to play from your main account. Goodbye!",
+          "updatedAt": "2026-06-18T07:37:42.024Z"
+        },
+        {
+          "language": "de",
+          "title": "дубль 2 сообщение",
+          "content": "Ich wünsche dir viel Glück und alles Gute! Bitte spiele weiterhin von deinem Hauptkonto. Auf Wiedersehen!",
+          "updatedAt": "2026-06-18T07:37:38.872Z"
+        },
+        {
+          "language": "pt",
+          "title": "дубль 2 сообщение",
+          "content": "Desejo-lhe boa sorte e tudo de bom! Por favor, continue jogando com sua conta principal. Até logo!",
+          "updatedAt": "2026-06-18T07:37:38.872Z"
+        },
+        {
+          "language": "el",
+          "title": "дубль 2 сообщение",
+          "content": "Σας εύχομαι καλή τύχη και ό,τι καλύτερο! Παρακαλώ συνεχίστε να παίζετε από τον κύριο λογαριασμό σας.\nΑντίο!",
+          "updatedAt": "2026-06-18T07:37:38.872Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:37:38.872Z",
+      "updatedAt": "2026-06-18T07:37:42.024Z"
+    },
+    {
+      "id": "bind-15876def-d98b-430a-aa54-d0c72843bdac",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1781768414762",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-1d588708-adfd-4a0a-b0ce-8fa5a12f81c9",
+      "color": "#3B82F6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Вериф за бонус",
+          "content": "Чтобы получить бонус, вам необходимо сначала пройти автоматическую верификацию на сайте .\nПосле успешной верификации посетите чат, чтобы получить свой бонус .",
+          "updatedAt": "2026-06-18T07:40:14.762Z"
+        },
+        {
+          "language": "en",
+          "title": "Вериф за бонус",
+          "content": "To receive the bonus, you must first go through automatic verification on the website. After successful verification, visit the chat to receive your bonus.",
+          "updatedAt": "2026-06-18T07:40:19.634Z"
+        },
+        {
+          "language": "de",
+          "title": "Вериф за бонус",
+          "content": "Um den Bonus zu erhalten, müssen Sie zuerst die automatische Verifizierung auf der Website durchlaufen. Nach erfolgreicher Verifizierung besuchen Sie den Chat, um Ihren Bonus zu erhalten.",
+          "updatedAt": "2026-06-18T07:40:14.762Z"
+        },
+        {
+          "language": "pt",
+          "title": "Вериф за бонус",
+          "content": "Para obter o bônus, você precisa primeiro passar pela verificação automática no site. Após a verificação bem-sucedida, visite o chat para receber seu bônus.",
+          "updatedAt": "2026-06-18T07:40:14.762Z"
+        },
+        {
+          "language": "el",
+          "title": "Вериф за бонус",
+          "content": "Για να λάβετε το μπόνους, θα πρέπει πρώτα να ολοκληρώσετε την αυτόματη επαλήθευση (verification) στον ιστότοπο.\nΜόλις η επαλήθευση ολοκληρωθεί επιτυχώς, παρακαλούμε επισκεφθείτε ξανά τη συνομιλία (chat), ώστε να σας πιστώσουμε το μπόνους σας.",
+          "updatedAt": "2026-06-18T07:40:14.762Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:40:14.762Z",
+      "updatedAt": "2026-06-18T07:40:19.634Z"
+    },
+    {
+      "id": "bind-4fd7c991-2b99-4443-ba8e-ad6b18ae9072",
+      "ownerId": null,
+      "sourceHash": "2f5019a9963b23a4c700f0bd299e399264a45915ffba73ed401f840c92a1c8a1",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "std-2f5019a9",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "STD условия",
+          "content": "SPORTS BONUS WAGERING RULES To successfully complete the wagering requirements, please follow these conditions:  Maximum stake per bet: €50 Single Bet: Minimum odds 2.00 Accumulator Bet: At least 3 selections, each with minimum odds of 1.50 The following bets do NOT count towards wagering: • Handicap markets; • Over/Under markets; • Odd/Even markets; • Virtual Sports (FIFA, NBA 2K, eSoccer, etc.); • Multiple bets placed on the same event (only the first one counts); • Bets settled using the Cashout feature. For the best experience, we recommend placing bets on the 1-X-2 market, following the minimum odds requirements, and keeping each stake within the €50 limit.",
+          "updatedAt": "2026-06-18T07:45:21.690Z"
+        },
+        {
+          "language": "en",
+          "title": "STD условия",
+          "content": "SPORTS BONUS WAGERING RULES To successfully complete the wagering requirements, please follow these conditions:  Maximum stake per bet: €50 Single Bet: Minimum odds 2.00 Accumulator Bet: At least 3 selections, each with minimum odds of 1.50 The following bets do NOT count towards wagering: • Handicap markets; • Over/Under markets; • Odd/Even markets; • Virtual Sports (FIFA, NBA 2K, eSoccer, etc.); • Multiple bets placed on the same event (only the first one counts); • Bets settled using the Cashout feature. For the best experience, we recommend placing bets on the 1-X-2 market, following the minimum odds requirements, and keeping each stake within the €50 limit.",
+          "updatedAt": "2026-06-18T07:45:21.690Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:45:21.690Z"
+    },
+    {
+      "id": "bind-201b2810-e79a-473b-a2d1-fc9df25beb1f",
+      "ownerId": null,
+      "sourceHash": "cfed8c0583e7df089e72195c61349ca006f99b86b5d1db6c00a56e1fe182febe",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "freebet-cfed8c05",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "FreeBet условия",
+          "content": "How to Use Your FreeBet\nPlease keep the following rules in mind:\n• Your FreeBet must be used in full on a single bet.\n• If only part of the FreeBet is used, the remaining amount will be automatically forfeited.\n• There are no minimum odds requirements unless otherwise stated in the promotion.\n• If you use the Cashout feature on a FreeBet wager, the FreeBet will be cancelled and the bet will not qualify.\nBefore confirming your bet, please make sure the entire FreeBet amount is being used.",
+          "updatedAt": "2026-06-18T07:45:01.554Z"
+        },
+        {
+          "language": "en",
+          "title": "FreeBet условия",
+          "content": "How to Use Your FreeBet\nPlease keep the following rules in mind:\n• Your FreeBet must be used in full on a single bet.\n• If only part of the FreeBet is used, the remaining amount will be automatically forfeited.\n• There are no minimum odds requirements unless otherwise stated in the promotion.\n• If you use the Cashout feature on a FreeBet wager, the FreeBet will be cancelled and the bet will not qualify.\nBefore confirming your bet, please make sure the entire FreeBet amount is being used.",
+          "updatedAt": "2026-06-18T07:45:01.554Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:45:01.554Z"
+    },
+    {
+      "id": "bind-21736c93-5acd-4800-a56a-cd605a4088a5",
+      "ownerId": null,
+      "sourceHash": "ae3c21da39ed8f5ec323fd14427c42d9aa9523a3ce86e989a293cd91eac5f615",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "no-risk-bet-ae3c21da",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "No Risk Bet условия",
+          "content": "How to Use Your No Risk Bet\nPlease note the following rules:\n• Your No Risk Bet must be used in full on your very first bet.\n• There are no restrictions on bet type or odds.\n• If only part of the No Risk Bet is used, the remaining bonus amount will be forfeited.\n• If you use the Cashout feature, the No Risk Bet will be cancelled and will not qualify.\n• If your qualifying bet loses, the full stake amount will be refunded to your account.\nTo avoid losing any bonus value, we recommend using the entire No Risk Bet on a single qualifying wager.",
+          "updatedAt": "2026-06-18T07:46:13.314Z"
+        },
+        {
+          "language": "en",
+          "title": "No Risk Bet условия",
+          "content": "How to Use Your No Risk Bet\nPlease note the following rules:\n• Your No Risk Bet must be used in full on your very first bet.\n• There are no restrictions on bet type or odds.\n• If only part of the No Risk Bet is used, the remaining bonus amount will be forfeited.\n• If you use the Cashout feature, the No Risk Bet will be cancelled and will not qualify.\n• If your qualifying bet loses, the full stake amount will be refunded to your account.\nTo avoid losing any bonus value, we recommend using the entire No Risk Bet on a single qualifying wager.",
+          "updatedAt": "2026-06-18T07:46:13.314Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:46:13.314Z"
+    },
+    {
+      "id": "bind-a70d1245-e8e2-44a8-b67b-f47756149dde",
+      "ownerId": null,
+      "sourceHash": "a3e3c0620491a8b8c34568d942f55dc3b0642c22c545b333b4da5e9096c51c66",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "free-money-bet-a3e3c062",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Free Money Bet условия",
+          "content": "How to Use Your Free Money Bet (FMB)\nPlease note the following rules:\n• Your Free Money Bet must be used in full on your very first bet.\n• There are no restrictions on bet type or odds.\n• If only part of the Free Money Bet is used, the remaining bonus amount will be forfeited.\n• If you use the Cashout feature, the Free Money Bet will be cancelled and will not qualify.\nUnlike a FreeBet, any winnings from a Free Money Bet are credited in full.\nThis means your original stake is NOT deducted from your winnings, unlike with a standard FreeBet.\nWe recommend using the entire Free Money Bet on a single qualifying wager to receive the maximum possible benefit.",
+          "updatedAt": "2026-06-18T07:46:30.834Z"
+        },
+        {
+          "language": "en",
+          "title": "Free Money Bet условия",
+          "content": "How to Use Your Free Money Bet (FMB)\nPlease note the following rules:\n• Your Free Money Bet must be used in full on your very first bet.\n• There are no restrictions on bet type or odds.\n• If only part of the Free Money Bet is used, the remaining bonus amount will be forfeited.\n• If you use the Cashout feature, the Free Money Bet will be cancelled and will not qualify.\nUnlike a FreeBet, any winnings from a Free Money Bet are credited in full.\nThis means your original stake is NOT deducted from your winnings, unlike with a standard FreeBet.\nWe recommend using the entire Free Money Bet on a single qualifying wager to receive the maximum possible benefit.",
+          "updatedAt": "2026-06-18T07:46:30.834Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:46:30.834Z"
+    },
+    {
+      "id": "bind-c37f74ba-044f-4832-bbcc-9e589efb7f66",
+      "ownerId": null,
+      "sourceHash": "178b50f3f1a917fc75a03a8ec429dd3f101c2202fc354baa35a7fdd96696a539",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "1-x-2-178b50f3",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Что такое 1-x-2",
+          "content": "What does the 1-X-2 market mean?\nThe 1-X-2 market is the standard match result market:\n1 – Home team wins.\nX – Draw.\n2 – Away team wins.\nFor sports bonus wagering, we recommend placing bets on this market to ensure they meet the promotion requirements.",
+          "updatedAt": "2026-06-18T07:46:45.218Z"
+        },
+        {
+          "language": "en",
+          "title": "Что такое 1-x-2",
+          "content": "What does the 1-X-2 market mean?\nThe 1-X-2 market is the standard match result market:\n1 – Home team wins.\nX – Draw.\n2 – Away team wins.\nFor sports bonus wagering, we recommend placing bets on this market to ensure they meet the promotion requirements.",
+          "updatedAt": "2026-06-18T07:46:45.218Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:46:45.218Z"
+    },
+    {
+      "id": "bind-3b06af7a-d933-4c35-9978-11a52b608247",
+      "ownerId": null,
+      "sourceHash": "2b04054afb88f8c491b5c958f2582542d1d3dcd639520c005efdc90fd3ae07f6",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "imported-bind-2b04054a",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Ставка была сделана не верно согласно условиям бонуса",
+          "content": "Unfortunately, your bet did not qualify for the bonus wagering requirements because it did not meet one or more promotion conditions.\nThe most common reasons are:\n• A restricted market was selected (Handicap, Over/Under, Odd/Even);\n• The odds were below the required minimum;\n• The Cashout feature was used;\n• The stake exceeded the €50 maximum limit;\n• It was a repeated bet on the same event;\n• The bet was placed on Virtual Sports.\nIf you provide your bet ID, we'll be happy to review it and explain exactly why it did not qualify.",
+          "updatedAt": "2026-06-18T07:47:19.183Z"
+        },
+        {
+          "language": "en",
+          "title": "Ставка была сделана не верно согласно условиям бонуса",
+          "content": "Unfortunately, your bet did not qualify for the bonus wagering requirements because it did not meet one or more promotion conditions.\nThe most common reasons are:\n• A restricted market was selected (Handicap, Over/Under, Odd/Even);\n• The odds were below the required minimum;\n• The Cashout feature was used;\n• The stake exceeded the €50 maximum limit;\n• It was a repeated bet on the same event;\n• The bet was placed on Virtual Sports.\nIf you provide your bet ID, we'll be happy to review it and explain exactly why it did not qualify.",
+          "updatedAt": "2026-06-18T07:47:19.183Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.104Z",
+      "updatedAt": "2026-06-18T07:47:19.183Z"
+    },
+    {
+      "id": "bind-8a7382b8-e6ee-4bcd-b481-3a8482fe0c4c",
+      "ownerId": null,
+      "sourceHash": "3ec2121e1ece8404caea9a7ec7a0a25533de4790302e5bd3ce84fa9614dd0195",
+      "importBatchId": "sheet-1006abc05b00dbf2",
+      "imported": true,
+      "slug": "imported-bind-3ec2121e",
+      "categoryId": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
+      "color": "#1ab1dd",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Как используется баланс",
+          "content": "Order of Balance Usage When Placing Sports Bets\nWhen you place a sports bet, your funds are used in the following order:\nFreeBet / No Risk Bet (if available);\nReal Money Balance;\nRegular Bonus Balance.\nThis means that if you have an active FreeBet or No Risk Bet, it will always be used before your real balance.",
+          "updatedAt": "2026-06-18T07:47:35.523Z"
+        },
+        {
+          "language": "en",
+          "title": "Как используется баланс",
+          "content": "Order of Balance Usage When Placing Sports Bets\nWhen you place a sports bet, your funds are used in the following order:\nFreeBet / No Risk Bet (if available);\nReal Money Balance;\nRegular Bonus Balance.\nThis means that if you have an active FreeBet or No Risk Bet, it will always be used before your real balance.",
+          "updatedAt": "2026-06-18T07:47:35.523Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-18T07:43:08.105Z",
+      "updatedAt": "2026-06-18T07:47:35.523Z"
+    }
+  ],
+  "language": "en"
+}

@@ -210,7 +210,7 @@ export function ProjectEmailsPage() {
 				upsertRecords(preview.records);
 			}
 
-			showToast(`Imported ${preview.records.length} projects`);
+			showToast(`Imported and saved ${preview.records.length} projects`);
 			setPreview(undefined);
 		} finally {
 			setCommitting(false);
