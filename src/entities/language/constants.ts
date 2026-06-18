@@ -14,12 +14,6 @@ export const languages: Language[] = [
     enabled: true,
   },
   {
-    code: "el",
-    name: "Greek",
-    flag: "🇬🇷",
-    enabled: true,
-  },
-  {
     code: "de",
     name: "German",
     flag: "🇩🇪",
@@ -31,4 +25,10 @@ export const languages: Language[] = [
     flag: "🇵🇹",
     enabled: true,
   },
+    {
+    code: "el",
+    name: "Greek",
+    flag: "🇬🇷",
+    enabled: true,
+  }
 ]
