@@ -26,6 +26,7 @@ import type { Bind } from "@/entities/bind";
 import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
+import { supportOSExportService } from "@/services/supportos-export.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { modalManager } from "@/shared/modals/modal.store";
 import { type LanguageCode, useKnowledgeStore } from "@/store";
@@ -130,7 +131,7 @@ export function Topbar() {
 	};
 
 	const exportJson = () => {
-		const blob = new Blob([knowledgeService.exportJson()], {
+		const blob = new Blob([supportOSExportService.exportJson()], {
 			type: "application/json",
 		});
 		const url = URL.createObjectURL(blob);
@@ -142,7 +143,7 @@ export function Topbar() {
 		link.click();
 		document.body.removeChild(link);
 		URL.revokeObjectURL(url);
-		showToast("JSON exported");
+		showToast("SupportOS JSON exported");
 	};
 
 	const importJson = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -153,8 +154,8 @@ export function Topbar() {
 		try {
 			const text = await file.text();
 
-			knowledgeService.importJson(text);
-			showToast("JSON imported");
+			supportOSExportService.importJson(text);
+			showToast("SupportOS JSON imported");
 		} catch {
 			showToast("Import failed");
 		} finally {
