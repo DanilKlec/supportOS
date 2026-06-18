@@ -1,15 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-	Bot,
-	BrainCircuit,
-	Clock3,
 	Contact,
 	FileSpreadsheet,
 	FileText,
 	Gift,
-	Languages,
 	Plus,
-	Settings,
 	Star,
 } from "lucide-react";
 
@@ -36,17 +31,12 @@ export function Sidebar() {
 	const tree = useKnowledgeStore((s) => s.tree);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const favorites = useKnowledgeStore((s) => s.favorites);
-	const recent = useKnowledgeStore((s) => s.recent);
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 
 	const favoriteBinds = favorites
 		.map((id) => binds.find((bind) => bind.id === id))
 		.filter((bind): bind is Bind => Boolean(bind));
-	const recentBinds = recent
-		.map((id) => binds.find((bind) => bind.id === id))
-		.filter((bind): bind is Bind => Boolean(bind));
-
 	const createCategory = () => {
 		modalManager.open("createCategory");
 	};

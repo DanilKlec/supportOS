@@ -1,3 +1,4 @@
+import { defaultLocalDataService } from "@/services/default-local-data.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 
@@ -29,6 +30,8 @@ export async function bootstrapApp() {
 	knowledgeInitialized = true;
 
 	await knowledgeService.loadKnowledge();
+	defaultLocalDataService.apply();
+
 	const session = await bootstrapAuth();
 
 	if (session && shouldAutoSyncCloud()) {

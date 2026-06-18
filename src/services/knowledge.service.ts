@@ -202,7 +202,33 @@ function updateTranslation(
 	return next;
 }
 
-function seedKnowledge(): KnowledgeDatabase {
+async function loadConfiguredSeedKnowledge() {
+	try {
+		const module = await import(
+			"@/entities/knowledge/mock/defaultKnowledge.json"
+		);
+		const config = module.default;
+
+		if (
+			config &&
+			Array.isArray(config.categories) &&
+			Array.isArray(config.folders) &&
+			Array.isArray(config.binds)
+		) {
+			return normalizeDatabase(config as unknown as Partial<StoredKnowledge>);
+		}
+	} catch {
+		return undefined;
+	}
+
+	return undefined;
+}
+
+async function seedKnowledge(): Promise<KnowledgeDatabase> {
+	const configuredSeed = await loadConfiguredSeedKnowledge();
+
+	if (configuredSeed) return configuredSeed;
+
 	const binds = clone(mockBinds);
 
 	return {
@@ -307,7 +333,7 @@ class KnowledgeService {
 
 	async loadKnowledge(): Promise<KnowledgeDatabase> {
 		const storedDatabase = await this.readStorage();
-		const database = storedDatabase ?? seedKnowledge();
+		const database = storedDatabase ?? (await seedKnowledge());
 
 		useKnowledgeStore.getState().setKnowledge(database);
 		this.startAutoSave();
