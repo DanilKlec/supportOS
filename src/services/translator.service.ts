@@ -23,6 +23,19 @@ interface LibreTranslateResponse {
 	message?: string;
 }
 
+interface MyMemoryResponse {
+	responseData?: {
+		translatedText?: string;
+		match?: number;
+	};
+	responseStatus?: number;
+	responseDetails?: string;
+	matches?: Array<{
+		translation?: string;
+		match?: number;
+	}>;
+}
+
 interface ProtectedSegment {
 	token: string;
 	value: string;
@@ -33,41 +46,23 @@ const LANGUAGE_ALIASES = new Map(
 		auto: "auto",
 		automatic: "auto",
 		english: "en",
-		английский: "en",
 		russian: "ru",
-		русский: "ru",
 		german: "de",
-		немецкий: "de",
 		portuguese: "pt",
-		португальский: "pt",
 		greek: "el",
-		греческий: "el",
 		spanish: "es",
-		испанский: "es",
 		french: "fr",
-		французский: "fr",
 		italian: "it",
-		итальянский: "it",
 		turkish: "tr",
-		турецкий: "tr",
 		polish: "pl",
-		польский: "pl",
 		ukrainian: "uk",
-		украинский: "uk",
 		japanese: "ja",
-		японский: "ja",
 		chinese: "zh",
-		китайский: "zh",
 		korean: "ko",
-		корейский: "ko",
 		arabic: "ar",
-		арабский: "ar",
 		dutch: "nl",
-		нидерландский: "nl",
 		czech: "cs",
-		чешский: "cs",
 		hindi: "hi",
-		хинди: "hi",
 	}),
 );
 
@@ -100,8 +95,48 @@ const PROTECTED_PATTERNS = [
 	{ prefix: "URL", pattern: /https?:\/\/[^\s<)]+/g },
 ];
 
+const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
+const MYMEMORY_MAX_CHUNK_BYTES = 450;
+
 function escapeRegExp(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getByteLength(value: string) {
+	return new TextEncoder().encode(value).length;
+}
+
+function inferSourceLanguage(text: string) {
+	if (/[\u0400-\u04ff]/.test(text)) return "ru";
+	if (/[\u0370-\u03ff]/.test(text)) return "el";
+	if (/[\u3040-\u30ff]/.test(text)) return "ja";
+	if (/[\u4e00-\u9fff]/.test(text)) return "zh";
+	if (/[\uac00-\ud7af]/.test(text)) return "ko";
+	if (/[\u0600-\u06ff]/.test(text)) return "ar";
+
+	return "en";
+}
+
+function splitTextByByteLimit(text: string, maxBytes: number) {
+	if (getByteLength(text) <= maxBytes) return [text];
+
+	const chunks: string[] = [];
+	let chunk = "";
+
+	for (const char of Array.from(text)) {
+		if (chunk && getByteLength(`${chunk}${char}`) > maxBytes) {
+			chunks.push(chunk);
+			chunk = "";
+		}
+
+		chunk += char;
+	}
+
+	if (chunk) {
+		chunks.push(chunk);
+	}
+
+	return chunks;
 }
 
 function protectStaticSegments(input: string) {
@@ -151,6 +186,10 @@ class TranslatorService {
 	}
 
 	async getLanguages(): Promise<TranslatorLanguage[]> {
+		if (useTranslatorStore.getState().provider === "mymemory") {
+			return FALLBACK_LANGUAGES;
+		}
+
 		const endpoint = this.getEndpoint();
 		const response = await this.request(
 			this.createUrl(endpoint, "/languages"),
@@ -187,6 +226,16 @@ class TranslatorService {
 	}
 
 	async testConnection() {
+		if (useTranslatorStore.getState().provider === "mymemory") {
+			await this.translate({
+				text: "Hello",
+				fromLanguage: "en",
+				toLanguage: "ru",
+			});
+
+			return true;
+		}
+
 		await this.getLanguages();
 		return true;
 	}
@@ -216,38 +265,99 @@ class TranslatorService {
 			throw new TranslatorServiceError("Target language cannot be Auto");
 		}
 
-		const endpoint = this.getEndpoint();
+		const { provider } = useTranslatorStore.getState();
+		const endpoint = provider === "libretranslate" ? this.getEndpoint() : "";
+		const effectiveSourceLanguage =
+			provider === "mymemory" && sourceLanguage === "auto"
+				? inferSourceLanguage(sourceText)
+				: sourceLanguage;
 		const protectedSource = protectStaticSegments(sourceText);
-		const response = await this.sendTranslateRequest({
-			endpoint,
-			text: protectedSource.text,
-			sourceLanguage,
-			targetLanguage,
-		});
-		const data = await this.readJson<LibreTranslateResponse>(
-			response,
-			"Translator returned an invalid response",
-		);
-		const translatedText = data.translatedText ?? data.translated_text;
-
-		if (typeof translatedText !== "string") {
-			throw new TranslatorServiceError(
-				data.error ?? data.message ?? "Translator returned an empty response",
-				response.status,
-			);
-		}
+		const translatedText =
+			provider === "mymemory"
+				? await this.translateWithMyMemory({
+						text: protectedSource.text,
+						sourceLanguage: effectiveSourceLanguage,
+						targetLanguage,
+					})
+				: await this.translateWithLibreTranslate({
+						endpoint,
+						text: protectedSource.text,
+						sourceLanguage: effectiveSourceLanguage,
+						targetLanguage,
+					});
 
 		return {
 			text: protectedSource.restore(translatedText),
-			fromLanguage: sourceLanguage,
+			fromLanguage: effectiveSourceLanguage,
 			toLanguage: targetLanguage,
-			model: this.isBuiltInEndpoint(endpoint)
-				? "LibreTranslate Built-In"
-				: "LibreTranslate",
+			model:
+				provider === "mymemory"
+					? "MyMemory"
+					: this.isBuiltInEndpoint(endpoint)
+						? "LibreTranslate Built-In"
+						: "LibreTranslate",
 		};
 	}
 
-	private async sendTranslateRequest({
+	private async translateWithMyMemory({
+		text,
+		sourceLanguage,
+		targetLanguage,
+	}: {
+		text: string;
+		sourceLanguage: string;
+		targetLanguage: string;
+	}) {
+		const { apiKey, email } = useTranslatorStore.getState();
+		const chunks = splitTextByByteLimit(text, MYMEMORY_MAX_CHUNK_BYTES);
+		const translatedChunks: string[] = [];
+
+		for (const chunk of chunks) {
+			if (!chunk.trim()) {
+				translatedChunks.push(chunk);
+				continue;
+			}
+
+			const url = new URL(MYMEMORY_ENDPOINT);
+
+			url.searchParams.set("q", chunk);
+			url.searchParams.set("langpair", `${sourceLanguage}|${targetLanguage}`);
+			url.searchParams.set("mt", "1");
+
+			if (email.trim()) {
+				url.searchParams.set("de", email.trim());
+			}
+
+			if (apiKey.trim()) {
+				url.searchParams.set("key", apiKey.trim());
+			}
+
+			const response = await this.request(url.toString(), {
+				method: "GET",
+			});
+			const data = await this.readJson<MyMemoryResponse>(
+				response,
+				"MyMemory returned an invalid response",
+			);
+			const status = data.responseStatus ?? response.status;
+			const translatedText =
+				data.responseData?.translatedText ??
+				data.matches?.find((match) => match.translation)?.translation;
+
+			if (status >= 400 || typeof translatedText !== "string") {
+				throw new TranslatorServiceError(
+					data.responseDetails || "MyMemory translation failed",
+					status,
+				);
+			}
+
+			translatedChunks.push(translatedText);
+		}
+
+		return translatedChunks.join("");
+	}
+
+	private async translateWithLibreTranslate({
 		endpoint,
 		text,
 		sourceLanguage,
@@ -261,19 +371,24 @@ class TranslatorService {
 		const { apiKey } = useTranslatorStore.getState();
 
 		if (this.isBuiltInEndpoint(endpoint)) {
-			return this.request(this.createUrl(endpoint, "/translate"), {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
+			const response = await this.request(
+				this.createUrl(endpoint, "/translate"),
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						text,
+						source: sourceLanguage,
+						target: targetLanguage,
+						format: "text",
+						apiKey: apiKey.trim() || undefined,
+					}),
 				},
-				body: JSON.stringify({
-					text,
-					source: sourceLanguage,
-					target: targetLanguage,
-					format: "text",
-					apiKey: apiKey.trim() || undefined,
-				}),
-			});
+			);
+
+			return this.readLibreTranslateText(response);
 		}
 
 		const formData = new FormData();
@@ -287,10 +402,32 @@ class TranslatorService {
 			formData.set("api_key", apiKey.trim());
 		}
 
-		return this.request(this.createUrl(endpoint, "/translate"), {
-			method: "POST",
-			body: formData,
-		});
+		const response = await this.request(
+			this.createUrl(endpoint, "/translate"),
+			{
+				method: "POST",
+				body: formData,
+			},
+		);
+
+		return this.readLibreTranslateText(response);
+	}
+
+	private async readLibreTranslateText(response: Response) {
+		const data = await this.readJson<LibreTranslateResponse>(
+			response,
+			"Translator returned an invalid response",
+		);
+		const translatedText = data.translatedText ?? data.translated_text;
+
+		if (typeof translatedText !== "string") {
+			throw new TranslatorServiceError(
+				data.error ?? data.message ?? "Translator returned an empty response",
+				response.status,
+			);
+		}
+
+		return translatedText;
 	}
 
 	private getEndpoint() {
@@ -335,11 +472,7 @@ class TranslatorService {
 			response = await fetch(url, init);
 		} catch (error) {
 			throw new TranslatorServiceError(
-				error instanceof TypeError
-					? "Translator server is unavailable."
-					: error instanceof Error
-						? error.message
-						: "Unable to reach translator server",
+				error instanceof Error ? error.message : "Unable to reach translator",
 			);
 		}
 
@@ -348,13 +481,16 @@ class TranslatorService {
 
 			if (response.status === 401 || response.status === 403) {
 				throw new TranslatorServiceError(
-					"LibreTranslate API key is required or invalid.",
+					"Translator API key is required or invalid.",
 					response.status,
 				);
 			}
 
 			throw new TranslatorServiceError(
-				data.error ?? data.message ?? "LibreTranslate request failed",
+				data.error ??
+					data.message ??
+					data.responseDetails ??
+					"Translation request failed",
 				response.status,
 			);
 		}
@@ -372,7 +508,8 @@ class TranslatorService {
 
 	private async readError(response: Response) {
 		try {
-			return (await response.json()) as LibreTranslateResponse;
+			return (await response.json()) as LibreTranslateResponse &
+				MyMemoryResponse;
 		} catch {
 			return {};
 		}

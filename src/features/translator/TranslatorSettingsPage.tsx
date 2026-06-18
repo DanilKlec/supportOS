@@ -8,10 +8,14 @@ import {
 } from "@/store/translator.store";
 
 export function TranslatorSettingsPage() {
+	const provider = useTranslatorStore((state) => state.provider);
 	const endpoint = useTranslatorStore((state) => state.endpoint);
 	const apiKey = useTranslatorStore((state) => state.apiKey);
+	const email = useTranslatorStore((state) => state.email);
+	const setProvider = useTranslatorStore((state) => state.setProvider);
 	const setEndpoint = useTranslatorStore((state) => state.setEndpoint);
 	const setApiKey = useTranslatorStore((state) => state.setApiKey);
+	const setEmail = useTranslatorStore((state) => state.setEmail);
 	const useBuiltInEndpoint = useTranslatorStore(
 		(state) => state.useBuiltInEndpoint,
 	);
@@ -27,17 +31,13 @@ export function TranslatorSettingsPage() {
 		setMessage("");
 
 		try {
-			const languages = await translatorService.getLanguages();
+			await translatorService.testConnection();
 
 			setStatus("ok");
-			setMessage(`Connected. Languages loaded: ${languages.length}.`);
+			setMessage("Connected. Translation provider is ready.");
 		} catch (error) {
 			setStatus("error");
-			setMessage(
-				error instanceof Error
-					? error.message
-					: "Unable to connect to LibreTranslate.",
-			);
+			setMessage(error instanceof Error ? error.message : "Unable to connect.");
 		} finally {
 			setChecking(false);
 		}
@@ -49,50 +49,117 @@ export function TranslatorSettingsPage() {
 				<div className="mb-6">
 					<h1 className="text-2xl font-bold">Translator Settings</h1>
 					<p className="mt-1 text-sm text-muted">
-						Configure the free LibreTranslate provider used by SupportOS.
+						Choose the translation provider used by SupportOS.
 					</p>
 				</div>
 
 				<div className="space-y-5 rounded-lg border border-border bg-surface p-5">
-					<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
-						<div>
-							<div className="text-sm font-medium">Endpoint Mode</div>
-							<div className="text-xs text-muted">
-								{isBuiltIn ? "Built-in endpoint" : "Custom endpoint"}
+					<div className="grid gap-3 sm:grid-cols-2">
+						<button
+							type="button"
+							onClick={() => setProvider("mymemory")}
+							className={`rounded-md border px-4 py-3 text-left ${
+								provider === "mymemory"
+									? "border-accent bg-accent/10 text-foreground"
+									: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
+							}`}
+						>
+							<div className="text-sm font-semibold">Simple Free</div>
+							<div className="mt-1 text-xs text-muted">
+								No extra server. Uses MyMemory API directly.
 							</div>
-						</div>
+						</button>
 
 						<button
 							type="button"
-							onClick={useBuiltInEndpoint}
-							disabled={isBuiltIn || checking}
-							className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							onClick={() => setProvider("libretranslate")}
+							className={`rounded-md border px-4 py-3 text-left ${
+								provider === "libretranslate"
+									? "border-accent bg-accent/10 text-foreground"
+									: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
+							}`}
 						>
-							<RotateCcw size={16} />
-							Use Built-In
+							<div className="text-sm font-semibold">LibreTranslate</div>
+							<div className="mt-1 text-xs text-muted">
+								For a custom LibreTranslate server or Vercel proxy.
+							</div>
 						</button>
 					</div>
 
-					<label className="block space-y-2">
-						<span className="text-sm font-medium">LibreTranslate Endpoint</span>
-						<input
-							value={endpoint}
-							onChange={(event) => setEndpoint(event.target.value)}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="/api/translator"
-						/>
-					</label>
+					{provider === "mymemory" ? (
+						<div className="space-y-4">
+							<label className="block space-y-2">
+								<span className="text-sm font-medium">Contact Email</span>
+								<input
+									type="email"
+									value={email}
+									onChange={(event) => setEmail(event.target.value)}
+									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Optional"
+								/>
+							</label>
 
-					<label className="block space-y-2">
-						<span className="text-sm font-medium">API Key</span>
-						<input
-							type="password"
-							value={apiKey}
-							onChange={(event) => setApiKey(event.target.value)}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Optional"
-						/>
-					</label>
+							<label className="block space-y-2">
+								<span className="text-sm font-medium">API Key</span>
+								<input
+									type="password"
+									value={apiKey}
+									onChange={(event) => setApiKey(event.target.value)}
+									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Optional"
+								/>
+							</label>
+
+							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+								Anonymous MyMemory usage is limited. Adding a contact email
+								increases the free daily character limit on their API.
+							</div>
+						</div>
+					) : (
+						<div className="space-y-4">
+							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+								<div>
+									<div className="text-sm font-medium">Endpoint Mode</div>
+									<div className="text-xs text-muted">
+										{isBuiltIn ? "Built-in endpoint" : "Custom endpoint"}
+									</div>
+								</div>
+
+								<button
+									type="button"
+									onClick={useBuiltInEndpoint}
+									disabled={isBuiltIn || checking}
+									className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									<RotateCcw size={16} />
+									Use Built-In
+								</button>
+							</div>
+
+							<label className="block space-y-2">
+								<span className="text-sm font-medium">
+									LibreTranslate Endpoint
+								</span>
+								<input
+									value={endpoint}
+									onChange={(event) => setEndpoint(event.target.value)}
+									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="/api/translator"
+								/>
+							</label>
+
+							<label className="block space-y-2">
+								<span className="text-sm font-medium">API Key</span>
+								<input
+									type="password"
+									value={apiKey}
+									onChange={(event) => setApiKey(event.target.value)}
+									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Optional"
+								/>
+							</label>
+						</div>
+					)}
 
 					<div className="flex flex-wrap items-center gap-3">
 						<button
@@ -119,12 +186,6 @@ export function TranslatorSettingsPage() {
 						{status === "error" && (
 							<div className="text-sm text-red-300">{message}</div>
 						)}
-					</div>
-
-					<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-						Settings are saved automatically. The built-in endpoint is used by
-						the published PWA; a custom endpoint can point to any compatible
-						LibreTranslate server.
 					</div>
 				</div>
 			</div>

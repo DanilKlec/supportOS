@@ -15,6 +15,7 @@ const CUSTOM_LANGUAGE = "__custom__";
 export function TranslatorPage() {
 	const { showToast } = useToast();
 	const endpoint = useTranslatorStore((state) => state.endpoint);
+	const provider = useTranslatorStore((state) => state.provider);
 	const [sourceText, setSourceText] = useState("");
 	const [resultText, setResultText] = useState("");
 	const [fromLanguage, setFromLanguage] = useState("auto");
@@ -59,6 +60,13 @@ export function TranslatorPage() {
 	}, [languages]);
 
 	const loadLanguages = async () => {
+		if (provider === "mymemory") {
+			setLanguages(translatorService.getFallbackLanguages());
+			setLanguageWarning("");
+			showToast("Popular languages are ready");
+			return;
+		}
+
 		if (!endpoint.trim()) {
 			setLanguageWarning("LibreTranslate endpoint is not configured.");
 			setLanguages(translatorService.getFallbackLanguages());
@@ -147,8 +155,7 @@ export function TranslatorPage() {
 					<div>
 						<h1 className="text-2xl font-bold">Translator</h1>
 						<p className="mt-1 text-sm text-muted">
-							LibreTranslate translation with markdown and code block
-							preservation.
+							Quick translation with markdown and code block preservation.
 						</p>
 					</div>
 

@@ -23,6 +23,7 @@ export interface KnowledgeDatabase
 			| "favorites"
 			| "recent"
 			| "openedTabs"
+			| "pinnedTabs"
 			| "activeTab"
 		>
 	> {
@@ -214,6 +215,7 @@ function seedKnowledge(): KnowledgeDatabase {
 		favorites: binds.filter((bind) => bind.favorite).map((bind) => bind.id),
 		recent: [],
 		openedTabs: [],
+		pinnedTabs: [],
 		activeTab: undefined,
 		selectedBind: undefined,
 		selectedCategory: undefined,
@@ -291,6 +293,7 @@ function normalizeDatabase(
 			: binds.filter((bind) => bind.favorite).map((bind) => bind.id),
 		recent: Array.isArray(database.recent) ? database.recent : [],
 		openedTabs: Array.isArray(database.openedTabs) ? database.openedTabs : [],
+		pinnedTabs: Array.isArray(database.pinnedTabs) ? database.pinnedTabs : [],
 		activeTab: database.activeTab,
 		selectedBind: database.selectedBind,
 		selectedCategory: database.selectedCategory,
@@ -511,12 +514,14 @@ class KnowledgeService {
 				override,
 			];
 			const openedTabs = store.openedTabs.filter((tabId) => tabId !== id);
+			const pinnedTabs = store.pinnedTabs.filter((tabId) => tabId !== id);
 			const activeTab =
 				store.activeTab === id ? openedTabs.at(-1) : store.activeTab;
 
 			store.setKnowledge({
 				binds,
 				openedTabs,
+				pinnedTabs,
 				activeTab,
 				selectedBind: activeTab,
 			});
@@ -529,6 +534,7 @@ class KnowledgeService {
 		const binds = store.binds.filter((bind) => bind.id !== id);
 
 		const openedTabs = store.openedTabs.filter((tabId) => tabId !== id);
+		const pinnedTabs = store.pinnedTabs.filter((tabId) => tabId !== id);
 
 		const activeTab =
 			store.activeTab === id ? openedTabs.at(-1) : store.activeTab;
@@ -538,6 +544,7 @@ class KnowledgeService {
 			favorites: store.favorites.filter((favoriteId) => favoriteId !== id),
 			recent: store.recent.filter((recentId) => recentId !== id),
 			openedTabs,
+			pinnedTabs,
 			activeTab,
 			selectedBind: activeTab,
 		});
@@ -813,6 +820,7 @@ class KnowledgeService {
 			favorites: state.favorites,
 			recent: state.recent,
 			openedTabs: state.openedTabs,
+			pinnedTabs: state.pinnedTabs,
 			activeTab: state.activeTab,
 		};
 	}
