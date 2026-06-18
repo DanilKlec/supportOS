@@ -1,1 +1,386 @@
-[]
+{
+    "projectEmails": {
+    "records": [
+      {
+        "id": "project-email-c5df1ffc-4ab7-4163-9ddd-32bab9f39a74",
+        "projectName": "Сasinojoy",
+        "slug": "asinojoy",
+        "supportEmail": "support@casinojoy.com",
+        "kycEmail": "kyc@casinojoy.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "165516166e7a2444e8bcaba5726f5a73c5707f8671b3e7815c2eeff9b14dba0e"
+      },
+      {
+        "id": "project-email-b672ec71-f9fe-4a5a-b69e-67be37951141",
+        "projectName": "BetFlare",
+        "slug": "betflare",
+        "supportEmail": "support@betflare.io",
+        "kycEmail": "kyc@betflare.io",
+        "vipEmail": "vip@betflare.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "285b03904528bafd1b19fd71052ad487aaa8f555f5cab7b4ba08d9268a9c0ad3"
+      },
+      {
+        "id": "project-email-7f90fa16-be1e-44ac-9755-2c7e2b9d4655",
+        "projectName": "betnaro",
+        "slug": "betnaro",
+        "supportEmail": "support@betnaro.com",
+        "kycEmail": "kyc@betnaro.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "b2dd60079fcdec40c79c1f6b660637f47b7fbaae3a750bdcca6f971539573fc3"
+      },
+      {
+        "id": "project-email-f37053ad-3617-4699-b7d0-9de940e0ae4c",
+        "projectName": "BlitzBet",
+        "slug": "blitzbet",
+        "supportEmail": "support@blitz-bet.com",
+        "kycEmail": "kyc@blitz-bet.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "f758f303f5afee3ac18e92a884dbaa025c883b383000f6eddc1f4ffa1a5d7e79"
+      },
+      {
+        "id": "project-email-286cd3fe-5ff1-41fb-9cd7-0bff7587f350",
+        "projectName": "Casabet",
+        "slug": "casabet",
+        "supportEmail": "support@casabet.io",
+        "kycEmail": "kyc@casabet.io",
+        "vipEmail": "vip@casabet.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "3ce7a039bba25a149ebcbb1d406f8f0fdd034170a9ab3bff76788398bae4ebb1"
+      },
+      {
+        "id": "project-email-111d628b-e08a-4894-96d6-f57b60088866",
+        "projectName": "casikora",
+        "slug": "casikora",
+        "supportEmail": "support@casikora.io",
+        "kycEmail": "kyc@casikora.io",
+        "vipEmail": "vip@casikora.io",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "e2b1e4a842e3301f9844621c33bf527d7fe35198530510b9ad85d8ec6e7a9b8c"
+      },
+      {
+        "id": "project-email-6840e13d-0ebb-4ee3-87a6-7f2fca8ed99b",
+        "projectName": "casperbets",
+        "slug": "casperbets",
+        "supportEmail": "support@casperbets.com",
+        "kycEmail": "kyc@casperbets.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "5cebf5c7419f82026f86307322ea8df7526a1ebcf08642f8461a4c9969cd0698"
+      },
+      {
+        "id": "project-email-7b33ffb2-fcf4-47b1-96da-bebc7b633b1d",
+        "projectName": "Corsaza",
+        "slug": "corsaza",
+        "supportEmail": "support@corsaza.com",
+        "kycEmail": "kyc@corsaza.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "75ee0069adab73398003302f2c7788043a3f079afe603ef228de625dafd385b5"
+      },
+      {
+        "id": "project-email-1f7cda44-c77b-44b9-a6d2-495e9d1ed49c",
+        "projectName": "CosmicSlot",
+        "slug": "cosmicslot",
+        "supportEmail": "support@cosmicslot.com",
+        "kycEmail": "kyc@cosmicslot.com",
+        "vipEmail": "vip@cosmicslot.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "6859f523eaa8dc9bbd9a30963c7a84879462cb8b3e095fa3ebe40abc1b1b9a77"
+      },
+      {
+        "id": "project-email-64c0b3dc-37da-4c9c-82ac-196e1c6802ae",
+        "projectName": "Crixcasino",
+        "slug": "crixcasino",
+        "supportEmail": "support@crixcasino.win",
+        "kycEmail": "kyc@crixcasino.win",
+        "vipEmail": "vip@crixcasino.win",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "52bdfe2e625530c0a91479291da97b644cb3ffd9dc9009073b9691f1af8572b4"
+      },
+      {
+        "id": "project-email-6924a1ab-35ed-46c2-a9b8-51b47c7ac944",
+        "projectName": "Dionyx",
+        "slug": "dionyx",
+        "supportEmail": "support@dionyx.win",
+        "kycEmail": "kyc@dionyx.win",
+        "vipEmail": "vip@dionyx.win",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "02c46ee0cc4bd6579cf4309289529f3d2ac437bb89c368c91149f73e318c7096"
+      },
+      {
+        "id": "project-email-a3ead8aa-a3fa-42ec-b618-434b5492b4ed",
+        "projectName": "EgoGames",
+        "slug": "egogames",
+        "supportEmail": "support@ego.games",
+        "kycEmail": "kyc@ego.games",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "10e5c73f275fe6a87a0f57ddbccbff50d6a56db329432e8738d21b62ec70fc3e"
+      },
+      {
+        "id": "project-email-27cd1581-b32a-4281-a783-7386230f9013",
+        "projectName": "emperiacasino",
+        "slug": "emperiacasino",
+        "supportEmail": "support@emperiacasino.com",
+        "kycEmail": "kyc@emperiacasino.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "b03114a50b3b566a64be2e6da588dca4229354062417753730360236c01a83c4"
+      },
+      {
+        "id": "project-email-9efa0b03-2052-442e-9423-96626f9ee3f2",
+        "projectName": "gamblezen",
+        "slug": "gamblezen",
+        "supportEmail": "support@gamblezen.com",
+        "kycEmail": "kyc@gamblezen.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "23b6accaa3216698b9e14139ce91fed59e209fa64e4a1854aca5ff93ebd5de05"
+      },
+      {
+        "id": "project-email-edfe6af5-04da-4e59-83e4-16ee6e7baa66",
+        "projectName": "HashLucky",
+        "slug": "hashlucky",
+        "supportEmail": "support@hashlucky.io",
+        "kycEmail": "kyc@hashlucky.io",
+        "vipEmail": "vip@hashlucky.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "e08b0ffd6fc73017fd245d9612b9a2fdedbc39ebf4459f941ef3d8d1ee4fab2c"
+      },
+      {
+        "id": "project-email-3fc3a08d-54e2-41e1-aa5e-9bffd3d22cc9",
+        "projectName": "HexaBet",
+        "slug": "hexabet",
+        "supportEmail": "support@hexabet.io",
+        "kycEmail": "kyc@hexabet.io",
+        "vipEmail": "vip@hexabet.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "b5158f3fcef63bd2e6b9d1422e65dd4dcbc8c977cb3c88016eb6120ff3783164"
+      },
+      {
+        "id": "project-email-5a1dd7ac-6234-47d7-8279-89ff86256201",
+        "projectName": "IgniBet",
+        "slug": "ignibet",
+        "supportEmail": "support@ignibet.com",
+        "kycEmail": "kyc@ignibet.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "752f4b543f860a995ba4c859d38e80112f1b2971b03361172b94a1fcfe7725bd"
+      },
+      {
+        "id": "project-email-fd45e167-2dd8-4698-800b-ada5681101d8",
+        "projectName": "Kairosbet",
+        "slug": "kairosbet",
+        "supportEmail": "support@kairosbet.io",
+        "kycEmail": "kyc@kairosbet.io",
+        "vipEmail": "vip@kairosbet.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "69d2a6fab952f2b491b4c3446d48e721d4a904a6b2cc2bfd4c046b8946452e52"
+      },
+      {
+        "id": "project-email-b4fe93e1-c8ab-46ae-a050-903e262db4ff",
+        "projectName": "luckyhour",
+        "slug": "luckyhour",
+        "supportEmail": "support@luckyhour.com",
+        "kycEmail": "kyc@luckyhour.com",
+        "vipEmail": "vip@luckyhour.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "aa8f2eddd5479ce19ecf112e1b910c97c8899def24379a1ae815e7582f65d650"
+      },
+      {
+        "id": "project-email-e17a14d5-e22c-496e-83ed-ddca81824d66",
+        "projectName": "MegaRich",
+        "slug": "megarich",
+        "supportEmail": "support@megarich.com",
+        "kycEmail": "kyc@megarich.com",
+        "vipEmail": "vip@megarich.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "7af0db908af3ff36c9059f8b3b43ccad3e4b5a00d0f7412b59701bc5208aa81e"
+      },
+      {
+        "id": "project-email-b9c3ec80-0d5b-45ad-a48b-ab2fea234100",
+        "projectName": "NikaSpin",
+        "slug": "nikaspin",
+        "supportEmail": "support@nikaspin.pro",
+        "kycEmail": "kyc@nikaspin.pro",
+        "vipEmail": "vip@nikaspin.pro",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "d789516e4b190956db8b34d868c9ba0820c85d353b5ea28fb12565e9afa8beba"
+      },
+      {
+        "id": "project-email-5e5a602a-e865-49ce-a0f7-da2fb4a195b8",
+        "projectName": "olymposwin",
+        "slug": "olymposwin",
+        "supportEmail": "support@olymposwin.io",
+        "kycEmail": "kyc@olymposwin.io",
+        "vipEmail": "vip@olymposwin.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "4b33828abbb72fb8a16d7cd5090447d2b72b638a7992640b2f52e94863dcebc6"
+      },
+      {
+        "id": "project-email-0bf53551-6f20-42f8-ad24-0d45484c8173",
+        "projectName": "Rioace",
+        "slug": "rioace",
+        "supportEmail": "support@rioace.com",
+        "kycEmail": "kyc@rioace.com",
+        "vipEmail": "vip@rioace.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "23460ec2fb81b2cdf91a921f0773684876d26bbe02fe2def7221d3445e6d298a"
+      },
+      {
+        "id": "project-email-972ca044-e27f-45d8-959f-f72a2771146d",
+        "projectName": "rollizor",
+        "slug": "rollizor",
+        "supportEmail": "support@rollizor.net",
+        "kycEmail": "kyc@rollizor.net",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "5aef242874ecad974137c47a062ee7d82c0871a95264ff27f2f72a041466ade5"
+      },
+      {
+        "id": "project-email-2ee980bf-3b1c-4dc5-a120-4418180018c5",
+        "projectName": "smokace.com",
+        "slug": "smokace-com",
+        "supportEmail": "support@smokace.com",
+        "kycEmail": "kyc@smokace.com",
+        "vipEmail": "vip@smokace.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "c08c5086f732d63e1dcad19197a9c1c234be15e51670ffcbc40d6644c7b67a76"
+      },
+      {
+        "id": "project-email-943c5bec-e543-4f06-aa38-fab7f5303dbf",
+        "projectName": "spartibet",
+        "slug": "spartibet",
+        "supportEmail": "support@spartibet.io",
+        "kycEmail": "kyc@spartibet.io",
+        "vipEmail": "vip@spartibet.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "20e4de76b8348b1502b7596b6515d183ceffd060ffe07a0ddce15caf21875de9"
+      },
+      {
+        "id": "project-email-2f705274-2ed0-419a-85af-a6b540dd39de",
+        "projectName": "spinfyre",
+        "slug": "spinfyre",
+        "supportEmail": "support@spinfyre.io",
+        "kycEmail": "kyc@spinfyre.io",
+        "vipEmail": "vip@spinfyre.io",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "7d225c3090be1c9acc00a07b618c822f737525b475544e704628fd49b572f3a4"
+      },
+      {
+        "id": "project-email-304f8b20-394d-4efc-bf81-199e214cb64a",
+        "projectName": "Spinko",
+        "slug": "spinko",
+        "supportEmail": "support@spinko.me",
+        "kycEmail": "kyc@spinko.me",
+        "vipEmail": "vip@spinko.me",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "e8508292edbb6cda2022ad408b3e06049a5e6e36defb54449d168830dda387da"
+      },
+      {
+        "id": "project-email-71f7c214-bd9b-4ded-a94e-be67a0e774cf",
+        "projectName": "spinmills",
+        "slug": "spinmills",
+        "supportEmail": "support@spinmills.club",
+        "kycEmail": "kyc@spinmills.club",
+        "vipEmail": "vip@spinmills.club",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "ab071f72aa7da4cd576d46cc100b63063c300dd998a9ec8757a5322736edc928"
+      },
+      {
+        "id": "project-email-dbafde2d-2d9b-4ce0-9cd8-595d5d995e8e",
+        "projectName": "spintado",
+        "slug": "spintado",
+        "supportEmail": "support@spintado.com",
+        "kycEmail": "kyc@spintado.com",
+        "vipEmail": "vip@spintado.com",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "81a01237fe2f1f80dad0d054ea4766bd9410bdef602077a8ad32f63484584261"
+      },
+      {
+        "id": "project-email-fba05e2b-e72c-4e80-ae90-08459a1b4c11",
+        "projectName": "stelario.com",
+        "slug": "stelario-com",
+        "supportEmail": "support@stelario.com",
+        "kycEmail": "kyc@stelario.com",
+        "vipEmail": "vip@stelario.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "e2032366af7e654b5db795462993fabc30601f12056b7de6e4f23188f7b7efc7"
+      },
+      {
+        "id": "project-email-aa87b564-8e46-4110-944f-132a56f90105",
+        "projectName": "VelWins",
+        "slug": "velwins",
+        "supportEmail": "support@velwins.pro",
+        "kycEmail": "kyc@velwins.pro",
+        "vipEmail": "vip@velwins.pro",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "0bc3ccdf4059f98e82cc9289552524ea95784e5dc3f0f5c04a54819f9e07fb34"
+      },
+      {
+        "id": "project-email-6048ec60-db2e-404c-bad5-0226869b8f51",
+        "projectName": "vibespins",
+        "slug": "vibespins",
+        "supportEmail": "support@vibespins.club",
+        "kycEmail": "kyc@vibespins.club",
+        "vipEmail": "vip@vibespins.club",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "3693d33a7babe67f9bf288ff3d6855b33c4c3b4929bab6b11c2bacebadb591a7"
+      },
+      {
+        "id": "project-email-00da9adb-f82d-4f41-927e-d988eb700cd0",
+        "projectName": "winarius",
+        "slug": "winarius",
+        "supportEmail": "support@winarius.com",
+        "kycEmail": "kyc@winarius.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "2dff3af625b5550da2355c5d27770fe8bffb35ee5bc0e2eb552cb7570bc4e658"
+      },
+      {
+        "id": "project-email-4efc93fd-3f4a-487d-b394-c07781190ea8",
+        "projectName": "winbandits",
+        "slug": "winbandits",
+        "supportEmail": "support@winbandits.com",
+        "kycEmail": "kyc@winbandits.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-18T06:25:20.151Z",
+        "sourceHash": "9c02b28bcafab081334f5fdb2e665be847ff04d982e5964a7d84099725d56222"
+      },
+      {
+        "id": "project-email-c1dd489b-03ee-4290-80ec-fece4d991892",
+        "projectName": "windetta.co",
+        "slug": "windetta-co",
+        "supportEmail": "support@windetta.com",
+        "kycEmail": "kyc@windetta.com",
+        "vipEmail": "vip@windetta.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "448c30c1cd751efdefc4ede20a43af75798caaf00dcc6e028760abadbf98beb6"
+      },
+      {
+        "id": "project-email-88a1e350-8d07-4de8-92cb-b09461218710",
+        "projectName": "winlegends.com",
+        "slug": "winlegends-com",
+        "supportEmail": "support@winlegends.com",
+        "kycEmail": "kyc@winlegends.com",
+        "vipEmail": "vip@winlegends.com",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "fcee09b23cc301bbfdeba8550addc648e8a0c6108fd18c6733af3adb4941925a"
+      },
+      {
+        "id": "project-email-7e98d168-0a55-4547-801b-0cd1ebb3cf4d",
+        "projectName": "winserra",
+        "slug": "winserra",
+        "supportEmail": "support@winserra.pro",
+        "kycEmail": "kyc@winserra.pro",
+        "vipEmail": "vip@winserra.pro",
+        "updatedAt": "2026-06-18T06:25:20.150Z",
+        "sourceHash": "d39cc21d45b18f57268dc4eb2069682b437d201106f2be7596bab491fa9386f9"
+      }
+    ]
+  }
+}
