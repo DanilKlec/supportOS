@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { isLightweightRoute } from "@/app/route-mode";
+import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
 
@@ -43,6 +44,8 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				<main className="flex flex-1 flex-col overflow-hidden bg-background">
 					{children}
 				</main>
+
+				<TranslatorWidget />
 			</div>
 		);
 	}
@@ -58,6 +61,8 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					{children}
 				</main>
 			</div>
+
+			<TranslatorWidget />
 		</div>
 	);
 }

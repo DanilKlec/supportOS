@@ -14,11 +14,17 @@ function parseEndpointList(value) {
 function getLibreTranslateEndpoints() {
 	const endpoints = [
 		normalizeEndpoint(process.env.LIBRETRANSLATE_ENDPOINT),
+		normalizeEndpoint(process.env.LIBRETRANSLATE_URL),
+		...parseEndpointList(process.env.LIBRETRANSLATE_ENDPOINTS),
 		...parseEndpointList(process.env.LIBRETRANSLATE_FALLBACK_ENDPOINTS),
 		...DEFAULT_ENDPOINTS,
 	].filter(Boolean);
 
 	return Array.from(new Set(endpoints));
+}
+
+function getPublicEndpointHint() {
+	return "Configure LIBRETRANSLATE_ENDPOINT in Vercel with a reachable LibreTranslate server.";
 }
 
 async function readPayload(response) {
@@ -80,6 +86,7 @@ export async function requestLibreTranslate(path, options = {}) {
 	const endpoints = getLibreTranslateEndpoints();
 	let lastStatus = 502;
 	let lastMessage = "LibreTranslate request failed";
+	const attempts = [];
 
 	for (const endpoint of endpoints) {
 		try {
@@ -100,13 +107,19 @@ export async function requestLibreTranslate(path, options = {}) {
 
 			lastStatus = response.status;
 			lastMessage = getErrorMessage(payload, lastMessage);
+			attempts.push(`${endpoint}: ${response.status} ${lastMessage}`);
 		} catch (error) {
 			lastMessage =
 				error instanceof Error ? error.message : "Unable to reach translator";
+			attempts.push(`${endpoint}: ${lastMessage}`);
 		}
 	}
 
-	const error = new Error(lastMessage);
+	const details = attempts.length ? ` Tried: ${attempts.join("; ")}` : "";
+	const error = new Error(
+		`${getPublicEndpointHint()} Last error: ${lastMessage}.${details}`,
+	);
+
 	error.status = lastStatus;
 	throw error;
 }

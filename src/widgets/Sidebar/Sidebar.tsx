@@ -3,8 +3,10 @@ import {
 	Bot,
 	BrainCircuit,
 	Clock3,
+	Contact,
 	FileSpreadsheet,
 	FileText,
+	Gift,
 	Languages,
 	Plus,
 	Settings,
@@ -125,6 +127,22 @@ export function Sidebar() {
 						>
 							<FileSpreadsheet size={14} />
 							<span>Google Sheets Import</span>
+						</Link>
+
+						<Link
+							to="/bonuses"
+							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+						>
+							<Gift size={14} />
+							<span>Deposit Bonuses</span>
+						</Link>
+
+						<Link
+							to="/project-emails"
+							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+						>
+							<Contact size={14} />
+							<span>Project Emails</span>
 						</Link>
 					</div>
 				</div>

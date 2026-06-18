@@ -27,6 +27,7 @@ export interface KnowledgeSnapshot {
 	recent: string[];
 
 	openedTabs: string[];
+	pinnedTabs: string[];
 	activeTab?: string;
 }
 
@@ -48,6 +49,7 @@ interface KnowledgeState extends KnowledgeSnapshot {
 	openBind: (id: string) => void;
 	closeTab: (id: string) => void;
 	setActiveTab: (id?: string) => void;
+	togglePinnedTab: (id: string) => void;
 
 	toggleFolder: (id: string) => void;
 
@@ -96,6 +98,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 	recent: [],
 
 	openedTabs: [],
+	pinnedTabs: [],
 	activeTab: undefined,
 
 	setKnowledge: (snapshot) => {
@@ -110,6 +113,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 		const openedTabs = unique(snapshot.openedTabs ?? state.openedTabs).filter(
 			(id) => bindIds.has(id),
+		);
+		const pinnedTabs = unique(snapshot.pinnedTabs ?? state.pinnedTabs).filter(
+			(id) => openedTabs.includes(id),
 		);
 
 		const requestedActiveTab =
@@ -159,6 +165,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			).filter((id) => expandableIds.has(id)),
 
 			openedTabs,
+			pinnedTabs,
 			activeTab,
 
 			selectedBind,
@@ -230,6 +237,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 	closeTab: (id) => {
 		const state = get();
+		if (state.pinnedTabs.includes(id)) return;
+
 		const openedTabs = state.openedTabs.filter((t) => t !== id);
 
 		const activeTab = state.activeTab === id ? openedTabs[0] : state.activeTab;
@@ -238,6 +247,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			openedTabs,
 			activeTab,
 			selectedBind: activeTab,
+			pinnedTabs: state.pinnedTabs.filter((tabId) => tabId !== id),
 		});
 	},
 
@@ -248,6 +258,29 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 		}
 
 		get().openBind(id);
+	},
+
+	togglePinnedTab: (id) => {
+		const state = get();
+		const bind = state.binds.find((item) => item.id === id);
+
+		if (!bind) return;
+
+		const pinnedTabs = state.pinnedTabs.includes(id)
+			? state.pinnedTabs.filter((tabId) => tabId !== id)
+			: [...state.pinnedTabs, id];
+		const openedTabs = state.openedTabs.includes(id)
+			? state.openedTabs
+			: [...state.openedTabs, id];
+
+		set({
+			pinnedTabs,
+			openedTabs,
+			activeTab: id,
+			selectedBind: id,
+			selectedCategory: bind.categoryId,
+			selectedFolder: bind.folderId,
+		});
 	},
 
 	toggleFolder: (id) =>

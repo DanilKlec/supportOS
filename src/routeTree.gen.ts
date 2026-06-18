@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslatorRouteImport } from './routes/translator'
 import { Route as RecentRouteImport } from './routes/recent'
+import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BindsRouteImport } from './routes/binds'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsTranslatorRouteImport } from './routes/settings/translator'
@@ -32,6 +34,11 @@ const RecentRoute = RecentRouteImport.update({
   path: '/recent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectEmailsRoute = ProjectEmailsRouteImport.update({
+  id: '/project-emails',
+  path: '/project-emails',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -40,6 +47,11 @@ const LoginRoute = LoginRouteImport.update({
 const FavoritesRoute = FavoritesRouteImport.update({
   id: '/favorites',
   path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BonusesRoute = BonusesRouteImport.update({
+  id: '/bonuses',
+  path: '/bonuses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BindsRoute = BindsRouteImport.update({
@@ -86,8 +98,10 @@ const AiAssistantRoute = AiAssistantRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/binds': typeof BindsRoute
+  '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
+  '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -100,8 +114,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/binds': typeof BindsRoute
+  '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
+  '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -115,8 +131,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/binds': typeof BindsRoute
+  '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
+  '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -131,8 +149,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/binds'
+    | '/bonuses'
     | '/favorites'
     | '/login'
+    | '/project-emails'
     | '/recent'
     | '/translator'
     | '/ai/assistant'
@@ -145,8 +165,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/binds'
+    | '/bonuses'
     | '/favorites'
     | '/login'
+    | '/project-emails'
     | '/recent'
     | '/translator'
     | '/ai/assistant'
@@ -159,8 +181,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/binds'
+    | '/bonuses'
     | '/favorites'
     | '/login'
+    | '/project-emails'
     | '/recent'
     | '/translator'
     | '/ai/assistant'
@@ -174,8 +198,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BindsRoute: typeof BindsRoute
+  BonusesRoute: typeof BonusesRoute
   FavoritesRoute: typeof FavoritesRoute
   LoginRoute: typeof LoginRoute
+  ProjectEmailsRoute: typeof ProjectEmailsRoute
   RecentRoute: typeof RecentRoute
   TranslatorRoute: typeof TranslatorRoute
   AiAssistantRoute: typeof AiAssistantRoute
@@ -202,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/project-emails': {
+      id: '/project-emails'
+      path: '/project-emails'
+      fullPath: '/project-emails'
+      preLoaderRoute: typeof ProjectEmailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -214,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/favorites'
       fullPath: '/favorites'
       preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bonuses': {
+      id: '/bonuses'
+      path: '/bonuses'
+      fullPath: '/bonuses'
+      preLoaderRoute: typeof BonusesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/binds': {
@@ -278,8 +318,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BindsRoute: BindsRoute,
+  BonusesRoute: BonusesRoute,
   FavoritesRoute: FavoritesRoute,
   LoginRoute: LoginRoute,
+  ProjectEmailsRoute: ProjectEmailsRoute,
   RecentRoute: RecentRoute,
   TranslatorRoute: TranslatorRoute,
   AiAssistantRoute: AiAssistantRoute,
