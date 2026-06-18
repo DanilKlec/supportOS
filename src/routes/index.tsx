@@ -34,7 +34,7 @@ function HomePage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+      {/* <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
         <div>
           <h1 className="text-sm font-semibold">
             {isCrmWorkspace ? "CRM Workspace" : "SupportOS Workspace"}
@@ -91,14 +91,15 @@ function HomePage() {
             </Link>
           ) : null}
         </div>
-      </div>
+      </div> */}
 
       <div className="min-h-0 flex-1">
-        {isCrmWorkspace ? (
+        {/* {isCrmWorkspace ? (
           <CRMFrame initialCrmId={search.crm} />
         ) : (
-          <BindWorkspace />
-        )}
+          
+        )} */}
+		<BindWorkspace />
       </div>
     </div>
   );
