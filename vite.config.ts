@@ -1,7 +1,99 @@
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+
+const GOOGLE_SHEETS_PROXY_PATH = "/api/google-sheets/fetch";
+const ALLOWED_GOOGLE_HOSTS = new Set([
+	"docs.google.com",
+	"spreadsheets.google.com",
+]);
+
+function sendProxyText(
+	response: {
+		statusCode: number;
+		setHeader: (name: string, value: string) => void;
+		end: (value?: string) => void;
+	},
+	status: number,
+	text: string,
+) {
+	response.statusCode = status;
+	response.setHeader("Access-Control-Allow-Origin", "*");
+	response.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+	response.setHeader("Cache-Control", "no-store");
+	response.setHeader("Content-Type", "text/plain; charset=utf-8");
+	response.end(text);
+}
+
+function googleSheetsProxyPlugin(): Plugin {
+	return {
+		name: "supportos-google-sheets-proxy",
+		configureServer(server) {
+			server.middlewares.use(async (request, response, next) => {
+				const requestUrl = request.url ?? "";
+
+				if (!requestUrl.startsWith(GOOGLE_SHEETS_PROXY_PATH)) {
+					next();
+					return;
+				}
+
+				if (request.method === "OPTIONS") {
+					sendProxyText(response, 204, "");
+					return;
+				}
+
+				if (request.method !== "GET") {
+					sendProxyText(response, 405, "Method not allowed");
+					return;
+				}
+
+				try {
+					const parsed = new URL(requestUrl, "http://localhost");
+					const rawTargetUrl = parsed.searchParams.get("url");
+
+					if (!rawTargetUrl) {
+						sendProxyText(response, 400, "Google Sheets URL is required");
+						return;
+					}
+
+					const target = new URL(rawTargetUrl);
+
+					if (
+						target.protocol !== "https:" ||
+						!ALLOWED_GOOGLE_HOSTS.has(target.hostname)
+					) {
+						sendProxyText(
+							response,
+							400,
+							"Only Google Sheets HTTPS URLs are supported",
+						);
+						return;
+					}
+
+					const googleResponse = await fetch(target.toString(), {
+						redirect: "follow",
+						headers: {
+							"User-Agent": "SupportOS Google Sheets Import",
+						},
+					});
+					const text = await googleResponse.text();
+
+					sendProxyText(response, googleResponse.status, text);
+				} catch (error) {
+					sendProxyText(
+						response,
+						502,
+						error instanceof Error
+							? error.message
+							: "Unable to load Google Sheet",
+					);
+				}
+			});
+		},
+	};
+}
 
 export default defineConfig({
 	resolve: {
@@ -13,6 +105,8 @@ export default defineConfig({
 			target: "react",
 			autoCodeSplitting: true,
 		}),
+
+		googleSheetsProxyPlugin(),
 
 		tailwindcss(),
 

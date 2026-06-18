@@ -84,7 +84,7 @@ export function Sidebar() {
 					)}
 				</div>
 
-				<div className="border-b border-border px-3 py-3">
+				{/* <div className="border-b border-border px-3 py-3">
 					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
 						<Clock3 size={13} />
 						Recent
@@ -97,7 +97,7 @@ export function Sidebar() {
 					) : (
 						<div className="px-2 text-xs text-muted">Nothing opened yet</div>
 					)}
-				</div>
+				</div> */}
 
 				<div className="border-b border-border px-3 py-3">
 					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -147,7 +147,7 @@ export function Sidebar() {
 					</div>
 				</div>
 
-				<div className="border-b border-border px-3 py-3">
+				{/* <div className="border-b border-border px-3 py-3">
 					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
 						AI
 					</div>
@@ -169,7 +169,7 @@ export function Sidebar() {
 							<span>AI Knowledge</span>
 						</Link>
 					</div>
-				</div>
+				</div> */}
 
 				<div className="flex items-center justify-between px-5 py-3">
 					<div className="text-xs font-semibold uppercase tracking-wider text-muted">

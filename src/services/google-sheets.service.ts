@@ -1,4 +1,9 @@
 import type { BindTranslation } from "@/entities/bind";
+import {
+	fetchGoogleSheetText,
+	looksLikeGoogleSheetHtml,
+	toGoogleSheetExportUrl,
+} from "@/services/google-sheet-fetch.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useKnowledgeStore } from "@/store";
 
@@ -73,22 +78,6 @@ async function hashText(value: string) {
 	return Math.abs(hash).toString(16);
 }
 
-function toGoogleExportUrl(url: string) {
-	const parsed = new URL(url);
-
-	if (parsed.searchParams.get("output")) {
-		return url;
-	}
-
-	const match = parsed.pathname.match(/\/spreadsheets\/d\/([^/]+)/);
-
-	if (!match) return url;
-
-	const gid = parsed.searchParams.get("gid") ?? "0";
-
-	return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=tsv&gid=${gid}`;
-}
-
 function detectDelimiter(text: string) {
 	const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
 
@@ -154,14 +143,20 @@ class GoogleSheetsService {
 			throw new Error("Google Sheets URL is required");
 		}
 
-		const csvUrl = toGoogleExportUrl(sourceUrl);
-		const response = await fetch(csvUrl);
+		const csvUrl = toGoogleSheetExportUrl(sourceUrl);
+		const response = await fetchGoogleSheetText(csvUrl);
 
 		if (!response.ok) {
-			throw new Error("Unable to load Google Sheet");
+			throw new Error(`Unable to load Google Sheet (${response.status})`);
 		}
 
-		const text = await response.text();
+		if (looksLikeGoogleSheetHtml(response.text)) {
+			throw new Error(
+				"Google returned a web page instead of table data. Publish the sheet to the web or share it for anyone with the link.",
+			);
+		}
+
+		const text = response.text;
 		const rows = parseDelimited(text);
 		const previewRows: SheetPreviewRow[] = [];
 		const errors: string[] = [];

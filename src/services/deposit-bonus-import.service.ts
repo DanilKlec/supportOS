@@ -3,6 +3,14 @@ import type {
 	DepositBonus,
 	DepositBonusTranslation,
 } from "@/entities/bonus";
+import {
+	extractGoogleSheetGid,
+	extractGoogleSpreadsheetId,
+	extractPublishedGoogleSpreadsheetId,
+	fetchGoogleSheetText,
+	looksLikeGoogleSheetHtml,
+	toGoogleSheetExportUrl,
+} from "@/services/google-sheet-fetch.service";
 
 export type DepositBonusImportMode = "upsert" | "replace";
 
@@ -150,29 +158,6 @@ function normalizeHeader(value: string) {
 		.trim();
 }
 
-function extractSpreadsheetId(url: string) {
-	try {
-		const parsed = new URL(url);
-		const match = parsed.pathname.match(/\/spreadsheets\/d\/([^/]+)/);
-
-		return match?.[1];
-	} catch {
-		return undefined;
-	}
-}
-
-function extractGid(url: string) {
-	try {
-		const parsed = new URL(url);
-
-		return (
-			parsed.searchParams.get("gid") ?? parsed.hash.match(/gid=(\d+)/)?.[1]
-		);
-	} catch {
-		return undefined;
-	}
-}
-
 function decodeHtml(value: string) {
 	const textarea = document.createElement("textarea");
 
@@ -190,11 +175,7 @@ function decodeJsonString(value: string) {
 }
 
 function toGoogleExportUrl(sourceUrl: string, gid?: string) {
-	const spreadsheetId = extractSpreadsheetId(sourceUrl);
-
-	if (!spreadsheetId) return sourceUrl;
-
-	return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=tsv&gid=${gid ?? extractGid(sourceUrl) ?? "0"}`;
+	return toGoogleSheetExportUrl(sourceUrl, gid);
 }
 
 function detectDelimiter(text: string) {
@@ -526,10 +507,11 @@ function parseTabsFromHtml(html: string) {
 }
 
 async function discoverSheetTabs(sourceUrl: string) {
-	const spreadsheetId = extractSpreadsheetId(sourceUrl);
-	const explicitGid = extractGid(sourceUrl);
+	const spreadsheetId = extractGoogleSpreadsheetId(sourceUrl);
+	const publishedSpreadsheetId = extractPublishedGoogleSpreadsheetId(sourceUrl);
+	const explicitGid = extractGoogleSheetGid(sourceUrl);
 
-	if (!spreadsheetId) {
+	if (!spreadsheetId && !publishedSpreadsheetId) {
 		return [{ gid: "0", title: "Imported Project" }];
 	}
 
@@ -537,19 +519,24 @@ async function discoverSheetTabs(sourceUrl: string) {
 		return [{ gid: explicitGid, title: `Sheet ${explicitGid}` }];
 	}
 
-	const candidates = [
-		`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit?usp=sharing`,
-		`https://docs.google.com/spreadsheets/d/${spreadsheetId}/pubhtml`,
-		sourceUrl,
-	];
+	const candidates = publishedSpreadsheetId
+		? [
+				sourceUrl,
+				`https://docs.google.com/spreadsheets/d/e/${publishedSpreadsheetId}/pubhtml`,
+			]
+		: [
+				`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit?usp=sharing`,
+				`https://docs.google.com/spreadsheets/d/${spreadsheetId}/pubhtml`,
+				sourceUrl,
+			];
 
 	for (const candidate of candidates) {
 		try {
-			const response = await fetch(candidate);
+			const response = await fetchGoogleSheetText(candidate);
 
 			if (!response.ok) continue;
 
-			const tabs = parseTabsFromHtml(await response.text());
+			const tabs = parseTabsFromHtml(response.text);
 
 			if (tabs.length > 0) {
 				return tabs;
@@ -593,16 +580,25 @@ class DepositBonusImportService {
 
 			for (const tab of tabs) {
 				const csvUrl = toGoogleExportUrl(sourceUrl, tab.gid);
-				const response = await fetch(csvUrl);
+				const response = await fetchGoogleSheetText(csvUrl);
 
 				csvUrls.push(csvUrl);
 
 				if (!response.ok) {
-					warnings.push(`${tab.title}: unable to load sheet`);
+					warnings.push(
+						`${tab.title}: unable to load sheet (${response.status})`,
+					);
 					continue;
 				}
 
-				const rows = parseDelimited(await response.text());
+				if (looksLikeGoogleSheetHtml(response.text)) {
+					warnings.push(
+						`${tab.title}: Google returned a web page instead of table data. Publish the sheet to the web or share it for anyone with the link.`,
+					);
+					continue;
+				}
+
+				const rows = parseDelimited(response.text);
 				const bonuses = parseBonusesFromRows(rows);
 
 				if (bonuses.length === 0) {
