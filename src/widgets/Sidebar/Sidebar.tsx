@@ -105,21 +105,21 @@ export function Sidebar() {
 					</div>
 
 					<div className="space-y-0.5">
-						<Link
+						{/* <Link
 							to="/translator"
 							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
 						>
 							<Languages size={14} />
 							<span>Translator</span>
-						</Link>
+						</Link> */}
 
-						<Link
+						{/* <Link
 							to="/settings/translator"
 							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
 						>
 							<Settings size={14} />
 							<span>Translator Settings</span>
-						</Link>
+						</Link> */}
 
 						<Link
 							to="/import/google-sheets"
