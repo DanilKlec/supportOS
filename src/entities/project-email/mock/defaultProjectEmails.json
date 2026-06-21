@@ -27,9 +27,9 @@
         "slug": "betnaro",
         "supportEmail": "support@betnaro.com",
         "kycEmail": "kyc@betnaro.com",
-        "vipEmail": "",
-        "updatedAt": "2026-06-18T06:25:20.151Z",
-        "sourceHash": "b2dd60079fcdec40c79c1f6b660637f47b7fbaae3a750bdcca6f971539573fc3"
+        "vipEmail": "vip@betnaro.com",
+        "sourceHash": "b2dd60079fcdec40c79c1f6b660637f47b7fbaae3a750bdcca6f971539573fc3",
+        "updatedAt": "2026-06-19T19:26:46.514Z"
       },
       {
         "id": "project-email-f37053ad-3617-4699-b7d0-9de940e0ae4c",
@@ -50,6 +50,15 @@
         "vipEmail": "vip@casabet.io",
         "updatedAt": "2026-06-18T06:25:20.150Z",
         "sourceHash": "3ce7a039bba25a149ebcbb1d406f8f0fdd034170a9ab3bff76788398bae4ebb1"
+      },
+      {
+        "id": "project-email-50da3ed1-9fe0-4528-8da0-93bbea46bf1f",
+        "projectName": "cashlounge",
+        "slug": "cashlounge",
+        "supportEmail": "support@cashlounge.com",
+        "kycEmail": "kyc@cashlounge.com",
+        "vipEmail": "",
+        "updatedAt": "2026-06-21T21:22:21.839Z"
       },
       {
         "id": "project-email-111d628b-e08a-4894-96d6-f57b60088866",
@@ -172,6 +181,15 @@
         "sourceHash": "752f4b543f860a995ba4c859d38e80112f1b2971b03361172b94a1fcfe7725bd"
       },
       {
+        "id": "project-email-0e54621c-54b5-4b99-bae6-d39021c8e1e2",
+        "projectName": "jettbet",
+        "slug": "jettbet",
+        "supportEmail": "support@jettbet.co",
+        "kycEmail": "kyc@jettbet.co",
+        "vipEmail": "",
+        "updatedAt": "2026-06-21T21:20:56.287Z"
+      },
+      {
         "id": "project-email-fd45e167-2dd8-4698-800b-ada5681101d8",
         "projectName": "Kairosbet",
         "slug": "kairosbet",
@@ -232,14 +250,23 @@
         "sourceHash": "23460ec2fb81b2cdf91a921f0773684876d26bbe02fe2def7221d3445e6d298a"
       },
       {
+        "id": "project-email-50434d1b-8e66-4b1e-9d32-9681e66474a4",
+        "projectName": "rollino",
+        "slug": "rollino",
+        "supportEmail": "support@rollino.co",
+        "kycEmail": "kyc@rollino.co",
+        "vipEmail": "",
+        "updatedAt": "2026-06-21T21:21:46.399Z"
+      },
+      {
         "id": "project-email-972ca044-e27f-45d8-959f-f72a2771146d",
         "projectName": "rollizor",
         "slug": "rollizor",
         "supportEmail": "support@rollizor.net",
         "kycEmail": "kyc@rollizor.net",
-        "vipEmail": "",
-        "updatedAt": "2026-06-18T06:25:20.151Z",
-        "sourceHash": "5aef242874ecad974137c47a062ee7d82c0871a95264ff27f2f72a041466ade5"
+        "vipEmail": "vip@rollizor.net",
+        "sourceHash": "5aef242874ecad974137c47a062ee7d82c0871a95264ff27f2f72a041466ade5",
+        "updatedAt": "2026-06-21T21:24:29.370Z"
       },
       {
         "id": "project-email-2ee980bf-3b1c-4dc5-a120-4418180018c5",
@@ -300,6 +327,15 @@
         "vipEmail": "vip@spintado.com",
         "updatedAt": "2026-06-18T06:25:20.151Z",
         "sourceHash": "81a01237fe2f1f80dad0d054ea4766bd9410bdef602077a8ad32f63484584261"
+      },
+      {
+        "id": "project-email-d1828f24-17a1-4ee1-8a20-cace338a0700",
+        "projectName": "Spintitans",
+        "slug": "spintitans",
+        "supportEmail": "support@spintitans.com",
+        "kycEmail": "kyc@spintitans.com",
+        "vipEmail": "vip@spintitans.com",
+        "updatedAt": "2026-06-21T21:23:06.580Z"
       },
       {
         "id": "project-email-fba05e2b-e72c-4e80-ae90-08459a1b4c11",
