@@ -1,5 +1,5 @@
 {
-      "categories": [
+"categories": [
       {
         "id": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
         "name": "Приветствие",
@@ -119,6 +119,14 @@
         "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
         "name": "Все еще проверяю",
         "color": "#10B981",
+        "order": 1
+      },
+      {
+        "id": "folder-dfa899db-a6eb-445f-90eb-d6f6766ede48",
+        "ownerId": null,
+        "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+        "name": "Документы KYC",
+        "color": "#F59E0B",
         "order": 1
       }
     ],
@@ -2549,19 +2557,25 @@
             "language": "ru",
             "title": "FreeBet условия",
             "content": "How to Use Your FreeBet\nPlease keep the following rules in mind:\n• Your FreeBet must be used in full on a single bet.\n• If only part of the FreeBet is used, the remaining amount will be automatically forfeited.\n• There are no minimum odds requirements unless otherwise stated in the promotion.\n• If you use the Cashout feature on a FreeBet wager, the FreeBet will be cancelled and the bet will not qualify.\nBefore confirming your bet, please make sure the entire FreeBet amount is being used.",
-            "updatedAt": "2026-06-18T07:45:01.554Z"
+            "updatedAt": "2026-06-19T14:13:23.903Z"
           },
           {
             "language": "en",
             "title": "FreeBet условия",
             "content": "How to Use Your FreeBet\nPlease keep the following rules in mind:\n• Your FreeBet must be used in full on a single bet.\n• If only part of the FreeBet is used, the remaining amount will be automatically forfeited.\n• There are no minimum odds requirements unless otherwise stated in the promotion.\n• If you use the Cashout feature on a FreeBet wager, the FreeBet will be cancelled and the bet will not qualify.\nBefore confirming your bet, please make sure the entire FreeBet amount is being used.",
-            "updatedAt": "2026-06-18T07:45:01.554Z"
+            "updatedAt": "2026-06-19T14:13:23.903Z"
+          },
+          {
+            "language": "de",
+            "title": "FreeBet условия",
+            "content": "So verwenden Sie Ihre FreeBet\nBitte beachten Sie die folgenden Regeln:\n• Ihre FreeBet muss vollständig für eine einzelne Wette verwendet werden.\n• Wenn nur ein Teil der FreeBet genutzt wird, verfällt der verbleibende Betrag automatisch.\n* Es gibt keine Mindestquotenanforderungen, sofern in der Aktion nicht anders angegeben.\n• Wenn Sie die Auszahlungsfunktion für eine FreeBet-Wette verwenden, wird die FreeBet storniert und die Wette qualifiziert sich nicht.\nBevor Sie Ihre Wette bestätigen, stellen Sie bitte sicher, dass der gesamte FreeBet-Betrag verwendet wird.",
+            "updatedAt": "2026-06-19T14:13:23.903Z"
           }
         ],
         "favorite": false,
         "archived": false,
         "createdAt": "2026-06-18T07:43:08.104Z",
-        "updatedAt": "2026-06-18T07:45:01.554Z"
+        "updatedAt": "2026-06-19T14:13:23.903Z"
       },
       {
         "id": "bind-21736c93-5acd-4800-a56a-cd605a4088a5",
@@ -2903,38 +2917,264 @@
           {
             "language": "ru",
             "title": "Мапа",
-            "content": "Так же для вас сегодня доступно предложение: \n45% bonus up to €2000 + 60 FS\nВам необходимо внести депозит от 25 EUR и выбрать акцию MAP DAY. \nПолучиться воспользоваться сегодня?",
-            "updatedAt": "2026-06-18T09:42:52.431Z"
+            "content": "Так же для вас сегодня доступно предложение: \n45% bonus up to €500 + 60 FS\nВам необходимо внести депозит от 25 EUR и выбрать акцию MAP DAY. \nПолучиться воспользоваться сегодня?",
+            "updatedAt": "2026-06-19T15:02:23.787Z"
           },
           {
             "language": "en",
             "title": "Мапа",
-            "content": "There is also an offer available for you today:  \n100% bonus up to A$1650 + 100 FS\nYou need to make a deposit of at least A$40 and choose the MAP DAY promotion.  \nWill you be able to take advantage of it today?",
-            "updatedAt": "2026-06-18T09:42:52.431Z"
+            "content": "There is also an offer available for you today:  \n100% bonus up to €1000 + 100 FS\nYou need to make a deposit of at least €25 and choose the MAP DAY promotion.  \nWill you be able to take advantage of it today?",
+            "updatedAt": "2026-06-19T15:02:23.787Z"
           },
           {
             "language": "de",
             "title": "Мапа",
             "content": "Heute haben wir ein besonderes Angebot für Sie:\n140 FS\nZahlen Sie mindestens 25€ ein und wählen Sie die MAP DAY-Aktion.\nNutzen Sie dieses Angebot noch heute?",
-            "updatedAt": "2026-06-18T09:42:52.431Z"
+            "updatedAt": "2026-06-19T15:02:23.787Z"
           },
           {
             "language": "pt",
             "title": "Мапа",
             "content": "Também temos uma oferta especial disponível hoje Playoff Freebet Boost:\n25% up to €1500 + 60 FS\nVocê precisa fazer um depósito de pelo menos €25 e selecionar a promoção DIA DO MAPA.\nVocê pode aproveitar hoje?",
-            "updatedAt": "2026-06-18T09:42:52.431Z"
+            "updatedAt": "2026-06-19T15:02:23.787Z"
           },
           {
             "language": "el",
             "title": "Мапа",
             "content": "Επίσης, σήμερα είναι διαθέσιμη για εσάς η παρακάτω προσφορά:\n30% bonus up to €1000 + 60 FS\nΓια να επωφεληθείτε από την προσφορά, θα πρέπει να πραγματοποιήσετε κατάθεση από 25 € και να επιλέξετε την προωθητική ενέργεια MAP DAY.\nΘα μπορέσετε να επωφεληθείτε από αυτήν την προσφορά σήμερα;",
-            "updatedAt": "2026-06-18T09:42:52.431Z"
+            "updatedAt": "2026-06-19T15:02:23.787Z"
           }
         ],
         "favorite": false,
         "archived": false,
         "createdAt": "2026-06-18T09:26:47.401Z",
-        "updatedAt": "2026-06-18T09:42:52.431Z"
+        "updatedAt": "2026-06-19T15:02:23.787Z"
+      },
+      {
+        "id": "bind-ffa95fc5-e9be-4e20-b37b-b61eda4236d8",
+        "ownerId": null,
+        "imported": false,
+        "slug": "bind-1781782655660",
+        "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+        "color": "#8B5CF6",
+        "tags": [],
+        "translations": [
+          {
+            "language": "ru",
+            "title": "ДР",
+            "content": "От имени всей нашей команды мы от всей души поздравляем вас с днём рождения! 🎉🎂\nЖелаем вам здоровья, счастья, успехов и множества прекрасных моментов в кругу близких и любимых людей. Пусть ваш новый год будет наполнен радостью, позитивной энергией и незабываемыми впечатлениями.\nСпасибо, что вы с нами, и мы надеемся, что этот особенный день принесет вам много улыбок и приятных сюрпризов.",
+            "updatedAt": "2026-06-18T11:37:35.660Z"
+          },
+          {
+            "language": "en",
+            "title": "ДР",
+            "content": "On behalf of our entire team, we sincerely congratulate you on your birthday! 🎉🎂\nWe wish you health, happiness, success and many wonderful moments with your loved ones. May your new year be filled with joy, positive energy and unforgettable impressions.\nThank you for being with us, and we hope that this special day will bring you many smiles and pleasant surprises.",
+            "updatedAt": "2026-06-18T11:37:35.660Z"
+          },
+          {
+            "language": "de",
+            "title": "ДР",
+            "content": "Im Namen unseres gesamten Teams gratulieren wir Ihnen herzlich zu Ihrem Geburtstag! 🎉🎂\nWir wünschen Ihnen Gesundheit, Glück, Erfolg und viele schöne Momente mit Ihren Lieben. Möge Ihr neues Jahr voller Freude, positiver Energie und unvergesslicher Eindrücke sein.\nVielen Dank, dass Sie bei uns waren, und wir hoffen, dass dieser besondere Tag Ihnen viele Lächeln und angenehme Überraschungen beschert.",
+            "updatedAt": "2026-06-18T11:37:35.660Z"
+          },
+          {
+            "language": "pt",
+            "title": "ДР",
+            "content": "Em nome de toda a nossa equipe, nós sinceramente parabenizamos você por seu aniversário! 🎉🎂\nDesejamos-lhe saúde, felicidade, sucesso e muitos momentos maravilhosos no círculo de entes queridos e entes queridos. Que o seu Ano Novo seja cheio de alegria, energia positiva e experiências inesquecíveis.\nObrigado por estar conosco e esperamos que este dia especial lhe traga muitos sorrisos e surpresas agradáveis.",
+            "updatedAt": "2026-06-18T11:37:35.660Z"
+          },
+          {
+            "language": "el",
+            "title": "ДР",
+            "content": "Εκ μέρους ολόκληρης της ομάδας μας, σας ευχόμαστε ολόψυχα Χρόνια Πολλά για τα γενέθλιά σας! 🎉🎂\nΣας ευχόμαστε υγεία, ευτυχία, επιτυχίες και πολλές όμορφες στιγμές με τα αγαπημένα σας πρόσωπα. Είθε η νέα σας χρονιά να είναι γεμάτη χαρές, θετική ενέργεια και αξέχαστες εμπειρίες.\nΣας ευχαριστούμε που είστε μαζί μας και ελπίζουμε η ξεχωριστή αυτή ημέρα να σας φέρει πολλά χαμόγελα και ευχάριστες εκπλήξεις.",
+            "updatedAt": "2026-06-18T11:37:38.951Z"
+          }
+        ],
+        "favorite": false,
+        "archived": false,
+        "createdAt": "2026-06-18T11:37:35.660Z",
+        "updatedAt": "2026-06-18T11:37:38.951Z"
+      },
+      {
+        "id": "bind-659b264a-8eeb-4ed9-9efe-5c48ac7ef910",
+        "ownerId": null,
+        "imported": false,
+        "slug": "bind-1781783545691",
+        "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+        "color": "#EF4444",
+        "tags": [],
+        "translations": [
+          {
+            "language": "ru",
+            "title": "Запрос на блок_Самоисключение",
+            "content": "Мы уважаем ваше решение и всегда готовы помочь! Если вы хотите закрыть свой счёт, пожалуйста, отправьте свой запрос на электронную почту: ###E-MAIL##, указав причину и период блокировки.",
+            "updatedAt": "2026-06-18T11:52:25.691Z"
+          },
+          {
+            "language": "en",
+            "title": "Запрос на блок_Самоисключение",
+            "content": "We respect your decision and are always ready to help! If you’d like to close your account, please send a request to ###E-MAIL###, including the reason and preferred duration of the block.",
+            "updatedAt": "2026-06-18T11:52:25.691Z"
+          },
+          {
+            "language": "de",
+            "title": "Запрос на блок_Самоисключение",
+            "content": "Wir respektieren Ihre Entscheidung und sind immer bereit zu helfen! Wenn Sie Ihr Konto schließen möchten, senden Sie bitte eine Anfrage an ###E-MAIL###, einschließlich des Grundes und der gewünschten Dauer der Sperrung.",
+            "updatedAt": "2026-06-18T11:52:30.374Z"
+          },
+          {
+            "language": "pt",
+            "title": "Запрос на блок_Самоисключение",
+            "content": "Respeitamos a sua decisão e estamos sempre prontos a ajudar! Se pretender encerrar a sua conta, envie um pedido para ###E-MAIL###, incluindo o motivo e a duração pretendida do bloqueio.",
+            "updatedAt": "2026-06-18T11:52:25.691Z"
+          },
+          {
+            "language": "el",
+            "title": "Запрос на блок_Самоисключение",
+            "content": "Σεβόμαστε την απόφασή σας και είμαστε πάντα έτοιμοι να σας βοηθήσουμε! Αν θέλετε να κλείσετε το λογαριασμό σας, στείλτε ένα αίτημα στο ###E-MAIL###, αναφέροντας το λόγο και την επιθυμητή διάρκεια του αποκλεισμού.",
+            "updatedAt": "2026-06-18T11:52:25.691Z"
+          }
+        ],
+        "favorite": false,
+        "archived": false,
+        "createdAt": "2026-06-18T11:52:25.691Z",
+        "updatedAt": "2026-06-18T11:52:30.374Z"
+      },
+      {
+        "id": "bind-8c410cf4-be9c-4457-bcb7-64c4864c90c4",
+        "ownerId": null,
+        "imported": false,
+        "slug": "waiting-for-docs",
+        "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+        "folderId": "folder-dfa899db-a6eb-445f-90eb-d6f6766ede48",
+        "color": "#F59E0B",
+        "tags": [],
+        "translations": [
+          {
+            "language": "ru",
+            "title": "Waiting for docs! - уточнить за письмо",
+            "content": "Обратите, пожалуйста, внимание, что вывод средств осуществляется после полной верификации аккаунт. Сегодня наш финансовый отдел отправил вам эмайл со списком недостающих документов для верификации. Скажите, пожалуйста, проверяли ли вы свою электронную почту, включая папку \"спам\"?",
+            "updatedAt": "2026-06-18T12:23:36.938Z"
+          },
+          {
+            "language": "en",
+            "title": "Waiting for docs! - уточнить за письмо",
+            "content": "Please note that withdrawals are made after full verification of the account. Today our finance department sent you an email with a list of missing documents for verification. Please tell me, have you checked your email, including your spam folder?",
+            "updatedAt": "2026-06-21T20:04:07.560Z"
+          },
+          {
+            "language": "de",
+            "title": "Waiting for docs! - уточнить за письмо",
+            "content": "Bitte beachten Sie, dass Abhebungen erst nach vollständiger Überprüfung des Kontos erfolgen. Unsere Finanzabteilung hat Ihnen heute eine E-Mail mit einer Liste der fehlenden Dokumente zur Überprüfung geschickt. Bitte sagen Sie mir, ob Sie Ihre E-Mail überprüft haben, einschließlich Ihres Spam-Ordners?",
+            "updatedAt": "2026-06-18T12:23:36.937Z"
+          },
+          {
+            "language": "pt",
+            "title": "Waiting for docs! - уточнить за письмо",
+            "content": "Tenha em atenção que os levantamentos são efectuados após verificação completa da conta. Hoje, o nosso departamento financeiro enviou-lhe um e-mail com uma lista dos documentos em falta para verificação. Por favor, diga-me, verificou o seu correio eletrónico, incluindo a pasta de spam?",
+            "updatedAt": "2026-06-18T12:23:36.937Z"
+          },
+          {
+            "language": "el",
+            "title": "Waiting for docs! - уточнить за письмо",
+            "content": "Παρακαλείστε να σημειώσετε ότι οι αναλήψεις πραγματοποιούνται μετά από πλήρη επαλήθευση του λογαριασμού. Σήμερα το οικονομικό μας τμήμα σας έστειλε μήνυμα ηλεκτρονικού ταχυδρομείου με κατάλογο των εγγράφων που λείπουν για επαλήθευση. Παρακαλώ πείτε μου, έχετε ελέγξει το email σας, συμπεριλαμβανομένου του φακέλου ανεπιθύμητης αλληλογραφίας;",
+            "updatedAt": "2026-06-18T12:23:36.937Z"
+          }
+        ],
+        "favorite": false,
+        "archived": false,
+        "createdAt": "2026-06-18T12:23:36.938Z",
+        "updatedAt": "2026-06-21T20:04:07.560Z"
+      },
+      {
+        "id": "bind-39c08ca2-d2be-4d46-a3eb-0901be196cef",
+        "ownerId": null,
+        "imported": false,
+        "slug": "bind-1781785465742",
+        "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+        "color": "#F59E0B",
+        "tags": [],
+        "translations": [
+          {
+            "language": "ru",
+            "title": "Не отыгран депозит",
+            "content": "Пожалуйста, обратите внимание, что перед вывод депозит необходимо отыграть в 3-х кратном размере. В данный момент статус отыгрыша составляет 0/0 EUR, это значит, что вам надо ещё совершить ставки на сумму ### EUR. Как только депозит будет отыгран, средства станут доступны для вывода. Также, отыгрыш депозита вы всегда можете уточнить у нас в лайв-чате - мы онлайн 24/7!",
+            "updatedAt": "2026-06-18T12:24:25.742Z"
+          },
+          {
+            "language": "en",
+            "title": "Не отыгран депозит",
+            "content": "Please note that the deposit must be wagered 3 times before withdrawal. At the moment the wagering status is 0/0 EUR, which means that you still need to wager ### EUR. Once the deposit is wagered, the funds will be available for withdrawal. Also, you can always check the wagering status of your deposit with us in live chat - we are online 24/7!",
+            "updatedAt": "2026-06-18T12:24:25.742Z"
+          },
+          {
+            "language": "de",
+            "title": "Не отыгран депозит",
+            "content": "Bitte beachten Sie, dass die Einzahlung vor der Auszahlung 3-mal umgesetzt werden muss. Im Moment ist der Einsatzstatus 0/0 EUR, was bedeutet, dass Sie noch ### EUR einsetzen müssen. Sobald die Einzahlung umgesetzt wurde, steht das Geld zur Auszahlung zur Verfügung. Sie können auch jederzeit den Einsatzstatus Ihrer Einzahlung mit uns im Live-Chat überprüfen - wir sind 24/7 online!",
+            "updatedAt": "2026-06-18T12:24:25.742Z"
+          },
+          {
+            "language": "pt",
+            "title": "Не отыгран депозит",
+            "content": "Tenha em atenção que o depósito deve ser apostado 3 vezes antes de ser levantado. De momento, o estado das apostas é 40.5/60 EUR, o que significa que ainda precisa de apostar 19,5 EUR. Assim que o depósito for apostado, os fundos estarão disponíveis para levantamento. Além disso, pode sempre verificar o estado das apostas do seu depósito connosco no chat ao vivo - estamos online 24 horas por dia, 7 dias por semana!",
+            "updatedAt": "2026-06-18T12:24:25.742Z"
+          },
+          {
+            "language": "el",
+            "title": "Не отыгран депозит",
+            "content": "Παρακαλείστε να σημειώσετε ότι η κατάθεση πρέπει να στοιχηματιστεί 3 φορές πριν από την ανάληψη. Αυτή τη στιγμή η κατάσταση στοιχηματισμού είναι 0/105 EUR, που σημαίνει ότι πρέπει να ποντάρετε ακόμα 105 EUR. Μόλις στοιχηματίσετε την κατάθεση, τα χρήματα θα είναι διαθέσιμα για ανάληψη. Επίσης, μπορείτε πάντα να ελέγχετε την κατάσταση στοιχηματισμού της κατάθεσής σας μαζί μας στη ζωντανή συνομιλία - είμαστε online 24 ώρες το 24ωρο!",
+            "updatedAt": "2026-06-18T12:24:28.862Z"
+          }
+        ],
+        "favorite": false,
+        "archived": false,
+        "createdAt": "2026-06-18T12:24:25.742Z",
+        "updatedAt": "2026-06-18T12:24:28.862Z"
+      },
+      {
+        "id": "bind-f8531a8e-aaaa-4018-8de8-c852f9d9c58f",
+        "ownerId": null,
+        "imported": false,
+        "slug": "bind-1781986762506",
+        "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+        "color": "#3B82F6",
+        "tags": [],
+        "translations": [
+          {
+            "language": "ru",
+            "title": "скрин ошибки",
+            "content": "Я буду рад помочь вам как можно скорее! Отправьте пожалуйста скриншот с ошибкой в слоте, что бы я мог вам помочь.",
+            "updatedAt": "2026-06-20T20:19:22.506Z"
+          },
+          {
+            "language": "en",
+            "title": "скрин ошибки",
+            "content": "I’ll be happy to assist you as soon as possible! Please send a screenshot of the error in the slot so that I can help you.",
+            "updatedAt": "2026-06-20T20:19:22.506Z"
+          },
+          {
+            "language": "de",
+            "title": "скрин ошибки",
+            "content": "Ich werde Ihnen gerne so schnell wie möglich helfen! Bitte senden Sie einen Screenshot mit einem Fehler im Steckplatz, damit ich Ihnen helfen kann.",
+            "updatedAt": "2026-06-20T20:19:22.506Z"
+          },
+          {
+            "language": "pt",
+            "title": "скрин ошибки",
+            "content": "Ficarei feliz em ajudá-lo o mais breve possível! Por favor, envie-me uma captura de tela com o erro no slot para que eu possa ajudá-lo.",
+            "updatedAt": "2026-06-20T20:19:22.506Z"
+          },
+          {
+            "language": "el",
+            "title": "скрин ошибки",
+            "content": "Παρακαλώ στείλτε ένα στιγμιότυπο οθόνης με το σφάλμα στο φρουτάκι, ώστε να μπορέσω να σας βοηθήσω.",
+            "updatedAt": "2026-06-20T20:25:53.121Z"
+          }
+        ],
+        "favorite": false,
+        "archived": false,
+        "createdAt": "2026-06-20T20:19:22.506Z",
+        "updatedAt": "2026-06-20T20:25:53.121Z"
       }
     ],
   "language": "en"
