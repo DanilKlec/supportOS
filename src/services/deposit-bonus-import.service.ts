@@ -7,9 +7,11 @@ import {
 	extractGoogleSheetGid,
 	extractGoogleSpreadsheetId,
 	extractPublishedGoogleSpreadsheetId,
+	fetchGoogleSheetArrayBuffer,
 	fetchGoogleSheetText,
 	looksLikeGoogleSheetHtml,
 	toGoogleSheetExportUrl,
+	toGoogleSheetXlsxExportUrl,
 } from "@/services/google-sheet-fetch.service";
 
 export type DepositBonusImportMode = "upsert" | "replace";
@@ -25,6 +27,19 @@ export interface DepositBonusImportPreview {
 interface SheetTab {
 	gid: string;
 	title: string;
+}
+
+interface XlsxSheet {
+	sheetId: string;
+	title: string;
+	rows: string[][];
+}
+
+interface XlsxWorkbookImport {
+	sourceUrl: string;
+	projects: BonusProject[];
+	warnings: string[];
+	sourceLabel: string;
 }
 
 const COMMON_CURRENCIES = [
@@ -250,6 +265,322 @@ function parseDelimited(text: string) {
 	}
 
 	return rows;
+}
+
+function readUint16(view: DataView, offset: number) {
+	return view.getUint16(offset, true);
+}
+
+function readUint32(view: DataView, offset: number) {
+	return view.getUint32(offset, true);
+}
+
+function isZipWorkbook(bytes: ArrayBuffer) {
+	const header = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 4));
+
+	return (
+		header[0] === 0x50 &&
+		header[1] === 0x4b &&
+		header[2] === 0x03 &&
+		header[3] === 0x04
+	);
+}
+
+function findEndOfCentralDirectory(bytes: Uint8Array, view: DataView) {
+	const minOffset = Math.max(0, bytes.length - 66000);
+
+	for (let offset = bytes.length - 22; offset >= minOffset; offset -= 1) {
+		if (readUint32(view, offset) === 0x06054b50) {
+			return offset;
+		}
+	}
+
+	return -1;
+}
+
+async function inflateRawBytes(compressed: Uint8Array) {
+	if (typeof DecompressionStream === "undefined") {
+		throw new Error("XLSX decompression is not supported in this browser");
+	}
+
+	const compressedBuffer = compressed.buffer.slice(
+		compressed.byteOffset,
+		compressed.byteOffset + compressed.byteLength,
+	);
+	const stream = new Blob([compressedBuffer])
+		.stream()
+		.pipeThrough(new DecompressionStream("deflate-raw"));
+
+	return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function unzipEntries(bytes: ArrayBuffer) {
+	const source = new Uint8Array(bytes);
+	const view = new DataView(bytes);
+	const decoder = new TextDecoder();
+	const endOfCentralDirectory = findEndOfCentralDirectory(source, view);
+	const entries = new Map<string, string>();
+
+	if (endOfCentralDirectory < 0) {
+		throw new Error("Invalid XLSX archive");
+	}
+
+	const entryCount = readUint16(view, endOfCentralDirectory + 10);
+	let centralDirectoryOffset = readUint32(view, endOfCentralDirectory + 16);
+
+	for (let index = 0; index < entryCount; index += 1) {
+		if (readUint32(view, centralDirectoryOffset) !== 0x02014b50) {
+			throw new Error("Invalid XLSX central directory");
+		}
+
+		const compressionMethod = readUint16(view, centralDirectoryOffset + 10);
+		const compressedSize = readUint32(view, centralDirectoryOffset + 20);
+		const nameLength = readUint16(view, centralDirectoryOffset + 28);
+		const extraLength = readUint16(view, centralDirectoryOffset + 30);
+		const commentLength = readUint16(view, centralDirectoryOffset + 32);
+		const localHeaderOffset = readUint32(view, centralDirectoryOffset + 42);
+		const nameBytes = source.slice(
+			centralDirectoryOffset + 46,
+			centralDirectoryOffset + 46 + nameLength,
+		);
+		const name = decoder.decode(nameBytes);
+
+		if (readUint32(view, localHeaderOffset) !== 0x04034b50) {
+			throw new Error("Invalid XLSX local header");
+		}
+
+		const localNameLength = readUint16(view, localHeaderOffset + 26);
+		const localExtraLength = readUint16(view, localHeaderOffset + 28);
+		const compressedStart =
+			localHeaderOffset + 30 + localNameLength + localExtraLength;
+		const compressed = source.slice(
+			compressedStart,
+			compressedStart + compressedSize,
+		);
+		const uncompressed =
+			compressionMethod === 0
+				? compressed
+				: compressionMethod === 8
+					? await inflateRawBytes(compressed)
+					: undefined;
+
+		if (!uncompressed) {
+			throw new Error(
+				`Unsupported XLSX compression method ${compressionMethod}`,
+			);
+		}
+
+		entries.set(name, decoder.decode(uncompressed));
+		centralDirectoryOffset += 46 + nameLength + extraLength + commentLength;
+	}
+
+	return entries;
+}
+
+function decodeXmlText(value: string) {
+	return value
+		.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+		.replace(/&#(\d+);/g, (_, code) =>
+			String.fromCodePoint(Number.parseInt(code, 10)),
+		)
+		.replace(/&#x([0-9a-f]+);/gi, (_, code) =>
+			String.fromCodePoint(Number.parseInt(code, 16)),
+		)
+		.replace(/&quot;/g, '"')
+		.replace(/&apos;/g, "'")
+		.replace(/&amp;/g, "&")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">");
+}
+
+function escapeRegExp(value: string) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getXmlAttribute(source: string, name: string) {
+	const match = source.match(
+		new RegExp(`(?:^|\\s)${escapeRegExp(name)}="([^"]*)"`),
+	);
+
+	return match?.[1] ? decodeXmlText(match[1]) : undefined;
+}
+
+function normalizeZipPath(path: string) {
+	const parts: string[] = [];
+
+	for (const part of path.replace(/\\/g, "/").split("/")) {
+		if (!part || part === ".") continue;
+		if (part === "..") {
+			parts.pop();
+			continue;
+		}
+
+		parts.push(part);
+	}
+
+	return parts.join("/");
+}
+
+function resolveWorkbookRelationshipTarget(target: string) {
+	if (target.startsWith("/")) {
+		return normalizeZipPath(target.slice(1));
+	}
+
+	return normalizeZipPath(`xl/${target}`);
+}
+
+function parseWorkbookRelationships(xml: string) {
+	const relationships = new Map<string, string>();
+
+	for (const match of xml.matchAll(/<Relationship\b[^>]*\/?>/g)) {
+		const tag = match[0];
+		const id = getXmlAttribute(tag, "Id");
+		const target = getXmlAttribute(tag, "Target");
+		const type = getXmlAttribute(tag, "Type");
+
+		if (!id || !target || !type?.includes("/worksheet")) continue;
+
+		relationships.set(id, resolveWorkbookRelationshipTarget(target));
+	}
+
+	return relationships;
+}
+
+function parseWorkbookSheets(xml: string) {
+	return Array.from(xml.matchAll(/<sheet\b[^>]*\/?>/g))
+		.map((match) => {
+			const tag = match[0];
+
+			return {
+				title: getXmlAttribute(tag, "name") ?? "Sheet",
+				sheetId: getXmlAttribute(tag, "sheetId") ?? "",
+				relationshipId: getXmlAttribute(tag, "r:id") ?? "",
+				state: getXmlAttribute(tag, "state") ?? "visible",
+			};
+		})
+		.filter((sheet) => sheet.relationshipId && sheet.state !== "hidden");
+}
+
+function readTextNodes(xml: string) {
+	return Array.from(xml.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g))
+		.map((match) => decodeXmlText(match[1] ?? ""))
+		.join("");
+}
+
+function parseSharedStrings(xml: string | undefined) {
+	if (!xml) return [];
+
+	return Array.from(xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)).map((match) =>
+		readTextNodes(match[1] ?? ""),
+	);
+}
+
+function columnNameToIndex(columnName: string) {
+	let index = 0;
+
+	for (const letter of columnName) {
+		index = index * 26 + letter.charCodeAt(0) - 64;
+	}
+
+	return Math.max(index - 1, 0);
+}
+
+function getCellColumnIndex(attributes: string, fallbackIndex: number) {
+	const reference = getXmlAttribute(attributes, "r");
+	const columnName = reference?.match(/^[A-Z]+/)?.[0];
+
+	return columnName ? columnNameToIndex(columnName) : fallbackIndex;
+}
+
+function readCellValue(
+	attributes: string,
+	body: string,
+	sharedStrings: string[],
+) {
+	const type = getXmlAttribute(attributes, "t");
+	const value = body.match(/<v\b[^>]*>([\s\S]*?)<\/v>/)?.[1] ?? "";
+
+	if (type === "inlineStr") {
+		return readTextNodes(body);
+	}
+
+	if (type === "s") {
+		const sharedStringIndex = Number.parseInt(decodeXmlText(value), 10);
+
+		return sharedStrings[sharedStringIndex] ?? "";
+	}
+
+	if (type === "b") {
+		return value === "1" ? "TRUE" : "FALSE";
+	}
+
+	return decodeXmlText(value);
+}
+
+function trimTrailingEmptyCells(row: string[]) {
+	const nextRow = [...row];
+
+	while (nextRow.length > 0 && !cleanCell(nextRow[nextRow.length - 1])) {
+		nextRow.pop();
+	}
+
+	return nextRow;
+}
+
+function parseXlsxSheetRows(xml: string, sharedStrings: string[]) {
+	const rows: string[][] = [];
+	const cellPattern = /<c\b([^>]*)>([\s\S]*?)<\/c>|<c\b([^>]*)\/>/g;
+
+	for (const rowMatch of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+		const rowXml = rowMatch[1] ?? "";
+		const row: string[] = [];
+		let fallbackColumnIndex = 0;
+
+		for (const cellMatch of rowXml.matchAll(cellPattern)) {
+			const attributes = cellMatch[1] ?? cellMatch[3] ?? "";
+			const body = cellMatch[2] ?? "";
+			const columnIndex = getCellColumnIndex(attributes, fallbackColumnIndex);
+
+			row[columnIndex] = readCellValue(attributes, body, sharedStrings);
+			fallbackColumnIndex = Math.max(fallbackColumnIndex, columnIndex + 1);
+		}
+
+		const trimmedRow = trimTrailingEmptyCells(row);
+
+		if (trimmedRow.some((cell) => cleanCell(cell))) {
+			rows.push(trimmedRow);
+		}
+	}
+
+	return rows;
+}
+
+async function parseXlsxWorkbook(bytes: ArrayBuffer): Promise<XlsxSheet[]> {
+	const entries = await unzipEntries(bytes);
+	const workbookXml = entries.get("xl/workbook.xml");
+	const relationshipsXml = entries.get("xl/_rels/workbook.xml.rels");
+
+	if (!workbookXml || !relationshipsXml) {
+		throw new Error("XLSX workbook metadata is missing");
+	}
+
+	const relationships = parseWorkbookRelationships(relationshipsXml);
+	const sharedStrings = parseSharedStrings(entries.get("xl/sharedStrings.xml"));
+
+	return parseWorkbookSheets(workbookXml)
+		.map((sheet, index) => {
+			const sheetPath = relationships.get(sheet.relationshipId);
+			const sheetXml = sheetPath ? entries.get(sheetPath) : undefined;
+
+			if (!sheetXml) return undefined;
+
+			return {
+				sheetId: sheet.sheetId || `xlsx-${index + 1}`,
+				title: sheet.title || `Sheet ${index + 1}`,
+				rows: parseXlsxSheetRows(sheetXml, sharedStrings),
+			};
+		})
+		.filter((sheet): sheet is XlsxSheet => Boolean(sheet));
 }
 
 function findColumn(headers: string[], candidates: string[]) {
@@ -577,6 +908,57 @@ async function discoverSheetTabs(sourceUrl: string) {
 	return [{ gid: "0", title: "Sheet 1" }];
 }
 
+async function importXlsxWorkbook(
+	sourceUrl: string,
+): Promise<XlsxWorkbookImport | undefined> {
+	const xlsxUrl = toGoogleSheetXlsxExportUrl(sourceUrl);
+
+	if (!xlsxUrl) return undefined;
+
+	try {
+		const response = await fetchGoogleSheetArrayBuffer(xlsxUrl);
+
+		if (!response.ok || !isZipWorkbook(response.bytes)) {
+			return undefined;
+		}
+
+		const sheets = await parseXlsxWorkbook(response.bytes);
+
+		if (sheets.length === 0) return undefined;
+
+		const projects: BonusProject[] = [];
+		const warnings: string[] = [];
+
+		for (const sheet of sheets) {
+			const bonuses = parseBonusesFromRows(sheet.rows);
+
+			if (bonuses.length === 0) {
+				warnings.push(`${sheet.title}: no bonuses found`);
+				continue;
+			}
+
+			const project = createProject({
+				name: sheet.title,
+				bonuses,
+				sheetId: sheet.sheetId,
+				sourceUrl,
+			});
+
+			project.sourceHash = await hashText(JSON.stringify(project));
+			projects.push(project);
+		}
+
+		return {
+			sourceUrl,
+			projects,
+			warnings,
+			sourceLabel: xlsxUrl,
+		};
+	} catch {
+		return undefined;
+	}
+}
+
 function splitSourceUrls(value: string) {
 	return value
 		.split(/\r?\n/)
@@ -598,6 +980,15 @@ class DepositBonusImportService {
 		const csvUrls: string[] = [];
 
 		for (const sourceUrl of sourceUrls) {
+			const workbookImport = await importXlsxWorkbook(sourceUrl);
+
+			if (workbookImport) {
+				projects.push(...workbookImport.projects);
+				warnings.push(...workbookImport.warnings);
+				csvUrls.push(workbookImport.sourceLabel);
+				continue;
+			}
+
 			const tabs = await discoverSheetTabs(sourceUrl);
 
 			if (tabs.length === 1 && tabs[0]?.title.startsWith("Sheet ")) {
@@ -664,5 +1055,7 @@ export const depositBonusImportService = new DepositBonusImportService();
 
 export const __depositBonusImportInternals = {
 	discoverSheetTabs,
+	importXlsxWorkbook,
+	parseXlsxWorkbook,
 	parseTabsFromHtml,
 };

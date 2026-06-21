@@ -13,18 +13,19 @@ function sendProxyText(
 	response: {
 		statusCode: number;
 		setHeader: (name: string, value: string) => void;
-		end: (value?: string) => void;
+		end: (value?: string | Uint8Array) => void;
 	},
 	status: number,
-	text: string,
+	body: string | Uint8Array,
+	contentType = "text/plain; charset=utf-8",
 ) {
 	response.statusCode = status;
 	response.setHeader("Access-Control-Allow-Origin", "*");
 	response.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
 	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 	response.setHeader("Cache-Control", "no-store");
-	response.setHeader("Content-Type", "text/plain; charset=utf-8");
-	response.end(text);
+	response.setHeader("Content-Type", contentType);
+	response.end(body);
 }
 
 function googleSheetsProxyPlugin(): Plugin {
@@ -78,9 +79,15 @@ function googleSheetsProxyPlugin(): Plugin {
 							"User-Agent": "SupportOS Google Sheets Import",
 						},
 					});
-					const text = await googleResponse.text();
+					const bytes = new Uint8Array(await googleResponse.arrayBuffer());
 
-					sendProxyText(response, googleResponse.status, text);
+					sendProxyText(
+						response,
+						googleResponse.status,
+						bytes,
+						googleResponse.headers.get("content-type") ??
+							"application/octet-stream",
+					);
 				} catch (error) {
 					sendProxyText(
 						response,
