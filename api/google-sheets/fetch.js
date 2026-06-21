@@ -9,11 +9,15 @@ function allowCors(response) {
 	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-function sendText(response, status, text) {
+function sendResponse(response, status, body, contentType) {
 	allowCors(response);
 	response.setHeader("Cache-Control", "no-store");
-	response.setHeader("Content-Type", "text/plain; charset=utf-8");
-	response.status(status).send(text);
+	response.setHeader("Content-Type", contentType);
+	response.status(status).send(body);
+}
+
+function sendText(response, status, text) {
+	sendResponse(response, status, text, "text/plain; charset=utf-8");
 }
 
 function handleOptions(request, response) {
@@ -77,9 +81,15 @@ export default async function handler(request, response) {
 				"User-Agent": "SupportOS Google Sheets Import",
 			},
 		});
-		const text = await googleResponse.text();
+		const bytes = Buffer.from(await googleResponse.arrayBuffer());
 
-		sendText(response, googleResponse.status, text);
+		sendResponse(
+			response,
+			googleResponse.status,
+			bytes,
+			googleResponse.headers.get("content-type") ??
+				"application/octet-stream",
+		);
 	} catch (error) {
 		sendText(
 			response,

@@ -4,6 +4,13 @@ export interface GoogleSheetTextResponse {
 	text: string;
 }
 
+export interface GoogleSheetBinaryResponse {
+	ok: boolean;
+	status: number;
+	bytes: ArrayBuffer;
+	contentType: string;
+}
+
 const GOOGLE_SHEETS_PROXY_ENDPOINT = "/api/google-sheets/fetch";
 
 export function extractGoogleSpreadsheetId(url: string) {
@@ -55,20 +62,9 @@ function looksLikeMissingProxy(response: Response, text: string) {
 	);
 }
 
-async function fetchDirectText(url: string): Promise<GoogleSheetTextResponse> {
-	const response = await fetch(url);
-	const text = await response.text();
-
-	return {
-		ok: response.ok,
-		status: response.status,
-		text,
-	};
-}
-
-async function fetchProxiedText(
+async function fetchProxiedResponse(
 	url: string,
-): Promise<GoogleSheetTextResponse | undefined> {
+): Promise<Response | undefined> {
 	if (typeof window === "undefined") return undefined;
 
 	try {
@@ -82,20 +78,155 @@ async function fetchProxiedText(
 		const response = await fetch(proxyUrl.toString(), {
 			cache: "no-store",
 		});
-		const text = await response.text();
 
-		if (looksLikeMissingProxy(response, text)) {
+		if (response.status === 404) {
 			return undefined;
 		}
 
-		return {
-			ok: response.ok,
-			status: response.status,
-			text,
-		};
+		const contentType = response.headers.get("content-type") ?? "";
+
+		if (response.ok && contentType.includes("text/html")) {
+			const text = await response.clone().text();
+
+			if (text.includes('<div id="root"')) {
+				return undefined;
+			}
+		}
+
+		return response;
 	} catch {
 		return undefined;
 	}
+}
+
+async function fetchDirectText(url: string): Promise<GoogleSheetTextResponse> {
+	const response = await fetch(url);
+	const text = await response.text();
+
+	return {
+		ok: response.ok,
+		status: response.status,
+		text,
+	};
+}
+
+async function fetchDirectBinary(
+	url: string,
+): Promise<GoogleSheetBinaryResponse> {
+	const response = await fetch(url);
+	const bytes = await response.arrayBuffer();
+
+	return {
+		ok: response.ok,
+		status: response.status,
+		bytes,
+		contentType: response.headers.get("content-type") ?? "",
+	};
+}
+
+async function fetchProxiedText(
+	url: string,
+): Promise<GoogleSheetTextResponse | undefined> {
+	const response = await fetchProxiedResponse(url);
+
+	if (!response) return undefined;
+
+	const text = await response.text();
+
+	if (looksLikeMissingProxy(response, text)) {
+		return undefined;
+	}
+
+	return {
+		ok: response.ok,
+		status: response.status,
+		text,
+	};
+}
+
+async function fetchProxiedBinary(
+	url: string,
+): Promise<GoogleSheetBinaryResponse | undefined> {
+	const response = await fetchProxiedResponse(url);
+
+	if (!response) return undefined;
+
+	return {
+		ok: response.ok,
+		status: response.status,
+		bytes: await response.arrayBuffer(),
+		contentType: response.headers.get("content-type") ?? "",
+	};
+}
+
+function isDelimitedUrl(sourceUrl: string) {
+	return (
+		sourceUrl.includes("output=csv") ||
+		sourceUrl.includes("output=tsv") ||
+		sourceUrl.includes("format=csv") ||
+		sourceUrl.includes("format=tsv") ||
+		/\.(csv|tsv)(?:$|[?#])/i.test(sourceUrl)
+	);
+}
+
+function isXlsxUrl(sourceUrl: string) {
+	return (
+		sourceUrl.includes("output=xlsx") ||
+		sourceUrl.includes("format=xlsx") ||
+		/\.xlsx(?:$|[?#])/i.test(sourceUrl)
+	);
+}
+
+export async function fetchGoogleSheetArrayBuffer(url: string) {
+	const proxied = await fetchProxiedBinary(url);
+
+	if (proxied) return proxied;
+
+	return fetchDirectBinary(url);
+}
+
+export function toGoogleSheetXlsxExportUrl(sourceUrl: string) {
+	const spreadsheetId = extractGoogleSpreadsheetId(sourceUrl);
+	const publishedSpreadsheetId = extractPublishedGoogleSpreadsheetId(sourceUrl);
+
+	if (isXlsxUrl(sourceUrl)) {
+		return sourceUrl;
+	}
+
+	if (isDelimitedUrl(sourceUrl)) {
+		return undefined;
+	}
+
+	if (publishedSpreadsheetId) {
+		return `https://docs.google.com/spreadsheets/d/e/${publishedSpreadsheetId}/pub?output=xlsx`;
+	}
+
+	if (!spreadsheetId) return undefined;
+
+	return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+}
+
+export function toGoogleSheetNamedExportUrl(
+	sourceUrl: string,
+	sheetName: string,
+) {
+	const spreadsheetId = extractGoogleSpreadsheetId(sourceUrl);
+	const publishedSpreadsheetId = extractPublishedGoogleSpreadsheetId(sourceUrl);
+	const encodedSheetName = encodeURIComponent(sheetName);
+
+	if (isDelimitedUrl(sourceUrl)) {
+		return sourceUrl;
+	}
+
+	if (spreadsheetId) {
+		return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodedSheetName}`;
+	}
+
+	if (publishedSpreadsheetId) {
+		return `https://docs.google.com/spreadsheets/d/e/${publishedSpreadsheetId}/pub?single=true&output=csv&sheet=${encodedSheetName}`;
+	}
+
+	return sourceUrl;
 }
 
 export async function fetchGoogleSheetText(url: string) {
@@ -110,13 +241,7 @@ export function toGoogleSheetExportUrl(sourceUrl: string, gid?: string) {
 	const spreadsheetId = extractGoogleSpreadsheetId(sourceUrl);
 	const publishedSpreadsheetId = extractPublishedGoogleSpreadsheetId(sourceUrl);
 
-	if (
-		sourceUrl.includes("output=csv") ||
-		sourceUrl.includes("output=tsv") ||
-		sourceUrl.includes("format=csv") ||
-		sourceUrl.includes("format=tsv") ||
-		/\.(csv|tsv)(?:$|[?#])/i.test(sourceUrl)
-	) {
+	if (isDelimitedUrl(sourceUrl)) {
 		return sourceUrl;
 	}
 
