@@ -126,8 +126,22 @@ function createId(prefix: string) {
 	return `${prefix}-${random}`;
 }
 
+const EMOJI_PATTERN =
+	/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+
+function cleanImportedText(value: string) {
+	return value
+		.replace(EMOJI_PATTERN, "")
+		.replace(/\r\n?/g, "\n")
+		.split("\n")
+		.map((line) => line.replace(/[ \t]+/g, " ").trim())
+		.filter(Boolean)
+		.join("\n")
+		.trim();
+}
+
 function cleanCell(value: string | undefined) {
-	const text = (value ?? "").trim();
+	const text = cleanImportedText(value ?? "");
 
 	if (!text || text === "#NAME?") return "";
 
