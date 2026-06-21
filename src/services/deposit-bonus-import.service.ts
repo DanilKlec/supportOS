@@ -159,6 +159,22 @@ function normalizeHeader(value: string) {
 }
 
 function decodeHtml(value: string) {
+	if (typeof document === "undefined") {
+		return value
+			.replace(/&#(\d+);/g, (_, code) =>
+				String.fromCharCode(Number.parseInt(code, 10)),
+			)
+			.replace(/&#x([0-9a-f]+);/gi, (_, code) =>
+				String.fromCharCode(Number.parseInt(code, 16)),
+			)
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
+			.replace(/&amp;/g, "&")
+			.replace(/&lt;/g, "<")
+			.replace(/&gt;/g, ">")
+			.trim();
+	}
+
 	const textarea = document.createElement("textarea");
 
 	textarea.innerHTML = value;
@@ -472,32 +488,44 @@ function parseBonusesFromRows(rows: string[][]) {
 
 function parseTabsFromHtml(html: string) {
 	const tabs = new Map<string, SheetTab>();
+	const metadataSources = [
+		html,
+		html
+			.replace(/\\u003d/g, "=")
+			.replace(/\\u0026/g, "&")
+			.replace(/\\u003c/g, "<")
+			.replace(/\\u003e/g, ">")
+			.replace(/\\"/g, '"'),
+	];
 	const sheetIdPatterns = [
 		/"sheetId"\s*:\s*(\d+)\s*,\s*"title"\s*:\s*"((?:\\"|[^"])*)"/g,
 		/"title"\s*:\s*"((?:\\"|[^"])*)"\s*,\s*"sheetId"\s*:\s*(\d+)/g,
 	];
-	const anchorPattern = /gid=(\d+)[^>]*>([^<]+)</g;
+	const anchorPattern =
+		/<a\b[^>]*(?:gid=|gid%3D|#gid=)(\d+)[^>]*>([\s\S]*?)<\/a>/gi;
 
-	for (const pattern of sheetIdPatterns) {
-		for (const match of html.matchAll(pattern)) {
-			const first = match[1] ?? "";
-			const second = match[2] ?? "";
-			const firstIsGid = /^\d+$/.test(first);
-			const gid = firstIsGid ? first : second;
-			const title = decodeJsonString(firstIsGid ? second : first);
+	for (const source of metadataSources) {
+		for (const pattern of sheetIdPatterns) {
+			for (const match of source.matchAll(pattern)) {
+				const first = match[1] ?? "";
+				const second = match[2] ?? "";
+				const firstIsGid = /^\d+$/.test(first);
+				const gid = firstIsGid ? first : second;
+				const title = decodeJsonString(firstIsGid ? second : first);
+
+				if (gid && title && !tabs.has(gid)) {
+					tabs.set(gid, { gid, title });
+				}
+			}
+		}
+
+		for (const match of source.matchAll(anchorPattern)) {
+			const gid = match[1] ?? "";
+			const title = decodeHtml((match[2] ?? "").replace(/<[^>]*>/g, ""));
 
 			if (gid && title && !tabs.has(gid)) {
 				tabs.set(gid, { gid, title });
 			}
-		}
-	}
-
-	for (const match of html.matchAll(anchorPattern)) {
-		const gid = match[1] ?? "";
-		const title = decodeHtml(match[2] ?? "");
-
-		if (gid && title && !tabs.has(gid)) {
-			tabs.set(gid, { gid, title });
 		}
 	}
 
@@ -515,10 +543,6 @@ async function discoverSheetTabs(sourceUrl: string) {
 		return [{ gid: "0", title: "Imported Project" }];
 	}
 
-	if (explicitGid) {
-		return [{ gid: explicitGid, title: `Sheet ${explicitGid}` }];
-	}
-
 	const candidates = publishedSpreadsheetId
 		? [
 				sourceUrl,
@@ -530,7 +554,7 @@ async function discoverSheetTabs(sourceUrl: string) {
 				sourceUrl,
 			];
 
-	for (const candidate of candidates) {
+	for (const candidate of Array.from(new Set(candidates))) {
 		try {
 			const response = await fetchGoogleSheetText(candidate);
 
@@ -542,8 +566,12 @@ async function discoverSheetTabs(sourceUrl: string) {
 				return tabs;
 			}
 		} catch {
-			// The CSV export fallback below still handles the first visible sheet.
+			// The CSV export fallback below still handles a single visible sheet.
 		}
+	}
+
+	if (explicitGid) {
+		return [{ gid: explicitGid, title: `Sheet ${explicitGid}` }];
 	}
 
 	return [{ gid: "0", title: "Sheet 1" }];
@@ -633,3 +661,8 @@ class DepositBonusImportService {
 }
 
 export const depositBonusImportService = new DepositBonusImportService();
+
+export const __depositBonusImportInternals = {
+	discoverSheetTabs,
+	parseTabsFromHtml,
+};
