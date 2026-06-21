@@ -206,6 +206,29 @@ export function toGoogleSheetXlsxExportUrl(sourceUrl: string) {
 	return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
 }
 
+export function toGoogleSheetNamedExportUrl(
+	sourceUrl: string,
+	sheetName: string,
+) {
+	const spreadsheetId = extractGoogleSpreadsheetId(sourceUrl);
+	const publishedSpreadsheetId = extractPublishedGoogleSpreadsheetId(sourceUrl);
+	const encodedSheetName = encodeURIComponent(sheetName);
+
+	if (isDelimitedUrl(sourceUrl)) {
+		return sourceUrl;
+	}
+
+	if (spreadsheetId) {
+		return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodedSheetName}`;
+	}
+
+	if (publishedSpreadsheetId) {
+		return `https://docs.google.com/spreadsheets/d/e/${publishedSpreadsheetId}/pub?single=true&output=csv&sheet=${encodedSheetName}`;
+	}
+
+	return sourceUrl;
+}
+
 export async function fetchGoogleSheetText(url: string) {
 	const proxied = await fetchProxiedText(url);
 

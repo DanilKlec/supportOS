@@ -162,7 +162,57 @@ function createXlsxWorkbook() {
 
 describe("deposit bonus Google Sheets import", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		mockedFetchGoogleSheetArrayBuffer.mockReset();
+		mockedFetchGoogleSheetText.mockReset();
+	});
+
+	it("imports every sheet by name when Google HTML exposes tab captions only", async () => {
+		mockedFetchGoogleSheetText.mockImplementation(async (url) => {
+			if (url.includes("/edit?usp=sharing")) {
+				return {
+					ok: true,
+					status: 200,
+					text: `
+						<div class="docs-sheet-tab-caption">SA</div>
+						<div class="docs-sheet-tab-caption">ST</div>
+					`,
+				};
+			}
+
+			if (url.includes("sheet=SA")) {
+				return {
+					ok: true,
+					status: 200,
+					text: "Bonus,Min Deposit,Content\nWelcome,10 USD,Welcome text",
+				};
+			}
+
+			if (url.includes("sheet=ST")) {
+				return {
+					ok: true,
+					status: 200,
+					text: "Bonus,Min Deposit,Content\nReload,20 EUR,Reload text",
+				};
+			}
+
+			return {
+				ok: false,
+				status: 404,
+				text: "",
+			};
+		});
+
+		const preview = await depositBonusImportService.preview(
+			"https://docs.google.com/spreadsheets/d/spreadsheet-id/edit?usp=sharing",
+		);
+
+		expect(preview.projects.map((project) => project.name)).toEqual([
+			"SA",
+			"ST",
+		]);
+		expect(preview.projects[0]?.bonuses[0]?.content).toBe("Welcome text");
+		expect(preview.projects[1]?.bonuses[0]?.minDepositCurrency).toBe("EUR");
+		expect(mockedFetchGoogleSheetArrayBuffer).not.toHaveBeenCalled();
 	});
 
 	it("imports every XLSX worksheet as a project named after the sheet", async () => {
@@ -187,7 +237,7 @@ describe("deposit bonus Google Sheets import", () => {
 		]);
 		expect(preview.projects[0]?.bonuses[0]?.content).toBe("Welcome text");
 		expect(preview.projects[1]?.bonuses[0]?.minDepositCurrency).toBe("EUR");
-		expect(mockedFetchGoogleSheetText).not.toHaveBeenCalled();
+		expect(mockedFetchGoogleSheetArrayBuffer).toHaveBeenCalledOnce();
 	});
 
 	it("discovers every tab when the source URL points to one gid", async () => {
@@ -216,11 +266,13 @@ describe("deposit bonus Google Sheets import", () => {
 		const tabs = __depositBonusImportInternals.parseTabsFromHtml(`
 			<a href="https://docs.google.com/spreadsheets/d/e/pubhtml?gid=11&amp;single=true">First &amp; Main</a>
 			<a href="#gid=22"><span>Second Project</span></a>
+			<div class="goog-inline-block docs-sheet-tab-caption">Third Project</div>
 		`);
 
 		expect(tabs).toEqual([
 			{ gid: "11", title: "First & Main" },
 			{ gid: "22", title: "Second Project" },
+			{ sheetName: "Third Project", title: "Third Project" },
 		]);
 	});
 });

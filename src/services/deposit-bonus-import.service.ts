@@ -11,6 +11,7 @@ import {
 	fetchGoogleSheetText,
 	looksLikeGoogleSheetHtml,
 	toGoogleSheetExportUrl,
+	toGoogleSheetNamedExportUrl,
 	toGoogleSheetXlsxExportUrl,
 } from "@/services/google-sheet-fetch.service";
 
@@ -25,7 +26,8 @@ export interface DepositBonusImportPreview {
 }
 
 interface SheetTab {
-	gid: string;
+	gid?: string;
+	sheetName?: string;
 	title: string;
 }
 
@@ -205,8 +207,16 @@ function decodeJsonString(value: string) {
 	}
 }
 
-function toGoogleExportUrl(sourceUrl: string, gid?: string) {
-	return toGoogleSheetExportUrl(sourceUrl, gid);
+function toGoogleTabExportUrl(sourceUrl: string, tab: SheetTab) {
+	if (tab.gid) {
+		return toGoogleSheetExportUrl(sourceUrl, tab.gid);
+	}
+
+	if (tab.sheetName) {
+		return toGoogleSheetNamedExportUrl(sourceUrl, tab.sheetName);
+	}
+
+	return toGoogleSheetExportUrl(sourceUrl);
 }
 
 function detectDelimiter(text: string) {
@@ -819,6 +829,26 @@ function parseBonusesFromRows(rows: string[][]) {
 
 function parseTabsFromHtml(html: string) {
 	const tabs = new Map<string, SheetTab>();
+	const setTab = (tab: SheetTab) => {
+		const key = tab.gid ? `gid:${tab.gid}` : `name:${tab.title}`;
+		const existingWithSameTitle = Array.from(tabs.entries()).find(
+			([, existing]) => existing.title === tab.title,
+		);
+
+		if (existingWithSameTitle) {
+			const [existingKey, existingTab] = existingWithSameTitle;
+
+			if (tab.gid && !existingTab.gid) {
+				tabs.delete(existingKey);
+			} else {
+				return;
+			}
+		}
+
+		if (tab.title && !tabs.has(key)) {
+			tabs.set(key, tab);
+		}
+	};
 	const metadataSources = [
 		html,
 		html
@@ -834,6 +864,8 @@ function parseTabsFromHtml(html: string) {
 	];
 	const anchorPattern =
 		/<a\b[^>]*(?:gid=|gid%3D|#gid=)(\d+)[^>]*>([\s\S]*?)<\/a>/gi;
+	const tabCaptionPattern =
+		/<div\b[^>]*class="[^"]*\bdocs-sheet-tab-caption\b[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
 
 	for (const source of metadataSources) {
 		for (const pattern of sheetIdPatterns) {
@@ -844,8 +876,8 @@ function parseTabsFromHtml(html: string) {
 				const gid = firstIsGid ? first : second;
 				const title = decodeJsonString(firstIsGid ? second : first);
 
-				if (gid && title && !tabs.has(gid)) {
-					tabs.set(gid, { gid, title });
+				if (gid && title) {
+					setTab({ gid, title });
 				}
 			}
 		}
@@ -854,8 +886,16 @@ function parseTabsFromHtml(html: string) {
 			const gid = match[1] ?? "";
 			const title = decodeHtml((match[2] ?? "").replace(/<[^>]*>/g, ""));
 
-			if (gid && title && !tabs.has(gid)) {
-				tabs.set(gid, { gid, title });
+			if (gid && title) {
+				setTab({ gid, title });
+			}
+		}
+
+		for (const match of source.matchAll(tabCaptionPattern)) {
+			const title = decodeHtml((match[1] ?? "").replace(/<[^>]*>/g, ""));
+
+			if (title) {
+				setTab({ sheetName: title, title });
 			}
 		}
 	}
@@ -980,25 +1020,29 @@ class DepositBonusImportService {
 		const csvUrls: string[] = [];
 
 		for (const sourceUrl of sourceUrls) {
-			const workbookImport = await importXlsxWorkbook(sourceUrl);
-
-			if (workbookImport) {
-				projects.push(...workbookImport.projects);
-				warnings.push(...workbookImport.warnings);
-				csvUrls.push(workbookImport.sourceLabel);
-				continue;
-			}
-
 			const tabs = await discoverSheetTabs(sourceUrl);
+			const tabsAreUnnamedFallback =
+				tabs.length === 1 &&
+				!tabs[0]?.sheetName &&
+				tabs[0]?.title.startsWith("Sheet ");
 
-			if (tabs.length === 1 && tabs[0]?.title.startsWith("Sheet ")) {
+			if (tabsAreUnnamedFallback) {
+				const workbookImport = await importXlsxWorkbook(sourceUrl);
+
+				if (workbookImport) {
+					projects.push(...workbookImport.projects);
+					warnings.push(...workbookImport.warnings);
+					csvUrls.push(workbookImport.sourceLabel);
+					continue;
+				}
+
 				warnings.push(
 					"Sheet names could not be detected. Import used gid as project name.",
 				);
 			}
 
 			for (const tab of tabs) {
-				const csvUrl = toGoogleExportUrl(sourceUrl, tab.gid);
+				const csvUrl = toGoogleTabExportUrl(sourceUrl, tab);
 				const response = await fetchGoogleSheetText(csvUrl);
 
 				csvUrls.push(csvUrl);
