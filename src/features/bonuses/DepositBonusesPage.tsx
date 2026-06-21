@@ -138,12 +138,12 @@ function getBonusTranslations(bonus: DepositBonus): DepositBonusTranslation[] {
 
 	return content.trim()
 		? [
-				{
-					language: DEFAULT_BONUS_LANGUAGE,
-					content,
-					updatedAt: new Date().toISOString(),
-				},
-			]
+			{
+				language: DEFAULT_BONUS_LANGUAGE,
+				content,
+				updatedAt: new Date().toISOString(),
+			},
+		]
 		: [];
 }
 
@@ -225,28 +225,13 @@ function pickPrimaryDraftContent(draft: BonusDraft, language: string) {
 }
 
 function buildBonusBind({
-	project,
 	bonus,
 	language,
-	selectedCurrency,
-	rates,
 }: {
-	project: BonusProject;
 	bonus: DepositBonus;
 	language: string;
-	selectedCurrency: string;
-	rates?: CurrencyRates;
 }) {
-	const content = getBonusContent(bonus, language);
-
-	return [
-		`${project.name} - ${bonus.name}`,
-		formatDeposit(bonus, selectedCurrency, rates),
-		"",
-		content,
-	]
-		.filter((_line, index) => index !== 2 || content.trim())
-		.join("\n");
+	return getBonusContent(bonus, language).trim();
 }
 
 function buildPackageBind({
@@ -525,14 +510,11 @@ export function DepositBonusesPage() {
 		setFormError("");
 	};
 
-	const copyBonus = async (project: BonusProject, bonus: DepositBonus) => {
+	const copyBonus = async (bonus: DepositBonus) => {
 		const copied = await copyToClipboard(
 			buildBonusBind({
-				project,
 				bonus,
-				language: selectedLanguage,
-				selectedCurrency,
-				rates,
+				language: selectedLanguage
 			}),
 		);
 
@@ -571,11 +553,10 @@ export function DepositBonusesPage() {
 									key={language.code}
 									type="button"
 									onClick={() => setSelectedLanguage(language.code)}
-									className={`h-8 rounded px-3 text-xs font-semibold transition ${
-										selectedLanguage === language.code
+									className={`h-8 rounded px-3 text-xs font-semibold transition ${selectedLanguage === language.code
 											? "bg-accent text-accent-foreground"
 											: "text-muted hover:bg-surface-elevated hover:text-foreground"
-									}`}
+										}`}
 								>
 									{language.label}
 								</button>
@@ -780,11 +761,10 @@ export function DepositBonusesPage() {
 											key={project.id}
 											type="button"
 											onClick={() => setActiveProject(project.id)}
-											className={`min-w-0 rounded-md border px-3 py-2 text-left text-sm transition ${
-												active
+											className={`min-w-0 rounded-md border px-3 py-2 text-left text-sm transition ${active
 													? "border-accent bg-accent/10 text-foreground"
 													: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-											}`}
+												}`}
 										>
 											<div className="max-w-48 truncate font-medium">
 												{project.name}
@@ -965,22 +945,20 @@ export function DepositBonusesPage() {
 															<div className="mt-1 text-xs text-muted">
 																{formatDeposit(bonus, selectedCurrency, rates)}
 															</div>
-															{languages.length > 0 && (
-																<div className="mt-2 flex flex-wrap gap-1">
-																	{languages.map((language) => (
-																		<span
-																			key={language}
-																			className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
-																				selectedLanguage === language
-																					? "border-accent bg-accent/10 text-foreground"
-																					: "border-border text-muted"
-																			}`}
-																		>
-																			{getLanguageLabel(language)}
-																		</span>
-																	))}
-																</div>
-															)}
+															{languages.map((language) => (
+																<button
+																	key={language}
+																	type="button"
+																	onClick={() => setSelectedLanguage(language)}
+																	title={`Switch to ${getLanguageLabel(language)}`}
+																	className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition ${selectedLanguage === language
+																			? "border-accent bg-accent/10 text-foreground"
+																			: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+																		}`}
+																>
+																	{getLanguageLabel(language)}
+																</button>
+															))}
 														</div>
 
 														<div className="min-w-0 whitespace-pre-wrap text-sm leading-6 text-muted">
@@ -991,7 +969,7 @@ export function DepositBonusesPage() {
 															<button
 																type="button"
 																onClick={() =>
-																	void copyBonus(activeProject, bonus)
+																	void copyBonus(bonus)
 																}
 																className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 															>
