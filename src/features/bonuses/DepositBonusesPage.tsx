@@ -22,6 +22,7 @@ import type {
 	DepositBonus,
 	DepositBonusTranslation,
 } from "@/entities/bonus";
+import { BONUS_PROJECT_ALIASES } from "@/entities/bonus/project-aliases";
 import {
 	type CurrencyRates,
 	currencyService,
@@ -75,6 +76,57 @@ const FALLBACK_CURRENCIES = [
 	"RON",
 	"KZT",
 ];
+
+function normalizeSearchText(value: string) {
+	return value
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/\u0451/g, "\u0435")
+		.replace(/[^a-z0-9\u0430-\u044f\u0370-\u03ff]+/g, " ")
+		.trim();
+}
+
+function getSearchTokens(value: string) {
+	return normalizeSearchText(value).split(/\s+/).filter(Boolean);
+}
+
+function matchesTokens(value: string, tokens: string[]) {
+	if (tokens.length === 0) return true;
+
+	const haystack = normalizeSearchText(value);
+
+	return tokens.every((token) => haystack.includes(token));
+}
+
+function getProjectAliases(project: BonusProject) {
+	const directAliases = BONUS_PROJECT_ALIASES[project.name.toUpperCase()] ?? [];
+	const slugAliases = BONUS_PROJECT_ALIASES[project.slug.toUpperCase()] ?? [];
+
+	return Array.from(new Set([...directAliases, ...slugAliases]));
+}
+
+function buildBonusSearchText(bonus: DepositBonus) {
+	return [
+		bonus.name,
+		bonus.content,
+		bonus.minDepositAmount?.toString() ?? "",
+		bonus.minDepositCurrency ?? "",
+		...getBonusTranslations(bonus).flatMap((translation) => [
+			translation.language,
+			translation.content,
+		]),
+	].join(" ");
+}
+
+function buildProjectSearchText(project: BonusProject) {
+	return [
+		project.name,
+		project.slug,
+		project.sheetId ?? "",
+		...getProjectAliases(project),
+	].join(" ");
+}
 
 function getConvertedDeposit(
 	bonus: DepositBonus,
@@ -138,12 +190,12 @@ function getBonusTranslations(bonus: DepositBonus): DepositBonusTranslation[] {
 
 	return content.trim()
 		? [
-			{
-				language: DEFAULT_BONUS_LANGUAGE,
-				content,
-				updatedAt: new Date().toISOString(),
-			},
-		]
+				{
+					language: DEFAULT_BONUS_LANGUAGE,
+					content,
+					updatedAt: new Date().toISOString(),
+				},
+			]
 		: [];
 }
 
@@ -323,29 +375,20 @@ export function DepositBonusesPage() {
 
 		return Array.from(values).sort();
 	}, [rates]);
+	const searchTokens = useMemo(() => getSearchTokens(query), [query]);
 	const filteredProjects = useMemo(() => {
-		const value = query.trim().toLowerCase();
-
-		if (!value) return projects;
+		if (searchTokens.length === 0) return projects;
 
 		return projects.filter((project) => {
-			const haystack = [
-				project.name,
-				project.slug,
-				...project.bonuses.flatMap((bonus) => [
-					bonus.name,
-					bonus.content,
-					...getBonusTranslations(bonus).map(
-						(translation) => translation.content,
-					),
-				]),
-			]
-				.join(" ")
-				.toLowerCase();
+			if (matchesTokens(buildProjectSearchText(project), searchTokens)) {
+				return true;
+			}
 
-			return haystack.includes(value);
+			return project.bonuses.some((bonus) =>
+				matchesTokens(buildBonusSearchText(bonus), searchTokens),
+			);
 		});
-	}, [projects, query]);
+	}, [projects, searchTokens]);
 	const activeProject =
 		filteredProjects.find((project) => project.id === activeProjectId) ??
 		filteredProjects[0] ??
@@ -354,6 +397,19 @@ export function DepositBonusesPage() {
 	const editingBonus = activeProject?.bonuses.find(
 		(bonus) => bonus.id === editingBonusId,
 	);
+	const activeProjectMatchesSearch = activeProject
+		? matchesTokens(buildProjectSearchText(activeProject), searchTokens)
+		: false;
+	const visibleBonuses = useMemo(() => {
+		if (!activeProject) return [];
+		if (searchTokens.length === 0 || activeProjectMatchesSearch) {
+			return activeProject.bonuses;
+		}
+
+		return activeProject.bonuses.filter((bonus) =>
+			matchesTokens(buildBonusSearchText(bonus), searchTokens),
+		);
+	}, [activeProject, activeProjectMatchesSearch, searchTokens]);
 
 	const loadRates = useCallback(
 		async (force: boolean) => {
@@ -514,7 +570,7 @@ export function DepositBonusesPage() {
 		const copied = await copyToClipboard(
 			buildBonusBind({
 				bonus,
-				language: selectedLanguage
+				language: selectedLanguage,
 			}),
 		);
 
@@ -553,10 +609,11 @@ export function DepositBonusesPage() {
 									key={language.code}
 									type="button"
 									onClick={() => setSelectedLanguage(language.code)}
-									className={`h-8 rounded px-3 text-xs font-semibold transition ${selectedLanguage === language.code
+									className={`h-8 rounded px-3 text-xs font-semibold transition ${
+										selectedLanguage === language.code
 											? "bg-accent text-accent-foreground"
 											: "text-muted hover:bg-surface-elevated hover:text-foreground"
-										}`}
+									}`}
 								>
 									{language.label}
 								</button>
@@ -761,16 +818,29 @@ export function DepositBonusesPage() {
 											key={project.id}
 											type="button"
 											onClick={() => setActiveProject(project.id)}
-											className={`min-w-0 rounded-md border px-3 py-2 text-left text-sm transition ${active
+											className={`min-w-0 rounded-md border px-3 py-2 text-left text-sm transition ${
+												active
 													? "border-accent bg-accent/10 text-foreground"
 													: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-												}`}
+											}`}
 										>
 											<div className="max-w-48 truncate font-medium">
 												{project.name}
 											</div>
 											<div className="mt-1 text-xs text-muted">
-												{project.bonuses.length} bonuses
+												{searchTokens.length > 0 &&
+												!matchesTokens(
+													buildProjectSearchText(project),
+													searchTokens,
+												)
+													? project.bonuses.filter((bonus) =>
+															matchesTokens(
+																buildBonusSearchText(bonus),
+																searchTokens,
+															),
+														).length
+													: project.bonuses.length}{" "}
+												bonuses
 											</div>
 										</button>
 									);
@@ -915,13 +985,17 @@ export function DepositBonusesPage() {
 								<div className="border-b border-border px-4 py-3">
 									<div className="font-semibold">{activeProject.name}</div>
 									<div className="mt-1 text-xs text-muted">
-										{activeProject.bonuses.length} bonuses
+										{visibleBonuses.length}
+										{visibleBonuses.length !== activeProject.bonuses.length
+											? ` of ${activeProject.bonuses.length}`
+											: ""}{" "}
+										bonuses
 									</div>
 								</div>
 
 								<div className="divide-y divide-border">
-									{activeProject.bonuses.length > 0 ? (
-										activeProject.bonuses
+									{visibleBonuses.length > 0 ? (
+										visibleBonuses
 											.slice()
 											.sort((first, second) => first.order - second.order)
 											.map((bonus) => {
@@ -951,10 +1025,11 @@ export function DepositBonusesPage() {
 																	type="button"
 																	onClick={() => setSelectedLanguage(language)}
 																	title={`Switch to ${getLanguageLabel(language)}`}
-																	className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition ${selectedLanguage === language
+																	className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition ${
+																		selectedLanguage === language
 																			? "border-accent bg-accent/10 text-foreground"
 																			: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-																		}`}
+																	}`}
 																>
 																	{getLanguageLabel(language)}
 																</button>
@@ -968,9 +1043,7 @@ export function DepositBonusesPage() {
 														<div className="flex items-start gap-2">
 															<button
 																type="button"
-																onClick={() =>
-																	void copyBonus(bonus)
-																}
+																onClick={() => void copyBonus(bonus)}
 																className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 															>
 																<Copy size={15} />
@@ -1000,7 +1073,9 @@ export function DepositBonusesPage() {
 											})
 									) : (
 										<div className="px-4 py-12 text-center text-sm text-muted">
-											This project sheet has no bonuses yet
+											{searchTokens.length > 0
+												? "No bonuses match this search"
+												: "This project sheet has no bonuses yet"}
 										</div>
 									)}
 								</div>
