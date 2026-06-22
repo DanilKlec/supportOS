@@ -3,19 +3,19 @@
     {
       "id": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
       "name": "Приветствие",
-      "order": 6,
+      "order": 2,
       "color": "#10B981"
     },
     {
       "id": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
       "name": "Бонусы",
-      "order": 7,
+      "order": 3,
       "color": "#3B82F6"
     },
     {
       "id": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
       "name": "Выводы",
-      "order": 8,
+      "order": 4,
       "color": "#F59E0B"
     },
     {
@@ -29,35 +29,35 @@
       "ownerId": null,
       "name": "AutoKYC",
       "color": "#FFFF00",
-      "order": 12
+      "order": 5
     },
     {
       "id": "category-36b7f946-5326-43f2-a62b-eba98409c329",
       "ownerId": null,
       "name": "Депозит",
       "color": "#EC4899",
-      "order": 13
+      "order": 7
     },
     {
       "id": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
       "ownerId": null,
       "name": "Полезное",
       "color": "#8B5CF6",
-      "order": 14
+      "order": 6
     },
     {
       "id": "category-8ea2eb93-d97b-487b-8e3d-8484212ecd34",
       "ownerId": null,
       "name": "Sport",
       "color": "#1ab1dd",
-      "order": 15
+      "order": 8
     },
     {
       "id": "category-07464f26-55ef-40f2-ba35-43a87cdc14db",
       "ownerId": null,
       "name": "Деш бинд",
       "color": "#FFFFFF",
-      "order": 16
+      "order": 1
     }
   ],
   "folders": [
@@ -166,6 +166,30 @@
       "categoryId": "category-07464f26-55ef-40f2-ba35-43a87cdc14db",
       "name": "Почты",
       "color": "#FFFFFF",
+      "order": 3
+    },
+    {
+      "id": "folder-5cb6d499-2f1d-44f6-80ea-4a2fedce1353",
+      "ownerId": null,
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "name": "Проверяю",
+      "color": "#10B981",
+      "order": 2
+    },
+    {
+      "id": "folder-154b5a75-b5c7-4b0c-9014-fd0ab6944396",
+      "ownerId": null,
+      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "name": "Есть вопросы?",
+      "color": "#10B981",
+      "order": 3
+    },
+    {
+      "id": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "ownerId": null,
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "name": "Общее",
+      "color": "#8B5CF6",
       "order": 3
     }
   ],
@@ -298,8 +322,9 @@
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-14T19:36:52.262Z",
-      "updatedAt": "2026-06-18T07:23:31.524Z",
+      "updatedAt": "2026-06-22T14:27:13.302Z",
       "imported": false,
+      "folderId": "folder-5cb6d499-2f1d-44f6-80ea-4a2fedce1353",
       "color": "#10B981"
     },
     {
@@ -342,8 +367,9 @@
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-14T19:39:22.588Z",
-      "updatedAt": "2026-06-18T07:23:28.968Z",
+      "updatedAt": "2026-06-22T14:27:50.035Z",
       "imported": false,
+      "folderId": "folder-154b5a75-b5c7-4b0c-9014-fd0ab6944396",
       "color": "#10B981"
     },
     {
@@ -386,8 +412,9 @@
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-14T19:40:15.261Z",
-      "updatedAt": "2026-06-18T07:23:26.208Z",
+      "updatedAt": "2026-06-22T14:28:32.475Z",
       "imported": false,
+      "folderId": "folder-154b5a75-b5c7-4b0c-9014-fd0ab6944396",
       "color": "#10B981"
     },
     {
@@ -1880,26 +1907,38 @@
         {
           "language": "ru",
           "title": "прошел самсамб",
-          "content": "По данным из нашего технического журнала, вы успешно прошли автоматическую верификацию на нашем сайте.✔️",
-          "updatedAt": "2026-06-17T10:51:32.790Z"
+          "content": "Рады сообщить, что ваш аккаунт успешно прошёл автоматическую верификацию.\nТеперь вы можете создать заявку на вывод средств в личном кабинете. После создания заявка будет передана на обработку финансовому отделу в стандартном порядке.\nБлагодарим вас за ожидание и сотрудничество.",
+          "updatedAt": "2026-06-22T18:05:01.571Z"
         },
         {
           "language": "en",
           "title": "прошел самсамб",
-          "content": "According to the data from our technical journal, you have successfully passed the automatic verification on our website.✔️",
-          "updatedAt": "2026-06-18T07:25:27.921Z"
+          "content": "We are pleased to inform you that your account has successfully passed automatic verification.\nYou can now submit a withdrawal request through your personal account. Once the request is created, it will be forwarded to the Financial Department for processing according to the standard procedure.\nThank you for your patience and cooperation.",
+          "updatedAt": "2026-06-22T18:05:01.571Z"
+        },
+        {
+          "language": "de",
+          "title": "прошел самсамб",
+          "content": "Wir freuen uns, Ihnen mitteilen zu können, dass Ihr Konto die automatische Verifizierung erfolgreich bestanden hat.\nSie können nun in Ihrem persönlichen Konto einen Auszahlungsantrag erstellen. Sobald der Antrag erstellt wurde, wird er gemäß dem Standardverfahren an die Finanzabteilung zur Bearbeitung weitergeleitet.\nVielen Dank für Ihre Geduld und Zusammenarbeit.",
+          "updatedAt": "2026-06-22T18:05:01.571Z"
+        },
+        {
+          "language": "pt",
+          "title": "прошел самсамб",
+          "content": "Temos o prazer de informar que a sua conta passou com sucesso pela verificação automática.\nAgora pode criar um pedido de levantamento na sua conta pessoal. Após a criação do pedido, este será encaminhado para o Departamento Financeiro para processamento de acordo com o procedimento padrão.\nAgradecemos a sua paciência e cooperação.",
+          "updatedAt": "2026-06-22T18:05:01.571Z"
         },
         {
           "language": "el",
           "title": "прошел самсамб",
-          "content": "Σύμφωνα με τα δεδομένα από το τεχνικό μας αρχείο, έχετε ολοκληρώσει με επιτυχία την αυτόματη επαλήθευση στον ιστότοπό μας. ✔️",
-          "updatedAt": "2026-06-17T10:51:26.025Z"
+          "content": "Είμαστε στην ευχάριστη θέση να σας ενημερώσουμε ότι ο λογαριασμός σας ολοκλήρωσε επιτυχώς την αυτόματη επαλήθευση.\nΠλέον μπορείτε να δημιουργήσετε αίτημα ανάληψης χρημάτων μέσα από τον προσωπικό σας λογαριασμό. Μετά τη δημιουργία του αιτήματος, αυτό θα προωθηθεί στο οικονομικό τμήμα για επεξεργασία σύμφωνα με την τυπική διαδικασία.\nΣας ευχαριστούμε για την υπομονή και τη συνεργασία σας.",
+          "updatedAt": "2026-06-22T18:05:01.571Z"
         }
       ],
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-17T10:51:32.790Z",
-      "updatedAt": "2026-06-18T07:25:27.921Z",
+      "updatedAt": "2026-06-22T18:05:01.572Z",
       "color": "#FFFF00"
     },
     {
@@ -2367,52 +2406,8 @@
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-17T19:49:52.701Z",
-      "updatedAt": "2026-06-21T21:52:55.976Z"
-    },
-    {
-      "id": "bind-be3e724b-8306-4ced-b097-d9bdf44fff1f",
-      "ownerId": null,
-      "imported": false,
-      "slug": "bind-1781764390138",
-      "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
-      "color": "#10B981",
-      "tags": [],
-      "translations": [
-        {
-          "language": "ru",
-          "title": "не нашел в црм",
-          "content": "Отправьте пожалуйста почту с которой вы зарегистрировались на нашем сайте и юзернейм из личного кабинета, пример Игрок12345.",
-          "updatedAt": "2026-06-18T06:33:10.138Z"
-        },
-        {
-          "language": "en",
-          "title": "не нашел в црм",
-          "content": "Please send us the email address you used to register on our website and your username from your personal account, for example: Player12345.",
-          "updatedAt": "2026-06-18T07:23:23.604Z"
-        },
-        {
-          "language": "de",
-          "title": "не нашел в црм",
-          "content": "Bitte senden Sie uns die E-Mail-Adresse, mit der Sie sich auf unserer Website registriert haben, sowie Ihren Benutzernamen aus Ihrem persönlichen Konto, zum Beispiel: Spieler12345.",
-          "updatedAt": "2026-06-18T06:33:10.137Z"
-        },
-        {
-          "language": "pt",
-          "title": "не нашел в црм",
-          "content": "Por favor, envie-nos o e-mail que utilizou para se registrar em nosso site e o seu nome de utilizador da conta pessoal, por exemplo: Jogador12345.",
-          "updatedAt": "2026-06-18T06:33:10.137Z"
-        },
-        {
-          "language": "el",
-          "title": "не нашел в црм",
-          "content": "Παρακαλούμε στείλτε μας το email με το οποίο εγγραφήκατε στον ιστότοπό μας και το όνομα χρήστη από τον προσωπικό σας λογαριασμό, για παράδειγμα: Παίκτης12345.",
-          "updatedAt": "2026-06-18T06:33:10.137Z"
-        }
-      ],
-      "favorite": false,
-      "archived": false,
-      "createdAt": "2026-06-18T06:33:10.138Z",
-      "updatedAt": "2026-06-18T07:23:23.604Z"
+      "updatedAt": "2026-06-22T14:28:14.539Z",
+      "folderId": "folder-154b5a75-b5c7-4b0c-9014-fd0ab6944396"
     },
     {
       "id": "bind-36be1405-bd4d-419e-af57-8b19f2e7ddcb",
@@ -2767,6 +2762,7 @@
       "imported": false,
       "slug": "2-2",
       "categoryId": "category-aedb1a02-13b7-4a24-b2da-60af508c51c1",
+      "folderId": "folder-5cb6d499-2f1d-44f6-80ea-4a2fedce1353",
       "color": "#10B981",
       "tags": [],
       "translations": [
@@ -2804,7 +2800,7 @@
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-18T08:18:30.676Z",
-      "updatedAt": "2026-06-18T08:18:30.676Z"
+      "updatedAt": "2026-06-22T14:26:46.562Z"
     },
     {
       "id": "bind-1bae068d-e2a2-4769-9390-b1e3fa82cac5",
@@ -2956,38 +2952,38 @@
         {
           "language": "ru",
           "title": "Мапа",
-          "content": "Так же для вас сегодня доступно предложение: \n45% bonus up to €500 + 60 FS\nВам необходимо внести депозит от 25 EUR и выбрать акцию MAP DAY. \nПолучиться воспользоваться сегодня?",
-          "updatedAt": "2026-06-19T15:02:23.787Z"
+          "content": "Так же для вас сегодня доступно предложение: \n130% bonus up to €1000\nВам необходимо внести депозит от 25 EUR и выбрать акцию MAP DAY. \nПолучиться воспользоваться сегодня?",
+          "updatedAt": "2026-06-22T17:51:43.886Z"
         },
         {
           "language": "en",
           "title": "Мапа",
-          "content": "There is also an offer available for you today:  \n100% bonus up to €1000 + 100 FS\nYou need to make a deposit of at least €25 and choose the MAP DAY promotion.  \nWill you be able to take advantage of it today?",
-          "updatedAt": "2026-06-19T15:02:23.787Z"
+          "content": "There is also an offer available for you today:  \n130% bonus up to €1000\nYou need to make a deposit of at least €25 and choose the MAP DAY promotion.  \nWill you be able to take advantage of it today?",
+          "updatedAt": "2026-06-22T17:51:43.886Z"
         },
         {
           "language": "de",
           "title": "Мапа",
           "content": "Heute haben wir ein besonderes Angebot für Sie:\n140 FS\nZahlen Sie mindestens 25€ ein und wählen Sie die MAP DAY-Aktion.\nNutzen Sie dieses Angebot noch heute?",
-          "updatedAt": "2026-06-19T15:02:23.787Z"
+          "updatedAt": "2026-06-22T17:51:43.886Z"
         },
         {
           "language": "pt",
           "title": "Мапа",
           "content": "Também temos uma oferta especial disponível hoje Playoff Freebet Boost:\n25% up to €1500 + 60 FS\nVocê precisa fazer um depósito de pelo menos €25 e selecionar a promoção DIA DO MAPA.\nVocê pode aproveitar hoje?",
-          "updatedAt": "2026-06-19T15:02:23.787Z"
+          "updatedAt": "2026-06-22T17:51:43.886Z"
         },
         {
           "language": "el",
           "title": "Мапа",
           "content": "Επίσης, σήμερα είναι διαθέσιμη για εσάς η παρακάτω προσφορά:\n30% bonus up to €1000 + 60 FS\nΓια να επωφεληθείτε από την προσφορά, θα πρέπει να πραγματοποιήσετε κατάθεση από 25 € και να επιλέξετε την προωθητική ενέργεια MAP DAY.\nΘα μπορέσετε να επωφεληθείτε από αυτήν την προσφορά σήμερα;",
-          "updatedAt": "2026-06-19T15:02:23.787Z"
+          "updatedAt": "2026-06-22T17:51:43.886Z"
         }
       ],
       "favorite": false,
       "archived": false,
       "createdAt": "2026-06-18T09:26:47.401Z",
-      "updatedAt": "2026-06-19T15:02:23.787Z"
+      "updatedAt": "2026-06-22T17:51:43.886Z"
     },
     {
       "id": "bind-ffa95fc5-e9be-4e20-b37b-b61eda4236d8",
@@ -3778,6 +3774,579 @@
       "archived": false,
       "createdAt": "2026-06-22T05:10:34.288Z",
       "updatedAt": "2026-06-22T05:10:34.288Z"
+    },
+    {
+      "id": "bind-7a3a1bb9-30dc-4f61-8386-81b829a4154c",
+      "ownerId": null,
+      "sourceHash": "4b1ddad8198d6a65a5220f18ab14c444ed5dda884e159cd0a2b548ad00166b6a",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-4b1ddad8",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "вопросы про лицензию",
+          "content": "Прошу обратить ваше внимание, что всю доступную информацию, вы можете найти в разделе О нас на нашем сайте.",
+          "updatedAt": "2026-06-22T14:54:45.696Z"
+        },
+        {
+          "language": "el",
+          "title": "вопросы про лицензию",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.035Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.035Z",
+      "updatedAt": "2026-06-22T15:05:27.784Z"
+    },
+    {
+      "id": "bind-2987ca9d-8d64-48b1-9f81-5b3ffe5baf70",
+      "ownerId": null,
+      "sourceHash": "db6adce2a62e3b9dd11608e045a997847c11b05cece376e78d3dc4e6c1c8377c",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-db6adce2",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-0b79001a-490b-4374-8fca-696664887ab5",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "кэшбэк по мин не прошел",
+          "content": "Давайте, я немного подробнее объясню вам формулу для подсчета кэшбэка. Кэшбэк начисляется по формуле депозиты - выводы- полученные бонусы х на %. За прошедшую неделю ваши депозиты составили 00 евро - 0 (выводы) - 0 ( полученные бонусы) = - 0 Так как минимальна сумма для получения кэшбэка составляет 1 евро, вы не набрали минимальную сумму для его получения.",
+          "updatedAt": "2026-06-22T14:54:58.168Z"
+        },
+        {
+          "language": "el",
+          "title": "кэшбэк по мин не прошел",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.036Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.036Z",
+      "updatedAt": "2026-06-22T15:05:13.868Z"
+    },
+    {
+      "id": "bind-619ef29d-d6d6-43a4-aee2-8df86d5bb3cc",
+      "ownerId": null,
+      "sourceHash": "86b08894e137ccd8a3b49233a758c15b999e338b314b3278ef83bec7431e9e1c",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-86b08894",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-0b79001a-490b-4374-8fca-696664887ab5",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "кэшбэк бонусов больше чем депов",
+          "content": "Согласно условиям акции, кэшбэк зачисляется автоматически по понедельникам в виде ..%...(формула рассчёта) Минимальная сумма бонуса ... EUR. Вижу, что за прошлую неделю сумма полученных бонусов превышает сумму депозитов, поэтому бонус недоступен.",
+          "updatedAt": "2026-06-22T14:55:08.300Z"
+        },
+        {
+          "language": "el",
+          "title": "кэшбэк бонусов больше чем депов",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.036Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.036Z",
+      "updatedAt": "2026-06-22T15:03:04.901Z"
+    },
+    {
+      "id": "bind-7fca01a0-0be0-447e-b4b1-f69c5d7247da",
+      "ownerId": null,
+      "sourceHash": "426d60cea34417813ca454ce7f432a3fdd56748d613a70ac98c8a037edb41577",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-426d60ce",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-0b79001a-490b-4374-8fca-696664887ab5",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "кэшбэк не вносил депы",
+          "content": "Пожалуйста, обратите внимание, что согласно условиям промоакции кэшбэк зачисляется автоматически по понедельникам в виде ..%...(формула рассчёта). Согласно нашим техническим журналам вы не вносили депозитов на прошлой неделе, поэтому кэшбэк недоступен.",
+          "updatedAt": "2026-06-22T14:55:12.088Z"
+        },
+        {
+          "language": "el",
+          "title": "кэшбэк не вносил депы",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.036Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.036Z",
+      "updatedAt": "2026-06-22T15:05:06.688Z"
+    },
+    {
+      "id": "bind-7510f25d-ce64-4bb2-a71c-9db45e71330c",
+      "ownerId": null,
+      "sourceHash": "f63b623a470983e881454576b92461364f3f056368d2c2cf0608eac85348d9eb",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-f63b623a",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "тех работы",
+          "content": "В данный момент сайт находится на техническом обслуживании, и в ближайшее время работа будет восстановлена. Любезно просим вас связаться с нами позже ( или через полчаса) для уточнения информации. Приносим извинения за причиненные неудобства!",
+          "updatedAt": "2026-06-22T14:55:16.400Z"
+        },
+        {
+          "language": "en",
+          "title": "тех работы",
+          "content": "The site is currently undergoing maintenance, and work will be restored in the near future. We kindly ask you to contact us later (or in half an hour) for clarification. We apologize for the inconvenience!",
+          "updatedAt": "2026-06-22T14:52:05.463Z"
+        },
+        {
+          "language": "el",
+          "title": "тех работы",
+          "content": "Αυτή τη στιγμή ο ιστότοπος βρίσκεται σε τεχνική συντήρηση και σύντομα η λειτουργία του θα αποκατασταθεί. Σας παρακαλούμε ευγενικά να επικοινωνήσετε ξανά μαζί μας αργότερα (ή σε μισή ώρα) για περισσότερες πληροφορίες. Ζητούμε συγγνώμη για την ενόχληση!",
+          "updatedAt": "2026-06-22T14:52:12.036Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.036Z",
+      "updatedAt": "2026-06-22T14:55:16.400Z"
+    },
+    {
+      "id": "bind-066c93ad-5e8b-4585-b6c1-4747602b1d78",
+      "ownerId": null,
+      "sourceHash": "081ccd16cb444b0b4a48562ad6efa55c59cd24ec6fa5aefe3aba30a33d48a4f5",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-081ccd16",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "а игроки из моего гео есть?",
+          "content": "На нашем сайте множество игроков по всему миру, к сожалению точной информацией и цифрами техническая поддержка не обладает, если у вас есть конкретные запросы вы можете обратиться и на почту отправить",
+          "updatedAt": "2026-06-22T14:55:34.597Z"
+        },
+        {
+          "language": "el",
+          "title": "а игроки из моего гео есть?",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T14:55:34.597Z"
+    },
+    {
+      "id": "bind-b328d426-9dbf-420a-ae4a-8aab236d8958",
+      "ownerId": null,
+      "sourceHash": "00600a5927e340ee9d07b66b18d5885705ebdbb6c569a7c9fae677657e31825a",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "frozen-00600a59",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "акк frozen",
+          "content": "Скорее всего, Вы неправильно вели Ваши данные при входе в аккаунт, и аккаунт был заморожен нашей системой безопасности. Вы можете примерно через 5 минут снова авторизоваться. Пожалуйста, убедитесь, что вы используете правильный логин и пароль. Если проблема сохраняется, Вы можете восстановить доступ к аккаунту: в окне входа нажмите кнопку Забыли пароль?. В открывшемся окне введите Вашу почту и вышлите письмо на почту на восстановление доступа. На почте откройте присланное письмо, перейдите по ссылке и смените пароль на новый.",
+          "updatedAt": "2026-06-22T14:55:31.705Z"
+        },
+        {
+          "language": "el",
+          "title": "акк frozen",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T14:58:18.964Z"
+    },
+    {
+      "id": "bind-e1a9d1d2-9bbf-4cd9-aab7-84c98a5ad0b7",
+      "ownerId": null,
+      "sourceHash": "15667ef9ec3290e2e620e0c3fd1b5100eb786b43fbb9f0afb6c811583f350dfc",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-15667ef9",
+      "categoryId": "category-36b7f946-5326-43f2-a62b-eba98409c329",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "если банк не позволяет сделать скрин",
+          "content": "Хочу отметить, что существуют сторонние приложения, позволяющие делать скриншоты банковских выписок. Информацию о таких приложениях можно найти в интернете, а скачать их можно из App Store или Play Market.",
+          "updatedAt": "2026-06-22T14:55:45.181Z"
+        },
+        {
+          "language": "en",
+          "title": "если банк не позволяет сделать скрин",
+          "content": "I would like to note that there are third-party applications that allow you to take screenshots in your bank account. You can find information about such applications on the Internet, and you can download them from the App Store or Play Market.",
+          "updatedAt": "2026-06-22T14:52:05.463Z"
+        },
+        {
+          "language": "el",
+          "title": "если банк не позволяет сделать скрин",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T15:07:29.006Z"
+    },
+    {
+      "id": "bind-24f1cfd7-8cc0-4e2c-991b-a1aeed8bb9b7",
+      "ownerId": null,
+      "sourceHash": "8ddb33ace626db9ceffb015360422b843c4f1b156af76aa865f23e5cc5276141",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-8ddb33ac",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "аффилейты",
+          "content": "По вопросам сотрудничества обращайтесь в наш компетентный отдел. Контактную информацию можно найти в самом конце сайта, в разделе «Партнеры».",
+          "updatedAt": "2026-06-22T14:55:48.501Z"
+        },
+        {
+          "language": "el",
+          "title": "аффилейты",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T14:58:00.508Z"
+    },
+    {
+      "id": "bind-901bc2ef-7987-4daf-a2f5-19d5d14e9f56",
+      "ownerId": null,
+      "sourceHash": "0b153c7ca18459ffb2e9535353ee844c5eaf58c177986fbb824f9acfda6aed74",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-0b153c7c",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-89b3b041-92a3-4816-be40-d604c8ccecd6",
+      "color": "#3B82F6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "доказывает по реге",
+          "content": "Обратите пожалуйста внимание, очень Важно! Компания не несёт ответственности за любые предложения, размещённые в интернете, если они не подтверждены через наши официальные каналы. проверяйте информацию только на официальном сайте и сайтах партнеров.",
+          "updatedAt": "2026-06-22T14:55:53.129Z"
+        },
+        {
+          "language": "en",
+          "title": "доказывает по реге",
+          "content": "Please pay attention, it is very important! The company is not responsible for any offers posted on the internet if they are not confirmed through our official channels. Please check the information only on the official website and partner websites.",
+          "updatedAt": "2026-06-22T14:52:05.463Z"
+        },
+        {
+          "language": "de",
+          "title": "доказывает по реге",
+          "content": "Bitte beachten Sie, es ist sehr wichtig! Das Unternehmen haftet nicht für Angebote, die im Internet veröffentlicht werden, es sei denn, sie werden über unsere offiziellen Kanäle bestätigt. überprüfen Sie die Informationen nur auf der offiziellen Website und den Websites der Partner.",
+          "updatedAt": "2026-06-22T14:52:05.463Z"
+        },
+        {
+          "language": "el",
+          "title": "доказывает по реге",
+          "content": "Παρακαλούμε δώστε ιδιαίτερη προσοχή, είναι πολύ σημαντικό! Η εταιρεία δεν φέρει ευθύνη για οποιεσδήποτε προσφορές δημοσιεύονται στο διαδίκτυο, εάν δεν έχουν επιβεβαιωθεί μέσω των επίσημων καναλιών μας. Παρακαλούμε να ελέγχετε τις πληροφορίες μόνο μέσω της επίσημης ιστοσελίδας και των συνεργαζόμενων ιστότοπων.",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T14:58:43.461Z"
+    },
+    {
+      "id": "bind-0fb2a1a5-60d8-4d34-a8d5-1f1b14118311",
+      "ownerId": null,
+      "sourceHash": "a369a110148e4d5a0fe9dc4e5bd2a1c887113e34acefff8490926e4de43a5cd7",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-a369a110",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Турнир",
+          "content": "В случае если вы заняли призовое место, как только ваш приз за участие в турнире будет начислен, вы получите уведомление об этом по почте.",
+          "updatedAt": "2026-06-22T14:57:00.655Z"
+        },
+        {
+          "language": "en",
+          "title": "Турнир",
+          "content": "На данный момент ведутся подсчеты результатов турнира. Как только все результаты буду подсчитаны, Все кто занял призовые места будут уведомлены по емаил",
+          "updatedAt": "2026-06-22T14:52:05.463Z"
+        },
+        {
+          "language": "el",
+          "title": "Турнир",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.037Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.037Z",
+      "updatedAt": "2026-06-22T14:57:00.655Z"
+    },
+    {
+      "id": "bind-7c6f1671-0ad1-45e9-b0ba-5dfa44bca1df",
+      "ownerId": null,
+      "sourceHash": "f680b7f3a9c262fd7b8aabe50451cabff57076a6e9767ca48817d8c00a1d73c8",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "imported-bind-f680b7f3",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#3B82F6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Уточнение по монетам не тысячи",
+          "content": "Прошу обратить внимание, что у вас не 23 тысячи монет. После недавнего обновления, для удобства пользователей, отображение было изменено — теперь вы видите не только целое число монет, но и их дробные части (сотые или тысячные). В вашем случае сейчас на балансе 23 монеты, и, к сожалению, этой суммы недостаточно. Хотите, я расскажу, как можно получить больше монеток? 💰  Монетки можно получить нескиолькоми спосабоми например, делая ставки на реальные средства (без использования бонусов), а также заработать их в турнирах или выполняя достижения.",
+          "updatedAt": "2026-06-22T14:57:05.611Z"
+        },
+        {
+          "language": "pt",
+          "title": "Уточнение по монетам не тысячи",
+          "content": "Observe que você não possui 23.000 moedas. Após uma atualização recente, para maior comodidade do usuário, a exibição foi alterada – agora você vê não apenas o número inteiro de moedas, mas também suas frações (centésimos ou milésimos). No seu caso, seu saldo atual é de 23 moedas e, infelizmente, essa quantia não é suficiente.  Gostaria que eu lhe contasse como conseguir mais moedas? 💰  As moedas podem ser obtidas de diversas maneiras, por exemplo, fazendo apostas com dinheiro real (sem usar bônus), ganhando-as em torneios ou completando conquistas.",
+          "updatedAt": "2026-06-22T14:52:05.464Z"
+        },
+        {
+          "language": "el",
+          "title": "Уточнение по монетам не тысячи",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.038Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.038Z",
+      "updatedAt": "2026-06-22T14:59:24.885Z"
+    },
+    {
+      "id": "bind-de34056c-f8dc-4c9d-840f-5f9ac972d1e6",
+      "ownerId": null,
+      "sourceHash": "4badc38368f1dc0bf689905006781d8b7d43cf81e0880a1f4f8620dc1ffc5b36",
+      "importBatchId": "sheet-5144cda1b2879f6b",
+      "imported": true,
+      "slug": "rtp-4badc383",
+      "categoryId": "category-c6d02ac8-efc4-4952-b24d-b67f17e42ece",
+      "folderId": "folder-c1c4699a-676d-438f-b797-b434534e6cfd",
+      "color": "#8B5CF6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Понятие RTP",
+          "content": "Существует такое понятие, как RTP, что означает возврат игроку. В данном случае речь идет о математике игры, которая определяется генератором случайных чисел. Среднее значение этого показателя в нашем казино составляет 95-97% и выше в зависимости от поставщика игрового софта.  Расстояние для получения такого показателя около 100 тысяч ставок, и определяется он общим показателем ставок в конкретной игре на выбранного провайдера. Другими словами, вы можете сделать множество ставок с нулевым выигрышем, в то время как другой игрок, посетив слот впервые в жизни, сорвет большой куш. Некоторые слоты дарят, некоторые нет. Это дело случая.",
+          "updatedAt": "2026-06-22T14:57:12.772Z"
+        },
+        {
+          "language": "en",
+          "title": "Понятие RTP",
+          "content": "There is such a concept as ‘RTP’, which means ‘return to player’. In this case, we are talking about the mathematics of the game, which is determined by the random number generator. The average value of this indicator in our casino is 95-97% and higher, depending on the supplier of game software.  The distance to obtain such an indicator is about 100 thousand bets, and it is determined by the total rate of bets in a particular game on the selected provider. In other words, you can make a lot of bets with ‘zero’ winnings, while another player, visiting a slot for the first time in his life, will rip off a big score. Some slots ‘give’, some don't. It's a matter of chance.",
+          "updatedAt": "2026-06-22T14:52:05.464Z"
+        },
+        {
+          "language": "de",
+          "title": "Понятие RTP",
+          "content": "Es gibt einen Begriff wie RTP, der für Return to Player steht. In diesem Fall geht es um die Mathematik des Spiels, die durch den Zufallszahlengenerator bestimmt wird.",
+          "updatedAt": "2026-06-22T14:52:05.464Z"
+        },
+        {
+          "language": "el",
+          "title": "Понятие RTP",
+          "content": "",
+          "updatedAt": "2026-06-22T14:52:12.038Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T14:52:12.038Z",
+      "updatedAt": "2026-06-22T14:57:12.772Z"
+    },
+    {
+      "id": "bind-a6f54b50-6348-445e-982d-db2dea6e377e",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1782151153855",
+      "categoryId": "category-20e0cc02-23d7-42cf-807b-c3dd40e804c2",
+      "color": "#3B82F6",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Не понимаю как активировать",
+          "content": "Чтобы активировать бонус, пожалуйста, перейдите в личный кабинет и откройте раздел «Бонусы». В этом разделе будут отображаться все доступные вам бонусы. Выберите нужный бонус и нажмите кнопку «Активировать». Если бонус включает бесплатные вращения, обратите внимание, что они обычно доступны только в конкретной игре, указанной в описании бонуса. После активации бонуса перейдите в эту игру, чтобы использовать бесплатные вращения. Если кнопка активации недоступна или бонус не отображается, пожалуйста, проверьте, выполнены ли условия акции. При необходимости отправьте нам скриншот, и мы поможем разобраться.",
+          "updatedAt": "2026-06-22T17:59:13.855Z"
+        },
+        {
+          "language": "en",
+          "title": "Не понимаю как активировать",
+          "content": "To activate the bonus, please log in to your personal account and open the “Bonuses” section.\nAll bonuses available to you will be displayed in this section. Select the required bonus and click “Activate”.\nIf the bonus includes Free Spins, please note that they are usually available only in the specific game indicated in the bonus description. After activating the bonus, please open that game to use the Free Spins.\nIf the activation button is unavailable or the bonus is not displayed, please check whether the promotion conditions have been met. If needed, send us a screenshot, and we will help you look into it.",
+          "updatedAt": "2026-06-22T17:59:13.855Z"
+        },
+        {
+          "language": "de",
+          "title": "Не понимаю как активировать",
+          "content": "Um den Bonus zu aktivieren, melden Sie sich bitte in Ihrem persönlichen Konto an und öffnen Sie den Bereich „Boni“.\nIn diesem Bereich werden alle für Sie verfügbaren Boni angezeigt. Wählen Sie den gewünschten Bonus aus und klicken Sie auf „Aktivieren“.\nWenn der Bonus Freispiele beinhaltet, beachten Sie bitte, dass diese in der Regel nur in dem bestimmten Spiel verfügbar sind, das in der Bonusbeschreibung angegeben ist. Öffnen Sie nach der Aktivierung des Bonus bitte dieses Spiel, um die Freispiele zu nutzen.\nWenn die Schaltfläche zur Aktivierung nicht verfügbar ist oder der Bonus nicht angezeigt wird, prüfen Sie bitte, ob die Bedingungen der Aktion erfüllt wurden. Bei Bedarf senden Sie uns bitte einen Screenshot, und wir helfen Ihnen gerne weiter.",
+          "updatedAt": "2026-06-22T17:59:13.855Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не понимаю как активировать",
+          "content": "Para ativar o bónus, por favor, aceda à sua conta pessoal e abra a secção «Bónus».\nNesta secção serão apresentados todos os bónus disponíveis para si. Selecione o bónus pretendido e clique em «Ativar».\nSe o bónus incluir rodadas grátis, tenha em atenção que normalmente elas estão disponíveis apenas no jogo específico indicado na descrição do bónus. Após ativar o bónus, por favor, abra esse jogo para utilizar as rodadas grátis.\nSe o botão de ativação não estiver disponível ou se o bónus não aparecer, por favor, verifique se as condições da promoção foram cumpridas. Se necessário, envie-nos uma captura de ecrã e ajudaremos a verificar a situação.",
+          "updatedAt": "2026-06-22T17:59:13.855Z"
+        },
+        {
+          "language": "el",
+          "title": "Не понимаю как активировать",
+          "content": "Για να ενεργοποιήσετε το μπόνους, παρακαλούμε συνδεθείτε στον προσωπικό σας λογαριασμό και ανοίξτε την ενότητα «Μπόνους».\nΣε αυτή την ενότητα θα εμφανίζονται όλα τα διαθέσιμα μπόνους για εσάς. Επιλέξτε το επιθυμητό μπόνους και πατήστε «Ενεργοποίηση».\nΕάν το μπόνους περιλαμβάνει δωρεάν περιστροφές, παρακαλούμε λάβετε υπόψη ότι συνήθως είναι διαθέσιμες μόνο στο συγκεκριμένο παιχνίδι που αναφέρεται στην περιγραφή του μπόνους. Μετά την ενεργοποίηση του μπόνους, παρακαλούμε ανοίξτε αυτό το παιχνίδι για να χρησιμοποιήσετε τις δωρεάν περιστροφές.\nΕάν το κουμπί ενεργοποίησης δεν είναι διαθέσιμο ή το μπόνους δεν εμφανίζεται, παρακαλούμε ελέγξτε εάν έχουν τηρηθεί οι όροι της προσφοράς. Εάν χρειάζεται, στείλτε μας ένα στιγμιότυπο οθόνης και θα σας βοηθήσουμε να το ελέγξουμε.",
+          "updatedAt": "2026-06-22T17:59:13.855Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T17:59:13.855Z",
+      "updatedAt": "2026-06-22T17:59:13.855Z"
+    },
+    {
+      "id": "bind-4c8ab5c8-da30-4b7d-a740-6dbd225645c5",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1782151250369",
+      "categoryId": "category-76f93b88-296a-43d9-ba14-3dc762416b0c",
+      "color": "#EF4444",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Не хочет на почту",
+          "content": "Пожалуйста не стоит переживать, как ранее я уже просил вас направить ваш запрос о закрытии аккаунта напрямую на наш e-mail поддержки. \nЭто важно, потому что только обращения, поступившие на официальный e-mail, подлежат обработке нашей командой. \nХочу уточнить, что если вы оставите запрос исключительно в чате, он, к сожалению, не будет принят в работу и не сможет быть выполнен. \nПоэтому, пожалуйста, продублируйте своё обращение по e-mail, чтобы мы могли корректно и своевременно его обработать. Благодарю вас за понимание и сотрудничество.",
+          "updatedAt": "2026-06-22T18:00:50.369Z"
+        },
+        {
+          "language": "en",
+          "title": "Не хочет на почту",
+          "content": "Please do not worry. As I mentioned earlier, please send your account closure request directly to our support email.\nThis is important because only requests sent to the official email can be processed by our team.\nI would like to clarify that if you leave your request only in the chat, unfortunately, it will not be accepted for processing and cannot be completed.\nTherefore, please duplicate your request by email so that we can process it correctly and in a timely manner.\n\nThank you for your understanding and cooperation.",
+          "updatedAt": "2026-06-22T18:00:50.368Z"
+        },
+        {
+          "language": "de",
+          "title": "Не хочет на почту",
+          "content": "Bitte machen Sie sich keine Sorgen. Wie bereits zuvor erwähnt, senden Sie Ihre Anfrage zur Kontoschließung bitte direkt an unsere Support-E-Mail-Adresse.\nDies ist wichtig, da nur Anfragen, die an die offizielle E-Mail-Adresse gesendet werden, von unserem Team bearbeitet werden können.\nIch möchte klarstellen, dass eine Anfrage, die ausschließlich im Chat hinterlassen wird, leider nicht zur Bearbeitung angenommen werden kann und daher nicht abgeschlossen werden kann.\nBitte senden Sie Ihre Anfrage daher zusätzlich per E-Mail, damit wir sie korrekt und zeitnah bearbeiten können.\nVielen Dank für Ihr Verständnis und Ihre Kooperation.",
+          "updatedAt": "2026-06-22T18:00:50.368Z"
+        },
+        {
+          "language": "pt",
+          "title": "Не хочет на почту",
+          "content": "Por favor, não se preocupe. Como mencionei anteriormente, envie o seu pedido de encerramento de conta diretamente para o nosso e-mail de suporte.\nIsto é importante porque apenas os pedidos enviados para o e-mail oficial podem ser processados pela nossa equipa.\nGostaria de esclarecer que, se deixar o seu pedido apenas no chat, infelizmente ele não poderá ser aceite para processamento e não poderá ser concluído.\nPor isso, por favor, envie também o seu pedido por e-mail, para que possamos processá-lo corretamente e em tempo útil.\nAgradecemos a sua compreensão e cooperação.",
+          "updatedAt": "2026-06-22T18:00:50.368Z"
+        },
+        {
+          "language": "el",
+          "title": "Не хочет на почту",
+          "content": "Παρακαλούμε, δεν χρειάζεται να ανησυχείτε. Όπως σας ζήτησα και νωρίτερα, παρακαλούμε να στείλετε το αίτημά σας για κλείσιμο λογαριασμού απευθείας στο email υποστήριξής μας.\nΑυτό είναι σημαντικό, επειδή μόνο τα αιτήματα που αποστέλλονται στο επίσημο email μπορούν να επεξεργαστούν από την ομάδα μας.\nΘα ήθελα να διευκρινίσω ότι εάν αφήσετε το αίτημά σας αποκλειστικά στο chat, δυστυχώς δεν θα μπορέσει να γίνει δεκτό προς επεξεργασία και δεν θα είναι δυνατό να ολοκληρωθεί.\nΓι’ αυτό, παρακαλούμε στείλτε εκ νέου το αίτημά σας μέσω email, ώστε να μπορέσουμε να το επεξεργαστούμε σωστά και εγκαίρως.\nΣας ευχαριστούμε για την κατανόηση και τη συνεργασία σας.",
+          "updatedAt": "2026-06-22T18:00:50.368Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T18:00:50.369Z",
+      "updatedAt": "2026-06-22T18:00:50.369Z"
+    },
+    {
+      "id": "bind-1f56bae4-cace-4a60-946c-f68c5e66f8ee",
+      "ownerId": null,
+      "imported": false,
+      "slug": "bind-1782151612602",
+      "categoryId": "category-3778f950-5c85-466e-9cbc-d3d49ca6f950",
+      "color": "#F59E0B",
+      "tags": [],
+      "translations": [
+        {
+          "language": "ru",
+          "title": "Вывод есть бонусы",
+          "content": "Пожалуйста, обратите внимание: при создании заявки на вывод средств все активные бонусы на аккаунте будут автоматически аннулированы согласно условиям бонуса.\nРекомендуем учитывать это перед подтверждением заявки на вывод.",
+          "updatedAt": "2026-06-22T18:06:52.602Z"
+        },
+        {
+          "language": "en",
+          "title": "Вывод есть бонусы",
+          "content": "Please note that when a withdrawal request is submitted, all active bonuses on the account will be automatically cancelled in accordance with the bonus terms.\nWe kindly recommend taking this into account before confirming the withdrawal request.",
+          "updatedAt": "2026-06-22T18:06:52.602Z"
+        },
+        {
+          "language": "de",
+          "title": "Вывод есть бонусы",
+          "content": "Bitte beachten Sie, dass bei der Erstellung eines Auszahlungsantrags alle aktiven Boni auf dem Konto gemäß den Bonusbedingungen automatisch storniert werden.\nWir empfehlen Ihnen, dies vor der Bestätigung des Auszahlungsantrags zu berücksichtigen.",
+          "updatedAt": "2026-06-22T18:06:52.602Z"
+        },
+        {
+          "language": "pt",
+          "title": "Вывод есть бонусы",
+          "content": "Tenha em atenção que, ao criar um pedido de levantamento, todos os bónus ativos na conta serão automaticamente cancelados de acordo com os termos do bónus.\nRecomendamos que tenha esta informação em consideração antes de confirmar o pedido de levantamento.",
+          "updatedAt": "2026-06-22T18:06:52.602Z"
+        },
+        {
+          "language": "el",
+          "title": "Вывод есть бонусы",
+          "content": "Παρακαλούμε λάβετε υπόψη ότι κατά τη δημιουργία αιτήματος ανάληψης χρημάτων, όλα τα ενεργά μπόνους στον λογαριασμό θα ακυρωθούν αυτόματα σύμφωνα με τους όρους του μπόνους.\nΣας συνιστούμε να λάβετε υπόψη αυτή την πληροφορία πριν επιβεβαιώσετε το αίτημα ανάληψης.",
+          "updatedAt": "2026-06-22T18:06:52.602Z"
+        }
+      ],
+      "favorite": false,
+      "archived": false,
+      "createdAt": "2026-06-22T18:06:52.602Z",
+      "updatedAt": "2026-06-22T18:06:52.602Z"
     }
   ],
   "language": "en"
