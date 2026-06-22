@@ -51,6 +51,7 @@ const KNOWN_CURRENCY_SHEETS = [
 	"Currency EG",
 	"Currency IG",
 	"Currency B2C",
+	"Currency RL,CJ,JB,CB"
 ];
 
 const B2C_PROJECTS = new Set(B2C_BONUS_PROJECTS.map(normalizeKey));

@@ -1,5 +1,5 @@
 import type { BonusProject } from "@/entities/bonus";
-import { BONUS_PROJECT_ALIASES } from "@/entities/bonus/project-aliases";
+import { BONUS_PROJECT_ALIASES,  KNOWN_SHORT_PROJECT_KEYS, PROJECT_CURRENCY_TABLE_OVERRIDES} from "@/entities/bonus/project-aliases";
 import {
 	type BonusRule,
 	type BonusToolsData,
@@ -44,7 +44,28 @@ function getProjectKeys(project: BonusProject) {
 	];
 
 	return new Set(
-		rawValues.map(normalizeProjectKey).filter((value) => value.length >= 3),
+		rawValues
+			.map(normalizeProjectKey)
+			.filter(
+				(value) => value.length >= 3 || KNOWN_SHORT_PROJECT_KEYS.has(value),
+			),
+	);
+}
+
+function getProjectOverrideTable(
+	projectKeys: Set<string>,
+	tables: CurrencyTable[],
+) {
+	const tableName = Array.from(projectKeys)
+		.map((key) => PROJECT_CURRENCY_TABLE_OVERRIDES[key])
+		.find(Boolean);
+
+	if (!tableName) return undefined;
+
+	const tableKey = normalizeProjectKey(tableName);
+
+	return tables.find(
+		(table) => normalizeProjectKey(table.name) === tableKey,
 	);
 }
 
@@ -72,7 +93,17 @@ function findProjectRule(project: BonusProject, data: BonusToolsData) {
 	return undefined;
 }
 
-function getRuleTable(rule: BonusRule, tables: CurrencyTable[]) {
+function getRuleTable(
+	rule: BonusRule,
+	tables: CurrencyTable[],
+	projectKeys?: Set<string>,
+) {
+	const overrideTable = projectKeys
+		? getProjectOverrideTable(projectKeys, tables)
+		: undefined;
+
+	if (overrideTable) return overrideTable;
+
 	const tableName = getCurrencyTableNameForRule(rule, tables);
 
 	return tables.find((table) => table.name === tableName) ?? tables[0];
@@ -83,11 +114,12 @@ function getCurrencyContext(project: BonusProject, data?: BonusToolsData) {
 
 	if (!registryData) return undefined;
 
+	const projectKeys = getProjectKeys(project);
 	const rule = findProjectRule(project, registryData);
 
 	if (!rule) return undefined;
 
-	const table = getRuleTable(rule, registryData.currencyTables);
+	const table = getRuleTable(rule, registryData.currencyTables, projectKeys);
 
 	if (!table) return undefined;
 
