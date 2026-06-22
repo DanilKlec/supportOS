@@ -1,5 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
+	ArrowDown,
+	ArrowUp,
 	ChevronDown,
 	ChevronRight,
 	Edit3,
@@ -12,6 +14,7 @@ import {
 import { useState } from "react";
 
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
+import { knowledgeService } from "@/services/knowledge.service";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 
@@ -35,6 +38,7 @@ export function TreeNode({ node, level }: Props) {
 	const selectedBind = useKnowledgeStore((s) => s.selectedBind);
 	const selectedCategory = useKnowledgeStore((s) => s.selectedCategory);
 	const selectedFolder = useKnowledgeStore((s) => s.selectedFolder);
+	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const toggle = useKnowledgeStore((s) => s.toggleFolder);
 	const selectBind = useKnowledgeStore((s) => s.selectBind);
@@ -46,6 +50,25 @@ export function TreeNode({ node, level }: Props) {
 	const hasChildren = node.children.length > 0;
 	const nodeColor = node.color ?? node.bind?.color;
 	const nodeColorStyle = nodeColor ? { color: nodeColor } : undefined;
+	const siblingIds =
+		node.type === "category"
+			? [...categories].sort((a, b) => a.order - b.order).map((item) => item.id)
+			: folder
+				? folders
+						.filter(
+							(item) =>
+								item.categoryId === folder.categoryId &&
+								item.parentId === folder.parentId,
+						)
+						.sort((a, b) => a.order - b.order)
+						.map((item) => item.id)
+				: [];
+	const siblingIndex = siblingIds.indexOf(node.id);
+	const canMoveUp = node.type !== "bind" && siblingIndex > 0;
+	const canMoveDown =
+		node.type !== "bind" &&
+		siblingIndex >= 0 &&
+		siblingIndex < siblingIds.length - 1;
 	const selected =
 		(node.type === "bind" && selectedBind === node.id) ||
 		(node.type === "category" && selectedCategory === node.id) ||
@@ -102,6 +125,17 @@ export function TreeNode({ node, level }: Props) {
 			type: node.type,
 			name: node.name,
 		});
+	};
+
+	const moveNode = (direction: "up" | "down") => {
+		if (node.type === "category") {
+			knowledgeService.moveCategory(node.id, direction);
+			return;
+		}
+
+		if (node.type === "folder") {
+			knowledgeService.moveFolder(node.id, direction);
+		}
 	};
 
 	const visibleChildren = expanded
@@ -171,9 +205,29 @@ export function TreeNode({ node, level }: Props) {
 					<span className="truncate text-sm">{node.name}</span>
 				</button>
 
-				<div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+				<div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-all group-focus-within:max-w-44 group-focus-within:opacity-100 group-hover:max-w-44 group-hover:opacity-100">
 					{node.type !== "bind" && (
 						<>
+							<button
+								type="button"
+								title="Move up"
+								disabled={!canMoveUp}
+								onClick={() => moveNode("up")}
+								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
+							>
+								<ArrowUp size={14} />
+							</button>
+
+							<button
+								type="button"
+								title="Move down"
+								disabled={!canMoveDown}
+								onClick={() => moveNode("down")}
+								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
+							>
+								<ArrowDown size={14} />
+							</button>
+
 							<button
 								type="button"
 								title="New bind"
