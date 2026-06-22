@@ -3,6 +3,7 @@ export type KnowledgeObjectType = "bind" | "folder" | "category";
 export type ModalType =
 	| "createBind"
 	| "editBind"
+	| "moveBind"
 	| "createFolder"
 	| "createCategory"
 	| "renameNode"
