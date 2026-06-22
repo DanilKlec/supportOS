@@ -6,6 +6,7 @@ import {
 	Gift,
 	Plus,
 	Star,
+	Wrench,
 } from "lucide-react";
 
 import type { Bind } from "@/entities/bind";
@@ -125,6 +126,14 @@ export function Sidebar() {
 						>
 							<Gift size={14} />
 							<span>Deposit Bonuses</span>
+						</Link>
+
+						<Link
+							to="/bonus-tools"
+							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+						>
+							<Wrench size={14} />
+							<span>Bonus Tools</span>
 						</Link>
 
 						<Link
