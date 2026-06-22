@@ -383,9 +383,9 @@
         "slug": "winbandits",
         "supportEmail": "support@winbandits.com",
         "kycEmail": "kyc@winbandits.com",
-        "vipEmail": "",
-        "updatedAt": "2026-06-18T06:25:20.151Z",
-        "sourceHash": "9c02b28bcafab081334f5fdb2e665be847ff04d982e5964a7d84099725d56222"
+        "vipEmail": "vip@winbandits.com",
+        "sourceHash": "9c02b28bcafab081334f5fdb2e665be847ff04d982e5964a7d84099725d56222",
+        "updatedAt": "2026-06-22T16:22:31.028Z"
       },
       {
         "id": "project-email-c1dd489b-03ee-4290-80ec-fece4d991892",
