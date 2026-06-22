@@ -1,5 +1,9 @@
 import type { BonusProject } from "@/entities/bonus";
-import { BONUS_PROJECT_ALIASES,  KNOWN_SHORT_PROJECT_KEYS, PROJECT_CURRENCY_TABLE_OVERRIDES} from "@/entities/bonus/project-aliases";
+import {
+	BONUS_PROJECT_ALIASES,
+	KNOWN_SHORT_PROJECT_KEYS,
+	PROJECT_CURRENCY_TABLE_OVERRIDES,
+} from "@/entities/bonus/project-aliases";
 import {
 	type BonusRule,
 	type BonusToolsData,
@@ -64,9 +68,7 @@ function getProjectOverrideTable(
 
 	const tableKey = normalizeProjectKey(tableName);
 
-	return tables.find(
-		(table) => normalizeProjectKey(table.name) === tableKey,
-	);
+	return tables.find((table) => normalizeProjectKey(table.name) === tableKey);
 }
 
 function findProjectRule(project: BonusProject, data: BonusToolsData) {

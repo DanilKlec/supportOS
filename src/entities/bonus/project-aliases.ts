@@ -65,16 +65,18 @@ export const BONUS_PROJECT_ALIASES: Record<string, string[]> = {
 
 export const KNOWN_SHORT_PROJECT_KEYS = new Set(["rl", "jb", "cj", "cb"]);
 
+export const SHORT_PROJECT_CURRENCY_TABLE_NAME = "Currency RL,CJ,JB,CB";
+
 export const PROJECT_CURRENCY_TABLE_OVERRIDES: Record<string, string> = {
 	// short aliases
-	rl: "rollino",
-	jb: "jettbet",
-	cj: "casinojoy",
-	cb: "casperbets",
+	rl: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	jb: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	cj: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	cb: SHORT_PROJECT_CURRENCY_TABLE_NAME,
 
 	// exact project names
-	rollino: "rollino",
-	jettbet: "jettbet",
-	casinojoy: "casinojoy",
-	casperbets: "casperbets",
+	rollino: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	jettbet: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	casinojoy: SHORT_PROJECT_CURRENCY_TABLE_NAME,
+	casperbets: SHORT_PROJECT_CURRENCY_TABLE_NAME,
 };

@@ -1,4 +1,8 @@
-import { B2C_BONUS_PROJECTS } from "@/entities/bonus/project-aliases";
+import {
+	B2C_BONUS_PROJECTS,
+	KNOWN_SHORT_PROJECT_KEYS,
+	SHORT_PROJECT_CURRENCY_TABLE_NAME,
+} from "@/entities/bonus/project-aliases";
 import {
 	fetchGoogleSheetText,
 	looksLikeGoogleSheetHtml,
@@ -51,10 +55,17 @@ const KNOWN_CURRENCY_SHEETS = [
 	"Currency EG",
 	"Currency IG",
 	"Currency B2C",
-	"Currency RL,CJ,JB,CB"
+	"Currency RL,CJ,JB,CB",
 ];
 
 const B2C_PROJECTS = new Set(B2C_BONUS_PROJECTS.map(normalizeKey));
+const SHORT_CURRENCY_PROJECTS = new Set([
+	"rollino",
+	"jettbet",
+	"casinojoy",
+	"casperbets",
+	...KNOWN_SHORT_PROJECT_KEYS,
+]);
 
 function isBonusToolsData(value: unknown): value is BonusToolsData {
 	if (!value || typeof value !== "object") return false;
@@ -398,6 +409,12 @@ export function getCurrencyTableNameForRule(
 	if (site.includes("egogames")) return "Currency EG";
 	if (site.includes("ignibet")) return "Currency IG";
 	if (site.includes("gamblezen")) return "Currency GZ, EC";
+	if (SHORT_CURRENCY_PROJECTS.has(site)) {
+		return (
+			tables.find((table) => table.name === SHORT_PROJECT_CURRENCY_TABLE_NAME)
+				?.name ?? SHORT_PROJECT_CURRENCY_TABLE_NAME
+		);
+	}
 
 	return tables.find((table) => table.name !== "Currency B2C")?.name;
 }
