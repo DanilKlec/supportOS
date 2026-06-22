@@ -1,5 +1,5 @@
 {
-    "depositBonuses": {
+  "depositBonuses": {
     "projects": [
       {
         "id": "bonus-project-469eb2ac-5982-44b9-8277-5b6db00d0082",
@@ -2533,7 +2533,7 @@
             "minDepositCurrency": "EUR"
           }
         ],
-        "updatedAt": "2026-06-21T22:44:40.388Z",
+        "updatedAt": "2026-06-22T00:48:16.913Z",
         "sourceHash": "efc956ff932cc04f97d91958fe7ea8018f48940ce1449ddc92e1ef0d29b11d31"
       },
       {
@@ -5704,7 +5704,7 @@
         "sourceHash": "05a2d83655dec062d54b738eb4d0f9e35d0b9f84d86320d453ff4856767b576d"
       }
     ],
-    "activeProjectId": "bonus-project-ca028112-deba-4e22-9b1e-0fb4dae15fce",
-    "selectedCurrency": "EUR"
+    "activeProjectId": "bonus-project-29c9e3ab-c402-4b16-8ee9-110bfa065a96",
+    "selectedCurrency": "USD"
   }
 }
