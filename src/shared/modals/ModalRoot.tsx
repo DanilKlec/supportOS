@@ -97,6 +97,10 @@ function ModalContent({
 		return <DeleteModal payload={payload} onClose={onClose} />;
 	}
 
+	if (activeModal.type === "moveBind") {
+		return <MoveBindModal payload={payload} onClose={onClose} />;
+	}
+
 	if (activeModal.type === "createBind") {
 		return <BindFormModal mode="create" payload={payload} onClose={onClose} />;
 	}
@@ -494,6 +498,139 @@ function DeleteModal({
 					onCancel={onClose}
 					danger
 				/>
+			</form>
+		</BaseModal>
+	);
+}
+
+function MoveBindModal({
+	payload,
+	onClose,
+}: {
+	payload: ModalPayload;
+	onClose: () => void;
+}) {
+	const navigate = useNavigate();
+	const { showToast } = useToast();
+	const categories = useKnowledgeStore((state) => state.categories);
+	const folders = useKnowledgeStore((state) => state.folders);
+	const binds = useKnowledgeStore((state) => state.binds);
+	const language = useKnowledgeStore((state) => state.language);
+	const expandedFolders = useKnowledgeStore((state) => state.expandedFolders);
+	const toggleFolder = useKnowledgeStore((state) => state.toggleFolder);
+	const openBind = useKnowledgeStore((state) => state.openBind);
+	const targetFolder = folders.find((folder) => folder.id === payload.folderId);
+	const targetCategoryId =
+		payload.categoryId ?? targetFolder?.categoryId ?? categories[0]?.id ?? "";
+	const targetFolderId = payload.folderId ?? "";
+	const targetCategory = categories.find(
+		(category) => category.id === targetCategoryId,
+	);
+	const targetName = targetFolder
+		? `${targetCategory?.name ?? "Category"} / ${getFolderPath(
+				targetFolder,
+				folders,
+			)}`
+		: (targetCategory?.name ?? "Unknown destination");
+	const availableBinds = useMemo(
+		() =>
+			binds
+				.filter(
+					(bind) =>
+						!bind.archived &&
+						!(
+							bind.categoryId === targetCategoryId &&
+							(bind.folderId ?? "") === targetFolderId
+						),
+				)
+				.sort((a, b) =>
+					getBindTitle(a, language).localeCompare(getBindTitle(b, language)),
+				),
+		[binds, language, targetCategoryId, targetFolderId],
+	);
+	const [bindId, setBindId] = useState(availableBinds[0]?.id ?? "");
+	const [errors, setErrors] = useState<FieldErrors>({});
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		if (!availableBinds.some((bind) => bind.id === bindId)) {
+			setBindId(availableBinds[0]?.id ?? "");
+		}
+	}, [availableBinds, bindId]);
+
+	const submit = (event: FormEvent) => {
+		event.preventDefault();
+
+		if (!targetCategoryId || !targetCategory) {
+			setErrors({ form: "Destination was not found" });
+			return;
+		}
+
+		if (!bindId) {
+			setErrors({ bindId: "Bind is required" });
+			return;
+		}
+
+		setSaving(true);
+
+		try {
+			const movedBind = knowledgeService.updateBind(bindId, {
+				categoryId: targetCategoryId,
+				folderId: targetFolderId || undefined,
+			});
+
+			for (const id of [targetCategoryId, targetFolderId]) {
+				if (id && !expandedFolders.includes(id)) {
+					toggleFolder(id);
+				}
+			}
+
+			openBind(movedBind.id);
+			showToast("Bind moved");
+			void navigate({ to: "/" });
+			onClose();
+		} catch (error) {
+			setErrors({ form: getErrorMessage(error) });
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	return (
+		<BaseModal
+			title="Add existing bind"
+			onClose={onClose}
+			closeDisabled={saving}
+			size="md"
+		>
+			<form onSubmit={submit} className="space-y-4">
+				<FormError message={errors.form} />
+
+				<div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">
+					{targetName}
+				</div>
+
+				<Field label="Bind" error={errors.bindId}>
+					<select
+						value={bindId}
+						onChange={(event) => setBindId(event.target.value)}
+						disabled={saving || availableBinds.length === 0}
+						className={inputClass}
+					>
+						{availableBinds.length === 0 ? (
+							<option value="">No binds to move</option>
+						) : (
+							availableBinds.map((bind) => (
+								<option key={bind.id} value={bind.id}>
+									{getBindTitle(bind, language)} -{" "}
+									{getBindLocation(bind, categories, folders)}
+								</option>
+							))
+						)}
+					</select>
+				</Field>
+
+				<ModalActions submitLabel="Move" saving={saving} onCancel={onClose} />
 			</form>
 		</BaseModal>
 	);
@@ -1018,6 +1155,36 @@ function getLanguageLabel(code: string) {
 	return language
 		? `${code.toUpperCase()} - ${language.name}`
 		: code.toUpperCase();
+}
+
+function getBindTitle(bind: Bind, language: string) {
+	return (
+		bind.translations.find((translation) => translation.language === language)
+			?.title ??
+		bind.translations.find((translation) => translation.language === "ru")
+			?.title ??
+		bind.translations.find((translation) => translation.language === "en")
+			?.title ??
+		bind.translations[0]?.title ??
+		bind.slug
+	);
+}
+
+function getBindLocation(
+	bind: Bind,
+	categories: KnowledgeCategory[],
+	folders: KnowledgeFolder[],
+) {
+	const category = categories.find((item) => item.id === bind.categoryId);
+	const folder = bind.folderId
+		? folders.find((item) => item.id === bind.folderId)
+		: undefined;
+
+	if (folder) {
+		return `${category?.name ?? "Category"} / ${getFolderPath(folder, folders)}`;
+	}
+
+	return category?.name ?? "No category";
 }
 
 function prepareTranslations(

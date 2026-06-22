@@ -7,6 +7,7 @@ import {
 	Edit3,
 	FileText,
 	Folder,
+	FolderInput,
 	FolderPlus,
 	Plus,
 	Trash2,
@@ -106,6 +107,15 @@ export function TreeNode({ node, level }: Props) {
 		if (!categoryId) return;
 
 		modalManager.open("createBind", {
+			categoryId,
+			folderId: node.type === "folder" ? node.id : undefined,
+		});
+	};
+
+	const moveBindHere = () => {
+		if (!categoryId) return;
+
+		modalManager.open("moveBind", {
 			categoryId,
 			folderId: node.type === "folder" ? node.id : undefined,
 		});
@@ -235,6 +245,15 @@ export function TreeNode({ node, level }: Props) {
 								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
 							>
 								<Plus size={14} />
+							</button>
+
+							<button
+								type="button"
+								title="Add existing bind"
+								onClick={moveBindHere}
+								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
+							>
+								<FolderInput size={14} />
 							</button>
 
 							<button
