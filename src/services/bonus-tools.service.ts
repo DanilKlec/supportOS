@@ -43,6 +43,8 @@ export interface BonusToolsData {
 	warnings: string[];
 }
 
+const BONUS_TOOLS_STORAGE_KEY = "supportos:bonus-tools:v1";
+
 const KNOWN_CURRENCY_SHEETS = [
 	"Currency GZ, EC",
 	"Currency CS",
@@ -52,6 +54,42 @@ const KNOWN_CURRENCY_SHEETS = [
 ];
 
 const B2C_PROJECTS = new Set(B2C_BONUS_PROJECTS.map(normalizeKey));
+
+function isBonusToolsData(value: unknown): value is BonusToolsData {
+	if (!value || typeof value !== "object") return false;
+
+	const candidate = value as Partial<BonusToolsData>;
+
+	return (
+		typeof candidate.sourceUrl === "string" &&
+		Array.isArray(candidate.rules) &&
+		Array.isArray(candidate.currencyTables) &&
+		typeof candidate.loadedAt === "string" &&
+		Array.isArray(candidate.warnings)
+	);
+}
+
+export function loadStoredBonusToolsData() {
+	if (typeof localStorage === "undefined") return undefined;
+
+	try {
+		const rawValue = localStorage.getItem(BONUS_TOOLS_STORAGE_KEY);
+
+		if (!rawValue) return undefined;
+
+		const parsed = JSON.parse(rawValue) as unknown;
+
+		return isBonusToolsData(parsed) ? parsed : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+export function saveStoredBonusToolsData(data: BonusToolsData) {
+	if (typeof localStorage === "undefined") return;
+
+	localStorage.setItem(BONUS_TOOLS_STORAGE_KEY, JSON.stringify(data));
+}
 
 function cleanCell(value: string | undefined) {
 	const text = (value ?? "").trim();
