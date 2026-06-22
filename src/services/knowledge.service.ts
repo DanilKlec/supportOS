@@ -79,6 +79,7 @@ export interface UpdateBindInput {
 }
 
 export type CreateCategoryInput = string | Partial<KnowledgeCategory>;
+type MoveDirection = "up" | "down";
 
 export type CreateFolderInput = {
 	categoryId: string;
@@ -171,6 +172,30 @@ function normalizeTranslations(
 	}
 
 	return next;
+}
+
+function getReorderedItemOrders<T extends { id: string; order: number }>(
+	items: T[],
+	id: string,
+	direction: MoveDirection,
+) {
+	const orderedItems = [...items].sort((a, b) => a.order - b.order);
+	const currentIndex = orderedItems.findIndex((item) => item.id === id);
+	const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+	if (
+		currentIndex < 0 ||
+		targetIndex < 0 ||
+		targetIndex >= orderedItems.length
+	) {
+		return undefined;
+	}
+
+	const [item] = orderedItems.splice(currentIndex, 1);
+
+	orderedItems.splice(targetIndex, 0, item);
+
+	return new Map(orderedItems.map((item, index) => [item.id, index + 1]));
 }
 
 function updateTranslation(
@@ -628,6 +653,37 @@ class KnowledgeService {
 		}
 	}
 
+	moveCategory(id: string, direction: MoveDirection) {
+		const store = useKnowledgeStore.getState();
+		const orderById = getReorderedItemOrders(store.categories, id, direction);
+
+		if (!orderById) return false;
+
+		const categories = store.categories.map((category) => {
+			const order = orderById.get(category.id);
+
+			return order && order !== category.order
+				? {
+						...category,
+						order,
+					}
+				: category;
+		});
+		const changedCategories = categories.filter((category) => {
+			const previous = store.categories.find((item) => item.id === category.id);
+
+			return previous && previous.order !== category.order;
+		});
+
+		if (changedCategories.length === 0) return false;
+
+		store.setCategories(categories);
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ categories: changedCategories });
+
+		return true;
+	}
+
 	deleteCategory(id: string) {
 		const store = useKnowledgeStore.getState();
 		const folderIds = new Set(
@@ -711,6 +767,46 @@ class KnowledgeService {
 		if (updatedFolder) {
 			cloudKnowledgeService.saveFolder(updatedFolder);
 		}
+	}
+
+	moveFolder(id: string, direction: MoveDirection) {
+		const store = useKnowledgeStore.getState();
+		const folder = store.folders.find((item) => item.id === id);
+
+		if (!folder) return false;
+
+		const siblingFolders = store.folders.filter(
+			(item) =>
+				item.categoryId === folder.categoryId &&
+				item.parentId === folder.parentId,
+		);
+		const orderById = getReorderedItemOrders(siblingFolders, id, direction);
+
+		if (!orderById) return false;
+
+		const folders = store.folders.map((item) => {
+			const order = orderById.get(item.id);
+
+			return order && order !== item.order
+				? {
+						...item,
+						order,
+					}
+				: item;
+		});
+		const changedFolders = folders.filter((item) => {
+			const previous = store.folders.find((folder) => folder.id === item.id);
+
+			return previous && previous.order !== item.order;
+		});
+
+		if (changedFolders.length === 0) return false;
+
+		store.setFolders(folders);
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ folders: changedFolders });
+
+		return true;
 	}
 
 	deleteFolder(id: string) {
