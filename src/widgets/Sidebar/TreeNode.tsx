@@ -9,10 +9,11 @@ import {
 	Folder,
 	FolderInput,
 	FolderPlus,
+	MoreHorizontal,
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { knowledgeService } from "@/services/knowledge.service";
@@ -28,8 +29,40 @@ interface Props {
 const INITIAL_CHILDREN_LIMIT = 120;
 const CHILDREN_LIMIT_STEP = 240;
 
+function ActionMenuItem({
+	icon,
+	label,
+	onClick,
+	disabled = false,
+	danger = false,
+}: {
+	icon: ReactNode;
+	label: string;
+	onClick: () => void;
+	disabled?: boolean;
+	danger?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			disabled={disabled}
+			className={`flex h-9 w-full items-center gap-2 px-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+				danger
+					? "text-muted hover:bg-red-500/10 hover:text-red-400"
+					: "text-muted hover:bg-surface-elevated hover:text-foreground"
+			}`}
+		>
+			<span className="shrink-0">{icon}</span>
+			<span className="truncate">{label}</span>
+		</button>
+	);
+}
+
 export function TreeNode({ node, level }: Props) {
 	const navigate = useNavigate();
+	const actionsRef = useRef<HTMLDivElement>(null);
+	const [actionsOpen, setActionsOpen] = useState(false);
 	const [visibleChildrenLimit, setVisibleChildrenLimit] = useState(
 		INITIAL_CHILDREN_LIMIT,
 	);
@@ -75,6 +108,29 @@ export function TreeNode({ node, level }: Props) {
 		(node.type === "category" && selectedCategory === node.id) ||
 		(node.type === "folder" && selectedFolder === node.id);
 
+	useEffect(() => {
+		if (!actionsOpen) return undefined;
+
+		const closeOnOutsideClick = (event: PointerEvent) => {
+			if (actionsRef.current?.contains(event.target as Node)) return;
+
+			setActionsOpen(false);
+		};
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setActionsOpen(false);
+			}
+		};
+
+		window.addEventListener("pointerdown", closeOnOutsideClick);
+		window.addEventListener("keydown", closeOnEscape);
+
+		return () => {
+			window.removeEventListener("pointerdown", closeOnOutsideClick);
+			window.removeEventListener("keydown", closeOnEscape);
+		};
+	}, [actionsOpen]);
+
 	const handleOpen = () => {
 		if (node.type === "bind") {
 			selectBind(node.id);
@@ -101,6 +157,7 @@ export function TreeNode({ node, level }: Props) {
 			categoryId,
 			parentId: node.type === "folder" ? node.id : undefined,
 		});
+		setActionsOpen(false);
 	};
 
 	const createBind = () => {
@@ -110,6 +167,7 @@ export function TreeNode({ node, level }: Props) {
 			categoryId,
 			folderId: node.type === "folder" ? node.id : undefined,
 		});
+		setActionsOpen(false);
 	};
 
 	const moveBindHere = () => {
@@ -119,6 +177,7 @@ export function TreeNode({ node, level }: Props) {
 			categoryId,
 			folderId: node.type === "folder" ? node.id : undefined,
 		});
+		setActionsOpen(false);
 	};
 
 	const renameNode = () => {
@@ -127,6 +186,7 @@ export function TreeNode({ node, level }: Props) {
 			type: node.type,
 			name: node.name,
 		});
+		setActionsOpen(false);
 	};
 
 	const deleteNode = () => {
@@ -135,17 +195,21 @@ export function TreeNode({ node, level }: Props) {
 			type: node.type,
 			name: node.name,
 		});
+		setActionsOpen(false);
 	};
 
 	const moveNode = (direction: "up" | "down") => {
 		if (node.type === "category") {
 			knowledgeService.moveCategory(node.id, direction);
+			setActionsOpen(false);
 			return;
 		}
 
 		if (node.type === "folder") {
 			knowledgeService.moveFolder(node.id, direction);
 		}
+
+		setActionsOpen(false);
 	};
 
 	const visibleChildren = expanded
@@ -215,75 +279,72 @@ export function TreeNode({ node, level }: Props) {
 					<span className="truncate text-sm">{node.name}</span>
 				</button>
 
-				<div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-all group-focus-within:max-w-44 group-focus-within:opacity-100 group-hover:max-w-44 group-hover:opacity-100">
-					{node.type !== "bind" && (
-						<>
-							<button
-								type="button"
-								title="Move up"
-								disabled={!canMoveUp}
-								onClick={() => moveNode("up")}
-								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
-							>
-								<ArrowUp size={14} />
-							</button>
+				<div ref={actionsRef} className="relative shrink-0">
+					<button
+						type="button"
+						aria-label="Node actions"
+						aria-expanded={actionsOpen}
+						title="Actions"
+						onClick={() => setActionsOpen((open) => !open)}
+						className={`rounded p-1 text-muted transition hover:bg-surface hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100 ${
+							actionsOpen || selected ? "opacity-100" : "opacity-60"
+						}`}
+					>
+						<MoreHorizontal size={15} />
+					</button>
 
-							<button
-								type="button"
-								title="Move down"
-								disabled={!canMoveDown}
-								onClick={() => moveNode("down")}
-								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
-							>
-								<ArrowDown size={14} />
-							</button>
+					{actionsOpen && (
+						<div className="absolute right-0 top-7 z-40 w-48 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-2xl">
+							{node.type !== "bind" && (
+								<>
+									<ActionMenuItem
+										icon={<ArrowUp size={14} />}
+										label="Move up"
+										disabled={!canMoveUp}
+										onClick={() => moveNode("up")}
+									/>
+									<ActionMenuItem
+										icon={<ArrowDown size={14} />}
+										label="Move down"
+										disabled={!canMoveDown}
+										onClick={() => moveNode("down")}
+									/>
 
-							<button
-								type="button"
-								title="New bind"
-								onClick={createBind}
-								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
-							>
-								<Plus size={14} />
-							</button>
+									<div className="my-1 border-t border-border" />
 
-							<button
-								type="button"
-								title="Add existing bind"
-								onClick={moveBindHere}
-								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
-							>
-								<FolderInput size={14} />
-							</button>
+									<ActionMenuItem
+										icon={<Plus size={14} />}
+										label="New bind"
+										onClick={createBind}
+									/>
+									<ActionMenuItem
+										icon={<FolderInput size={14} />}
+										label="Add existing bind"
+										onClick={moveBindHere}
+									/>
+									<ActionMenuItem
+										icon={<FolderPlus size={14} />}
+										label="New folder"
+										onClick={createFolder}
+									/>
 
-							<button
-								type="button"
-								title="New folder"
-								onClick={createFolder}
-								className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
-							>
-								<FolderPlus size={14} />
-							</button>
-						</>
+									<div className="my-1 border-t border-border" />
+								</>
+							)}
+
+							<ActionMenuItem
+								icon={<Edit3 size={14} />}
+								label="Rename"
+								onClick={renameNode}
+							/>
+							<ActionMenuItem
+								icon={<Trash2 size={14} />}
+								label="Delete"
+								danger
+								onClick={deleteNode}
+							/>
+						</div>
 					)}
-
-					<button
-						type="button"
-						title="Rename"
-						onClick={renameNode}
-						className="rounded p-1 text-muted hover:bg-surface hover:text-foreground"
-					>
-						<Edit3 size={14} />
-					</button>
-
-					<button
-						type="button"
-						title="Delete"
-						onClick={deleteNode}
-						className="rounded p-1 text-muted hover:bg-surface hover:text-red-400"
-					>
-						<Trash2 size={14} />
-					</button>
 				</div>
 			</div>
 
