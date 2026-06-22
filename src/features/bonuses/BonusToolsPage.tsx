@@ -18,7 +18,9 @@ import {
 	findCurrencyValue,
 	formatRuleCurrencyAmount,
 	getCurrencyTableNameForRule,
+	loadStoredBonusToolsData,
 	normalizeBonusToolsSearch,
+	saveStoredBonusToolsData,
 } from "@/services/bonus-tools.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
@@ -66,8 +68,12 @@ const RULE_COLUMNS: Array<{
 
 export function BonusToolsPage() {
 	const { showToast } = useToast();
-	const [sourceUrl, setSourceUrl] = useState(DEFAULT_BONUS_TOOLS_SHEET_URL);
-	const [data, setData] = useState<BonusToolsData>();
+	const [data, setData] = useState<BonusToolsData | undefined>(() =>
+		loadStoredBonusToolsData(),
+	);
+	const [sourceUrl, setSourceUrl] = useState(
+		() => data?.sourceUrl ?? DEFAULT_BONUS_TOOLS_SHEET_URL,
+	);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [query, setQuery] = useState("");
@@ -76,17 +82,21 @@ export function BonusToolsPage() {
 	const [selectedTableName, setSelectedTableName] = useState("");
 	const [selectedBaseAmount, setSelectedBaseAmount] = useState("");
 
-	const loadData = useCallback(
-		async (nextUrl: string) => {
+	const updateFromGoogle = useCallback(
+		async (nextUrl: string, showSuccess = true) => {
 			setLoading(true);
 			setError("");
 
 			try {
 				const nextData = await bonusToolsService.load(nextUrl);
 
+				saveStoredBonusToolsData(nextData);
 				setData(nextData);
 				setSelectedRuleId((current) => current || nextData.rules[0]?.id || "");
-				showToast("Bonus tools loaded");
+				setSourceUrl(nextData.sourceUrl);
+				if (showSuccess) {
+					showToast("Bonus tools updated from Google Sheet");
+				}
 			} catch (loadError) {
 				setError(
 					loadError instanceof Error
@@ -101,8 +111,10 @@ export function BonusToolsPage() {
 	);
 
 	useEffect(() => {
-		void loadData(DEFAULT_BONUS_TOOLS_SHEET_URL);
-	}, [loadData]);
+		if (data) return;
+
+		void updateFromGoogle(DEFAULT_BONUS_TOOLS_SHEET_URL, false);
+	}, [data, updateFromGoogle]);
 
 	const filteredRules = useMemo(
 		() => data?.rules.filter((rule) => matchesRule(rule, query)) ?? [],
@@ -177,7 +189,7 @@ export function BonusToolsPage() {
 
 					<button
 						type="button"
-						onClick={() => void loadData(sourceUrl)}
+						onClick={() => void updateFromGoogle(sourceUrl)}
 						disabled={loading}
 						className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 					>
@@ -186,7 +198,7 @@ export function BonusToolsPage() {
 						) : (
 							<RefreshCw size={16} />
 						)}
-						Reload
+						Update from Google
 					</button>
 				</div>
 
@@ -196,6 +208,13 @@ export function BonusToolsPage() {
 						Google Sheet
 					</div>
 
+					{data && (
+						<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+							Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
+							Update from Google when the sheet changes.
+						</div>
+					)}
+
 					<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
 						<input
 							value={sourceUrl}
@@ -204,7 +223,7 @@ export function BonusToolsPage() {
 						/>
 						<button
 							type="button"
-							onClick={() => void loadData(sourceUrl)}
+							onClick={() => void updateFromGoogle(sourceUrl)}
 							disabled={loading || !sourceUrl.trim()}
 							className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
@@ -213,7 +232,7 @@ export function BonusToolsPage() {
 							) : (
 								<FileSpreadsheet size={16} />
 							)}
-							Load
+							Update
 						</button>
 					</div>
 
