@@ -23,6 +23,7 @@ import type {
 	DepositBonusTranslation,
 } from "@/entities/bonus";
 import { BONUS_PROJECT_ALIASES } from "@/entities/bonus/project-aliases";
+import { bonusCurrencyRegistryService } from "@/services/bonus-currency-registry.service";
 import {
 	type CurrencyRates,
 	currencyService,
@@ -53,13 +54,23 @@ const BONUS_LANGUAGES = [
 	{ code: "el", label: "GR" },
 ];
 
-function createEmptyBonusDraft(): BonusDraft {
+const EMPTY_DRAFT_CONTENT = { [DEFAULT_BONUS_LANGUAGE]: "" };
+
+function createEmptyBonusDraft(currency = "USD"): BonusDraft {
 	return {
 		name: "",
 		minDepositAmount: "",
-		minDepositCurrency: "USD",
-		contents: { [DEFAULT_BONUS_LANGUAGE]: "" },
+		minDepositCurrency: currency,
+		contents: { ...EMPTY_DRAFT_CONTENT },
 	};
+}
+
+function isEmptyBonusDraft(draft: BonusDraft) {
+	return (
+		!draft.name.trim() &&
+		!draft.minDepositAmount.trim() &&
+		Object.values(draft.contents).every((content) => !content.trim())
+	);
 }
 
 const FALLBACK_CURRENCIES = [
@@ -276,14 +287,41 @@ function pickPrimaryDraftContent(draft: BonusDraft, language: string) {
 	);
 }
 
-function buildBonusBind({
+function getDisplayBonusContent({
 	bonus,
+	project,
 	language,
+	selectedCurrency,
 }: {
 	bonus: DepositBonus;
+	project?: BonusProject;
 	language: string;
+	selectedCurrency: string;
 }) {
-	return getBonusContent(bonus, language).trim();
+	return bonusCurrencyRegistryService.replaceProjectMoneyText({
+		text: getBonusContent(bonus, language),
+		project,
+		targetCurrency: selectedCurrency,
+	});
+}
+
+function buildBonusBind({
+	bonus,
+	project,
+	language,
+	selectedCurrency,
+}: {
+	bonus: DepositBonus;
+	project?: BonusProject;
+	language: string;
+	selectedCurrency: string;
+}) {
+	return getDisplayBonusContent({
+		bonus,
+		project,
+		language,
+		selectedCurrency,
+	}).trim();
 }
 
 function buildPackageBind({
@@ -303,7 +341,12 @@ function buildPackageBind({
 		...project.bonuses.flatMap((bonus, index) => [
 			`${index + 1}. ${bonus.name}`,
 			formatDeposit(bonus, selectedCurrency, rates),
-			getBonusContent(bonus, language),
+			getDisplayBonusContent({
+				bonus,
+				project,
+				language,
+				selectedCurrency,
+			}),
 			"",
 		]),
 	]
@@ -335,6 +378,8 @@ export function DepositBonusesPage() {
 	const projects = useBonusStore((state) => state.projects);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
 	const selectedCurrency = useBonusStore((state) => state.selectedCurrency);
+	const selectedLanguage = useBonusStore((state) => state.depositBonusLanguage);
+	const query = useBonusStore((state) => state.depositBonusQuery);
 	const addProject = useBonusStore((state) => state.addProject);
 	const renameProject = useBonusStore((state) => state.renameProject);
 	const upsertProjects = useBonusStore((state) => state.upsertProjects);
@@ -347,12 +392,12 @@ export function DepositBonusesPage() {
 	const setSelectedCurrency = useBonusStore(
 		(state) => state.setSelectedCurrency,
 	);
-	const [query, setQuery] = useState("");
+	const setSelectedLanguage = useBonusStore(
+		(state) => state.setDepositBonusLanguage,
+	);
+	const setQuery = useBonusStore((state) => state.setDepositBonusQuery);
 	const [newProjectName, setNewProjectName] = useState("");
 	const [renameValue, setRenameValue] = useState("");
-	const [selectedLanguage, setSelectedLanguage] = useState(
-		DEFAULT_BONUS_LANGUAGE,
-	);
 	const [bonusDraft, setBonusDraft] = useState<BonusDraft>(() =>
 		createEmptyBonusDraft(),
 	);
@@ -367,7 +412,7 @@ export function DepositBonusesPage() {
 	const [ratesLoading, setRatesLoading] = useState(false);
 	const [ratesError, setRatesError] = useState("");
 
-	const currencies = useMemo(() => {
+	const rateCurrencies = useMemo(() => {
 		const values = new Set([
 			...FALLBACK_CURRENCIES,
 			...(rates ? Object.keys(rates.rates) : []),
@@ -394,6 +439,22 @@ export function DepositBonusesPage() {
 		filteredProjects[0] ??
 		projects.find((project) => project.id === activeProjectId) ??
 		projects[0];
+	const activeCurrencyContext = useMemo(
+		() => bonusCurrencyRegistryService.getProjectContext(activeProject),
+		[activeProject],
+	);
+	const defaultBonusCurrency =
+		bonusCurrencyRegistryService.getDefaultCurrency(activeProject) ??
+		selectedCurrency ??
+		"USD";
+	const currencies = useMemo(
+		() =>
+			bonusCurrencyRegistryService.getCurrencyOptions({
+				project: activeProject,
+				fallback: rateCurrencies,
+			}),
+		[activeProject, rateCurrencies],
+	);
 	const editingBonus = activeProject?.bonuses.find(
 		(bonus) => bonus.id === editingBonusId,
 	);
@@ -450,6 +511,17 @@ export function DepositBonusesPage() {
 		setRenameValue(activeProject?.name ?? "");
 	}, [activeProject?.name]);
 
+	useEffect(() => {
+		if (editingBonusId) return;
+
+		setBonusDraft((current) => {
+			if (!isEmptyBonusDraft(current)) return current;
+			if (current.minDepositCurrency === defaultBonusCurrency) return current;
+
+			return createEmptyBonusDraft(defaultBonusCurrency);
+		});
+	}, [defaultBonusCurrency, editingBonusId]);
+
 	const loadPreview = async () => {
 		setImporting(true);
 
@@ -505,7 +577,7 @@ export function DepositBonusesPage() {
 	};
 
 	const resetBonusForm = () => {
-		setBonusDraft(createEmptyBonusDraft());
+		setBonusDraft(createEmptyBonusDraft(defaultBonusCurrency));
 		setEditingBonusId(undefined);
 		setFormError("");
 	};
@@ -570,7 +642,9 @@ export function DepositBonusesPage() {
 		const copied = await copyToClipboard(
 			buildBonusBind({
 				bonus,
+				project: activeProject,
 				language: selectedLanguage,
+				selectedCurrency,
 			}),
 		);
 
@@ -592,6 +666,12 @@ export function DepositBonusesPage() {
 
 	return (
 		<div className="flex h-full flex-col overflow-auto bg-background">
+			<datalist id="deposit-bonus-currencies">
+				{currencies.map((currency) => (
+					<option key={currency} value={currency} />
+				))}
+			</datalist>
+
 			<div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
@@ -658,6 +738,14 @@ export function DepositBonusesPage() {
 					<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
 						Rates source: {rates.source}. Date: {rates.date}. Base: {rates.base}
 						.
+					</div>
+				)}
+
+				{activeCurrencyContext && (
+					<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+						Currency registry: {activeCurrencyContext.rule.site} -{" "}
+						{activeCurrencyContext.table.name}. Text amounts in EUR are copied
+						as {selectedCurrency} when a matching row exists.
 					</div>
 				)}
 
@@ -925,6 +1013,7 @@ export function DepositBonusesPage() {
 										/>
 										<input
 											value={bonusDraft.minDepositCurrency}
+											list="deposit-bonus-currencies"
 											onChange={(event) =>
 												setBonusDraft((current) => ({
 													...current,
@@ -999,10 +1088,12 @@ export function DepositBonusesPage() {
 											.slice()
 											.sort((first, second) => first.order - second.order)
 											.map((bonus) => {
-												const content = getBonusContent(
+												const content = getDisplayBonusContent({
 													bonus,
-													selectedLanguage,
-												);
+													project: activeProject,
+													language: selectedLanguage,
+													selectedCurrency,
+												});
 												const languages = getBonusTranslations(bonus).map(
 													(translation) => translation.language,
 												);

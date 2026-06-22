@@ -7,6 +7,13 @@ interface BonusState {
 	projects: BonusProject[];
 	activeProjectId?: string;
 	selectedCurrency: string;
+	depositBonusLanguage: string;
+	depositBonusQuery: string;
+	bonusToolsQuery: string;
+	bonusToolsSelectedRuleId: string;
+	bonusToolsSelectedTableName: string;
+	bonusToolsSelectedBaseAmount: string;
+	bonusToolsSourceUrl: string;
 	setProjects: (projects: BonusProject[]) => void;
 	upsertProjects: (projects: BonusProject[]) => void;
 	replaceProjects: (projects: BonusProject[]) => void;
@@ -25,6 +32,13 @@ interface BonusState {
 	) => void;
 	removeBonus: (projectId: string, bonusId: string) => void;
 	setSelectedCurrency: (currency: string) => void;
+	setDepositBonusLanguage: (language: string) => void;
+	setDepositBonusQuery: (query: string) => void;
+	setBonusToolsQuery: (query: string) => void;
+	setBonusToolsSelectedRule: (id: string) => void;
+	setBonusToolsSelectedTable: (name: string) => void;
+	setBonusToolsSelectedBaseAmount: (amount: string) => void;
+	setBonusToolsSourceUrl: (url: string) => void;
 }
 
 function normalizeCurrency(currency: string) {
@@ -70,6 +84,13 @@ export const useBonusStore = create<BonusState>()(
 			projects: [],
 			activeProjectId: undefined,
 			selectedCurrency: "USD",
+			depositBonusLanguage: "ru",
+			depositBonusQuery: "",
+			bonusToolsQuery: "",
+			bonusToolsSelectedRuleId: "",
+			bonusToolsSelectedTableName: "",
+			bonusToolsSelectedBaseAmount: "",
+			bonusToolsSourceUrl: "",
 			setProjects: (projects) =>
 				set((state) => ({
 					projects: sortProjects(projects),
@@ -199,6 +220,18 @@ export const useBonusStore = create<BonusState>()(
 				})),
 			setSelectedCurrency: (currency) =>
 				set({ selectedCurrency: normalizeCurrency(currency) }),
+			setDepositBonusLanguage: (depositBonusLanguage) =>
+				set({ depositBonusLanguage }),
+			setDepositBonusQuery: (depositBonusQuery) => set({ depositBonusQuery }),
+			setBonusToolsQuery: (bonusToolsQuery) => set({ bonusToolsQuery }),
+			setBonusToolsSelectedRule: (bonusToolsSelectedRuleId) =>
+				set({ bonusToolsSelectedRuleId }),
+			setBonusToolsSelectedTable: (bonusToolsSelectedTableName) =>
+				set({ bonusToolsSelectedTableName }),
+			setBonusToolsSelectedBaseAmount: (bonusToolsSelectedBaseAmount) =>
+				set({ bonusToolsSelectedBaseAmount }),
+			setBonusToolsSourceUrl: (bonusToolsSourceUrl) =>
+				set({ bonusToolsSourceUrl }),
 		}),
 		{
 			name: "supportos:deposit-bonuses:v1",
@@ -207,6 +240,13 @@ export const useBonusStore = create<BonusState>()(
 				projects: state.projects,
 				activeProjectId: state.activeProjectId,
 				selectedCurrency: state.selectedCurrency,
+				depositBonusLanguage: state.depositBonusLanguage,
+				depositBonusQuery: state.depositBonusQuery,
+				bonusToolsQuery: state.bonusToolsQuery,
+				bonusToolsSelectedRuleId: state.bonusToolsSelectedRuleId,
+				bonusToolsSelectedTableName: state.bonusToolsSelectedTableName,
+				bonusToolsSelectedBaseAmount: state.bonusToolsSelectedBaseAmount,
+				bonusToolsSourceUrl: state.bonusToolsSourceUrl,
 			}),
 		},
 	),

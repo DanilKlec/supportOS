@@ -24,6 +24,7 @@ import {
 } from "@/services/bonus-tools.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { useBonusStore } from "@/store/bonus.store";
 
 function getRuleFieldValue(rule: BonusRule, field: keyof BonusRule) {
 	const value = rule[field];
@@ -68,19 +69,41 @@ const RULE_COLUMNS: Array<{
 
 export function BonusToolsPage() {
 	const { showToast } = useToast();
+	const query = useBonusStore((state) => state.bonusToolsQuery);
+	const selectedRuleId = useBonusStore(
+		(state) => state.bonusToolsSelectedRuleId,
+	);
+	const selectedCurrency = useBonusStore((state) => state.selectedCurrency);
+	const selectedTableName = useBonusStore(
+		(state) => state.bonusToolsSelectedTableName,
+	);
+	const selectedBaseAmount = useBonusStore(
+		(state) => state.bonusToolsSelectedBaseAmount,
+	);
+	const storedSourceUrl = useBonusStore((state) => state.bonusToolsSourceUrl);
+	const setQuery = useBonusStore((state) => state.setBonusToolsQuery);
+	const setSelectedRuleId = useBonusStore(
+		(state) => state.setBonusToolsSelectedRule,
+	);
+	const setSelectedCurrency = useBonusStore(
+		(state) => state.setSelectedCurrency,
+	);
+	const setSelectedTableName = useBonusStore(
+		(state) => state.setBonusToolsSelectedTable,
+	);
+	const setSelectedBaseAmount = useBonusStore(
+		(state) => state.setBonusToolsSelectedBaseAmount,
+	);
+	const setStoredSourceUrl = useBonusStore(
+		(state) => state.setBonusToolsSourceUrl,
+	);
 	const [data, setData] = useState<BonusToolsData | undefined>(() =>
 		loadStoredBonusToolsData(),
 	);
-	const [sourceUrl, setSourceUrl] = useState(
-		() => data?.sourceUrl ?? DEFAULT_BONUS_TOOLS_SHEET_URL,
-	);
+	const sourceUrl =
+		storedSourceUrl || data?.sourceUrl || DEFAULT_BONUS_TOOLS_SHEET_URL;
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
-	const [query, setQuery] = useState("");
-	const [selectedRuleId, setSelectedRuleId] = useState("");
-	const [selectedCurrency, setSelectedCurrency] = useState("EUR");
-	const [selectedTableName, setSelectedTableName] = useState("");
-	const [selectedBaseAmount, setSelectedBaseAmount] = useState("");
 
 	const updateFromGoogle = useCallback(
 		async (nextUrl: string, showSuccess = true) => {
@@ -92,8 +115,8 @@ export function BonusToolsPage() {
 
 				saveStoredBonusToolsData(nextData);
 				setData(nextData);
-				setSelectedRuleId((current) => current || nextData.rules[0]?.id || "");
-				setSourceUrl(nextData.sourceUrl);
+				setSelectedRuleId(selectedRuleId || nextData.rules[0]?.id || "");
+				setStoredSourceUrl(nextData.sourceUrl);
 				if (showSuccess) {
 					showToast("Bonus tools updated from Google Sheet");
 				}
@@ -107,7 +130,7 @@ export function BonusToolsPage() {
 				setLoading(false);
 			}
 		},
-		[showToast],
+		[showToast, selectedRuleId, setSelectedRuleId, setStoredSourceUrl],
 	);
 
 	useEffect(() => {
@@ -151,22 +174,36 @@ export function BonusToolsPage() {
 	useEffect(() => {
 		if (!selectedRule) return;
 
-		setSelectedTableName(
-			(current) =>
-				current ||
-				getCurrencyTableNameForRule(selectedRule, data?.currencyTables ?? []) ||
-				"",
+		const tableExists = data?.currencyTables.some(
+			(table) => table.name === selectedTableName,
 		);
-		setSelectedBaseAmount((current) => current || getRuleAmount(selectedRule));
-	}, [data?.currencyTables, selectedRule]);
+
+		if (!selectedTableName || !tableExists) {
+			setSelectedTableName(
+				getCurrencyTableNameForRule(selectedRule, data?.currencyTables ?? []) ||
+					"",
+			);
+		}
+
+		if (!selectedBaseAmount) {
+			setSelectedBaseAmount(getRuleAmount(selectedRule));
+		}
+	}, [
+		data?.currencyTables,
+		selectedBaseAmount,
+		selectedRule,
+		selectedTableName,
+		setSelectedBaseAmount,
+		setSelectedTableName,
+	]);
 
 	useEffect(() => {
 		if (currencies.length === 0) return;
 
-		setSelectedCurrency((current) =>
-			currencies.includes(current) ? current : currencies[0],
-		);
-	}, [currencies]);
+		if (!currencies.includes(selectedCurrency)) {
+			setSelectedCurrency(currencies[0]);
+		}
+	}, [currencies, selectedCurrency, setSelectedCurrency]);
 
 	const copyText = async (value: string, successMessage: string) => {
 		const copied = await copyToClipboard(value);
@@ -218,7 +255,7 @@ export function BonusToolsPage() {
 					<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
 						<input
 							value={sourceUrl}
-							onChange={(event) => setSourceUrl(event.target.value)}
+							onChange={(event) => setStoredSourceUrl(event.target.value)}
 							className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 						/>
 						<button
