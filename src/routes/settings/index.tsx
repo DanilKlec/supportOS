@@ -30,7 +30,11 @@ import {
 	ACCENT_COLORS,
 	type AppearanceSettings,
 	applyAppearance,
+	FONT_SCALE_OPTIONS,
 	getAppearanceSettings,
+	getDefaultAppearanceSettings,
+	PALETTE_OPTIONS,
+	RADIUS_OPTIONS,
 	resolveThemeMode,
 	saveAppearanceSettings,
 	type ThemeMode,
@@ -110,6 +114,13 @@ function SettingsPage() {
 
 	const updateAppearance = (patch: Partial<AppearanceSettings>) => {
 		const next = { ...appearance, ...patch };
+
+		setAppearance(next);
+		saveAppearanceSettings(next);
+	};
+
+	const resetAppearance = () => {
+		const next = getDefaultAppearanceSettings();
 
 		setAppearance(next);
 		saveAppearanceSettings(next);
@@ -204,8 +215,17 @@ function SettingsPage() {
 							</p>
 						</div>
 
-						<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-							Current: {resolvedTheme}
+						<div className="flex items-center gap-2">
+							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+								Current: {resolvedTheme}
+							</div>
+							<button
+								type="button"
+								onClick={resetAppearance}
+								className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							>
+								Reset
+							</button>
 						</div>
 					</div>
 
@@ -271,6 +291,59 @@ function SettingsPage() {
 									})}
 								</div>
 							</div>
+
+							<label className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
+								<span>
+									<span className="block text-sm font-medium">
+										Custom accent
+									</span>
+									<span className="mt-1 block text-xs text-muted">
+										Pick any color for active states and highlights.
+									</span>
+								</span>
+								<input
+									type="color"
+									value={appearance.accent}
+									onChange={(event) =>
+										updateAppearance({ accent: event.target.value })
+									}
+									className="h-10 w-14 cursor-pointer rounded-md border border-border bg-background p-1"
+								/>
+							</label>
+
+							<div className="space-y-2">
+								<div className="text-sm font-medium">Workspace palette</div>
+								<div className="grid gap-2 sm:grid-cols-3">
+									{PALETTE_OPTIONS.map((option) => {
+										const active = appearance.palette === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() =>
+													updateAppearance({ palette: option.value })
+												}
+												className={`rounded-lg border px-3 py-3 text-left transition ${
+													active
+														? "border-accent bg-accent/10"
+														: "border-border bg-background hover:bg-surface-elevated"
+												}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<span className="text-sm font-semibold">
+														{option.name}
+													</span>
+													{active && <Check size={14} />}
+												</div>
+												<div className="mt-1 text-xs text-muted">
+													{option.description}
+												</div>
+											</button>
+										);
+									})}
+								</div>
+							</div>
 						</div>
 
 						<div className="space-y-4">
@@ -316,6 +389,66 @@ function SettingsPage() {
 									>
 										Compact
 									</button>
+								</div>
+							</div>
+
+							<div className="space-y-2">
+								<div className="text-sm font-medium">Text size</div>
+								<div className="grid grid-cols-3 gap-2">
+									{FONT_SCALE_OPTIONS.map((option) => {
+										const active = appearance.fontScale === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() =>
+													updateAppearance({ fontScale: option.value })
+												}
+												className={`rounded-md border px-3 py-2 text-sm ${
+													active
+														? "border-accent bg-accent/10"
+														: "border-border bg-background hover:bg-surface-elevated"
+												}`}
+											>
+												{option.name}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+
+							<div className="space-y-2">
+								<div className="text-sm font-medium">Corner style</div>
+								<div className="grid gap-2">
+									{RADIUS_OPTIONS.map((option) => {
+										const active = appearance.radius === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() =>
+													updateAppearance({ radius: option.value })
+												}
+												className={`flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
+													active
+														? "border-accent bg-accent/10"
+														: "border-border bg-background hover:bg-surface-elevated"
+												}`}
+											>
+												<span>
+													<span className="block font-medium">
+														{option.name}
+													</span>
+													<span className="text-xs text-muted">
+														{option.description}
+													</span>
+												</span>
+												{active && <Check size={14} />}
+											</button>
+										);
+									})}
 								</div>
 							</div>
 
