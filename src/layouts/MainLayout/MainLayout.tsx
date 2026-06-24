@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { isLightweightRoute } from "@/app/route-mode";
+import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
@@ -15,7 +16,11 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		return (
 			<div className="flex h-screen flex-col bg-background">
 				<header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
-					<Link to="/" className="font-semibold hover:text-accent">
+					<Link
+						to="/"
+						className="inline-flex items-center gap-2 font-semibold hover:text-accent"
+					>
+						<SupportOSLogo className="h-7 w-7" />
 						SupportOS
 					</Link>
 

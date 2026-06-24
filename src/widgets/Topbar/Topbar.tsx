@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Cloud, LogIn, LogOut, Plus, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import type { Bind } from "@/entities/bind";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
@@ -135,9 +136,7 @@ export function Topbar() {
 	return (
 		<header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
 			<div className="flex items-center gap-3">
-				<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 font-bold text-white">
-					S
-				</div>
+				<SupportOSLogo />
 
 				<div>
 					<div className="font-semibold">SupportOS</div>

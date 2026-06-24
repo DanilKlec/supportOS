@@ -120,7 +120,7 @@ export default defineConfig({
 		VitePWA({
 			registerType: "autoUpdate",
 			injectRegister: "auto",
-			includeAssets: ["favicon.ico", "icon.svg", "logo192.png", "logo512.png"],
+			includeAssets: ["icon.svg"],
 			manifest: false,
 			workbox: {
 				cleanupOutdatedCaches: true,
