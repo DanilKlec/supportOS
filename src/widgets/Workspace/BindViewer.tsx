@@ -51,11 +51,20 @@ export function BindViewer() {
 		);
 	}
 
-	const copy = async () => {
+	const title = translation.title || bind.slug;
+
+	const copyContent = async () => {
 		const ok = await copyToClipboard(translation.content);
 
 		addRecent(bind.id);
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
+	};
+
+	const copyTitle = async () => {
+		const ok = await copyToClipboard(title);
+
+		addRecent(bind.id);
+		showToast(ok ? "Title copied to clipboard" : "Copy failed");
 	};
 
 	const toggleFavorite = () => {
@@ -72,7 +81,7 @@ export function BindViewer() {
 		modalManager.open("deleteNode", {
 			id: bind.id,
 			type: "bind",
-			name: translation.title || bind.slug,
+			name: title,
 		});
 	};
 
@@ -93,7 +102,18 @@ export function BindViewer() {
 							</span>
 						</div>
 
-						<h1 className="truncate text-3xl font-bold">{translation.title}</h1>
+						<div className="flex min-w-0 items-center gap-2">
+							<h1 className="min-w-0 truncate text-3xl font-bold">{title}</h1>
+
+							<button
+								type="button"
+								onClick={copyTitle}
+								title="Copy title"
+								className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:bg-surface-elevated hover:text-foreground"
+							>
+								<Copy size={16} />
+							</button>
+						</div>
 
 						<p className="mt-2 text-sm text-muted">{bind.slug}</p>
 					</div>
@@ -101,8 +121,8 @@ export function BindViewer() {
 					<div className="flex shrink-0 gap-2">
 						<button
 							type="button"
-							onClick={copy}
-							title="Copy"
+							onClick={copyContent}
+							title="Copy content"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Copy size={18} />
