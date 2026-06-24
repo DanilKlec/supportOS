@@ -47,6 +47,10 @@ body,
   min-height: 100%;
 }
 
+html[data-density="compact"] {
+  font-size: 15px;
+}
+
 body {
   margin: 0;
 }

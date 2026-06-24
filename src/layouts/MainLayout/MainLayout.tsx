@@ -33,7 +33,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 							Translator
 						</Link>
 						<Link
-							to="/settings/translator"
+							to="/settings"
 							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							Settings

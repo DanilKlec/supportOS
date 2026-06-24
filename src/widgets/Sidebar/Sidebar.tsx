@@ -1,13 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-	Contact,
-	FileSpreadsheet,
-	FileText,
-	Gift,
-	Plus,
-	Star,
-	Wrench,
-} from "lucide-react";
+import { Contact, FileText, Gift, Plus, Star, Wrench } from "lucide-react";
 
 import type { Bind } from "@/entities/bind";
 import { modalManager } from "@/shared/modals/modal.store";
@@ -110,14 +102,6 @@ export function Sidebar() {
 							<Settings size={14} />
 							<span>Translator Settings</span>
 						</Link> */}
-
-					<Link
-						to="/import/google-sheets"
-						className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-					>
-						<FileSpreadsheet size={14} />
-						<span>Google Sheets Import</span>
-					</Link>
 
 					<Link
 						to="/bonuses"
