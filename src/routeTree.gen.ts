@@ -18,6 +18,7 @@ import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTranslatorRouteImport } from './routes/settings/translator'
 import { Route as SettingsAiRouteImport } from './routes/settings/ai'
 import { Route as ImportGoogleSheetsRouteImport } from './routes/import/google-sheets'
@@ -70,6 +71,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsTranslatorRoute = SettingsTranslatorRouteImport.update({
   id: '/settings/translator',
   path: '/settings/translator',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   ImportGoogleSheetsRoute: typeof ImportGoogleSheetsRoute
   SettingsAiRoute: typeof SettingsAiRoute
   SettingsTranslatorRoute: typeof SettingsTranslatorRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/translator': {
       id: '/settings/translator'
       path: '/settings/translator'
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportGoogleSheetsRoute: ImportGoogleSheetsRoute,
   SettingsAiRoute: SettingsAiRoute,
   SettingsTranslatorRoute: SettingsTranslatorRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

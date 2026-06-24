@@ -1,35 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-	Cloud,
-	Download,
-	FileSpreadsheet,
-	Languages,
-	LogIn,
-	LogOut,
-	Moon,
-	Plus,
-	Search,
-	Settings,
-	Sun,
-	Upload,
-} from "lucide-react";
-import {
-	type ChangeEvent,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { Cloud, LogIn, LogOut, Plus, Search, Settings } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { PWAInstallButton } from "@/components/pwa/PWAInstallButton";
+import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import type { Bind } from "@/entities/bind";
-import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
-import { supportOSExportService } from "@/services/supportos-export.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { modalManager } from "@/shared/modals/modal.store";
-import { type LanguageCode, useKnowledgeStore } from "@/store";
+import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 
 function getBindTitle(bind: Bind, language: string) {
@@ -46,17 +25,8 @@ function getBindTitle(bind: Bind, language: string) {
 
 export function Topbar() {
 	const navigate = useNavigate();
-	const [theme, setTheme] = useState<"dark" | "light">(() => {
-		if (typeof window === "undefined") return "dark";
-
-		return (
-			(localStorage.getItem("supportos-theme") as "dark" | "light" | null) ??
-			"dark"
-		);
-	});
 	const [searchFocused, setSearchFocused] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
-	const importInputRef = useRef<HTMLInputElement>(null);
 	const { showToast } = useToast();
 
 	const authConfigured = useAuthStore((s) => s.configured);
@@ -64,7 +34,6 @@ export function Topbar() {
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
-	const setLanguage = useKnowledgeStore((s) => s.setLanguage);
 	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
@@ -110,58 +79,6 @@ export function Topbar() {
 					: undefined,
 		});
 	}, [categories, folders, selectedCategory, selectedFolder, showToast]);
-
-	const toggleTheme = () => {
-		const next = theme === "dark" ? "light" : "dark";
-
-		setTheme(next);
-
-		document.documentElement.classList.toggle("dark", next === "dark");
-
-		localStorage.setItem("supportos-theme", next);
-	};
-
-	const cycleLanguage = () => {
-		const enabled = languages.map((item) => item.code as LanguageCode);
-		const index = enabled.indexOf(language);
-		const next = enabled[(index + 1) % enabled.length] ?? "ru";
-
-		setLanguage(next);
-		showToast(`Language: ${next.toUpperCase()}`);
-	};
-
-	const exportJson = () => {
-		const blob = new Blob([supportOSExportService.exportJson()], {
-			type: "application/json",
-		});
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-
-		link.href = url;
-		link.download = `supportos-${new Date().toISOString().slice(0, 10)}.json`;
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
-		showToast("SupportOS JSON exported");
-	};
-
-	const importJson = async (event: ChangeEvent<HTMLInputElement>) => {
-		const file = event.target.files?.[0];
-
-		if (!file) return;
-
-		try {
-			const text = await file.text();
-
-			supportOSExportService.importJson(text);
-			showToast("SupportOS JSON imported");
-		} catch {
-			showToast("Import failed");
-		} finally {
-			event.target.value = "";
-		}
-	};
 
 	const signOut = async () => {
 		await supabaseService.signOut();
@@ -219,9 +136,7 @@ export function Topbar() {
 	return (
 		<header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
 			<div className="flex items-center gap-3">
-				<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 font-bold text-white">
-					S
-				</div>
+				<SupportOSLogo />
 
 				<div>
 					<div className="font-semibold">SupportOS</div>
@@ -291,57 +206,6 @@ export function Topbar() {
 					<Plus size={18} />
 				</button>
 
-				<Link
-					to="/import/google-sheets"
-					title="Import Google Sheets"
-					className="rounded-lg p-2 hover:bg-surface-elevated"
-				>
-					<FileSpreadsheet size={18} />
-				</Link>
-
-				<button
-					type="button"
-					title="Import JSON"
-					onClick={() => importInputRef.current?.click()}
-					className="rounded-lg p-2 hover:bg-surface-elevated"
-				>
-					<Upload size={18} />
-				</button>
-
-				<input
-					ref={importInputRef}
-					type="file"
-					accept="application/json,.json"
-					className="hidden"
-					onChange={importJson}
-				/>
-
-				<button
-					type="button"
-					title="Export JSON"
-					onClick={exportJson}
-					className="rounded-lg p-2 hover:bg-surface-elevated"
-				>
-					<Download size={18} />
-				</button>
-
-				<button
-					type="button"
-					title="Switch language"
-					onClick={cycleLanguage}
-					className="rounded-lg p-2 hover:bg-surface-elevated"
-				>
-					<Languages size={18} />
-				</button>
-
-				<Link
-					to="/settings/translator"
-					title="Translator settings"
-					className="rounded-lg p-2 hover:bg-surface-elevated"
-				>
-					<Settings size={18} />
-				</Link>
-
 				{authConfigured &&
 					(authSession ? (
 						<button
@@ -364,16 +228,13 @@ export function Topbar() {
 						</Link>
 					))}
 
-				<PWAInstallButton />
-
-				<button
-					type="button"
-					title="Toggle theme"
+				<Link
+					to="/settings"
+					title="Settings"
 					className="rounded-lg p-2 hover:bg-surface-elevated"
-					onClick={toggleTheme}
 				>
-					{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-				</button>
+					<Settings size={18} />
+				</Link>
 			</div>
 		</header>
 	);
