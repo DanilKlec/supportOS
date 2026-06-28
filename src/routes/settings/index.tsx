@@ -43,10 +43,12 @@ import {
 	ACCENT_COLORS,
 	type AppearanceSettings,
 	applyAppearance,
+	CUSTOM_PALETTE_FIELDS,
 	FONT_SCALE_OPTIONS,
 	getAppearanceSettings,
 	getDefaultAppearanceSettings,
 	PALETTE_OPTIONS,
+	type PaletteColors,
 	RADIUS_OPTIONS,
 	resolveThemeMode,
 	saveAppearanceSettings,
@@ -251,6 +253,16 @@ function SettingsPage() {
 		saveAppearanceSettings(next);
 	};
 
+	const updateCustomPalette = (patch: Partial<PaletteColors>) => {
+		updateAppearance({
+			palette: "custom",
+			customPalette: {
+				...appearance.customPalette,
+				...patch,
+			},
+		});
+	};
+
 	const toggleWorkspaceFlag = (key: WorkspaceToggleKey) => {
 		setWorkspaceLayout({
 			[key]: !workspaceLayout[key],
@@ -449,7 +461,7 @@ function SettingsPage() {
 
 							<div className="space-y-2">
 								<div className="text-sm font-medium">Workspace palette</div>
-								<div className="grid gap-2 sm:grid-cols-3">
+								<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 									{PALETTE_OPTIONS.map((option) => {
 										const active = appearance.palette === option.value;
 
@@ -480,6 +492,47 @@ function SettingsPage() {
 									})}
 								</div>
 							</div>
+
+							{appearance.palette === "custom" && (
+								<div className="rounded-lg border border-border bg-background p-3">
+									<div className="mb-3 flex items-center justify-between gap-3">
+										<div className="text-sm font-medium">Custom colors</div>
+										<div className="flex overflow-hidden rounded-md border border-border">
+											{CUSTOM_PALETTE_FIELDS.map((field) => (
+												<span
+													key={field.key}
+													className="h-7 w-8"
+													style={{
+														backgroundColor:
+															appearance.customPalette[field.key],
+													}}
+												/>
+											))}
+										</div>
+									</div>
+
+									<div className="grid gap-3 sm:grid-cols-2">
+										{CUSTOM_PALETTE_FIELDS.map((field) => (
+											<label
+												key={field.key}
+												className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2"
+											>
+												<span className="text-sm text-muted">{field.name}</span>
+												<input
+													type="color"
+													value={appearance.customPalette[field.key]}
+													onChange={(event) =>
+														updateCustomPalette({
+															[field.key]: event.target.value,
+														})
+													}
+													className="h-9 w-12 cursor-pointer rounded-md border border-border bg-background p-1"
+												/>
+											</label>
+										))}
+									</div>
+								</div>
+							)}
 						</div>
 
 						<div className="space-y-4">

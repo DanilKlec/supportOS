@@ -1,6 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, Languages, Loader2, Repeat2, Settings } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import {
+	Copy,
+	Languages,
+	Loader2,
+	Repeat2,
+	Settings,
+	Trash2,
+} from "lucide-react";
+import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 
 import {
 	type TranslatorLanguage,
@@ -29,6 +36,7 @@ export function TranslatorPage() {
 	const [languageWarning, setLanguageWarning] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [detectedLanguage, setDetectedLanguage] = useState("");
 
 	const resolvedFromLanguage =
 		fromLanguage === CUSTOM_LANGUAGE ? customFromLanguage : fromLanguage;
@@ -58,6 +66,51 @@ export function TranslatorPage() {
 			return first.name.localeCompare(second.name);
 		});
 	}, [languages]);
+
+	const setLanguageSelection = (side: "from" | "to", languageCode: string) => {
+		const knownLanguage = languageOptions.some(
+			(language) => language.code === languageCode,
+		);
+
+		if (side === "from") {
+			setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+			setCustomFromLanguage(knownLanguage ? "" : languageCode);
+			return;
+		}
+
+		setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+		setCustomToLanguage(knownLanguage ? "" : languageCode);
+	};
+
+	const getTranslationDirection = () => {
+		const detected = translatorService.detectLanguage(sourceText);
+		const source = resolvedFromLanguage.trim().toLowerCase();
+		const target = resolvedToLanguage.trim().toLowerCase();
+		const shouldSwap =
+			source !== "auto" &&
+			detected === target &&
+			source !== target &&
+			Boolean(target);
+
+		if (!shouldSwap) {
+			return {
+				fromLanguage: resolvedFromLanguage,
+				toLanguage: resolvedToLanguage,
+				detected,
+				swapped: false,
+			};
+		}
+
+		setLanguageSelection("from", detected);
+		setLanguageSelection("to", source);
+
+		return {
+			fromLanguage: detected,
+			toLanguage: source,
+			detected,
+			swapped: true,
+		};
+	};
 
 	const loadLanguages = async () => {
 		if (provider === "mymemory") {
@@ -92,8 +145,10 @@ export function TranslatorPage() {
 		}
 	};
 
-	const translate = async (event: FormEvent) => {
-		event.preventDefault();
+	const translate = async (event?: FormEvent) => {
+		event?.preventDefault();
+		if (loading) return;
+
 		if (!canTranslate) {
 			setError("Enter text and choose a target language.");
 			return;
@@ -103,14 +158,20 @@ export function TranslatorPage() {
 		setLoading(true);
 
 		try {
+			const direction = getTranslationDirection();
 			const result = await translatorService.translate({
 				text: sourceText,
-				fromLanguage: resolvedFromLanguage,
-				toLanguage: resolvedToLanguage,
+				fromLanguage: direction.fromLanguage,
+				toLanguage: direction.toLanguage,
 			});
 
 			setResultText(result.text);
-			showToast("Translated");
+			setDetectedLanguage(result.fromLanguage);
+			showToast(
+				direction.swapped
+					? `Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`
+					: "Translated",
+			);
 		} catch (translationError) {
 			setError(
 				translationError instanceof Error
@@ -120,6 +181,20 @@ export function TranslatorPage() {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const translateFromKeyboard = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key !== "Enter" || (!event.ctrlKey && !event.metaKey)) return;
+
+		event.preventDefault();
+		void translate();
+	};
+
+	const clearTranslator = () => {
+		setSourceText("");
+		setResultText("");
+		setError("");
+		setDetectedLanguage("");
 	};
 
 	const swapLanguages = () => {
@@ -136,6 +211,7 @@ export function TranslatorPage() {
 		setCustomToLanguage(nextCustomToLanguage);
 		setSourceText(resultText);
 		setResultText(sourceText);
+		setDetectedLanguage("");
 	};
 
 	const copyResult = async () => {
@@ -146,7 +222,7 @@ export function TranslatorPage() {
 	};
 
 	return (
-		<div className="flex h-full flex-col overflow-auto bg-background">
+		<div className="supportos-scroll flex h-full flex-col overflow-auto bg-background">
 			<form
 				onSubmit={translate}
 				className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-6"
@@ -190,6 +266,16 @@ export function TranslatorPage() {
 						>
 							<Repeat2 size={16} />
 							Swap Languages
+						</button>
+
+						<button
+							type="button"
+							onClick={clearTranslator}
+							disabled={loading || (!sourceText && !resultText && !error)}
+							className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							title="Clear translator"
+						>
+							<Trash2 size={16} />
 						</button>
 
 						<button
@@ -247,14 +333,20 @@ export function TranslatorPage() {
 
 				<div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
 					<div className="flex min-h-96 flex-col rounded-lg border border-border bg-surface">
-						<div className="border-b border-border px-4 py-3 text-sm font-semibold">
-							Source
+						<div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+							<div className="text-sm font-semibold">Source</div>
+							{fromLanguage === "auto" && detectedLanguage && (
+								<div className="rounded-full border border-border px-2 py-1 text-xs text-muted">
+									Detected: {detectedLanguage.toUpperCase()}
+								</div>
+							)}
 						</div>
 						<textarea
 							value={sourceText}
 							onChange={(event) => setSourceText(event.target.value)}
+							onKeyDown={translateFromKeyboard}
 							disabled={loading}
-							className="min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+							className="supportos-scroll min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Paste text, markdown, or code here..."
 						/>
 					</div>
@@ -276,7 +368,7 @@ export function TranslatorPage() {
 							value={resultText}
 							onChange={(event) => setResultText(event.target.value)}
 							disabled={loading}
-							className="min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+							className="supportos-scroll min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Translation result will appear here..."
 						/>
 					</div>
