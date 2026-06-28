@@ -13,10 +13,22 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { knowledgeService } from "@/services/knowledge.service";
+import { useToast } from "@/shared/hooks/useToast";
+import {
+	getDraggedBindIds,
+	hasBindDragData,
+	setBindDragData,
+} from "@/shared/lib/bind-drag";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 
@@ -24,6 +36,10 @@ interface Props {
 	node: KnowledgeTreeNode;
 
 	level: number;
+	forceExpanded?: boolean;
+	selectedBindIds?: string[];
+	onToggleBindSelection?: (id: string) => void;
+	onClearBindSelection?: () => void;
 }
 
 const INITIAL_CHILDREN_LIMIT = 120;
@@ -59,16 +75,27 @@ function ActionMenuItem({
 	);
 }
 
-export function TreeNode({ node, level }: Props) {
+export function TreeNode({
+	node,
+	level,
+	forceExpanded = false,
+	selectedBindIds = [],
+	onToggleBindSelection,
+	onClearBindSelection,
+}: Props) {
 	const navigate = useNavigate();
 	const actionsRef = useRef<HTMLDivElement>(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
+	const [dragging, setDragging] = useState(false);
+	const [dragOver, setDragOver] = useState(false);
 	const [visibleChildrenLimit, setVisibleChildrenLimit] = useState(
 		INITIAL_CHILDREN_LIMIT,
 	);
-	const expanded = useKnowledgeStore((s) =>
+	const { showToast } = useToast();
+	const storedExpanded = useKnowledgeStore((s) =>
 		s.expandedFolders.includes(node.id),
 	);
+	const expanded = forceExpanded || storedExpanded;
 	const selectedBind = useKnowledgeStore((s) => s.selectedBind);
 	const selectedCategory = useKnowledgeStore((s) => s.selectedCategory);
 	const selectedFolder = useKnowledgeStore((s) => s.selectedFolder);
@@ -81,6 +108,8 @@ export function TreeNode({ node, level }: Props) {
 
 	const folder = folders.find((item) => item.id === node.id);
 	const categoryId = node.type === "category" ? node.id : folder?.categoryId;
+	const targetFolderId = node.type === "folder" ? node.id : undefined;
+	const canDropBind = node.type !== "bind" && Boolean(categoryId);
 	const hasChildren = node.children.length > 0;
 	const nodeColor = node.color ?? node.bind?.color;
 	const nodeColorStyle = nodeColor ? { color: nodeColor } : undefined;
@@ -107,6 +136,7 @@ export function TreeNode({ node, level }: Props) {
 		(node.type === "bind" && selectedBind === node.id) ||
 		(node.type === "category" && selectedCategory === node.id) ||
 		(node.type === "folder" && selectedFolder === node.id);
+	const bindSelected = selectedBindIds.includes(node.id);
 
 	useEffect(() => {
 		if (!actionsOpen) return undefined;
@@ -212,8 +242,153 @@ export function TreeNode({ node, level }: Props) {
 		setActionsOpen(false);
 	};
 
+	const expandDropTarget = () => {
+		for (const id of [categoryId, targetFolderId]) {
+			if (!id) continue;
+
+			const state = useKnowledgeStore.getState();
+
+			if (!state.expandedFolders.includes(id)) {
+				state.toggleFolder(id);
+			}
+		}
+	};
+
+	const handleDragStart = (event: DragEvent<HTMLElement>) => {
+		if (node.type !== "bind") {
+			event.preventDefault();
+			return;
+		}
+
+		setBindDragData(
+			event.dataTransfer,
+			node.id,
+			bindSelected ? selectedBindIds : [node.id],
+		);
+		setDragging(true);
+		setActionsOpen(false);
+	};
+
+	const handleDragEnd = () => {
+		setDragging(false);
+		setDragOver(false);
+	};
+
+	const handleDragEnter = (event: DragEvent<HTMLElement>) => {
+		if (!canDropBind || !hasBindDragData(event.dataTransfer)) return;
+
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "move";
+		setDragOver(true);
+		expandDropTarget();
+	};
+
+	const handleDragOver = (event: DragEvent<HTMLElement>) => {
+		if (!canDropBind || !hasBindDragData(event.dataTransfer)) return;
+
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "move";
+		setDragOver(true);
+	};
+
+	const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+		if (
+			event.relatedTarget instanceof Node &&
+			event.currentTarget.contains(event.relatedTarget)
+		) {
+			return;
+		}
+
+		setDragOver(false);
+	};
+
+	const handleDrop = (event: DragEvent<HTMLElement>) => {
+		if (!canDropBind || !categoryId) return;
+
+		event.preventDefault();
+		event.stopPropagation();
+		setDragOver(false);
+
+		const bindIds = getDraggedBindIds(event.dataTransfer);
+
+		if (bindIds.length === 0) return;
+
+		const store = useKnowledgeStore.getState();
+		const previousLocations = bindIds
+			.map((bindId) => {
+				const bind = store.binds.find((item) => item.id === bindId);
+
+				return bind
+					? {
+							id: bind.id,
+							categoryId: bind.categoryId,
+							folderId: bind.folderId,
+						}
+					: undefined;
+			})
+			.filter(
+				(item): item is { id: string; categoryId: string; folderId?: string } =>
+					Boolean(item),
+			);
+		const movedLocations: typeof previousLocations = [];
+
+		try {
+			for (const location of previousLocations) {
+				if (
+					location.categoryId === categoryId &&
+					(location.folderId ?? "") === (targetFolderId ?? "")
+				) {
+					continue;
+				}
+
+				const movedBind = knowledgeService.moveBind(location.id, {
+					categoryId,
+					folderId: targetFolderId,
+				});
+
+				movedLocations.push({
+					...location,
+					id: movedBind.id,
+				});
+			}
+
+			expandDropTarget();
+
+			if (movedLocations.length > 0) {
+				showToast(
+					movedLocations.length > 1
+						? `${movedLocations.length} binds moved`
+						: "Bind moved",
+					{
+						action: {
+							label: "Undo",
+							onClick: () => {
+								for (const location of movedLocations) {
+									knowledgeService.moveBind(location.id, {
+										categoryId: location.categoryId,
+										folderId: location.folderId,
+									});
+								}
+								showToast("Move undone");
+							},
+						},
+						duration: 6000,
+					},
+				);
+				onClearBindSelection?.();
+			}
+		} catch (error) {
+			showToast(error instanceof Error ? error.message : "Bind move failed");
+		}
+	};
+
 	const visibleChildren = expanded
-		? node.children.slice(0, visibleChildrenLimit)
+		? node.children.slice(
+				0,
+				forceExpanded ? node.children.length : visibleChildrenLimit,
+			)
 		: [];
 	const hiddenChildrenCount = Math.max(
 		0,
@@ -231,15 +406,47 @@ export function TreeNode({ node, level }: Props) {
           border-l-2
           pr-2
           transition
-          ${selected ? "bg-accent/15 text-accent" : "hover:bg-accent/10"}
+          ${
+						dragOver
+							? "bg-accent/20 text-foreground ring-1 ring-inset ring-accent/50"
+							: selected
+								? "bg-accent/15 text-accent"
+								: "hover:bg-accent/10"
+					}
+          ${dragging ? "opacity-50" : ""}
+          ${node.type === "bind" ? "cursor-grab active:cursor-grabbing" : ""}
         `}
 				style={{
 					borderLeftColor: nodeColor ?? "transparent",
 				}}
 			>
+				{node.type === "bind" && (
+					<label
+						className="flex shrink-0 items-center pr-1"
+						style={{
+							paddingLeft: 12 + level * 18,
+						}}
+					>
+						<input
+							type="checkbox"
+							checked={bindSelected}
+							onChange={() => onToggleBindSelection?.(node.id)}
+							aria-label={`Select ${node.name}`}
+							className="h-3.5 w-3.5 accent-current"
+						/>
+					</label>
+				)}
+
 				<button
 					type="button"
 					onClick={handleOpen}
+					draggable={node.type === "bind"}
+					onDragStart={handleDragStart}
+					onDragEnd={handleDragEnd}
+					onDragEnter={handleDragEnter}
+					onDragOver={handleDragOver}
+					onDragLeave={handleDragLeave}
+					onDrop={handleDrop}
 					className="
             flex
             min-w-0
@@ -250,7 +457,7 @@ export function TreeNode({ node, level }: Props) {
             text-left
           "
 					style={{
-						paddingLeft: 12 + level * 18,
+						paddingLeft: node.type === "bind" ? 0 : 12 + level * 18,
 					}}
 				>
 					{hasChildren ? (
@@ -351,7 +558,15 @@ export function TreeNode({ node, level }: Props) {
 			{expanded && (
 				<>
 					{visibleChildren.map((child) => (
-						<TreeNode key={child.id} node={child} level={level + 1} />
+						<TreeNode
+							key={child.id}
+							node={child}
+							level={level + 1}
+							forceExpanded={forceExpanded}
+							selectedBindIds={selectedBindIds}
+							onToggleBindSelection={onToggleBindSelection}
+							onClearBindSelection={onClearBindSelection}
+						/>
 					))}
 
 					{hiddenChildrenCount > 0 && (

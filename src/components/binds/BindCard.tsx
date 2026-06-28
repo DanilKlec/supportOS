@@ -1,8 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Copy, Pencil, Trash2 } from "lucide-react";
+import { type DragEvent, useState } from "react";
 
 import type { Bind } from "#/entities/bind";
 import { useToast } from "#/shared/hooks/useToast";
+import { setBindDragData } from "#/shared/lib/bind-drag";
 import { copyToClipboard } from "#/shared/lib/clipboard";
 import { modalManager } from "#/shared/modals/modal.store";
 import { useKnowledgeStore } from "#/store";
@@ -37,6 +39,7 @@ export function BindCard({ bind }: BindCardProps) {
 	const language = useKnowledgeStore((state) => state.language);
 	const openBind = useKnowledgeStore((state) => state.openBind);
 	const addRecent = useKnowledgeStore((state) => state.addRecent);
+	const [dragging, setDragging] = useState(false);
 	const { showToast } = useToast();
 	const title = getBindTitle(bind, language);
 	const content = getBindContent(bind, language);
@@ -48,8 +51,20 @@ export function BindCard({ bind }: BindCardProps) {
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
 	};
 
+	const handleDragStart = (event: DragEvent<HTMLElement>) => {
+		setBindDragData(event.dataTransfer, bind.id);
+		setDragging(true);
+	};
+
 	return (
-		<article className="group rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent/30">
+		<article
+			draggable
+			onDragStart={handleDragStart}
+			onDragEnd={() => setDragging(false)}
+			className={`group cursor-grab rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent/30 active:cursor-grabbing ${
+				dragging ? "opacity-50" : ""
+			}`}
+		>
 			<div className="flex items-start justify-between gap-3">
 				<button
 					type="button"

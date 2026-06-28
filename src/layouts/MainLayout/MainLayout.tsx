@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { isLightweightRoute } from "@/app/route-mode";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
+import { CommandPalette } from "@/widgets/CommandPalette/CommandPalette";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
 
@@ -51,6 +52,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				</main>
 
 				<TranslatorWidget />
+				<CommandPalette />
 			</div>
 		);
 	}
@@ -68,6 +70,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 			</div>
 
 			<TranslatorWidget />
+			<CommandPalette />
 		</div>
 	);
 }

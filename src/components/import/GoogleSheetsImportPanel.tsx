@@ -10,8 +10,14 @@ import { useToast } from "@/shared/hooks/useToast";
 import { useAuthStore } from "@/store/auth.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 
+type PreviewStatus = "new" | "update" | "unchanged" | "conflict" | "error";
+
 interface GoogleSheetsImportPanelProps {
 	showHeading?: boolean;
+}
+
+function normalizeTitle(value: string) {
+	return value.trim().toLowerCase();
 }
 
 export function GoogleSheetsImportPanel({
@@ -22,6 +28,7 @@ export function GoogleSheetsImportPanel({
 	const configured = useAuthStore((state) => state.configured);
 	const categories = useKnowledgeStore((state) => state.categories);
 	const folders = useKnowledgeStore((state) => state.folders);
+	const binds = useKnowledgeStore((state) => state.binds);
 	const [url, setUrl] = useState("");
 	const [preview, setPreview] = useState<SheetPreview>();
 	const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
@@ -36,6 +43,66 @@ export function GoogleSheetsImportPanel({
 		() => folders.filter((folder) => folder.categoryId === categoryId),
 		[categoryId, folders],
 	);
+	const previewRows = useMemo(() => {
+		if (!preview) return [];
+
+		return preview.rows.map((row) => {
+			let status: PreviewStatus = row.errors.length > 0 ? "error" : "new";
+			const exactImportedBind = binds.find(
+				(bind) =>
+					bind.importBatchId === preview.importBatchId &&
+					bind.sourceHash === row.hash,
+			);
+			const titleImportedBind = binds.find(
+				(bind) =>
+					bind.importBatchId === preview.importBatchId &&
+					bind.translations.some(
+						(translation) =>
+							normalizeTitle(translation.title) === normalizeTitle(row.title),
+					),
+			);
+			const localTitleConflict = binds.some(
+				(bind) =>
+					bind.importBatchId !== preview.importBatchId &&
+					bind.categoryId === categoryId &&
+					(bind.folderId ?? "") === (folderId ?? "") &&
+					bind.translations.some(
+						(translation) =>
+							normalizeTitle(translation.title) === normalizeTitle(row.title),
+					),
+			);
+
+			if (status !== "error") {
+				if (exactImportedBind) {
+					status = "unchanged";
+				} else if (titleImportedBind) {
+					status = "update";
+				} else if (localTitleConflict) {
+					status = "conflict";
+				}
+			}
+
+			return {
+				...row,
+				status,
+			};
+		});
+	}, [binds, categoryId, folderId, preview]);
+	const previewCounts = useMemo(() => {
+		const counts: Record<PreviewStatus, number> = {
+			new: 0,
+			update: 0,
+			unchanged: 0,
+			conflict: 0,
+			error: 0,
+		};
+
+		for (const row of previewRows) {
+			counts[row.status] += 1;
+		}
+
+		return counts;
+	}, [previewRows]);
 
 	useEffect(() => {
 		if (!categoryId && categories[0]) {
@@ -74,7 +141,7 @@ export function GoogleSheetsImportPanel({
 			const imported = googleSheetsService.commit({
 				preview,
 				categoryId,
-				folderId: folderId || undefined,
+				folderId: folderId || null,
 				mode,
 			});
 
@@ -207,6 +274,14 @@ export function GoogleSheetsImportPanel({
 							</div>
 						</div>
 
+						<div className="flex flex-wrap gap-2 text-xs">
+							<StatusPill label="New" value={previewCounts.new} />
+							<StatusPill label="Update" value={previewCounts.update} />
+							<StatusPill label="Same" value={previewCounts.unchanged} />
+							<StatusPill label="Conflict" value={previewCounts.conflict} />
+							<StatusPill label="Error" value={previewCounts.error} />
+						</div>
+
 						<button
 							type="button"
 							onClick={commitImport}
@@ -242,7 +317,7 @@ export function GoogleSheetsImportPanel({
 							</thead>
 
 							<tbody>
-								{preview.rows.map((row) => (
+								{previewRows.map((row) => (
 									<tr key={`${row.hash}-${row.rowNumber}`}>
 										<td className="border-b border-border px-4 py-2 text-muted">
 											{row.rowNumber}
@@ -266,7 +341,7 @@ export function GoogleSheetsImportPanel({
 													{row.errors.join(", ")}
 												</span>
 											) : (
-												<span className="text-green-300">Ready</span>
+												<ImportStatus status={row.status} />
 											)}
 										</td>
 									</tr>
@@ -278,4 +353,31 @@ export function GoogleSheetsImportPanel({
 			)}
 		</div>
 	);
+}
+
+function StatusPill({ label, value }: { label: string; value: number }) {
+	return (
+		<span className="rounded-full border border-border px-2 py-1 text-muted">
+			{label}: {value}
+		</span>
+	);
+}
+
+function ImportStatus({ status }: { status: PreviewStatus }) {
+	const labelByStatus: Record<PreviewStatus, string> = {
+		new: "New",
+		update: "Update",
+		unchanged: "No changes",
+		conflict: "Possible duplicate",
+		error: "Error",
+	};
+	const classByStatus: Record<PreviewStatus, string> = {
+		new: "text-green-300",
+		update: "text-blue-300",
+		unchanged: "text-muted",
+		conflict: "text-yellow-300",
+		error: "text-red-300",
+	};
+
+	return <span className={classByStatus[status]}>{labelByStatus[status]}</span>;
 }

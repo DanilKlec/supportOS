@@ -6,6 +6,14 @@ export interface BindTranslation {
 	aiGenerated?: boolean;
 }
 
+export interface BindHistoryEntry {
+	id: string;
+	createdAt: string;
+	slug: string;
+	tags: string[];
+	translations: BindTranslation[];
+}
+
 export interface Bind {
 	id: string;
 
@@ -32,6 +40,8 @@ export interface Bind {
 	tags: string[];
 
 	translations: BindTranslation[];
+
+	history?: BindHistoryEntry[];
 
 	aiGenerated?: boolean;
 

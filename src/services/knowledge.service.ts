@@ -1,4 +1,4 @@
-import type { Bind, BindTranslation } from "@/entities/bind";
+import type { Bind, BindHistoryEntry, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import {
 	mockBinds,
@@ -57,7 +57,7 @@ export interface CreateBindInput {
 
 export interface UpdateBindInput {
 	categoryId?: string;
-	folderId?: string;
+	folderId?: string | null;
 	slug?: string;
 	ownerId?: string | null;
 	sourceBindId?: string;
@@ -80,6 +80,17 @@ export interface UpdateBindInput {
 
 export type CreateCategoryInput = string | Partial<KnowledgeCategory>;
 type MoveDirection = "up" | "down";
+
+interface MoveBindInput {
+	categoryId: string;
+	folderId?: string;
+}
+
+export interface RestoreDeletedItemsInput {
+	categories?: KnowledgeCategory[];
+	folders?: KnowledgeFolder[];
+	binds?: Bind[];
+}
 
 export type CreateFolderInput = {
 	categoryId: string;
@@ -172,6 +183,26 @@ function normalizeTranslations(
 	}
 
 	return next;
+}
+
+function createBindHistoryEntry(bind: Bind): BindHistoryEntry {
+	return {
+		id: createId("history"),
+		createdAt: now(),
+		slug: bind.slug,
+		tags: [...bind.tags],
+		translations: clone(bind.translations),
+	};
+}
+
+function shouldTrackBindHistory(patch: UpdateBindInput) {
+	return (
+		patch.slug !== undefined ||
+		patch.tags !== undefined ||
+		patch.translations !== undefined ||
+		patch.title !== undefined ||
+		patch.content !== undefined
+	);
 }
 
 function getReorderedItemOrders<T extends { id: string; order: number }>(
@@ -319,6 +350,7 @@ function normalizeDatabase(
 				imported: Boolean(bind.imported),
 				tags: Array.isArray(bind.tags) ? bind.tags : [],
 				translations: Array.isArray(bind.translations) ? bind.translations : [],
+				history: Array.isArray(bind.history) ? bind.history : [],
 				aiGenerated: bind.aiGenerated,
 				aiTranslated: bind.aiTranslated,
 				aiSummary:
@@ -440,6 +472,7 @@ class KnowledgeService {
 				title,
 				content,
 			),
+			history: [],
 			aiGenerated: input.aiGenerated,
 			aiTranslated: input.aiTranslated,
 			aiSummary: input.aiSummary,
@@ -524,6 +557,12 @@ class KnowledgeService {
 			tags:
 				patch.tags === undefined ? existing.tags : normalizeTags(patch.tags),
 			translations,
+			history: shouldTrackBindHistory(patch)
+				? [createBindHistoryEntry(existing), ...(existing.history ?? [])].slice(
+						0,
+						25,
+					)
+				: existing.history,
 			aiGenerated:
 				patch.aiGenerated === undefined
 					? existing.aiGenerated
@@ -548,6 +587,109 @@ class KnowledgeService {
 		cloudKnowledgeService.saveBind(updated);
 
 		return updated;
+	}
+
+	duplicateBind(id: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) {
+			throw new Error("Bind not found");
+		}
+
+		const duplicate = this.createBind({
+			categoryId: existing.categoryId,
+			folderId: existing.folderId,
+			slug: `${existing.slug}-copy`,
+			ownerId: existing.ownerId,
+			icon: existing.icon,
+			color: existing.color,
+			tags: existing.tags,
+			translations: clone(existing.translations),
+			title: existing.translations[0]?.title ?? existing.slug,
+			content: existing.translations[0]?.content ?? "",
+			language: existing.translations[0]?.language,
+		});
+
+		return duplicate;
+	}
+
+	restoreBindHistory(id: string, historyId: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+		const entry = existing?.history?.find((item) => item.id === historyId);
+
+		if (!existing || !entry) {
+			throw new Error("History entry not found");
+		}
+
+		return this.updateBind(id, {
+			slug: entry.slug,
+			tags: entry.tags,
+			translations: clone(entry.translations),
+		});
+	}
+
+	moveBind(id: string, destination: MoveBindInput) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) {
+			throw new Error("Bind not found");
+		}
+
+		const targetFolderId = destination.folderId ?? "";
+		const targetFolder = targetFolderId
+			? store.folders.find((folder) => folder.id === targetFolderId)
+			: undefined;
+
+		if (targetFolderId && !targetFolder) {
+			throw new Error("Destination folder was not found");
+		}
+
+		const categoryId = targetFolder?.categoryId ?? destination.categoryId;
+
+		if (!store.categories.some((category) => category.id === categoryId)) {
+			throw new Error("Destination category was not found");
+		}
+
+		if (
+			existing.categoryId === categoryId &&
+			(existing.folderId ?? "") === targetFolderId
+		) {
+			return existing;
+		}
+
+		return this.updateBind(id, {
+			categoryId,
+			folderId: targetFolderId || null,
+		});
+	}
+
+	restoreDeletedItems({
+		categories = [],
+		folders = [],
+		binds = [],
+	}: RestoreDeletedItemsInput) {
+		if (categories.length === 0 && folders.length === 0 && binds.length === 0) {
+			return;
+		}
+
+		const store = useKnowledgeStore.getState();
+		const mergeById = <T extends { id: string }>(current: T[], restored: T[]) =>
+			Array.from(
+				new Map(
+					[...current, ...restored].map((item) => [item.id, item]),
+				).values(),
+			);
+
+		store.setKnowledge({
+			categories: mergeById(store.categories, categories),
+			folders: mergeById(store.folders, folders),
+			binds: mergeById(store.binds, binds),
+		});
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ categories, folders, binds });
 	}
 
 	deleteBind(id: string) {
@@ -1030,6 +1172,12 @@ class KnowledgeService {
 			tags:
 				patch.tags === undefined ? existing.tags : normalizeTags(patch.tags),
 			translations,
+			history: shouldTrackBindHistory(patch)
+				? [createBindHistoryEntry(existing), ...(existing.history ?? [])].slice(
+						0,
+						25,
+					)
+				: existing.history,
 			aiGenerated:
 				patch.aiGenerated === undefined
 					? existing.aiGenerated

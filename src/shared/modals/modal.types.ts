@@ -3,6 +3,9 @@ export type KnowledgeObjectType = "bind" | "folder" | "category";
 export type ModalType =
 	| "createBind"
 	| "editBind"
+	| "copyBind"
+	| "bindHistory"
+	| "findDuplicates"
 	| "moveBind"
 	| "createFolder"
 	| "createCategory"
@@ -14,6 +17,7 @@ export interface ModalPayload {
 	folderId?: string;
 	parentId?: string;
 	bindId?: string;
+	language?: string;
 	id?: string;
 	type?: KnowledgeObjectType;
 	name?: string;

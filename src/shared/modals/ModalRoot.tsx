@@ -11,8 +11,16 @@ import {
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
-import { knowledgeService } from "@/services/knowledge.service";
+import {
+	knowledgeService,
+	type RestoreDeletedItemsInput,
+} from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import {
+	applyTemplateVariables,
+	extractTemplateVariables,
+} from "@/shared/lib/template-variables";
 import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 
@@ -99,6 +107,18 @@ function ModalContent({
 
 	if (activeModal.type === "moveBind") {
 		return <MoveBindModal payload={payload} onClose={onClose} />;
+	}
+
+	if (activeModal.type === "copyBind") {
+		return <CopyBindModal payload={payload} onClose={onClose} />;
+	}
+
+	if (activeModal.type === "bindHistory") {
+		return <BindHistoryModal payload={payload} onClose={onClose} />;
+	}
+
+	if (activeModal.type === "findDuplicates") {
+		return <FindDuplicatesModal payload={payload} onClose={onClose} />;
 	}
 
 	if (activeModal.type === "createBind") {
@@ -454,6 +474,14 @@ function DeleteModal({
 		setSaving(true);
 
 		try {
+			const deletedItems = getDeletedItemsSnapshot(
+				payload.type,
+				payload.id,
+				categories,
+				folders,
+				binds,
+			);
+
 			if (payload.type === "category") {
 				knowledgeService.deleteCategory(payload.id);
 			}
@@ -466,7 +494,16 @@ function DeleteModal({
 				knowledgeService.deleteBind(payload.id);
 			}
 
-			showToast("Deleted");
+			showToast("Deleted", {
+				action: {
+					label: "Undo",
+					onClick: () => {
+						knowledgeService.restoreDeletedItems(deletedItems);
+						showToast("Restored");
+					},
+				},
+				duration: 6000,
+			});
 			onClose();
 		} catch (error) {
 			setErrors({ form: getErrorMessage(error) });
@@ -574,7 +611,8 @@ function MoveBindModal({
 		setSaving(true);
 
 		try {
-			const movedBind = knowledgeService.updateBind(bindId, {
+			const previousBind = binds.find((bind) => bind.id === bindId);
+			const movedBind = knowledgeService.moveBind(bindId, {
 				categoryId: targetCategoryId,
 				folderId: targetFolderId || undefined,
 			});
@@ -586,7 +624,21 @@ function MoveBindModal({
 			}
 
 			openBind(movedBind.id);
-			showToast("Bind moved");
+			showToast("Bind moved", {
+				action: previousBind
+					? {
+							label: "Undo",
+							onClick: () => {
+								knowledgeService.moveBind(movedBind.id, {
+									categoryId: previousBind.categoryId,
+									folderId: previousBind.folderId,
+								});
+								showToast("Move undone");
+							},
+						}
+					: undefined,
+				duration: 6000,
+			});
 			void navigate({ to: "/" });
 			onClose();
 		} catch (error) {
@@ -632,6 +684,222 @@ function MoveBindModal({
 
 				<ModalActions submitLabel="Move" saving={saving} onCancel={onClose} />
 			</form>
+		</BaseModal>
+	);
+}
+
+function CopyBindModal({
+	payload,
+	onClose,
+}: {
+	payload: ModalPayload;
+	onClose: () => void;
+}) {
+	const { showToast } = useToast();
+	const language = useKnowledgeStore((state) => state.language);
+	const bind = useKnowledgeStore((state) =>
+		payload.bindId ? state.getBind(payload.bindId) : undefined,
+	);
+	const targetLanguage = payload.language ?? language;
+	const translation = bind
+		? getBindTranslation(bind, targetLanguage)
+		: undefined;
+	const variables = useMemo(
+		() => extractTemplateVariables(translation?.content ?? ""),
+		[translation?.content],
+	);
+	const [values, setValues] = useState<Record<string, string>>({});
+	const [saving, setSaving] = useState(false);
+	const content = applyTemplateVariables(translation?.content ?? "", values);
+
+	if (!bind || !translation) {
+		return (
+			<BaseModal title="Copy bind" onClose={onClose}>
+				<p className="text-sm text-muted">Bind was not found</p>
+			</BaseModal>
+		);
+	}
+
+	const submit = async (event: FormEvent) => {
+		event.preventDefault();
+		setSaving(true);
+
+		try {
+			const ok = await copyToClipboard(content);
+
+			showToast(ok ? "Copied to clipboard" : "Copy failed");
+			if (ok) onClose();
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	return (
+		<BaseModal title="Copy with variables" onClose={onClose} size="lg">
+			<form onSubmit={submit} className="space-y-4">
+				<div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">
+					{translation.title || bind.slug}
+				</div>
+
+				{variables.length > 0 ? (
+					<div className="grid gap-3 sm:grid-cols-2">
+						{variables.map((variable) => (
+							<Field key={variable} label={`{${variable}}`}>
+								<input
+									value={values[variable] ?? ""}
+									onChange={(event) =>
+										setValues((current) => ({
+											...current,
+											[variable]: event.target.value,
+										}))
+									}
+									className={inputClass}
+									placeholder={variable}
+								/>
+							</Field>
+						))}
+					</div>
+				) : (
+					<p className="text-sm text-muted">
+						This bind has no variables. It will be copied as is.
+					</p>
+				)}
+
+				<div className="max-h-64 overflow-auto rounded-md border border-border bg-background p-3 text-sm leading-6 text-muted">
+					<pre className="whitespace-pre-wrap font-sans">{content}</pre>
+				</div>
+
+				<ModalActions submitLabel="Copy" saving={saving} onCancel={onClose} />
+			</form>
+		</BaseModal>
+	);
+}
+
+function BindHistoryModal({
+	payload,
+	onClose,
+}: {
+	payload: ModalPayload;
+	onClose: () => void;
+}) {
+	const { showToast } = useToast();
+	const language = useKnowledgeStore((state) => state.language);
+	const bind = useKnowledgeStore((state) =>
+		payload.bindId ? state.getBind(payload.bindId) : undefined,
+	);
+	const history = bind?.history ?? [];
+
+	if (!bind) {
+		return (
+			<BaseModal title="History" onClose={onClose}>
+				<p className="text-sm text-muted">Bind was not found</p>
+			</BaseModal>
+		);
+	}
+
+	const restore = (historyId: string) => {
+		knowledgeService.restoreBindHistory(bind.id, historyId);
+		showToast("Version restored");
+		onClose();
+	};
+
+	return (
+		<BaseModal title="History" onClose={onClose} size="lg">
+			<div className="space-y-3">
+				{history.length === 0 ? (
+					<p className="text-sm text-muted">No previous versions yet</p>
+				) : (
+					history.map((entry) => {
+						const translation =
+							entry.translations.find((item) => item.language === language) ??
+							entry.translations[0];
+
+						return (
+							<div
+								key={entry.id}
+								className="rounded-md border border-border bg-background p-3"
+							>
+								<div className="flex items-start justify-between gap-3">
+									<div className="min-w-0">
+										<div className="truncate text-sm font-semibold">
+											{translation?.title ?? entry.slug}
+										</div>
+										<div className="mt-1 text-xs text-muted">
+											{new Date(entry.createdAt).toLocaleString()} ·{" "}
+											{entry.translations.length} languages
+										</div>
+									</div>
+
+									<button
+										type="button"
+										onClick={() => restore(entry.id)}
+										className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated"
+									>
+										Restore
+									</button>
+								</div>
+
+								<p className="mt-3 line-clamp-3 text-sm leading-6 text-muted">
+									{translation?.content ?? "No content"}
+								</p>
+							</div>
+						);
+					})
+				)}
+			</div>
+		</BaseModal>
+	);
+}
+
+function FindDuplicatesModal({
+	payload,
+	onClose,
+}: {
+	payload: ModalPayload;
+	onClose: () => void;
+}) {
+	const navigate = useNavigate();
+	const language = useKnowledgeStore((state) => state.language);
+	const binds = useKnowledgeStore((state) => state.binds);
+	const openBind = useKnowledgeStore((state) => state.openBind);
+	const target = payload.bindId
+		? binds.find((bind) => bind.id === payload.bindId)
+		: undefined;
+	const duplicates = useMemo(
+		() => getDuplicateCandidates(binds, language, target),
+		[binds, language, target],
+	);
+
+	const openCandidate = (id: string) => {
+		openBind(id);
+		void navigate({ to: "/" });
+		onClose();
+	};
+
+	return (
+		<BaseModal title="Duplicate check" onClose={onClose} size="lg">
+			<div className="space-y-3">
+				{duplicates.length === 0 ? (
+					<p className="text-sm text-muted">No obvious duplicates found</p>
+				) : (
+					duplicates.map((bind) => (
+						<button
+							key={bind.id}
+							type="button"
+							onClick={() => openCandidate(bind.id)}
+							className="block w-full rounded-md border border-border bg-background p-3 text-left hover:bg-surface-elevated"
+						>
+							<div className="truncate text-sm font-semibold">
+								{getBindTitle(bind, language)}
+							</div>
+							<div className="mt-1 truncate text-xs text-muted">
+								{bind.slug}
+								{bind.tags.length > 0 ? ` · ${bind.tags.join(", ")}` : ""}
+							</div>
+						</button>
+					))
+				)}
+			</div>
 		</BaseModal>
 	);
 }
@@ -816,7 +1084,7 @@ function BindFormModal({
 				knowledgeService.updateBind(bind.id, {
 					slug: trimmedSlug,
 					categoryId,
-					folderId: folderId || undefined,
+					folderId: folderId || null,
 					color: normalizedColor,
 					translations: prepared.translations,
 				});
@@ -1170,6 +1438,73 @@ function getBindTitle(bind: Bind, language: string) {
 	);
 }
 
+function getBindTranslation(bind: Bind, language: string) {
+	return (
+		bind.translations.find(
+			(translation) => translation.language === language,
+		) ??
+		bind.translations.find((translation) => translation.language === "ru") ??
+		bind.translations.find((translation) => translation.language === "en") ??
+		bind.translations[0]
+	);
+}
+
+function normalizeDuplicateText(value: string) {
+	return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function getDuplicateCandidates(
+	binds: Bind[],
+	language: string,
+	target?: Bind,
+) {
+	const visibleBinds = binds.filter((bind) => !bind.archived);
+
+	if (target) {
+		const targetTranslation = getBindTranslation(target, language);
+		const targetContent = normalizeDuplicateText(
+			targetTranslation?.content ?? "",
+		);
+		const targetTitle = normalizeDuplicateText(targetTranslation?.title ?? "");
+
+		return visibleBinds
+			.filter((bind) => bind.id !== target.id)
+			.filter((bind) =>
+				bind.translations.some((translation) => {
+					const content = normalizeDuplicateText(translation.content);
+					const title = normalizeDuplicateText(translation.title);
+
+					return (
+						(targetContent && content === targetContent) ||
+						(targetTitle && title === targetTitle)
+					);
+				}),
+			);
+	}
+
+	const seen = new Map<string, string>();
+	const duplicateIds = new Set<string>();
+
+	for (const bind of visibleBinds) {
+		for (const translation of bind.translations) {
+			const content = normalizeDuplicateText(translation.content);
+
+			if (!content) continue;
+
+			const previousId = seen.get(content);
+
+			if (previousId) {
+				duplicateIds.add(previousId);
+				duplicateIds.add(bind.id);
+			} else {
+				seen.set(content, bind.id);
+			}
+		}
+	}
+
+	return visibleBinds.filter((bind) => duplicateIds.has(bind.id));
+}
+
 function getBindLocation(
 	bind: Bind,
 	categories: KnowledgeCategory[],
@@ -1305,4 +1640,73 @@ function getTarget(
 				translationLanguage: translation?.language ?? language,
 			}
 		: undefined;
+}
+
+function getDeletedItemsSnapshot(
+	type: KnowledgeObjectType | undefined,
+	id: string | undefined,
+	categories: KnowledgeCategory[],
+	folders: KnowledgeFolder[],
+	binds: Bind[],
+): RestoreDeletedItemsInput {
+	if (!type || !id) return {};
+
+	if (type === "category") {
+		const category = categories.find((item) => item.id === id);
+		const categoryFolders = folders.filter(
+			(folder) => folder.categoryId === id,
+		);
+		const categoryFolderIds = new Set(
+			categoryFolders.map((folder) => folder.id),
+		);
+
+		return {
+			categories: category ? [category] : [],
+			folders: categoryFolders,
+			binds: binds.filter(
+				(bind) =>
+					bind.categoryId === id ||
+					(Boolean(bind.folderId) && categoryFolderIds.has(bind.folderId)),
+			),
+		};
+	}
+
+	if (type === "folder") {
+		const folderIds = collectNestedFolderIds(id, folders);
+
+		return {
+			folders: folders.filter((folder) => folderIds.has(folder.id)),
+			binds: binds.filter(
+				(bind) => Boolean(bind.folderId) && folderIds.has(bind.folderId),
+			),
+		};
+	}
+
+	const bind = binds.find((item) => item.id === id);
+
+	return {
+		binds: bind ? [bind] : [],
+	};
+}
+
+function collectNestedFolderIds(id: string, folders: KnowledgeFolder[]) {
+	const result = new Set<string>([id]);
+	let changed = true;
+
+	while (changed) {
+		changed = false;
+
+		for (const folder of folders) {
+			if (
+				folder.parentId &&
+				result.has(folder.parentId) &&
+				!result.has(folder.id)
+			) {
+				result.add(folder.id);
+				changed = true;
+			}
+		}
+	}
+
+	return result;
 }

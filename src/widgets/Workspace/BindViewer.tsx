@@ -1,4 +1,12 @@
-import { Copy, Edit3, Star, Trash2 } from "lucide-react";
+import {
+	Copy,
+	Edit3,
+	Files,
+	History,
+	Search,
+	Star,
+	Trash2,
+} from "lucide-react";
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,6 +16,7 @@ import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { extractTemplateVariables } from "@/shared/lib/template-variables";
 import { modalManager } from "@/shared/modals/modal.store";
 import { type LanguageCode, useKnowledgeStore } from "@/store";
 
@@ -53,12 +62,22 @@ export function BindViewer() {
 
 	const title = translation.title || bind.slug;
 
-	const copyContent = async () => {
-		const ok = await copyToClipboard(translation.content);
+	const copyTranslation = async (item: BindTranslation) => {
+		if (extractTemplateVariables(item.content).length > 0) {
+			modalManager.open("copyBind", {
+				bindId: bind.id,
+				language: item.language,
+			});
+			return;
+		}
+
+		const ok = await copyToClipboard(item.content);
 
 		addRecent(bind.id);
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
 	};
+
+	const copyContent = () => copyTranslation(translation);
 
 	const copyTitle = async () => {
 		const ok = await copyToClipboard(title);
@@ -83,6 +102,29 @@ export function BindViewer() {
 			type: "bind",
 			name: title,
 		});
+	};
+
+	const duplicateBind = () => {
+		const duplicate = knowledgeService.duplicateBind(bind.id);
+
+		showToast("Bind duplicated", {
+			action: {
+				label: "Undo",
+				onClick: () => {
+					knowledgeService.deleteBind(duplicate.id);
+					showToast("Duplicate removed");
+				},
+			},
+			duration: 6000,
+		});
+	};
+
+	const showHistory = () => {
+		modalManager.open("bindHistory", { bindId: bind.id });
+	};
+
+	const findDuplicates = () => {
+		modalManager.open("findDuplicates", { bindId: bind.id });
 	};
 
 	return (
@@ -135,6 +177,33 @@ export function BindViewer() {
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Star size={18} fill={bind.favorite ? "currentColor" : "none"} />
+						</button>
+
+						<button
+							type="button"
+							onClick={duplicateBind}
+							title="Duplicate bind"
+							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
+						>
+							<Files size={18} />
+						</button>
+
+						<button
+							type="button"
+							onClick={showHistory}
+							title="History"
+							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
+						>
+							<History size={18} />
+						</button>
+
+						<button
+							type="button"
+							onClick={findDuplicates}
+							title="Find duplicates"
+							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
+						>
+							<Search size={18} />
 						</button>
 
 						<button
@@ -201,20 +270,33 @@ export function BindViewer() {
 
 					<div className="grid gap-2 sm:grid-cols-2">
 						{bind.translations.map((item) => (
-							<button
+							<div
 								key={item.language}
-								type="button"
-								onClick={() => setLanguage(item.language as LanguageCode)}
-								className="min-w-0 rounded-md border border-border bg-background px-3 py-2 text-left hover:bg-surface-elevated"
+								className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
 							>
-								<div className="text-xs font-semibold uppercase text-muted">
-									{item.language}
-								</div>
+								<button
+									type="button"
+									onClick={() => setLanguage(item.language as LanguageCode)}
+									className="min-w-0 flex-1 text-left hover:text-accent"
+								>
+									<div className="text-xs font-semibold uppercase text-muted">
+										{item.language}
+									</div>
 
-								<div className="truncate text-sm">
-									{item.title || bind.slug}
-								</div>
-							</button>
+									<div className="truncate text-sm">
+										{item.title || bind.slug}
+									</div>
+								</button>
+
+								<button
+									type="button"
+									onClick={() => void copyTranslation(item)}
+									title={`Copy ${item.language.toUpperCase()}`}
+									className="shrink-0 rounded-md p-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
+								>
+									<Copy size={15} />
+								</button>
+							</div>
 						))}
 					</div>
 				</div>

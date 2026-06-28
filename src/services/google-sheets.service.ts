@@ -57,6 +57,10 @@ function slugify(value: string) {
 	return slug || "imported-bind";
 }
 
+function normalizeTitle(value: string) {
+	return value.trim().toLowerCase();
+}
+
 async function hashText(value: string) {
 	const bytes = new TextEncoder().encode(value);
 
@@ -224,7 +228,7 @@ class GoogleSheetsService {
 	}: {
 		preview: SheetPreview;
 		categoryId: string;
-		folderId?: string;
+		folderId?: string | null;
 		mode: SheetImportMode;
 	}) {
 		if (!categoryId) {
@@ -239,7 +243,11 @@ class GoogleSheetsService {
 			const existing = store.binds.find(
 				(bind) =>
 					bind.importBatchId === preview.importBatchId &&
-					bind.sourceHash === row.hash,
+					(bind.sourceHash === row.hash ||
+						bind.translations.some(
+							(translation) =>
+								normalizeTitle(translation.title) === normalizeTitle(row.title),
+						)),
 			);
 
 			if (existing) {
@@ -257,7 +265,7 @@ class GoogleSheetsService {
 
 			knowledgeService.createBind({
 				categoryId,
-				folderId,
+				folderId: folderId || undefined,
 				slug: row.slug,
 				title: row.title,
 				sourceHash: row.hash,
