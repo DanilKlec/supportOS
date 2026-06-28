@@ -130,12 +130,73 @@ function getByteLength(value: string) {
 }
 
 function inferSourceLanguage(text: string) {
+	const normalized = text.toLowerCase();
+
+	if (/[\u0456\u0457\u0454\u0491]/i.test(text)) return "uk";
 	if (/[\u0400-\u04ff]/.test(text)) return "ru";
 	if (/[\u0370-\u03ff]/.test(text)) return "el";
 	if (/[\u3040-\u30ff]/.test(text)) return "ja";
 	if (/[\u4e00-\u9fff]/.test(text)) return "zh";
 	if (/[\uac00-\ud7af]/.test(text)) return "ko";
 	if (/[\u0600-\u06ff]/.test(text)) return "ar";
+	if (/[\u00df\u00e4\u00f6\u00fc]/i.test(text)) return "de";
+	if (/[\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c]/i.test(text)) {
+		return "pl";
+	}
+	if (/[\u011f\u0131\u015f\u00e7\u00f6\u00fc]/i.test(text)) return "tr";
+	if (
+		/[\u00e3\u00f5]/i.test(text) ||
+		/\b(n\u00e3o|voc\u00ea|obrigado|obrigada)\b/.test(normalized)
+	) {
+		return "pt";
+	}
+	if (
+		/[\u00f1\u00bf\u00a1]/i.test(text) ||
+		/\b(hola|gracias|usted|para|porque)\b/.test(normalized)
+	) {
+		return "es";
+	}
+	if (
+		/[\u00e0\u00e2\u00ea\u00e8\u00e9\u00eb\u00ee\u00ef\u00f4\u00f9\u00fb\u00e7]/i.test(
+			text,
+		) ||
+		/\b(merci|bonjour|avec|pourquoi)\b/.test(normalized)
+	) {
+		return "fr";
+	}
+	if (/\b(ciao|grazie|perch\u00e9|buongiorno)\b/.test(normalized)) {
+		return "it";
+	}
+
+	if (/[іїєґ]/i.test(text)) return "uk";
+	if (/[\u0400-\u04ff]/.test(text)) return "ru";
+	if (/[\u0370-\u03ff]/.test(text)) return "el";
+	if (/[\u3040-\u30ff]/.test(text)) return "ja";
+	if (/[\u4e00-\u9fff]/.test(text)) return "zh";
+	if (/[\uac00-\ud7af]/.test(text)) return "ko";
+	if (/[\u0600-\u06ff]/.test(text)) return "ar";
+	if (/[ßäöü]/i.test(text)) return "de";
+	if (/[ąćęłńóśźż]/i.test(text)) return "pl";
+	if (/[ğışçöü]/i.test(text)) return "tr";
+	if (
+		/[ãõ]/i.test(text) ||
+		/\b(não|você|obrigado|obrigada)\b/.test(normalized)
+	) {
+		return "pt";
+	}
+	if (
+		/[ñ¿¡]/i.test(text) ||
+		/\b(hola|gracias|usted|para|porque)\b/.test(normalized)
+	) {
+		return "es";
+	}
+	if (
+		/[àâêèéëîïôùûç]/i.test(text) ||
+		/\b(merci|bonjour|avec|pourquoi)\b/.test(normalized)
+	) {
+		return "fr";
+	}
+	if (/\b(ciao|grazie|perché|buongiorno)\b/.test(normalized)) return "it";
 
 	return "en";
 }
@@ -206,6 +267,10 @@ export class TranslatorServiceError extends Error {
 class TranslatorService {
 	getFallbackLanguages() {
 		return FALLBACK_LANGUAGES;
+	}
+
+	detectLanguage(text: string) {
+		return inferSourceLanguage(text);
 	}
 
 	async getLanguages(): Promise<TranslatorLanguage[]> {
@@ -317,7 +382,7 @@ class TranslatorService {
 		const { provider } = useTranslatorStore.getState();
 		const endpoint = provider === "libretranslate" ? this.getEndpoint() : "";
 		const effectiveSourceLanguage =
-			provider === "mymemory" && sourceLanguage === "auto"
+			sourceLanguage === "auto"
 				? inferSourceLanguage(sourceText)
 				: sourceLanguage;
 		const protectedSource = protectStaticSegments(sourceText);

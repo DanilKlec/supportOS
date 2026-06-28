@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
-import { Copy, Languages, Loader2, Repeat2, X } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { Copy, Languages, Loader2, Repeat2, Trash2, X } from "lucide-react";
+import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 
 import {
 	type TranslatorLanguage,
@@ -29,6 +29,7 @@ export function TranslatorWidget() {
 	const [customToLanguage, setCustomToLanguage] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [detectedLanguage, setDetectedLanguage] = useState("");
 	const languages = useMemo(() => translatorService.getFallbackLanguages(), []);
 
 	if (isTranslatorPage(pathname)) return null;
@@ -44,8 +45,55 @@ export function TranslatorWidget() {
 			resolvedToLanguage.trim().toLowerCase() !== "auto",
 	);
 
-	const translate = async (event: FormEvent) => {
-		event.preventDefault();
+	const setLanguageSelection = (side: "from" | "to", languageCode: string) => {
+		const knownLanguage = languages.some(
+			(language) => language.code === languageCode,
+		);
+
+		if (side === "from") {
+			setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+			setCustomFromLanguage(knownLanguage ? "" : languageCode);
+			return;
+		}
+
+		setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+		setCustomToLanguage(knownLanguage ? "" : languageCode);
+	};
+
+	const getTranslationDirection = () => {
+		const detected = translatorService.detectLanguage(sourceText);
+		const source = resolvedFromLanguage.trim().toLowerCase();
+		const target = resolvedToLanguage.trim().toLowerCase();
+		const shouldSwap =
+			source !== "auto" &&
+			detected === target &&
+			source !== target &&
+			Boolean(target);
+
+		if (!shouldSwap) {
+			return {
+				fromLanguage: resolvedFromLanguage,
+				toLanguage: resolvedToLanguage,
+				detected,
+				swapped: false,
+			};
+		}
+
+		setLanguageSelection("from", detected);
+		setLanguageSelection("to", source);
+
+		return {
+			fromLanguage: detected,
+			toLanguage: source,
+			detected,
+			swapped: true,
+		};
+	};
+
+	const translate = async (event?: FormEvent) => {
+		event?.preventDefault();
+		if (loading) return;
+
 		if (!canTranslate) {
 			setError("Enter text and choose a target language.");
 			return;
@@ -55,13 +103,20 @@ export function TranslatorWidget() {
 		setLoading(true);
 
 		try {
+			const direction = getTranslationDirection();
 			const result = await translatorService.translate({
 				text: sourceText,
-				fromLanguage: resolvedFromLanguage,
-				toLanguage: resolvedToLanguage,
+				fromLanguage: direction.fromLanguage,
+				toLanguage: direction.toLanguage,
 			});
 
 			setResultText(result.text);
+			setDetectedLanguage(result.fromLanguage);
+			if (direction.swapped) {
+				showToast(
+					`Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`,
+				);
+			}
 		} catch (translationError) {
 			setError(
 				translationError instanceof Error
@@ -71,6 +126,20 @@ export function TranslatorWidget() {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const translateFromKeyboard = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key !== "Enter" || event.shiftKey) return;
+
+		event.preventDefault();
+		void translate();
+	};
+
+	const clearTranslator = () => {
+		setSourceText("");
+		setResultText("");
+		setError("");
+		setDetectedLanguage("");
 	};
 
 	const swapLanguages = () => {
@@ -87,6 +156,7 @@ export function TranslatorWidget() {
 		setCustomToLanguage(nextCustomToLanguage);
 		setSourceText(resultText);
 		setResultText(sourceText);
+		setDetectedLanguage("");
 	};
 
 	const copyResult = async () => {
@@ -119,7 +189,7 @@ export function TranslatorWidget() {
 						</button>
 					</div>
 
-					<div className="space-y-3 overflow-auto p-4">
+					<div className="supportos-scroll space-y-3 overflow-auto p-4">
 						<div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
 							<WidgetLanguageSelect
 								label="From"
@@ -157,10 +227,17 @@ export function TranslatorWidget() {
 						<textarea
 							value={sourceText}
 							onChange={(event) => setSourceText(event.target.value)}
+							onKeyDown={translateFromKeyboard}
 							disabled={loading}
-							className="h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+							className="supportos-scroll h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Text to translate..."
 						/>
+
+						{fromLanguage === "auto" && detectedLanguage && (
+							<div className="text-xs text-muted">
+								Detected: {detectedLanguage.toUpperCase()}
+							</div>
+						)}
 
 						{error && (
 							<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
@@ -172,26 +249,39 @@ export function TranslatorWidget() {
 							value={resultText}
 							onChange={(event) => setResultText(event.target.value)}
 							disabled={loading}
-							className="h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+							className="supportos-scroll h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Result..."
 						/>
 					</div>
 
 					<div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
-						<button
-							type="button"
-							onClick={copyResult}
-							disabled={loading || !resultText.trim()}
-							className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-						>
-							<Copy size={15} />
-							Copy
-						</button>
+						<div className="flex items-center gap-2">
+							<button
+								type="button"
+								onClick={copyResult}
+								disabled={loading || !resultText.trim()}
+								className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								<Copy size={15} />
+								Copy
+							</button>
+
+							<button
+								type="button"
+								onClick={clearTranslator}
+								disabled={loading || (!sourceText && !resultText && !error)}
+								className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+								title="Clear translator"
+							>
+								<Trash2 size={15} />
+							</button>
+						</div>
 
 						<button
 							type="submit"
 							disabled={loading || !canTranslate}
 							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							title="Translate"
 						>
 							{loading ? (
 								<Loader2 size={16} className="animate-spin" />
