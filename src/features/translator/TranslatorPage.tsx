@@ -6,8 +6,17 @@ import {
 	Repeat2,
 	Settings,
 	Trash2,
+	Zap,
 } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	type KeyboardEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import {
 	type TranslatorLanguage,
@@ -18,6 +27,11 @@ import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useTranslatorStore } from "@/store/translator.store";
 
 const CUSTOM_LANGUAGE = "__custom__";
+const LIVE_TRANSLATE_DELAY_MS = 700;
+
+function getFallbackTargetLanguage(languageCode: string) {
+	return languageCode === "en" ? "ru" : "en";
+}
 
 export function TranslatorPage() {
 	const { showToast } = useToast();
@@ -37,6 +51,8 @@ export function TranslatorPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [detectedLanguage, setDetectedLanguage] = useState("");
+	const [liveTranslate, setLiveTranslate] = useState(true);
+	const liveSignatureRef = useRef("");
 
 	const resolvedFromLanguage =
 		fromLanguage === CUSTOM_LANGUAGE ? customFromLanguage : fromLanguage;
@@ -67,37 +83,65 @@ export function TranslatorPage() {
 		});
 	}, [languages]);
 
-	const setLanguageSelection = (side: "from" | "to", languageCode: string) => {
-		const knownLanguage = languageOptions.some(
-			(language) => language.code === languageCode,
-		);
+	const setLanguageSelection = useCallback(
+		(side: "from" | "to", languageCode: string) => {
+			const knownLanguage = languageOptions.some(
+				(language) => language.code === languageCode,
+			);
 
-		if (side === "from") {
-			setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
-			setCustomFromLanguage(knownLanguage ? "" : languageCode);
-			return;
-		}
+			if (side === "from") {
+				setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+				setCustomFromLanguage(knownLanguage ? "" : languageCode);
+				return;
+			}
 
-		setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
-		setCustomToLanguage(knownLanguage ? "" : languageCode);
-	};
+			setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+			setCustomToLanguage(knownLanguage ? "" : languageCode);
+		},
+		[languageOptions],
+	);
 
-	const getTranslationDirection = () => {
+	const getLiveSignature = useCallback(
+		(text = sourceText, from = resolvedFromLanguage, to = resolvedToLanguage) =>
+			JSON.stringify([
+				text.trim(),
+				from.trim().toLowerCase(),
+				to.trim().toLowerCase(),
+			]),
+		[sourceText, resolvedFromLanguage, resolvedToLanguage],
+	);
+
+	const getTranslationDirection = useCallback(() => {
 		const detected = translatorService.detectLanguage(sourceText);
 		const source = resolvedFromLanguage.trim().toLowerCase();
 		const target = resolvedToLanguage.trim().toLowerCase();
+
+		if (source === "auto") {
+			const nextTarget =
+				detected === target ? getFallbackTargetLanguage(detected) : target;
+
+			setLanguageSelection("from", detected);
+			if (nextTarget !== target) {
+				setLanguageSelection("to", nextTarget);
+			}
+
+			return {
+				fromLanguage: detected,
+				toLanguage: nextTarget,
+				detected,
+				switched: true,
+			};
+		}
+
 		const shouldSwap =
-			source !== "auto" &&
-			detected === target &&
-			source !== target &&
-			Boolean(target);
+			detected === target && source !== target && Boolean(target);
 
 		if (!shouldSwap) {
 			return {
 				fromLanguage: resolvedFromLanguage,
 				toLanguage: resolvedToLanguage,
 				detected,
-				swapped: false,
+				switched: false,
 			};
 		}
 
@@ -108,9 +152,14 @@ export function TranslatorPage() {
 			fromLanguage: detected,
 			toLanguage: source,
 			detected,
-			swapped: true,
+			switched: true,
 		};
-	};
+	}, [
+		resolvedFromLanguage,
+		resolvedToLanguage,
+		setLanguageSelection,
+		sourceText,
+	]);
 
 	const loadLanguages = async () => {
 		if (provider === "mymemory") {
@@ -145,43 +194,91 @@ export function TranslatorPage() {
 		}
 	};
 
-	const translate = async (event?: FormEvent) => {
-		event?.preventDefault();
-		if (loading) return;
+	const translate = useCallback(
+		async (event?: FormEvent, options?: { silent?: boolean }) => {
+			event?.preventDefault();
+			if (loading) return;
 
-		if (!canTranslate) {
-			setError("Enter text and choose a target language.");
+			if (!canTranslate) {
+				setError("Enter text and choose a target language.");
+				return;
+			}
+
+			setError("");
+			setLoading(true);
+
+			try {
+				const direction = getTranslationDirection();
+				liveSignatureRef.current = getLiveSignature(
+					sourceText,
+					direction.fromLanguage,
+					direction.toLanguage,
+				);
+				const result = await translatorService.translate({
+					text: sourceText,
+					fromLanguage: direction.fromLanguage,
+					toLanguage: direction.toLanguage,
+				});
+
+				setResultText(result.text);
+				setDetectedLanguage(result.fromLanguage);
+				if (!options?.silent) {
+					showToast(
+						direction.switched
+							? `Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`
+							: "Translated",
+					);
+				}
+			} catch (translationError) {
+				setError(
+					translationError instanceof Error
+						? translationError.message
+						: "Translation failed",
+				);
+			} finally {
+				setLoading(false);
+			}
+		},
+		[
+			canTranslate,
+			getLiveSignature,
+			getTranslationDirection,
+			loading,
+			showToast,
+			sourceText,
+		],
+	);
+
+	useEffect(() => {
+		if (!liveTranslate) return;
+
+		if (!sourceText.trim()) {
+			setResultText("");
+			setDetectedLanguage("");
+			setError("");
+			liveSignatureRef.current = "";
 			return;
 		}
 
-		setError("");
-		setLoading(true);
+		if (loading || !canTranslate) return;
 
-		try {
-			const direction = getTranslationDirection();
-			const result = await translatorService.translate({
-				text: sourceText,
-				fromLanguage: direction.fromLanguage,
-				toLanguage: direction.toLanguage,
-			});
+		const signature = getLiveSignature();
+		if (signature === liveSignatureRef.current) return;
 
-			setResultText(result.text);
-			setDetectedLanguage(result.fromLanguage);
-			showToast(
-				direction.swapped
-					? `Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`
-					: "Translated",
-			);
-		} catch (translationError) {
-			setError(
-				translationError instanceof Error
-					? translationError.message
-					: "Translation failed",
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
+		const timer = window.setTimeout(() => {
+			liveSignatureRef.current = signature;
+			void translate(undefined, { silent: true });
+		}, LIVE_TRANSLATE_DELAY_MS);
+
+		return () => window.clearTimeout(timer);
+	}, [
+		canTranslate,
+		getLiveSignature,
+		liveTranslate,
+		loading,
+		sourceText,
+		translate,
+	]);
 
 	const translateFromKeyboard = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key !== "Enter" || (!event.ctrlKey && !event.metaKey)) return;
@@ -195,6 +292,7 @@ export function TranslatorPage() {
 		setResultText("");
 		setError("");
 		setDetectedLanguage("");
+		liveSignatureRef.current = "";
 	};
 
 	const swapLanguages = () => {
@@ -276,6 +374,20 @@ export function TranslatorPage() {
 							title="Clear translator"
 						>
 							<Trash2 size={16} />
+						</button>
+
+						<button
+							type="button"
+							onClick={() => setLiveTranslate((value) => !value)}
+							className={`rounded-md border p-2 transition-colors ${
+								liveTranslate
+									? "border-accent bg-accent/10 text-accent hover:bg-accent/15"
+									: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+							}`}
+							title={liveTranslate ? "Live translate on" : "Live translate off"}
+							aria-pressed={liveTranslate}
+						>
+							<Zap size={16} />
 						</button>
 
 						<button
