@@ -67,7 +67,7 @@ export function TranslatorPage() {
 			return;
 		}
 
-		if (!endpoint.trim()) {
+		if (provider === "libretranslate" && !endpoint.trim()) {
 			setLanguageWarning("LibreTranslate endpoint is not configured.");
 			setLanguages(translatorService.getFallbackLanguages());
 			return;

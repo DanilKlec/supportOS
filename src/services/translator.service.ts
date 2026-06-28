@@ -1,4 +1,5 @@
 import {
+	DEFAULT_LINGVA_ENDPOINT,
 	DEFAULT_TRANSLATOR_ENDPOINT,
 	useTranslatorStore,
 } from "@/store/translator.store";
@@ -34,6 +35,27 @@ interface MyMemoryResponse {
 		translation?: string;
 		match?: number;
 	}>;
+}
+
+interface LingvaLanguage {
+	code?: string;
+	name?: string;
+}
+
+interface LingvaLanguagesResponse {
+	languages?: LingvaLanguage[];
+}
+
+interface LingvaTranslateResponse {
+	translation?: string;
+	info?: {
+		pronunciation?: {
+			query?: string;
+			translation?: string;
+		};
+	};
+	error?: string;
+	message?: string;
 }
 
 interface ProtectedSegment {
@@ -97,6 +119,7 @@ const PROTECTED_PATTERNS = [
 
 const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
 const MYMEMORY_MAX_CHUNK_BYTES = 450;
+const LINGVA_MAX_CHUNK_BYTES = 1400;
 
 function escapeRegExp(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -186,8 +209,32 @@ class TranslatorService {
 	}
 
 	async getLanguages(): Promise<TranslatorLanguage[]> {
-		if (useTranslatorStore.getState().provider === "mymemory") {
+		const provider = useTranslatorStore.getState().provider;
+
+		if (provider === "mymemory") {
 			return FALLBACK_LANGUAGES;
+		}
+
+		if (provider === "lingva") {
+			const endpoint = this.getLingvaEndpoint();
+			const response = await this.request(
+				this.createUrl(endpoint, "/api/v1/languages/target"),
+				{
+					method: "GET",
+				},
+			);
+			const data = await this.readJson<
+				LingvaLanguagesResponse | LingvaLanguage[]
+			>(response, "Lingva returned an invalid language list");
+			const languageItems = Array.isArray(data) ? data : (data.languages ?? []);
+			const languages = languageItems
+				.map((language) => ({
+					code: String(language.code ?? "").trim(),
+					name: String(language.name ?? language.code ?? "").trim(),
+				}))
+				.filter((language) => language.code && language.name);
+
+			return languages.length > 0 ? languages : FALLBACK_LANGUAGES;
 		}
 
 		const endpoint = this.getEndpoint();
@@ -226,7 +273,9 @@ class TranslatorService {
 	}
 
 	async testConnection() {
-		if (useTranslatorStore.getState().provider === "mymemory") {
+		const provider = useTranslatorStore.getState().provider;
+
+		if (provider === "mymemory" || provider === "lingva") {
 			await this.translate({
 				text: "Hello",
 				fromLanguage: "en",
@@ -279,12 +328,18 @@ class TranslatorService {
 						sourceLanguage: effectiveSourceLanguage,
 						targetLanguage,
 					})
-				: await this.translateWithLibreTranslate({
-						endpoint,
-						text: protectedSource.text,
-						sourceLanguage: effectiveSourceLanguage,
-						targetLanguage,
-					});
+				: provider === "lingva"
+					? await this.translateWithLingva({
+							text: protectedSource.text,
+							sourceLanguage: effectiveSourceLanguage,
+							targetLanguage,
+						})
+					: await this.translateWithLibreTranslate({
+							endpoint,
+							text: protectedSource.text,
+							sourceLanguage: effectiveSourceLanguage,
+							targetLanguage,
+						});
 
 		return {
 			text: protectedSource.restore(translatedText),
@@ -293,9 +348,11 @@ class TranslatorService {
 			model:
 				provider === "mymemory"
 					? "MyMemory"
-					: this.isBuiltInEndpoint(endpoint)
-						? "LibreTranslate Built-In"
-						: "LibreTranslate",
+					: provider === "lingva"
+						? "Lingva Free"
+						: this.isBuiltInEndpoint(endpoint)
+							? "LibreTranslate Built-In"
+							: "LibreTranslate",
 		};
 	}
 
@@ -413,6 +470,54 @@ class TranslatorService {
 		return this.readLibreTranslateText(response);
 	}
 
+	private async translateWithLingva({
+		text,
+		sourceLanguage,
+		targetLanguage,
+	}: {
+		text: string;
+		sourceLanguage: string;
+		targetLanguage: string;
+	}) {
+		const endpoint = this.getLingvaEndpoint();
+		const chunks = splitTextByByteLimit(text, LINGVA_MAX_CHUNK_BYTES);
+		const translatedChunks: string[] = [];
+
+		for (const chunk of chunks) {
+			if (!chunk.trim()) {
+				translatedChunks.push(chunk);
+				continue;
+			}
+
+			const response = await this.request(
+				this.createUrl(
+					endpoint,
+					`/api/v1/${encodeURIComponent(sourceLanguage)}/${encodeURIComponent(
+						targetLanguage,
+					)}/${encodeURIComponent(chunk)}`,
+				),
+				{
+					method: "GET",
+				},
+			);
+			const data = await this.readJson<LingvaTranslateResponse>(
+				response,
+				"Lingva returned an invalid response",
+			);
+
+			if (typeof data.translation !== "string") {
+				throw new TranslatorServiceError(
+					data.error ?? data.message ?? "Lingva returned an empty response",
+					response.status,
+				);
+			}
+
+			translatedChunks.push(data.translation);
+		}
+
+		return translatedChunks.join("");
+	}
+
 	private async readLibreTranslateText(response: Response) {
 		const data = await this.readJson<LibreTranslateResponse>(
 			response,
@@ -438,6 +543,14 @@ class TranslatorService {
 				"LibreTranslate endpoint is not configured",
 			);
 		}
+
+		return endpoint.replace(/\/+$/, "");
+	}
+
+	private getLingvaEndpoint() {
+		const endpoint =
+			useTranslatorStore.getState().lingvaEndpoint.trim() ||
+			DEFAULT_LINGVA_ENDPOINT;
 
 		return endpoint.replace(/\/+$/, "");
 	}
