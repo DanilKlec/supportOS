@@ -67,6 +67,7 @@ export function ModalRoot() {
 		activeModal.payload?.categoryId,
 		activeModal.payload?.folderId,
 		activeModal.payload?.parentId,
+		activeModal.payload?.language,
 	]
 		.filter(Boolean)
 		.join(":");
@@ -462,6 +463,13 @@ function DeleteModal({
 	);
 	const [errors, setErrors] = useState<FieldErrors>({});
 	const [saving, setSaving] = useState(false);
+	const deletePreview = getDeletedItemsSnapshot(
+		payload.type,
+		payload.id,
+		categories,
+		folders,
+		binds,
+	);
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
@@ -474,13 +482,7 @@ function DeleteModal({
 		setSaving(true);
 
 		try {
-			const deletedItems = getDeletedItemsSnapshot(
-				payload.type,
-				payload.id,
-				categories,
-				folders,
-				binds,
-			);
+			const deletedItems = deletePreview;
 
 			if (payload.type === "category") {
 				knowledgeService.deleteCategory(payload.id);
@@ -491,13 +493,21 @@ function DeleteModal({
 			}
 
 			if (payload.type === "bind") {
-				knowledgeService.deleteBind(payload.id);
+				knowledgeService.archiveBind(payload.id);
 			}
 
-			showToast("Deleted", {
+			showToast(payload.type === "bind" ? "Archived" : "Deleted", {
 				action: {
 					label: "Undo",
 					onClick: () => {
+						if (payload.type === "bind") {
+							knowledgeService.updateBind(payload.id as string, {
+								archived: false,
+							});
+							showToast("Restored");
+							return;
+						}
+
 						knowledgeService.restoreDeletedItems(deletedItems);
 						showToast("Restored");
 					},
@@ -527,10 +537,11 @@ function DeleteModal({
 					<p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">
 						{target?.name ?? payload.name ?? "Unknown object"}
 					</p>
+					<DeletePreview snapshot={deletePreview} type={payload.type} />
 				</div>
 
 				<ModalActions
-					submitLabel="Delete"
+					submitLabel={payload.type === "bind" ? "Archive" : "Delete"}
 					saving={saving}
 					onCancel={onClose}
 					danger
@@ -708,7 +719,9 @@ function CopyBindModal({
 		() => extractTemplateVariables(translation?.content ?? ""),
 		[translation?.content],
 	);
-	const [values, setValues] = useState<Record<string, string>>({});
+	const [values, setValues] = useState<Record<string, string>>(() =>
+		readVariablePreset(variables),
+	);
 	const [saving, setSaving] = useState(false);
 	const content = applyTemplateVariables(translation?.content ?? "", values);
 
@@ -727,6 +740,10 @@ function CopyBindModal({
 		try {
 			const ok = await copyToClipboard(content);
 
+			if (ok) {
+				writeVariablePreset(values);
+				knowledgeService.recordBindCopied(bind.id);
+			}
 			showToast(ok ? "Copied to clipboard" : "Copy failed");
 			if (ok) onClose();
 		} finally {
@@ -825,7 +842,7 @@ function BindHistoryModal({
 											{translation?.title ?? entry.slug}
 										</div>
 										<div className="mt-1 text-xs text-muted">
-											{new Date(entry.createdAt).toLocaleString()} ·{" "}
+											{new Date(entry.createdAt).toLocaleString()} -{" "}
 											{entry.translations.length} languages
 										</div>
 									</div>
@@ -848,6 +865,34 @@ function BindHistoryModal({
 				)}
 			</div>
 		</BaseModal>
+	);
+}
+
+function DeletePreview({
+	snapshot,
+	type,
+}: {
+	snapshot: RestoreDeletedItemsInput;
+	type?: KnowledgeObjectType;
+}) {
+	const folderCount = snapshot.folders?.length ?? 0;
+	const bindCount = snapshot.binds?.length ?? 0;
+
+	if (type === "bind") {
+		return (
+			<p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+				The bind will be archived and can be restored later.
+			</p>
+		);
+	}
+
+	if (folderCount === 0 && bindCount === 0) return null;
+
+	return (
+		<div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+			This will remove {folderCount} folder{folderCount === 1 ? "" : "s"} and{" "}
+			{bindCount} bind{bindCount === 1 ? "" : "s"}.
+		</div>
 	);
 }
 
@@ -894,7 +939,7 @@ function FindDuplicatesModal({
 							</div>
 							<div className="mt-1 truncate text-xs text-muted">
 								{bind.slug}
-								{bind.tags.length > 0 ? ` · ${bind.tags.join(", ")}` : ""}
+								{bind.tags.length > 0 ? ` - ${bind.tags.join(", ")}` : ""}
 							</div>
 						</button>
 					))
@@ -919,6 +964,7 @@ function BindFormModal({
 	const folders = useKnowledgeStore((state) => state.folders);
 	const selectedCategory = useKnowledgeStore((state) => state.selectedCategory);
 	const selectedFolder = useKnowledgeStore((state) => state.selectedFolder);
+	const binds = useKnowledgeStore((state) => state.binds);
 	const bind = useKnowledgeStore((state) =>
 		payload.bindId ? state.getBind(payload.bindId) : undefined,
 	);
@@ -941,6 +987,7 @@ function BindFormModal({
 
 	const [slug, setSlug] = useState(bind?.slug ?? "");
 	const [color, setColor] = useState(bind?.color ?? "");
+	const [tags, setTags] = useState(bind?.tags.join(", ") ?? "");
 	const [categoryId, setCategoryId] = useState(initialCategoryId);
 	const [folderId, setFolderId] = useState(initialFolderId);
 	const [translationDrafts, setTranslationDrafts] =
@@ -956,6 +1003,14 @@ function BindFormModal({
 	const availableFolders = useMemo(
 		() => folders.filter((folder) => folder.categoryId === categoryId),
 		[categoryId, folders],
+	);
+	const tagSuggestions = useMemo(
+		() =>
+			Array.from(new Set(binds.flatMap((item) => item.tags)))
+				.filter(Boolean)
+				.sort((a, b) => a.localeCompare(b))
+				.slice(0, 20),
+		[binds],
 	);
 
 	const activeDraft =
@@ -1073,6 +1128,7 @@ function BindFormModal({
 					categoryId,
 					folderId: folderId || undefined,
 					color: normalizedColor || undefined,
+					tags: splitTags(tags),
 					translations: prepared.translations,
 					title: prepared.translations[0]?.title ?? trimmedSlug,
 					content: prepared.translations[0]?.content ?? "",
@@ -1086,6 +1142,7 @@ function BindFormModal({
 					categoryId,
 					folderId: folderId || null,
 					color: normalizedColor,
+					tags: splitTags(tags),
 					translations: prepared.translations,
 				});
 				showToast("Bind saved");
@@ -1156,6 +1213,31 @@ function BindFormModal({
 				</div>
 
 				<ColorField value={color} onChange={setColor} disabled={saving} />
+
+				<Field label="Tags" hint="Comma separated">
+					<input
+						value={tags}
+						onChange={(event) => setTags(event.target.value)}
+						disabled={saving}
+						className={inputClass}
+						placeholder="kyc, withdrawal, bonus"
+					/>
+					{tagSuggestions.length > 0 && (
+						<div className="mt-2 flex flex-wrap gap-1">
+							{tagSuggestions.map((tag) => (
+								<button
+									key={tag}
+									type="button"
+									onClick={() => setTags((current) => toggleTag(current, tag))}
+									disabled={saving}
+									className="rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									#{tag}
+								</button>
+							))}
+						</div>
+					)}
+				</Field>
 
 				<div className="space-y-3">
 					<div className="flex flex-wrap items-center justify-between gap-3">
@@ -1395,6 +1477,25 @@ function optional(value: string) {
 	const trimmed = value.trim();
 
 	return trimmed || undefined;
+}
+
+function splitTags(value: string) {
+	return Array.from(
+		new Set(
+			value
+				.split(",")
+				.map((tag) => tag.trim())
+				.filter(Boolean),
+		),
+	);
+}
+
+function toggleTag(current: string, tag: string) {
+	const tags = splitTags(current);
+
+	return tags.includes(tag)
+		? tags.filter((item) => item !== tag).join(", ")
+		: [...tags, tag].join(", ");
 }
 
 function getErrorMessage(error: unknown) {
@@ -1709,4 +1810,42 @@ function collectNestedFolderIds(id: string, folders: KnowledgeFolder[]) {
 	}
 
 	return result;
+}
+
+const VARIABLE_PRESET_KEY = "supportos:variable-presets:v1";
+
+function readVariablePreset(variables: string[]) {
+	if (typeof localStorage === "undefined") return {};
+
+	try {
+		const stored = JSON.parse(
+			localStorage.getItem(VARIABLE_PRESET_KEY) ?? "{}",
+		) as Record<string, string>;
+
+		return Object.fromEntries(
+			variables.map((variable) => [variable, stored[variable] ?? ""]),
+		);
+	} catch {
+		return {};
+	}
+}
+
+function writeVariablePreset(values: Record<string, string>) {
+	if (typeof localStorage === "undefined") return;
+
+	try {
+		const stored = JSON.parse(
+			localStorage.getItem(VARIABLE_PRESET_KEY) ?? "{}",
+		) as Record<string, string>;
+
+		localStorage.setItem(
+			VARIABLE_PRESET_KEY,
+			JSON.stringify({
+				...stored,
+				...values,
+			}),
+		);
+	} catch {
+		localStorage.setItem(VARIABLE_PRESET_KEY, JSON.stringify(values));
+	}
 }

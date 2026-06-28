@@ -41,6 +41,19 @@ export function buildKnowledgeTree(
 		group.sort((a, b) => a.order - b.order);
 	}
 
+	for (const group of bindsByParent.values()) {
+		group.sort((a, b) => {
+			if (Boolean(a.pinned) !== Boolean(b.pinned)) {
+				return a.pinned ? -1 : 1;
+			}
+
+			return (
+				(a.order ?? 0) - (b.order ?? 0) ||
+				getBindName(a).localeCompare(getBindName(b))
+			);
+		});
+	}
+
 	return [...categories]
 		.sort((a, b) => a.order - b.order)
 		.map((category) => ({

@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
+	Download,
 	FileText,
 	FolderPlus,
 	Search,
@@ -123,6 +124,66 @@ export function CommandPalette() {
 		modalManager.open("findDuplicates");
 		close();
 	};
+	const exportCurrentScope = () => {
+		const folder = folders.find((item) => item.id === selectedFolder);
+		const categoryId =
+			folder?.categoryId ?? selectedCategory ?? categories[0]?.id;
+		const category = categories.find((item) => item.id === categoryId);
+		const folderIds = new Set<string>();
+
+		if (folder) {
+			folderIds.add(folder.id);
+
+			let changed = true;
+
+			while (changed) {
+				changed = false;
+
+				for (const item of folders) {
+					if (
+						item.parentId &&
+						folderIds.has(item.parentId) &&
+						!folderIds.has(item.id)
+					) {
+						folderIds.add(item.id);
+						changed = true;
+					}
+				}
+			}
+		}
+
+		const exportedFolders = folder
+			? folders.filter((item) => folderIds.has(item.id))
+			: folders.filter((item) => item.categoryId === categoryId);
+		const exportedFolderIds = new Set(exportedFolders.map((item) => item.id));
+		const exportedBinds = binds.filter((bind) =>
+			folder
+				? Boolean(bind.folderId) && exportedFolderIds.has(bind.folderId)
+				: bind.categoryId === categoryId,
+		);
+		const blob = new Blob(
+			[
+				JSON.stringify(
+					{
+						categories: category ? [category] : [],
+						folders: exportedFolders,
+						binds: exportedBinds,
+					},
+					null,
+					2,
+				),
+			],
+			{ type: "application/json" },
+		);
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+
+		anchor.href = url;
+		anchor.download = `${folder?.name ?? category?.name ?? "supportos-export"}.json`;
+		anchor.click();
+		URL.revokeObjectURL(url);
+		close();
+	};
 	const goTo = (to: "/" | "/settings") => {
 		void navigate({ to });
 		close();
@@ -165,6 +226,12 @@ export function CommandPalette() {
 						title="Check duplicates"
 						subtitle="Find binds with repeated content"
 						onClick={runFindDuplicates}
+					/>
+					<PaletteButton
+						icon={<Download size={16} />}
+						title="Export current scope"
+						subtitle="Download selected folder or category as JSON"
+						onClick={exportCurrentScope}
 					/>
 					<PaletteButton
 						icon={<Settings size={16} />}

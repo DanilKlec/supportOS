@@ -33,6 +33,8 @@ export interface Bind {
 
 	folderId?: string;
 
+	order?: number;
+
 	icon?: string;
 
 	color?: string;
@@ -42,6 +44,12 @@ export interface Bind {
 	translations: BindTranslation[];
 
 	history?: BindHistoryEntry[];
+
+	pinned?: boolean;
+
+	copyCount?: number;
+
+	lastCopiedAt?: string;
 
 	aiGenerated?: boolean;
 

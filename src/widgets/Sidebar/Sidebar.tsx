@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	Contact,
 	FileText,
+	Folder,
 	Gift,
 	Plus,
 	Search,
@@ -12,7 +13,7 @@ import {
 import { useMemo, useState } from "react";
 
 import type { Bind } from "@/entities/bind";
-import type { KnowledgeTreeNode } from "@/entities/knowledge";
+import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 
@@ -81,8 +82,12 @@ export function Sidebar() {
 	const tree = useKnowledgeStore((s) => s.tree);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const favorites = useKnowledgeStore((s) => s.favorites);
+	const favoriteFolders = useKnowledgeStore((s) => s.favoriteFolders);
+	const recentFolders = useKnowledgeStore((s) => s.recentFolders);
+	const folders = useKnowledgeStore((s) => s.folders);
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
+	const selectFolder = useKnowledgeStore((s) => s.selectFolder);
 	const [treeSearch, setTreeSearch] = useState("");
 	const [selectedTag, setSelectedTag] = useState("");
 	const [selectedBindIds, setSelectedBindIds] = useState<string[]>([]);
@@ -103,6 +108,12 @@ export function Sidebar() {
 	const favoriteBinds = favorites
 		.map((id) => binds.find((bind) => bind.id === id))
 		.filter((bind): bind is Bind => Boolean(bind));
+	const favoriteFolderItems = favoriteFolders
+		.map((id) => folders.find((folder) => folder.id === id))
+		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
+	const recentFolderItems = recentFolders
+		.map((id) => folders.find((folder) => folder.id === id))
+		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
 	const createCategory = () => {
 		modalManager.open("createCategory");
 	};
@@ -126,6 +137,20 @@ export function Sidebar() {
 			<span className="truncate">{getBindTitle(bind, language)}</span>
 		</button>
 	);
+	const renderFolderShortcut = (folder: KnowledgeFolder) => (
+		<button
+			key={folder.id}
+			type="button"
+			onClick={() => {
+				selectFolder(folder.id);
+				void navigate({ to: "/" });
+			}}
+			className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+		>
+			<Folder size={14} className="shrink-0" />
+			<span className="truncate">{folder.name}</span>
+		</button>
+	);
 
 	return (
 		<aside className="flex h-full w-72 flex-col border-r border-border bg-surface">
@@ -135,12 +160,32 @@ export function Sidebar() {
 					Favorites
 				</div>
 
+				{favoriteFolderItems.length > 0 && (
+					<div className="mb-2 space-y-0.5">
+						{favoriteFolderItems.map(renderFolderShortcut)}
+					</div>
+				)}
+
 				{favoriteBinds.length > 0 ? (
 					<div className="space-y-0.5">
 						{favoriteBinds.map(renderBindShortcut)}
 					</div>
-				) : (
+				) : favoriteFolderItems.length === 0 ? (
 					<div className="px-2 text-xs text-muted">No favorites yet</div>
+				) : null}
+			</div>
+
+			<div className="shrink-0 border-b border-border px-3 py-3">
+				<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
+					Recent folders
+				</div>
+
+				{recentFolderItems.length > 0 ? (
+					<div className="space-y-0.5">
+						{recentFolderItems.map(renderFolderShortcut)}
+					</div>
+				) : (
+					<div className="px-2 text-xs text-muted">No folders opened yet</div>
 				)}
 			</div>
 
@@ -264,7 +309,10 @@ export function Sidebar() {
 							<button
 								type="button"
 								title="Clear search"
-								onClick={() => setTreeSearch("")}
+								onClick={() => {
+									setTreeSearch("");
+									setSelectedTag("");
+								}}
 								className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={14} />
@@ -294,14 +342,20 @@ export function Sidebar() {
 					)}
 
 					{selectedBindIds.length > 0 && (
-						<div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-							<span>{selectedBindIds.length} selected</span>
+						<div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-muted">
+							<span>
+								<span className="font-semibold text-foreground">
+									{selectedBindIds.length}
+								</span>{" "}
+								selected - drag to folder
+							</span>
 							<button
 								type="button"
 								onClick={() => setSelectedBindIds([])}
-								className="rounded px-2 py-1 text-foreground hover:bg-surface-elevated"
+								className="rounded p-1 text-foreground hover:bg-accent/15"
+								title="Clear selection"
 							>
-								Clear
+								<X size={13} />
 							</button>
 						</div>
 					)}

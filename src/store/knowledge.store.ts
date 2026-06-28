@@ -25,6 +25,8 @@ export interface KnowledgeSnapshot {
 
 	favorites: string[];
 	recent: string[];
+	favoriteFolders: string[];
+	recentFolders: string[];
 
 	openedTabs: string[];
 	pinnedTabs: string[];
@@ -58,6 +60,8 @@ interface KnowledgeState extends KnowledgeSnapshot {
 
 	toggleFavorite: (id: string) => void;
 	addRecent: (id: string) => void;
+	toggleFavoriteFolder: (id: string) => void;
+	addRecentFolder: (id: string) => void;
 
 	getBind: (id: string) => Bind | undefined;
 }
@@ -96,6 +100,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 	favorites: [],
 	recent: [],
+	favoriteFolders: [],
+	recentFolders: [],
 
 	openedTabs: [],
 	pinnedTabs: [],
@@ -180,6 +186,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			recent: unique(snapshot.recent ?? state.recent)
 				.filter((id) => bindIds.has(id))
 				.slice(0, MAX_RECENT),
+			favoriteFolders: unique(
+				snapshot.favoriteFolders ?? state.favoriteFolders,
+			).filter((id) => folders.some((folder) => folder.id === id)),
+			recentFolders: unique(snapshot.recentFolders ?? state.recentFolders)
+				.filter((id) => folders.some((folder) => folder.id === id))
+				.slice(0, MAX_RECENT),
 		});
 	},
 
@@ -201,6 +213,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 		set({
 			selectedFolder,
 			selectedCategory: folder?.categoryId,
+			recentFolders: selectedFolder
+				? [
+						selectedFolder,
+						...get().recentFolders.filter((id) => id !== selectedFolder),
+					].slice(0, MAX_RECENT)
+				: get().recentFolders,
 		});
 	},
 
@@ -228,6 +246,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			selectedBind: id,
 			selectedCategory: bind.categoryId,
 			selectedFolder: bind.folderId,
+			recentFolders: bind.folderId
+				? [
+						bind.folderId,
+						...state.recentFolders.filter((x) => x !== bind.folderId),
+					].slice(0, MAX_RECENT)
+				: state.recentFolders,
 			recent: [id, ...state.recent.filter((x) => x !== id)].slice(
 				0,
 				MAX_RECENT,
@@ -306,6 +330,21 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 	addRecent: (id) =>
 		set((state) => ({
 			recent: [id, ...state.recent.filter((x) => x !== id)].slice(
+				0,
+				MAX_RECENT,
+			),
+		})),
+
+	toggleFavoriteFolder: (id) =>
+		set((state) => ({
+			favoriteFolders: state.favoriteFolders.includes(id)
+				? state.favoriteFolders.filter((folderId) => folderId !== id)
+				: [...state.favoriteFolders, id],
+		})),
+
+	addRecentFolder: (id) =>
+		set((state) => ({
+			recentFolders: [id, ...state.recentFolders.filter((x) => x !== id)].slice(
 				0,
 				MAX_RECENT,
 			),

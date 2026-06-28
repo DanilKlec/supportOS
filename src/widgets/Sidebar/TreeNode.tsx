@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
 	ArrowDown,
 	ArrowUp,
+	Check,
 	ChevronDown,
 	ChevronRight,
 	Edit3,
@@ -9,8 +10,10 @@ import {
 	Folder,
 	FolderInput,
 	FolderPlus,
+	GripVertical,
 	MoreHorizontal,
 	Plus,
+	Star,
 	Trash2,
 } from "lucide-react";
 import {
@@ -26,8 +29,12 @@ import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import {
 	getDraggedBindIds,
+	getDraggedFolderId,
 	hasBindDragData,
+	hasFolderDragData,
+	hasTreeDragData,
 	setBindDragData,
+	setFolderDragData,
 } from "@/shared/lib/bind-drag";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
@@ -44,6 +51,17 @@ interface Props {
 
 const INITIAL_CHILDREN_LIMIT = 120;
 const CHILDREN_LIMIT_STEP = 240;
+
+function createDragPreview(label: string, count: number) {
+	const preview = document.createElement("div");
+
+	preview.className =
+		"fixed -top-20 left-0 z-50 rounded-md border border-accent/50 bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-2xl";
+	preview.textContent = count > 1 ? `${count} binds` : label;
+	document.body.appendChild(preview);
+
+	return preview;
+}
 
 function ActionMenuItem({
 	icon,
@@ -105,11 +123,16 @@ export function TreeNode({
 	const selectBind = useKnowledgeStore((s) => s.selectBind);
 	const selectCategory = useKnowledgeStore((s) => s.selectCategory);
 	const selectFolder = useKnowledgeStore((s) => s.selectFolder);
+	const favoriteFolders = useKnowledgeStore((s) => s.favoriteFolders);
+	const toggleFavoriteFolder = useKnowledgeStore((s) => s.toggleFavoriteFolder);
 
 	const folder = folders.find((item) => item.id === node.id);
 	const categoryId = node.type === "category" ? node.id : folder?.categoryId;
 	const targetFolderId = node.type === "folder" ? node.id : undefined;
-	const canDropBind = node.type !== "bind" && Boolean(categoryId);
+	const dropCategoryId =
+		node.type === "bind" ? node.bind?.categoryId : categoryId;
+	const dropFolderId =
+		node.type === "bind" ? node.bind?.folderId : targetFolderId;
 	const hasChildren = node.children.length > 0;
 	const nodeColor = node.color ?? node.bind?.color;
 	const nodeColorStyle = nodeColor ? { color: nodeColor } : undefined;
@@ -137,6 +160,7 @@ export function TreeNode({
 		(node.type === "category" && selectedCategory === node.id) ||
 		(node.type === "folder" && selectedFolder === node.id);
 	const bindSelected = selectedBindIds.includes(node.id);
+	const folderFavorite = favoriteFolders.includes(node.id);
 
 	useEffect(() => {
 		if (!actionsOpen) return undefined;
@@ -228,6 +252,13 @@ export function TreeNode({
 		setActionsOpen(false);
 	};
 
+	const toggleFolderFavorite = () => {
+		if (node.type !== "folder") return;
+
+		toggleFavoriteFolder(node.id);
+		setActionsOpen(false);
+	};
+
 	const moveNode = (direction: "up" | "down") => {
 		if (node.type === "category") {
 			knowledgeService.moveCategory(node.id, direction);
@@ -255,16 +286,23 @@ export function TreeNode({
 	};
 
 	const handleDragStart = (event: DragEvent<HTMLElement>) => {
-		if (node.type !== "bind") {
+		if (node.type !== "bind" && node.type !== "folder") {
 			event.preventDefault();
 			return;
 		}
 
-		setBindDragData(
-			event.dataTransfer,
-			node.id,
-			bindSelected ? selectedBindIds : [node.id],
-		);
+		const dragIds =
+			node.type === "bind" && bindSelected ? selectedBindIds : [node.id];
+		const dragPreview = createDragPreview(node.name, dragIds.length);
+
+		if (node.type === "bind") {
+			setBindDragData(event.dataTransfer, node.id, dragIds);
+		} else {
+			setFolderDragData(event.dataTransfer, node.id);
+		}
+
+		event.dataTransfer.setDragImage(dragPreview, 12, 12);
+		window.setTimeout(() => dragPreview.remove(), 0);
 		setDragging(true);
 		setActionsOpen(false);
 	};
@@ -275,7 +313,15 @@ export function TreeNode({
 	};
 
 	const handleDragEnter = (event: DragEvent<HTMLElement>) => {
-		if (!canDropBind || !hasBindDragData(event.dataTransfer)) return;
+		if (!dropCategoryId) return;
+		if (
+			node.type === "bind"
+				? !hasBindDragData(event.dataTransfer) ||
+					hasFolderDragData(event.dataTransfer)
+				: !hasTreeDragData(event.dataTransfer)
+		) {
+			return;
+		}
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -285,7 +331,15 @@ export function TreeNode({
 	};
 
 	const handleDragOver = (event: DragEvent<HTMLElement>) => {
-		if (!canDropBind || !hasBindDragData(event.dataTransfer)) return;
+		if (!dropCategoryId) return;
+		if (
+			node.type === "bind"
+				? !hasBindDragData(event.dataTransfer) ||
+					hasFolderDragData(event.dataTransfer)
+				: !hasTreeDragData(event.dataTransfer)
+		) {
+			return;
+		}
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -305,15 +359,84 @@ export function TreeNode({
 	};
 
 	const handleDrop = (event: DragEvent<HTMLElement>) => {
-		if (!canDropBind || !categoryId) return;
+		if (!dropCategoryId) return;
 
 		event.preventDefault();
 		event.stopPropagation();
 		setDragOver(false);
 
 		const bindIds = getDraggedBindIds(event.dataTransfer);
+		const folderId = getDraggedFolderId(event.dataTransfer);
 
-		if (bindIds.length === 0) return;
+		if (bindIds.length === 0 && !folderId) return;
+
+		if (folderId) {
+			if (node.type === "bind") return;
+			const store = useKnowledgeStore.getState();
+			const previousFolder = store.folders.find((item) => item.id === folderId);
+
+			if (!previousFolder) return;
+			if (
+				previousFolder.categoryId === categoryId &&
+				(previousFolder.parentId ?? "") === (targetFolderId ?? "")
+			) {
+				return;
+			}
+
+			try {
+				knowledgeService.moveFolderTo(folderId, {
+					categoryId: dropCategoryId,
+					parentId: targetFolderId,
+				});
+				expandDropTarget();
+				showToast("Folder moved", {
+					action: {
+						label: "Undo",
+						onClick: () => {
+							knowledgeService.moveFolderTo(folderId, {
+								categoryId: previousFolder.categoryId,
+								parentId: previousFolder.parentId,
+							});
+							showToast("Move undone");
+						},
+					},
+					duration: 6000,
+				});
+			} catch (error) {
+				showToast(
+					error instanceof Error ? error.message : "Folder move failed",
+				);
+			}
+
+			return;
+		}
+
+		if (node.type === "bind" && bindIds.length > 0) {
+			try {
+				const movedCount = bindIds.filter(
+					(bindId) => bindId !== node.id,
+				).length;
+
+				for (const bindId of bindIds) {
+					if (bindId !== node.id) {
+						knowledgeService.moveBindBefore(bindId, node.id);
+					}
+				}
+
+				if (movedCount > 0) {
+					showToast(
+						movedCount > 1 ? `${movedCount} binds reordered` : "Bind reordered",
+					);
+					onClearBindSelection?.();
+				}
+			} catch (error) {
+				showToast(
+					error instanceof Error ? error.message : "Bind reorder failed",
+				);
+			}
+
+			return;
+		}
 
 		const store = useKnowledgeStore.getState();
 		const previousLocations = bindIds
@@ -337,15 +460,15 @@ export function TreeNode({
 		try {
 			for (const location of previousLocations) {
 				if (
-					location.categoryId === categoryId &&
-					(location.folderId ?? "") === (targetFolderId ?? "")
+					location.categoryId === dropCategoryId &&
+					(location.folderId ?? "") === (dropFolderId ?? "")
 				) {
 					continue;
 				}
 
 				const movedBind = knowledgeService.moveBind(location.id, {
-					categoryId,
-					folderId: targetFolderId,
+					categoryId: dropCategoryId,
+					folderId: dropFolderId,
 				});
 
 				movedLocations.push({
@@ -400,47 +523,58 @@ export function TreeNode({
 			<div
 				className={`
           group
+          relative
           flex
           items-center
-          gap-1
+          gap-1.5
           border-l-2
           pr-2
           transition
           ${
 						dragOver
-							? "bg-accent/20 text-foreground ring-1 ring-inset ring-accent/50"
+							? "bg-accent/15 text-foreground shadow-[inset_0_0_0_1px_rgba(59,130,246,0.45)]"
 							: selected
 								? "bg-accent/15 text-accent"
 								: "hover:bg-accent/10"
 					}
-          ${dragging ? "opacity-50" : ""}
-          ${node.type === "bind" ? "cursor-grab active:cursor-grabbing" : ""}
+          ${dragging ? "scale-[0.99] opacity-45" : ""}
+          ${node.type !== "category" ? "cursor-grab active:cursor-grabbing" : ""}
         `}
 				style={{
 					borderLeftColor: nodeColor ?? "transparent",
 				}}
 			>
 				{node.type === "bind" && (
-					<label
-						className="flex shrink-0 items-center pr-1"
+					<div
+						className="flex shrink-0 items-center"
 						style={{
 							paddingLeft: 12 + level * 18,
 						}}
 					>
-						<input
-							type="checkbox"
-							checked={bindSelected}
-							onChange={() => onToggleBindSelection?.(node.id)}
-							aria-label={`Select ${node.name}`}
-							className="h-3.5 w-3.5 accent-current"
-						/>
-					</label>
+						<button
+							type="button"
+							aria-pressed={bindSelected}
+							title={bindSelected ? "Unselect bind" : "Select bind"}
+							onClick={() => onToggleBindSelection?.(node.id)}
+							className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+								bindSelected
+									? "border-accent bg-accent text-accent-foreground opacity-100"
+									: "border-border text-muted opacity-0 hover:border-accent hover:bg-accent/10 hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100"
+							}`}
+						>
+							{bindSelected ? (
+								<Check size={12} strokeWidth={3} />
+							) : (
+								<span className="h-1.5 w-1.5 rounded-full bg-current" />
+							)}
+						</button>
+					</div>
 				)}
 
 				<button
 					type="button"
 					onClick={handleOpen}
-					draggable={node.type === "bind"}
+					draggable={node.type !== "category"}
 					onDragStart={handleDragStart}
 					onDragEnd={handleDragEnd}
 					onDragEnter={handleDragEnter}
@@ -478,13 +612,33 @@ export function TreeNode({
 					/>
 
 					{node.type === "bind" ? (
-						<FileText size={16} className="shrink-0" style={nodeColorStyle} />
+						<>
+							<GripVertical
+								size={14}
+								className="shrink-0 text-muted opacity-0 transition group-hover:opacity-70"
+							/>
+							<FileText size={16} className="shrink-0" style={nodeColorStyle} />
+						</>
 					) : (
-						<Folder size={16} className="shrink-0" style={nodeColorStyle} />
+						<>
+							{node.type === "folder" && (
+								<GripVertical
+									size={14}
+									className="shrink-0 text-muted opacity-0 transition group-hover:opacity-70"
+								/>
+							)}
+							<Folder size={16} className="shrink-0" style={nodeColorStyle} />
+						</>
 					)}
 
 					<span className="truncate text-sm">{node.name}</span>
 				</button>
+
+				{dragOver && (
+					<div className="pointer-events-none shrink-0 rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+						{node.type === "bind" ? "Place here" : "Drop here"}
+					</div>
+				)}
 
 				<div ref={actionsRef} className="relative shrink-0">
 					<button
@@ -516,6 +670,20 @@ export function TreeNode({
 										disabled={!canMoveDown}
 										onClick={() => moveNode("down")}
 									/>
+									{node.type === "folder" && (
+										<ActionMenuItem
+											icon={
+												<Star
+													size={14}
+													fill={folderFavorite ? "currentColor" : "none"}
+												/>
+											}
+											label={
+												folderFavorite ? "Remove favorite" : "Favorite folder"
+											}
+											onClick={toggleFolderFavorite}
+										/>
+									)}
 
 									<div className="my-1 border-t border-border" />
 
