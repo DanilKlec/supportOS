@@ -52,6 +52,7 @@ export function TranslatorPage() {
 	const [error, setError] = useState("");
 	const [detectedLanguage, setDetectedLanguage] = useState("");
 	const [liveTranslate, setLiveTranslate] = useState(true);
+	const autoManagedFromRef = useRef(true);
 	const liveSignatureRef = useRef("");
 
 	const resolvedFromLanguage =
@@ -111,6 +112,17 @@ export function TranslatorPage() {
 		[sourceText, resolvedFromLanguage, resolvedToLanguage],
 	);
 
+	const handleFromLanguageChange = useCallback((languageCode: string) => {
+		autoManagedFromRef.current = languageCode === "auto";
+		setFromLanguage(languageCode);
+		setDetectedLanguage("");
+	}, []);
+
+	const handleCustomFromLanguageChange = useCallback((languageCode: string) => {
+		autoManagedFromRef.current = false;
+		setCustomFromLanguage(languageCode);
+	}, []);
+
 	const getTranslationDirection = useCallback(() => {
 		const detected = translatorService.detectLanguage(sourceText);
 		const source = resolvedFromLanguage.trim().toLowerCase();
@@ -120,6 +132,7 @@ export function TranslatorPage() {
 			const nextTarget =
 				detected === target ? getFallbackTargetLanguage(detected) : target;
 
+			autoManagedFromRef.current = true;
 			setLanguageSelection("from", detected);
 			if (nextTarget !== target) {
 				setLanguageSelection("to", nextTarget);
@@ -128,6 +141,24 @@ export function TranslatorPage() {
 			return {
 				fromLanguage: detected,
 				toLanguage: nextTarget,
+				detected,
+				switched: true,
+			};
+		}
+
+		const shouldCorrectSource =
+			fromLanguage !== CUSTOM_LANGUAGE &&
+			detected !== source &&
+			Boolean(source);
+
+		if (shouldCorrectSource) {
+			autoManagedFromRef.current = true;
+			setLanguageSelection("from", detected);
+			setLanguageSelection("to", source);
+
+			return {
+				fromLanguage: detected,
+				toLanguage: source,
 				detected,
 				switched: true,
 			};
@@ -155,6 +186,52 @@ export function TranslatorPage() {
 			switched: true,
 		};
 	}, [
+		resolvedFromLanguage,
+		resolvedToLanguage,
+		fromLanguage,
+		setLanguageSelection,
+		sourceText,
+	]);
+
+	useEffect(() => {
+		if (!sourceText.trim()) {
+			setDetectedLanguage("");
+			return;
+		}
+
+		const detected = translatorService.detectLanguage(sourceText);
+		setDetectedLanguage(detected);
+
+		const source = resolvedFromLanguage.trim().toLowerCase();
+		const target = resolvedToLanguage.trim().toLowerCase();
+		const shouldCorrectSource =
+			fromLanguage !== CUSTOM_LANGUAGE &&
+			detected !== source &&
+			Boolean(source);
+
+		if (
+			!(fromLanguage === "auto" || autoManagedFromRef.current) &&
+			!shouldCorrectSource
+		) {
+			return;
+		}
+
+		const nextTarget = shouldCorrectSource
+			? source
+			: detected === target
+				? getFallbackTargetLanguage(detected)
+				: target;
+
+		if (source !== detected) {
+			autoManagedFromRef.current = true;
+			setLanguageSelection("from", detected);
+		}
+
+		if (nextTarget && nextTarget !== target) {
+			setLanguageSelection("to", nextTarget);
+		}
+	}, [
+		fromLanguage,
 		resolvedFromLanguage,
 		resolvedToLanguage,
 		setLanguageSelection,
@@ -296,6 +373,7 @@ export function TranslatorPage() {
 	};
 
 	const swapLanguages = () => {
+		autoManagedFromRef.current = false;
 		const nextFromLanguage = toLanguage;
 		const nextCustomFromLanguage = customToLanguage;
 		const nextToLanguage =
@@ -425,8 +503,8 @@ export function TranslatorPage() {
 						languages={languageOptions}
 						allowAuto
 						loading={languagesLoading}
-						onChange={setFromLanguage}
-						onCustomChange={setCustomFromLanguage}
+						onChange={handleFromLanguageChange}
+						onCustomChange={handleCustomFromLanguageChange}
 						disabled={loading}
 					/>
 
