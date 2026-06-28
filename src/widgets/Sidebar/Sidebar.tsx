@@ -128,8 +128,7 @@ export function Sidebar() {
 		() =>
 			Array.from(new Set(binds.flatMap((bind) => bind.tags)))
 				.filter(Boolean)
-				.sort((a, b) => a.localeCompare(b))
-				.slice(0, 18),
+				.sort((a, b) => a.localeCompare(b)),
 		[binds],
 	);
 	const filteredTree = useMemo(
@@ -497,7 +496,7 @@ export function Sidebar() {
 					</div>
 
 					{tags.length > 0 && (
-						<div className="mt-3 flex gap-1 overflow-x-auto pb-1">
+						<div className="mt-3 flex flex-wrap gap-1.5">
 							{tags.map((tag) => (
 								<button
 									key={tag}
@@ -505,13 +504,13 @@ export function Sidebar() {
 									onClick={() =>
 										setSelectedTag((current) => (current === tag ? "" : tag))
 									}
-									className={`shrink-0 rounded-full border px-2 py-1 text-xs transition ${
+									className={`max-w-full rounded-full border px-2 py-1 text-xs transition ${
 										selectedTag === tag
 											? "border-accent bg-accent text-accent-foreground"
 											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 									}`}
 								>
-									#{tag}
+									<span className="break-all">#{tag}</span>
 								</button>
 							))}
 						</div>
