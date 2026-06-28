@@ -1,50 +1,98 @@
 import { create } from "zustand";
-import type { WorkspaceMode } from "@/entities/workspace";
+import { persist } from "zustand/middleware";
+
+import type {
+	WorkspaceLayoutSettings,
+	WorkspaceMode,
+} from "@/entities/workspace";
+
+export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayoutSettings = {
+	sidebarWidth: "standard",
+	contentWidth: "standard",
+	showTopbar: true,
+	showSidebar: true,
+	showTabs: true,
+	showTranslatorWidget: true,
+	showSidebarFavorites: true,
+	showSidebarRecentFolders: true,
+	showSidebarTools: true,
+};
 
 interface WorkspaceState {
-  mode: WorkspaceMode;
+	mode: WorkspaceMode;
 
-  selectedCategory?: string;
+	layout: WorkspaceLayoutSettings;
 
-  selectedFolder?: string;
+	selectedCategory?: string;
 
-  openedBind?: string;
+	selectedFolder?: string;
 
-  setMode: (mode: WorkspaceMode) => void;
+	openedBind?: string;
 
-  setCategory: (id?: string) => void;
+	setMode: (mode: WorkspaceMode) => void;
 
-  setFolder: (id?: string) => void;
+	setLayout: (patch: Partial<WorkspaceLayoutSettings>) => void;
 
-  openBind: (id?: string) => void;
+	resetLayout: () => void;
+
+	setCategory: (id?: string) => void;
+
+	setFolder: (id?: string) => void;
+
+	openBind: (id?: string) => void;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  mode: "knowledge",
+export const useWorkspaceStore = create<WorkspaceState>()(
+	persist(
+		(set) => ({
+			mode: "knowledge",
 
-  selectedCategory: undefined,
+			layout: DEFAULT_WORKSPACE_LAYOUT,
 
-  selectedFolder: undefined,
+			selectedCategory: undefined,
 
-  openedBind: undefined,
+			selectedFolder: undefined,
 
-  setMode: (mode) =>
-    set({
-      mode,
-    }),
+			openedBind: undefined,
 
-  setCategory: (selectedCategory) =>
-    set({
-      selectedCategory,
-    }),
+			setMode: (mode) =>
+				set({
+					mode,
+				}),
 
-  setFolder: (selectedFolder) =>
-    set({
-      selectedFolder,
-    }),
+			setLayout: (patch) =>
+				set((state) => ({
+					layout: {
+						...state.layout,
+						...patch,
+					},
+				})),
 
-  openBind: (openedBind) =>
-    set({
-      openedBind,
-    }),
-}));
+			resetLayout: () =>
+				set({
+					layout: DEFAULT_WORKSPACE_LAYOUT,
+				}),
+
+			setCategory: (selectedCategory) =>
+				set({
+					selectedCategory,
+				}),
+
+			setFolder: (selectedFolder) =>
+				set({
+					selectedFolder,
+				}),
+
+			openBind: (openedBind) =>
+				set({
+					openedBind,
+				}),
+		}),
+		{
+			name: "supportos:workspace-layout:v1",
+			partialize: (state) => ({
+				layout: state.layout,
+			}),
+		},
+	),
+);

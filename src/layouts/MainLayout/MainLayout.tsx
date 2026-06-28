@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 import { isLightweightRoute } from "@/app/route-mode";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
+import { useWorkspaceStore } from "@/store";
+import { CommandPalette } from "@/widgets/CommandPalette/CommandPalette";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
 
 export function MainLayout({ children }: { children: ReactNode }) {
+	const layout = useWorkspaceStore((state) => state.layout);
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
@@ -50,24 +53,26 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					{children}
 				</main>
 
-				<TranslatorWidget />
+				{layout.showTranslatorWidget && <TranslatorWidget />}
+				<CommandPalette />
 			</div>
 		);
 	}
 
 	return (
 		<div className="flex h-screen flex-col">
-			<Topbar />
+			{layout.showTopbar && <Topbar />}
 
 			<div className="flex flex-1 overflow-hidden">
-				<Sidebar />
+				{layout.showSidebar && <Sidebar />}
 
 				<main className="flex flex-1 flex-col overflow-hidden bg-background">
 					{children}
 				</main>
 			</div>
 
-			<TranslatorWidget />
+			{layout.showTranslatorWidget && <TranslatorWidget />}
+			<CommandPalette />
 		</div>
 	);
 }

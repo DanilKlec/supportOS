@@ -1,4 +1,4 @@
-import type { Bind, BindTranslation } from "@/entities/bind";
+import type { Bind, BindHistoryEntry, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import {
 	mockBinds,
@@ -22,6 +22,8 @@ export interface KnowledgeDatabase
 			| "search"
 			| "favorites"
 			| "recent"
+			| "favoriteFolders"
+			| "recentFolders"
 			| "openedTabs"
 			| "pinnedTabs"
 			| "activeTab"
@@ -50,6 +52,7 @@ export interface CreateBindInput {
 	aiTranslated?: boolean;
 	aiSummary?: string;
 	favorite?: boolean;
+	pinned?: boolean;
 	archived?: boolean;
 	icon?: string;
 	color?: string;
@@ -57,7 +60,7 @@ export interface CreateBindInput {
 
 export interface UpdateBindInput {
 	categoryId?: string;
-	folderId?: string;
+	folderId?: string | null;
 	slug?: string;
 	ownerId?: string | null;
 	sourceBindId?: string;
@@ -73,6 +76,10 @@ export interface UpdateBindInput {
 	aiTranslated?: boolean;
 	aiSummary?: string;
 	favorite?: boolean;
+	pinned?: boolean;
+	order?: number;
+	copyCount?: number;
+	lastCopiedAt?: string;
 	archived?: boolean;
 	icon?: string;
 	color?: string;
@@ -80,6 +87,22 @@ export interface UpdateBindInput {
 
 export type CreateCategoryInput = string | Partial<KnowledgeCategory>;
 type MoveDirection = "up" | "down";
+
+interface MoveBindInput {
+	categoryId: string;
+	folderId?: string;
+}
+
+interface MoveFolderInput {
+	categoryId: string;
+	parentId?: string;
+}
+
+export interface RestoreDeletedItemsInput {
+	categories?: KnowledgeCategory[];
+	folders?: KnowledgeFolder[];
+	binds?: Bind[];
+}
 
 export type CreateFolderInput = {
 	categoryId: string;
@@ -97,6 +120,10 @@ type StoredKnowledge = KnowledgeDatabase & {
 
 function clone<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function uniqueIds(ids: string[]) {
+	return Array.from(new Set(ids.filter(Boolean)));
 }
 
 function now() {
@@ -172,6 +199,45 @@ function normalizeTranslations(
 	}
 
 	return next;
+}
+
+function createBindHistoryEntry(bind: Bind): BindHistoryEntry {
+	return {
+		id: createId("history"),
+		createdAt: now(),
+		slug: bind.slug,
+		tags: [...bind.tags],
+		translations: clone(bind.translations),
+	};
+}
+
+function shouldTrackBindHistory(patch: UpdateBindInput) {
+	return (
+		patch.slug !== undefined ||
+		patch.tags !== undefined ||
+		patch.translations !== undefined ||
+		patch.title !== undefined ||
+		patch.content !== undefined
+	);
+}
+
+function getNextBindOrder(
+	binds: Bind[],
+	categoryId: string,
+	folderId?: string,
+) {
+	return (
+		Math.max(
+			0,
+			...binds
+				.filter(
+					(bind) =>
+						bind.categoryId === categoryId &&
+						(bind.folderId ?? "") === (folderId ?? ""),
+				)
+				.map((bind) => bind.order ?? 0),
+		) + 1
+	);
 }
 
 function getReorderedItemOrders<T extends { id: string; order: number }>(
@@ -317,8 +383,14 @@ function normalizeDatabase(
 						? bind.importBatchId
 						: undefined,
 				imported: Boolean(bind.imported),
+				order: typeof bind.order === "number" ? bind.order : undefined,
 				tags: Array.isArray(bind.tags) ? bind.tags : [],
 				translations: Array.isArray(bind.translations) ? bind.translations : [],
+				history: Array.isArray(bind.history) ? bind.history : [],
+				pinned: Boolean(bind.pinned),
+				copyCount: typeof bind.copyCount === "number" ? bind.copyCount : 0,
+				lastCopiedAt:
+					typeof bind.lastCopiedAt === "string" ? bind.lastCopiedAt : undefined,
 				aiGenerated: bind.aiGenerated,
 				aiTranslated: bind.aiTranslated,
 				aiSummary:
@@ -343,6 +415,12 @@ function normalizeDatabase(
 			? database.favorites
 			: binds.filter((bind) => bind.favorite).map((bind) => bind.id),
 		recent: Array.isArray(database.recent) ? database.recent : [],
+		favoriteFolders: Array.isArray(database.favoriteFolders)
+			? database.favoriteFolders
+			: [],
+		recentFolders: Array.isArray(database.recentFolders)
+			? database.recentFolders
+			: [],
 		openedTabs: Array.isArray(database.openedTabs) ? database.openedTabs : [],
 		pinnedTabs: Array.isArray(database.pinnedTabs) ? database.pinnedTabs : [],
 		activeTab: database.activeTab,
@@ -431,6 +509,7 @@ class KnowledgeService {
 			slug: uniqueSlug(input.slug ?? title, store.binds),
 			categoryId: input.categoryId,
 			folderId: input.folderId,
+			order: getNextBindOrder(store.binds, input.categoryId, input.folderId),
 			icon: input.icon,
 			color: input.color,
 			tags: normalizeTags(input.tags),
@@ -440,6 +519,9 @@ class KnowledgeService {
 				title,
 				content,
 			),
+			history: [],
+			pinned: Boolean(input.pinned),
+			copyCount: 0,
 			aiGenerated: input.aiGenerated,
 			aiTranslated: input.aiTranslated,
 			aiSummary: input.aiSummary,
@@ -515,6 +597,7 @@ class KnowledgeService {
 				patch.folderId === undefined
 					? existing.folderId
 					: patch.folderId || undefined,
+			order: patch.order === undefined ? existing.order : patch.order,
 			slug:
 				patch.slug === undefined
 					? existing.slug
@@ -524,6 +607,19 @@ class KnowledgeService {
 			tags:
 				patch.tags === undefined ? existing.tags : normalizeTags(patch.tags),
 			translations,
+			history: shouldTrackBindHistory(patch)
+				? [createBindHistoryEntry(existing), ...(existing.history ?? [])].slice(
+						0,
+						25,
+					)
+				: existing.history,
+			pinned: patch.pinned === undefined ? existing.pinned : patch.pinned,
+			copyCount:
+				patch.copyCount === undefined ? existing.copyCount : patch.copyCount,
+			lastCopiedAt:
+				patch.lastCopiedAt === undefined
+					? existing.lastCopiedAt
+					: patch.lastCopiedAt,
 			aiGenerated:
 				patch.aiGenerated === undefined
 					? existing.aiGenerated
@@ -548,6 +644,201 @@ class KnowledgeService {
 		cloudKnowledgeService.saveBind(updated);
 
 		return updated;
+	}
+
+	duplicateBind(id: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) {
+			throw new Error("Bind not found");
+		}
+
+		const duplicate = this.createBind({
+			categoryId: existing.categoryId,
+			folderId: existing.folderId,
+			slug: `${existing.slug}-copy`,
+			ownerId: existing.ownerId,
+			icon: existing.icon,
+			color: existing.color,
+			tags: existing.tags,
+			translations: clone(existing.translations),
+			title: existing.translations[0]?.title ?? existing.slug,
+			content: existing.translations[0]?.content ?? "",
+			language: existing.translations[0]?.language,
+		});
+
+		return duplicate;
+	}
+
+	restoreBindHistory(id: string, historyId: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+		const entry = existing?.history?.find((item) => item.id === historyId);
+
+		if (!existing || !entry) {
+			throw new Error("History entry not found");
+		}
+
+		return this.updateBind(id, {
+			slug: entry.slug,
+			tags: entry.tags,
+			translations: clone(entry.translations),
+		});
+	}
+
+	togglePinnedBind(id: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) {
+			throw new Error("Bind not found");
+		}
+
+		const updated = this.updateBind(id, {
+			pinned: !existing.pinned,
+		});
+
+		return Boolean(updated.pinned);
+	}
+
+	recordBindCopied(id: string) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) return;
+
+		this.updateBind(id, {
+			copyCount: (existing.copyCount ?? 0) + 1,
+			lastCopiedAt: now(),
+		});
+	}
+
+	moveBindBefore(id: string, targetId: string) {
+		if (id === targetId) return false;
+
+		const store = useKnowledgeStore.getState();
+		const source = store.binds.find((bind) => bind.id === id);
+		const target = store.binds.find((bind) => bind.id === targetId);
+
+		if (!source || !target) {
+			throw new Error("Bind not found");
+		}
+
+		const siblingBinds = store.binds
+			.filter(
+				(bind) =>
+					!bind.archived &&
+					bind.categoryId === target.categoryId &&
+					(bind.folderId ?? "") === (target.folderId ?? "") &&
+					bind.id !== id,
+			)
+			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+		const targetIndex = siblingBinds.findIndex((bind) => bind.id === targetId);
+
+		if (targetIndex < 0) return false;
+
+		siblingBinds.splice(targetIndex, 0, {
+			...source,
+			categoryId: target.categoryId,
+			folderId: target.folderId,
+		});
+
+		const orderById = new Map(
+			siblingBinds.map((bind, index) => [bind.id, index + 1]),
+		);
+		const binds = store.binds.map((bind) => {
+			const order = orderById.get(bind.id);
+
+			return order
+				? {
+						...bind,
+						categoryId: target.categoryId,
+						folderId: target.folderId,
+						order,
+						updatedAt: now(),
+					}
+				: bind;
+		});
+		const changedBinds = binds.filter((bind) => {
+			const previous = store.binds.find((item) => item.id === bind.id);
+
+			return (
+				previous &&
+				(previous.categoryId !== bind.categoryId ||
+					previous.folderId !== bind.folderId ||
+					previous.order !== bind.order)
+			);
+		});
+
+		store.setBinds(binds);
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ binds: changedBinds });
+
+		return changedBinds.length > 0;
+	}
+
+	moveBind(id: string, destination: MoveBindInput) {
+		const store = useKnowledgeStore.getState();
+		const existing = store.binds.find((bind) => bind.id === id);
+
+		if (!existing) {
+			throw new Error("Bind not found");
+		}
+
+		const targetFolderId = destination.folderId ?? "";
+		const targetFolder = targetFolderId
+			? store.folders.find((folder) => folder.id === targetFolderId)
+			: undefined;
+
+		if (targetFolderId && !targetFolder) {
+			throw new Error("Destination folder was not found");
+		}
+
+		const categoryId = targetFolder?.categoryId ?? destination.categoryId;
+
+		if (!store.categories.some((category) => category.id === categoryId)) {
+			throw new Error("Destination category was not found");
+		}
+
+		if (
+			existing.categoryId === categoryId &&
+			(existing.folderId ?? "") === targetFolderId
+		) {
+			return existing;
+		}
+
+		return this.updateBind(id, {
+			categoryId,
+			folderId: targetFolderId || null,
+			order: getNextBindOrder(store.binds, categoryId, targetFolderId),
+		});
+	}
+
+	restoreDeletedItems({
+		categories = [],
+		folders = [],
+		binds = [],
+	}: RestoreDeletedItemsInput) {
+		if (categories.length === 0 && folders.length === 0 && binds.length === 0) {
+			return;
+		}
+
+		const store = useKnowledgeStore.getState();
+		const mergeById = <T extends { id: string }>(current: T[], restored: T[]) =>
+			Array.from(
+				new Map(
+					[...current, ...restored].map((item) => [item.id, item]),
+				).values(),
+			);
+
+		store.setKnowledge({
+			categories: mergeById(store.categories, categories),
+			folders: mergeById(store.folders, folders),
+			binds: mergeById(store.binds, binds),
+		});
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ categories, folders, binds });
 	}
 
 	deleteBind(id: string) {
@@ -602,6 +893,233 @@ class KnowledgeService {
 
 		this.saveKnowledge();
 		cloudKnowledgeService.deleteBind(id);
+	}
+
+	archiveBind(id: string) {
+		const archived = this.updateBind(id, { archived: true });
+		const store = useKnowledgeStore.getState();
+		const openedTabs = store.openedTabs.filter((tabId) => tabId !== id);
+		const pinnedTabs = store.pinnedTabs.filter((tabId) => tabId !== id);
+		const activeTab =
+			store.activeTab === id ? openedTabs.at(-1) : store.activeTab;
+
+		store.setKnowledge({
+			openedTabs,
+			pinnedTabs,
+			activeTab,
+			selectedBind: activeTab,
+			favorites: store.favorites.filter((favoriteId) => favoriteId !== id),
+			recent: store.recent.filter((recentId) => recentId !== id),
+		});
+		this.saveKnowledge();
+
+		return archived;
+	}
+
+	updateManyBinds(
+		ids: string[],
+		patchOrFactory: UpdateBindInput | ((bind: Bind) => UpdateBindInput),
+	) {
+		const targetIds = new Set(uniqueIds(ids));
+
+		if (targetIds.size === 0) return [];
+
+		const store = useKnowledgeStore.getState();
+		const changedBinds: Bind[] = [];
+		const binds = store.binds.map((bind) => {
+			if (!targetIds.has(bind.id)) return bind;
+
+			const patch =
+				typeof patchOrFactory === "function"
+					? patchOrFactory(bind)
+					: patchOrFactory;
+			const language = patch.language ?? store.language;
+			const translations =
+				patch.translations ??
+				(patch.title !== undefined || patch.content !== undefined
+					? updateTranslation(
+							bind.translations,
+							language,
+							patch.title,
+							patch.content,
+						)
+					: bind.translations);
+			const updated: Bind = {
+				...bind,
+				ownerId: patch.ownerId === undefined ? bind.ownerId : patch.ownerId,
+				sourceBindId:
+					patch.sourceBindId === undefined
+						? bind.sourceBindId
+						: patch.sourceBindId,
+				sourceHash:
+					patch.sourceHash === undefined ? bind.sourceHash : patch.sourceHash,
+				importBatchId:
+					patch.importBatchId === undefined
+						? bind.importBatchId
+						: patch.importBatchId,
+				imported: patch.imported === undefined ? bind.imported : patch.imported,
+				categoryId: patch.categoryId ?? bind.categoryId,
+				folderId:
+					patch.folderId === undefined
+						? bind.folderId
+						: patch.folderId || undefined,
+				order: patch.order === undefined ? bind.order : patch.order,
+				slug:
+					patch.slug === undefined
+						? bind.slug
+						: uniqueSlug(patch.slug, store.binds, bind.id),
+				icon: patch.icon === undefined ? bind.icon : patch.icon,
+				color: patch.color === undefined ? bind.color : patch.color,
+				tags: patch.tags === undefined ? bind.tags : normalizeTags(patch.tags),
+				translations,
+				history: shouldTrackBindHistory(patch)
+					? [createBindHistoryEntry(bind), ...(bind.history ?? [])].slice(0, 25)
+					: bind.history,
+				pinned: patch.pinned === undefined ? bind.pinned : patch.pinned,
+				copyCount:
+					patch.copyCount === undefined ? bind.copyCount : patch.copyCount,
+				lastCopiedAt:
+					patch.lastCopiedAt === undefined
+						? bind.lastCopiedAt
+						: patch.lastCopiedAt,
+				aiGenerated:
+					patch.aiGenerated === undefined
+						? bind.aiGenerated
+						: patch.aiGenerated,
+				aiTranslated:
+					patch.aiTranslated === undefined
+						? bind.aiTranslated
+						: patch.aiTranslated,
+				aiSummary:
+					patch.aiSummary === undefined ? bind.aiSummary : patch.aiSummary,
+				favorite: patch.favorite === undefined ? bind.favorite : patch.favorite,
+				archived: patch.archived === undefined ? bind.archived : patch.archived,
+				updatedAt: now(),
+			};
+
+			if (JSON.stringify(updated) !== JSON.stringify(bind)) {
+				changedBinds.push(updated);
+			}
+
+			return updated;
+		});
+
+		if (changedBinds.length === 0) return [];
+
+		const changedIds = new Set(changedBinds.map((bind) => bind.id));
+		const archiveIds = new Set(
+			changedBinds.filter((bind) => bind.archived).map((bind) => bind.id),
+		);
+		let favorites = store.favorites;
+
+		if (changedBinds.some((bind) => bind.favorite)) {
+			favorites = uniqueIds([
+				...favorites,
+				...changedBinds
+					.filter((bind) => bind.favorite && !bind.archived)
+					.map((bind) => bind.id),
+			]);
+		}
+
+		if (changedBinds.some((bind) => !bind.favorite || bind.archived)) {
+			favorites = favorites.filter((id) => {
+				const changed = changedBinds.find((bind) => bind.id === id);
+
+				return changed ? changed.favorite && !changed.archived : true;
+			});
+		}
+
+		const openedTabs =
+			archiveIds.size > 0
+				? store.openedTabs.filter((id) => !archiveIds.has(id))
+				: store.openedTabs;
+		const pinnedTabs =
+			archiveIds.size > 0
+				? store.pinnedTabs.filter((id) => !archiveIds.has(id))
+				: store.pinnedTabs;
+		const activeTab =
+			store.activeTab && archiveIds.has(store.activeTab)
+				? openedTabs.at(-1)
+				: store.activeTab;
+
+		store.setKnowledge({
+			binds,
+			favorites,
+			recent: store.recent.filter((id) => !archiveIds.has(id)),
+			openedTabs,
+			pinnedTabs,
+			activeTab,
+			selectedBind:
+				store.selectedBind && archiveIds.has(store.selectedBind)
+					? activeTab
+					: store.selectedBind,
+		});
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({ binds: changedBinds });
+
+		return changedBinds.filter((bind) => changedIds.has(bind.id));
+	}
+
+	addTagToBinds(ids: string[], tag: string) {
+		const normalizedTag = tag.trim();
+
+		if (!normalizedTag) return [];
+
+		return this.updateManyBinds(ids, (bind) => ({
+			tags: Array.from(new Set([...bind.tags, normalizedTag])),
+		}));
+	}
+
+	archiveManyBinds(ids: string[]) {
+		return this.updateManyBinds(ids, { archived: true, favorite: false });
+	}
+
+	restoreArchivedBind(id: string) {
+		const [restored] = this.updateManyBinds([id], { archived: false });
+
+		if (restored) {
+			useKnowledgeStore.getState().openBind(restored.id);
+			this.saveKnowledge();
+		}
+
+		return restored;
+	}
+
+	deleteManyBinds(ids: string[]) {
+		const targetIds = new Set(uniqueIds(ids));
+
+		if (targetIds.size === 0) return [];
+
+		const store = useKnowledgeStore.getState();
+		const deletedBinds = store.binds.filter((bind) => targetIds.has(bind.id));
+
+		if (deletedBinds.length === 0) return [];
+
+		const openedTabs = store.openedTabs.filter((id) => !targetIds.has(id));
+		const activeTab =
+			store.activeTab && targetIds.has(store.activeTab)
+				? openedTabs.at(-1)
+				: store.activeTab;
+
+		store.setKnowledge({
+			binds: store.binds.filter((bind) => !targetIds.has(bind.id)),
+			favorites: store.favorites.filter((id) => !targetIds.has(id)),
+			recent: store.recent.filter((id) => !targetIds.has(id)),
+			openedTabs,
+			pinnedTabs: store.pinnedTabs.filter((id) => !targetIds.has(id)),
+			activeTab,
+			selectedBind:
+				store.selectedBind && targetIds.has(store.selectedBind)
+					? activeTab
+					: store.selectedBind,
+		});
+		this.saveKnowledge();
+
+		for (const bind of deletedBinds) {
+			cloudKnowledgeService.deleteBind(bind.id);
+		}
+
+		return deletedBinds;
 	}
 
 	createCategory(input: CreateCategoryInput) {
@@ -809,6 +1327,117 @@ class KnowledgeService {
 		return true;
 	}
 
+	moveFolderTo(id: string, destination: MoveFolderInput) {
+		const store = useKnowledgeStore.getState();
+		const folder = store.folders.find((item) => item.id === id);
+
+		if (!folder) {
+			throw new Error("Folder not found");
+		}
+
+		const targetParentId = destination.parentId ?? "";
+		const targetParent = targetParentId
+			? store.folders.find((item) => item.id === targetParentId)
+			: undefined;
+
+		if (targetParentId && !targetParent) {
+			throw new Error("Destination folder was not found");
+		}
+
+		const categoryId = targetParent?.categoryId ?? destination.categoryId;
+
+		if (!store.categories.some((category) => category.id === categoryId)) {
+			throw new Error("Destination category was not found");
+		}
+
+		const movedFolderIds = this.collectFolderIds(id, store.folders);
+
+		if (targetParentId && movedFolderIds.has(targetParentId)) {
+			throw new Error("Folder cannot be moved into itself");
+		}
+
+		if (
+			folder.categoryId === categoryId &&
+			(folder.parentId ?? "") === targetParentId
+		) {
+			return {
+				folders: [folder],
+				binds: [],
+			};
+		}
+
+		const nextOrder =
+			Math.max(
+				0,
+				...store.folders
+					.filter(
+						(item) =>
+							item.id !== id &&
+							item.categoryId === categoryId &&
+							(item.parentId ?? "") === targetParentId,
+					)
+					.map((item) => item.order),
+			) + 1;
+		const folders = store.folders.map((item) => {
+			if (!movedFolderIds.has(item.id)) return item;
+
+			return {
+				...item,
+				categoryId,
+				parentId: item.id === id ? targetParentId || undefined : item.parentId,
+				order: item.id === id ? nextOrder : item.order,
+			};
+		});
+		const binds = store.binds.map((bind) =>
+			bind.folderId && movedFolderIds.has(bind.folderId)
+				? {
+						...bind,
+						categoryId,
+						updatedAt: now(),
+					}
+				: bind,
+		);
+		const changedFolders = folders.filter((item) => {
+			const previous = store.folders.find((folder) => folder.id === item.id);
+
+			return (
+				previous &&
+				(previous.categoryId !== item.categoryId ||
+					previous.parentId !== item.parentId ||
+					previous.order !== item.order)
+			);
+		});
+		const changedBinds = binds.filter((bind) => {
+			const previous = store.binds.find((item) => item.id === bind.id);
+
+			return previous && previous.categoryId !== bind.categoryId;
+		});
+
+		store.setKnowledge({
+			folders,
+			binds,
+			selectedCategory: categoryId,
+			selectedFolder: id,
+		});
+
+		for (const expandableId of [categoryId, targetParentId, id]) {
+			if (expandableId && !store.expandedFolders.includes(expandableId)) {
+				useKnowledgeStore.getState().toggleFolder(expandableId);
+			}
+		}
+
+		this.saveKnowledge();
+		cloudKnowledgeService.saveMany({
+			folders: changedFolders,
+			binds: changedBinds,
+		});
+
+		return {
+			folders: changedFolders,
+			binds: changedBinds,
+		};
+	}
+
 	deleteFolder(id: string) {
 		const store = useKnowledgeStore.getState();
 		const folderIds = this.collectFolderIds(id, store.folders);
@@ -941,6 +1570,8 @@ class KnowledgeService {
 			search: state.search,
 			favorites: state.favorites,
 			recent: state.recent,
+			favoriteFolders: state.favoriteFolders,
+			recentFolders: state.recentFolders,
 			openedTabs: state.openedTabs,
 			pinnedTabs: state.pinnedTabs,
 			activeTab: state.activeTab,
@@ -1021,6 +1652,7 @@ class KnowledgeService {
 				patch.folderId === undefined
 					? existing.folderId
 					: patch.folderId || undefined,
+			order: patch.order === undefined ? existing.order : patch.order,
 			slug:
 				patch.slug === undefined
 					? uniqueSlug(existing.slug, binds, existing.id)
@@ -1030,6 +1662,19 @@ class KnowledgeService {
 			tags:
 				patch.tags === undefined ? existing.tags : normalizeTags(patch.tags),
 			translations,
+			history: shouldTrackBindHistory(patch)
+				? [createBindHistoryEntry(existing), ...(existing.history ?? [])].slice(
+						0,
+						25,
+					)
+				: existing.history,
+			pinned: patch.pinned === undefined ? existing.pinned : patch.pinned,
+			copyCount:
+				patch.copyCount === undefined ? existing.copyCount : patch.copyCount,
+			lastCopiedAt:
+				patch.lastCopiedAt === undefined
+					? existing.lastCopiedAt
+					: patch.lastCopiedAt,
 			aiGenerated:
 				patch.aiGenerated === undefined
 					? existing.aiGenerated

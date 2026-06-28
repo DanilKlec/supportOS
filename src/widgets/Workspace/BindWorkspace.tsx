@@ -1,23 +1,17 @@
-import { useKnowledgeStore } from "@/store";
-
-import { WorkspaceTabs } from "./WorkspaceTabs";
+import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { BindViewer } from "./BindViewer";
 import { EmptyWorkspace } from "./EmptyWorkspace";
+import { WorkspaceTabs } from "./WorkspaceTabs";
 
 export function BindWorkspace() {
-  const activeTab = useKnowledgeStore((s) => s.activeTab);
+	const activeTab = useKnowledgeStore((s) => s.activeTab);
+	const showTabs = useWorkspaceStore((s) => s.layout.showTabs);
 
-  return (
-    <main className="flex flex-1 flex-col overflow-hidden bg-background">
+	return (
+		<main className="flex flex-1 flex-col overflow-hidden bg-background">
+			{showTabs && <WorkspaceTabs />}
 
-      <WorkspaceTabs />
-
-      {activeTab ? (
-        <BindViewer />
-      ) : (
-        <EmptyWorkspace />
-      )}
-
-    </main>
-  );
+			{activeTab ? <BindViewer /> : <EmptyWorkspace />}
+		</main>
+	);
 }
