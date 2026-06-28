@@ -26,7 +26,7 @@ import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 
 const CUSTOM_LANGUAGE = "__custom__";
-const LIVE_TRANSLATE_DELAY_MS = 700;
+const LIVE_TRANSLATE_DELAY_MS = 300;
 
 function getFallbackTargetLanguage(languageCode: string) {
 	return languageCode === "en" ? "ru" : "en";
@@ -54,6 +54,7 @@ export function TranslatorWidget() {
 	const [liveTranslate, setLiveTranslate] = useState(true);
 	const autoManagedFromRef = useRef(true);
 	const liveSignatureRef = useRef("");
+	const latestSourceTextRef = useRef(sourceText);
 	const languages = useMemo(() => translatorService.getFallbackLanguages(), []);
 	const isHiddenOnCurrentPage = isTranslatorPage(pathname);
 
@@ -67,6 +68,10 @@ export function TranslatorWidget() {
 			resolvedToLanguage.trim() &&
 			resolvedToLanguage.trim().toLowerCase() !== "auto",
 	);
+
+	useEffect(() => {
+		latestSourceTextRef.current = sourceText;
+	}, [sourceText]);
 
 	const setLanguageSelection = useCallback(
 		(side: "from" | "to", languageCode: string) => {
@@ -235,18 +240,24 @@ export function TranslatorWidget() {
 			setError("");
 			setLoading(true);
 
+			const requestText = sourceText;
+
 			try {
 				const direction = getTranslationDirection();
 				liveSignatureRef.current = getLiveSignature(
-					sourceText,
+					requestText,
 					direction.fromLanguage,
 					direction.toLanguage,
 				);
 				const result = await translatorService.translate({
-					text: sourceText,
+					text: requestText,
 					fromLanguage: direction.fromLanguage,
 					toLanguage: direction.toLanguage,
 				});
+
+				if (options?.silent && latestSourceTextRef.current !== requestText) {
+					return;
+				}
 
 				setResultText(result.text);
 				setDetectedLanguage(result.fromLanguage);
@@ -256,6 +267,10 @@ export function TranslatorWidget() {
 					);
 				}
 			} catch (translationError) {
+				if (options?.silent && latestSourceTextRef.current !== requestText) {
+					return;
+				}
+
 				setError(
 					translationError instanceof Error
 						? translationError.message
@@ -412,7 +427,6 @@ export function TranslatorWidget() {
 							value={sourceText}
 							onChange={(event) => setSourceText(event.target.value)}
 							onKeyDown={translateFromKeyboard}
-							disabled={loading}
 							className="supportos-scroll h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Text to translate..."
 						/>
@@ -432,7 +446,6 @@ export function TranslatorWidget() {
 						<textarea
 							value={resultText}
 							onChange={(event) => setResultText(event.target.value)}
-							disabled={loading}
 							className="supportos-scroll h-28 w-full resize-none rounded-md border border-border bg-background p-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Result..."
 						/>
