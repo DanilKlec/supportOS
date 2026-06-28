@@ -3,14 +3,12 @@ import {
 	Edit3,
 	Files,
 	History,
-	Maximize2,
-	Minimize2,
 	Pin,
 	Search,
 	Star,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -19,9 +17,14 @@ import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
 import { extractTemplateVariables } from "@/shared/lib/template-variables";
 import { modalManager } from "@/shared/modals/modal.store";
-import { type LanguageCode, useKnowledgeStore } from "@/store";
+import {
+	type LanguageCode,
+	useKnowledgeStore,
+	useWorkspaceStore,
+} from "@/store";
 
 function getTranslation(bind: Bind, language: string): BindTranslation {
 	return (
@@ -93,6 +96,7 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 
 export function BindViewer() {
 	const activeTab = useKnowledgeStore((state) => state.activeTab);
+	const contentWidth = useWorkspaceStore((state) => state.layout.contentWidth);
 	const bind = useKnowledgeStore((state) =>
 		activeTab ? state.getBind(activeTab) : undefined,
 	);
@@ -100,7 +104,6 @@ export function BindViewer() {
 	const setLanguage = useKnowledgeStore((state) => state.setLanguage);
 	const addRecent = useKnowledgeStore((state) => state.addRecent);
 	const binds = useKnowledgeStore((state) => state.binds);
-	const [cleanView, setCleanView] = useState(false);
 	const { showToast } = useToast();
 
 	const translation = useMemo(() => {
@@ -206,15 +209,18 @@ export function BindViewer() {
 		() => (bind ? getQualityIssues(bind, binds) : []),
 		[bind, binds],
 	);
+	const contentWidthClass = {
+		standard: "max-w-5xl",
+		wide: "max-w-7xl",
+		full: "max-w-none",
+	}[contentWidth];
 
 	useEffect(() => {
 		if (!bind || !translation) return undefined;
 
 		const handler = (event: KeyboardEvent) => {
-			const target = event.target as HTMLElement | null;
-
 			if (
-				target?.closest("input, textarea, select, [contenteditable='true']") ||
+				isTypingTarget(event.target) ||
 				event.ctrlKey ||
 				event.metaKey ||
 				event.altKey
@@ -222,39 +228,42 @@ export function BindViewer() {
 				return;
 			}
 
-			const key = event.key.toLowerCase();
-
-			if (key === "c") {
+			if (isKeyboardCode(event, "KeyC")) {
 				event.preventDefault();
 				void copyContent();
 			}
 
-			if (key === "e") {
+			if (isKeyboardCode(event, "KeyE")) {
 				event.preventDefault();
 				editBind();
 			}
 
-			if (key === "d") {
+			if (isKeyboardCode(event, "KeyD")) {
 				event.preventDefault();
 				duplicateBind();
 			}
 
-			if (key === "f") {
+			if (isKeyboardCode(event, "KeyF")) {
 				event.preventDefault();
 				toggleFavorite();
 			}
 
-			if (key === "p") {
+			if (isKeyboardCode(event, "KeyP")) {
 				event.preventDefault();
 				togglePinned();
 			}
 
-			if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+			if (
+				isKeyboardCode(event, "ArrowRight") ||
+				isKeyboardCode(event, "ArrowLeft")
+			) {
 				const existingLanguages = bind.translations.map(
 					(item) => item.language,
 				);
+				if (existingLanguages.length === 0) return;
+
 				const currentIndex = existingLanguages.indexOf(language);
-				const direction = event.key === "ArrowRight" ? 1 : -1;
+				const direction = isKeyboardCode(event, "ArrowRight") ? 1 : -1;
 				const next =
 					existingLanguages[
 						(currentIndex + direction + existingLanguages.length) %
@@ -283,7 +292,7 @@ export function BindViewer() {
 
 	return (
 		<div className="flex flex-1 overflow-auto">
-			<div className="mx-auto w-full max-w-5xl p-8">
+			<div className={`mx-auto w-full ${contentWidthClass} p-8`}>
 				<div className="mb-8 flex items-start justify-between gap-6">
 					<div className="min-w-0 flex-1">
 						<div className="mb-3 flex flex-wrap items-center gap-2">
@@ -323,7 +332,7 @@ export function BindViewer() {
 						<button
 							type="button"
 							onClick={copyContent}
-							title="Copy content"
+							title="Copy content (C)"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Copy size={18} />
@@ -331,17 +340,8 @@ export function BindViewer() {
 
 						<button
 							type="button"
-							onClick={() => setCleanView((value) => !value)}
-							title={cleanView ? "Exit clean view" : "Clean view"}
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							{cleanView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-						</button>
-
-						<button
-							type="button"
 							onClick={toggleFavorite}
-							title="Favorite"
+							title="Favorite (F)"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Star size={18} fill={bind.favorite ? "currentColor" : "none"} />
@@ -350,7 +350,7 @@ export function BindViewer() {
 						<button
 							type="button"
 							onClick={togglePinned}
-							title="Pin in folder"
+							title="Pin in folder (P)"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Pin size={18} fill={bind.pinned ? "currentColor" : "none"} />
@@ -359,7 +359,7 @@ export function BindViewer() {
 						<button
 							type="button"
 							onClick={duplicateBind}
-							title="Duplicate bind"
+							title="Duplicate bind (D)"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Files size={18} />
@@ -386,7 +386,7 @@ export function BindViewer() {
 						<button
 							type="button"
 							onClick={editBind}
-							title="Edit bind"
+							title="Edit bind (E)"
 							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
 						>
 							<Edit3 size={18} />
@@ -427,7 +427,7 @@ export function BindViewer() {
 					})}
 				</div>
 
-				{!cleanView && bind.tags.length > 0 && (
+				{bind.tags.length > 0 && (
 					<div className="mb-6 flex flex-wrap gap-2">
 						{bind.tags.map((tag) => (
 							<div
@@ -440,83 +440,79 @@ export function BindViewer() {
 					</div>
 				)}
 
-				{!cleanView && (
-					<div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-						<div className="rounded-lg border border-border bg-surface p-4">
-							<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-								Quality
-							</div>
-							{qualityIssues.length > 0 ? (
-								<div className="flex flex-wrap gap-2">
-									{qualityIssues.map((issue) => (
-										<span
-											key={issue}
-											className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-200"
-										>
-											{issue}
-										</span>
-									))}
-								</div>
-							) : (
-								<p className="text-sm text-muted">No obvious issues</p>
-							)}
-						</div>
-
-						<div className="rounded-lg border border-border bg-surface p-4">
-							<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-								Usage
-							</div>
-							<div className="text-sm">
-								{bind.copyCount ?? 0} copies
-								{bind.lastCopiedAt ? (
-									<div className="mt-1 text-xs text-muted">
-										Last: {new Date(bind.lastCopiedAt).toLocaleString()}
-									</div>
-								) : null}
-							</div>
-						</div>
-					</div>
-				)}
-
-				{!cleanView && (
-					<div className="mb-6 rounded-lg border border-border bg-surface p-4">
+				<div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+					<div className="rounded-lg border border-border bg-surface p-4">
 						<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-							Translations
+							Quality
 						</div>
-
-						<div className="grid gap-2 sm:grid-cols-2">
-							{bind.translations.map((item) => (
-								<div
-									key={item.language}
-									className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
-								>
-									<button
-										type="button"
-										onClick={() => setLanguage(item.language as LanguageCode)}
-										className="min-w-0 flex-1 text-left hover:text-accent"
+						{qualityIssues.length > 0 ? (
+							<div className="flex flex-wrap gap-2">
+								{qualityIssues.map((issue) => (
+									<span
+										key={issue}
+										className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-200"
 									>
-										<div className="text-xs font-semibold uppercase text-muted">
-											{item.language}
-										</div>
+										{issue}
+									</span>
+								))}
+							</div>
+						) : (
+							<p className="text-sm text-muted">No obvious issues</p>
+						)}
+					</div>
 
-										<div className="truncate text-sm">
-											{item.title || bind.slug}
-										</div>
-									</button>
-
-									<button
-										type="button"
-										onClick={() => void copyTranslation(item)}
-										title={`Copy ${item.language.toUpperCase()}`}
-										className="shrink-0 rounded-md p-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-									>
-										<Copy size={15} />
-									</button>
+					<div className="rounded-lg border border-border bg-surface p-4">
+						<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
+							Usage
+						</div>
+						<div className="text-sm">
+							{bind.copyCount ?? 0} copies
+							{bind.lastCopiedAt ? (
+								<div className="mt-1 text-xs text-muted">
+									Last: {new Date(bind.lastCopiedAt).toLocaleString()}
 								</div>
-							))}
+							) : null}
 						</div>
 					</div>
-				)}
+				</div>
+
+				<div className="mb-6 rounded-lg border border-border bg-surface p-4">
+					<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
+						Translations
+					</div>
+
+					<div className="grid gap-2 sm:grid-cols-2">
+						{bind.translations.map((item) => (
+							<div
+								key={item.language}
+								className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
+							>
+								<button
+									type="button"
+									onClick={() => setLanguage(item.language as LanguageCode)}
+									className="min-w-0 flex-1 text-left hover:text-accent"
+								>
+									<div className="text-xs font-semibold uppercase text-muted">
+										{item.language}
+									</div>
+
+									<div className="truncate text-sm">
+										{item.title || bind.slug}
+									</div>
+								</button>
+
+								<button
+									type="button"
+									onClick={() => void copyTranslation(item)}
+									title={`Copy ${item.language.toUpperCase()}`}
+									className="shrink-0 rounded-md p-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
+								>
+									<Copy size={15} />
+								</button>
+							</div>
+						))}
+					</div>
+				</div>
 
 				<div className="rounded-lg border border-border bg-surface p-8">
 					<div className="prose max-w-none leading-8 dark:prose-invert">

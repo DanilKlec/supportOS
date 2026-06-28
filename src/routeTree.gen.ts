@@ -13,10 +13,12 @@ import { Route as TranslatorRouteImport } from './routes/translator'
 import { Route as RecentRouteImport } from './routes/recent'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
+import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTranslatorRouteImport } from './routes/settings/translator'
@@ -46,6 +48,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HealthRoute = HealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FavoritesRoute = FavoritesRouteImport.update({
   id: '/favorites',
   path: '/favorites',
@@ -64,6 +71,11 @@ const BonusToolsRoute = BonusToolsRouteImport.update({
 const BindsRoute = BindsRouteImport.update({
   id: '/binds',
   path: '/binds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchiveRoute = ArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -109,10 +121,12 @@ const AiAssistantRoute = AiAssistantRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -127,10 +141,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -146,10 +162,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -166,10 +184,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
     | '/favorites'
+    | '/health'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -184,10 +204,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
     | '/favorites'
+    | '/health'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -202,10 +224,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
     | '/favorites'
+    | '/health'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -221,10 +245,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArchiveRoute: typeof ArchiveRoute
   BindsRoute: typeof BindsRoute
   BonusToolsRoute: typeof BonusToolsRoute
   BonusesRoute: typeof BonusesRoute
   FavoritesRoute: typeof FavoritesRoute
+  HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
   RecentRoute: typeof RecentRoute
@@ -268,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/favorites': {
       id: '/favorites'
       path: '/favorites'
@@ -294,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/binds'
       fullPath: '/binds'
       preLoaderRoute: typeof BindsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archive': {
+      id: '/archive'
+      path: '/archive'
+      fullPath: '/archive'
+      preLoaderRoute: typeof ArchiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -357,10 +397,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArchiveRoute: ArchiveRoute,
   BindsRoute: BindsRoute,
   BonusToolsRoute: BonusToolsRoute,
   BonusesRoute: BonusesRoute,
   FavoritesRoute: FavoritesRoute,
+  HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
   RecentRoute: RecentRoute,

@@ -2,19 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	Bot,
 	Check,
+	Clock3,
 	Cloud,
 	Database,
 	Download,
 	FileJson,
+	FileText,
+	Languages,
+	LayoutDashboard,
 	LogIn,
 	LogOut,
 	Monitor,
 	Moon,
 	Palette,
+	PanelLeft,
+	PanelTop,
 	Shield,
+	Star,
 	Sun,
 	Upload,
 	User,
+	Wrench,
 	Zap,
 } from "lucide-react";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
@@ -22,6 +30,11 @@ import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { GoogleSheetsImportPanel } from "@/components/import/GoogleSheetsImportPanel";
 import { PWAInstallButton } from "@/components/pwa/PWAInstallButton";
 import { languages } from "@/entities/language";
+import type {
+	WorkspaceContentWidth,
+	WorkspaceLayoutSettings,
+	WorkspaceSidebarWidth,
+} from "@/entities/workspace";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 import { supportOSExportService } from "@/services/supportos-export.service";
@@ -39,7 +52,11 @@ import {
 	saveAppearanceSettings,
 	type ThemeMode,
 } from "@/shared/lib/appearance";
-import { type LanguageCode, useKnowledgeStore } from "@/store";
+import {
+	type LanguageCode,
+	useKnowledgeStore,
+	useWorkspaceStore,
+} from "@/store";
 import { useAIStore } from "@/store/ai.store";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -73,6 +90,111 @@ const themeOptions: Array<{
 	},
 ];
 
+const sidebarWidthOptions: Array<{
+	value: WorkspaceSidebarWidth;
+	title: string;
+	description: string;
+}> = [
+	{
+		value: "narrow",
+		title: "Narrow",
+		description: "More room for bind content.",
+	},
+	{
+		value: "standard",
+		title: "Standard",
+		description: "Balanced tree and content.",
+	},
+	{
+		value: "wide",
+		title: "Wide",
+		description: "Better for deep folders.",
+	},
+];
+
+const contentWidthOptions: Array<{
+	value: WorkspaceContentWidth;
+	title: string;
+	description: string;
+}> = [
+	{
+		value: "standard",
+		title: "Standard",
+		description: "Readable centered bind view.",
+	},
+	{
+		value: "wide",
+		title: "Wide",
+		description: "More space for long answers.",
+	},
+	{
+		value: "full",
+		title: "Full",
+		description: "Use the whole workspace.",
+	},
+];
+
+type WorkspaceToggleKey = keyof Pick<
+	WorkspaceLayoutSettings,
+	| "showTopbar"
+	| "showSidebar"
+	| "showTabs"
+	| "showTranslatorWidget"
+	| "showSidebarFavorites"
+	| "showSidebarRecentFolders"
+	| "showSidebarTools"
+>;
+
+const workspaceToggleOptions: Array<{
+	key: WorkspaceToggleKey;
+	title: string;
+	description: string;
+	icon: typeof Monitor;
+}> = [
+	{
+		key: "showTopbar",
+		title: "Top bar",
+		description: "Search, create button and settings.",
+		icon: PanelTop,
+	},
+	{
+		key: "showSidebar",
+		title: "Knowledge tree",
+		description: "Left navigation panel.",
+		icon: PanelLeft,
+	},
+	{
+		key: "showTabs",
+		title: "Opened tabs",
+		description: "Bind tabs above the viewer.",
+		icon: FileText,
+	},
+	{
+		key: "showTranslatorWidget",
+		title: "Translator button",
+		description: "Floating quick translator.",
+		icon: Languages,
+	},
+	{
+		key: "showSidebarFavorites",
+		title: "Favorites block",
+		description: "Pinned shortcuts in the tree.",
+		icon: Star,
+	},
+	{
+		key: "showSidebarRecentFolders",
+		title: "Recent folders",
+		description: "Fast return to opened folders.",
+		icon: Clock3,
+	},
+	{
+		key: "showSidebarTools",
+		title: "Tools block",
+		description: "Bonus tools and project links.",
+		icon: Wrench,
+	},
+];
+
 function SettingsPage() {
 	const importInputRef = useRef<HTMLInputElement>(null);
 	const { showToast } = useToast();
@@ -90,6 +212,9 @@ function SettingsPage() {
 	const recent = useKnowledgeStore((state) => state.recent);
 	const language = useKnowledgeStore((state) => state.language);
 	const setLanguage = useKnowledgeStore((state) => state.setLanguage);
+	const workspaceLayout = useWorkspaceStore((state) => state.layout);
+	const setWorkspaceLayout = useWorkspaceStore((state) => state.setLayout);
+	const resetWorkspaceLayout = useWorkspaceStore((state) => state.resetLayout);
 	const authConfigured = useAuthStore((state) => state.configured);
 	const authSession = useAuthStore((state) => state.session);
 	const aiApiKey = useAIStore((state) => state.apiKey);
@@ -124,6 +249,17 @@ function SettingsPage() {
 
 		setAppearance(next);
 		saveAppearanceSettings(next);
+	};
+
+	const toggleWorkspaceFlag = (key: WorkspaceToggleKey) => {
+		setWorkspaceLayout({
+			[key]: !workspaceLayout[key],
+		} as Partial<WorkspaceLayoutSettings>);
+	};
+
+	const resetWorkspace = () => {
+		resetWorkspaceLayout();
+		showToast("Workspace layout reset");
 	};
 
 	const exportJson = () => {
@@ -459,6 +595,162 @@ function SettingsPage() {
 								</div>
 								<PWAInstallButton />
 							</div>
+						</div>
+					</div>
+				</section>
+
+				<section className="rounded-lg border border-border bg-surface p-5">
+					<div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+						<div>
+							<div className="flex items-center gap-2 text-lg font-semibold">
+								<LayoutDashboard size={18} />
+								Workspace layout
+							</div>
+							<p className="mt-1 text-sm text-muted">
+								Choose which panels stay visible and how much space the tree and
+								bind viewer use.
+							</p>
+						</div>
+
+						<button
+							type="button"
+							onClick={resetWorkspace}
+							className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+						>
+							Reset layout
+						</button>
+					</div>
+
+					<div className="grid gap-4 lg:grid-cols-[0.95fr_1.2fr]">
+						<div className="space-y-4">
+							<div className="space-y-2">
+								<div className="flex items-center gap-2 text-sm font-medium">
+									<PanelLeft size={16} />
+									Tree width
+								</div>
+								<div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+									{sidebarWidthOptions.map((option) => {
+										const active =
+											workspaceLayout.sidebarWidth === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() =>
+													setWorkspaceLayout({
+														sidebarWidth: option.value,
+													})
+												}
+												className={`rounded-lg border px-3 py-3 text-left transition ${
+													active
+														? "border-accent bg-accent/10 text-foreground"
+														: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
+												}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<span className="text-sm font-semibold">
+														{option.title}
+													</span>
+													{active && <Check size={14} />}
+												</div>
+												<div className="mt-1 text-xs text-muted">
+													{option.description}
+												</div>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+
+							<div className="space-y-2">
+								<div className="flex items-center gap-2 text-sm font-medium">
+									<FileText size={16} />
+									Bind viewer width
+								</div>
+								<div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+									{contentWidthOptions.map((option) => {
+										const active =
+											workspaceLayout.contentWidth === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												onClick={() =>
+													setWorkspaceLayout({
+														contentWidth: option.value,
+													})
+												}
+												className={`rounded-lg border px-3 py-3 text-left transition ${
+													active
+														? "border-accent bg-accent/10 text-foreground"
+														: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
+												}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<span className="text-sm font-semibold">
+														{option.title}
+													</span>
+													{active && <Check size={14} />}
+												</div>
+												<div className="mt-1 text-xs text-muted">
+													{option.description}
+												</div>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+
+						<div className="grid gap-2 sm:grid-cols-2">
+							{workspaceToggleOptions.map((option) => {
+								const Icon = option.icon;
+								const enabled = workspaceLayout[option.key];
+
+								return (
+									<button
+										key={option.key}
+										type="button"
+										onClick={() => toggleWorkspaceFlag(option.key)}
+										className={`flex min-h-24 items-start gap-3 rounded-lg border p-3 text-left transition ${
+											enabled
+												? "border-accent bg-accent/10 text-foreground"
+												: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
+										}`}
+									>
+										<span
+											className={`mt-0.5 rounded-md border p-2 ${
+												enabled
+													? "border-accent/40 bg-accent/15 text-accent"
+													: "border-border text-muted"
+											}`}
+										>
+											<Icon size={17} />
+										</span>
+										<span className="min-w-0 flex-1">
+											<span className="flex items-center justify-between gap-2">
+												<span className="text-sm font-semibold">
+													{option.title}
+												</span>
+												<span
+													className={`rounded-full px-2 py-0.5 text-[11px] ${
+														enabled
+															? "bg-accent text-accent-foreground"
+															: "bg-surface-elevated text-muted"
+													}`}
+												>
+													{enabled ? "On" : "Off"}
+												</span>
+											</span>
+											<span className="mt-1 block text-xs text-muted">
+												{option.description}
+											</span>
+										</span>
+									</button>
+								);
+							})}
 						</div>
 					</div>
 				</section>

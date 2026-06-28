@@ -3,25 +3,14 @@ import { Cloud, LogIn, LogOut, Plus, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
-import type { Bind } from "@/entities/bind";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
+import { isKeyboardCode } from "@/shared/lib/keyboard";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
-
-function getBindTitle(bind: Bind, language: string) {
-	return (
-		bind.translations.find((translation) => translation.language === language)
-			?.title ??
-		bind.translations.find((translation) => translation.language === "ru")
-			?.title ??
-		bind.translations.find((translation) => translation.language === "en")
-			?.title ??
-		bind.slug
-	);
-}
 
 export function Topbar() {
 	const navigate = useNavigate();
@@ -42,22 +31,16 @@ export function Topbar() {
 	const binds = useKnowledgeStore((s) => s.binds);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 
-	const searchQuery = searchValue.trim().toLowerCase();
-	const searchResults = searchQuery
-		? binds
-				.filter((bind) => {
-					if (bind.archived) return false;
-
-					const translations = bind.translations
-						.map((translation) => `${translation.title} ${translation.content}`)
-						.join(" ");
-					const haystack = [bind.slug, bind.tags.join(" "), translations]
-						.join(" ")
-						.toLowerCase();
-
-					return haystack.includes(searchQuery);
-				})
-				.slice(0, 8)
+	const searchResults = searchValue.trim()
+		? searchBinds(
+				binds.filter((bind) => !bind.archived),
+				searchValue,
+				{
+					categories,
+					folders,
+					language,
+				},
+			).slice(0, 8)
 		: [];
 
 	const createBind = useCallback(() => {
@@ -90,27 +73,25 @@ export function Topbar() {
 		const handler = (event: KeyboardEvent) => {
 			if (!event.ctrlKey && !event.metaKey) return;
 
-			const key = event.key.toLowerCase();
-
-			if (key === "f" || key === "p") {
+			if (isKeyboardCode(event, "KeyF") || isKeyboardCode(event, "KeyP")) {
 				event.preventDefault();
 				searchInputRef.current?.focus();
 				searchInputRef.current?.select();
 			}
 
-			if (key === "n") {
+			if (isKeyboardCode(event, "KeyN")) {
 				event.preventDefault();
 				createBind();
 			}
 
-			if (key === "d" && activeTab) {
+			if (isKeyboardCode(event, "KeyD") && activeTab) {
 				event.preventDefault();
 				const favorite = knowledgeService.toggleFavorite(activeTab);
 
 				showToast(favorite ? "Added to favorites" : "Removed from favorites");
 			}
 
-			if (key === "s") {
+			if (isKeyboardCode(event, "KeyS")) {
 				event.preventDefault();
 
 				const detail = { handled: false };

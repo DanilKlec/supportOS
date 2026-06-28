@@ -1,8 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
+	Archive,
 	Download,
 	FileText,
 	FolderPlus,
+	HeartPulse,
 	Search,
 	Settings,
 	ShieldCheck,
@@ -12,20 +14,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Bind } from "@/entities/bind";
 import { useToast } from "@/shared/hooks/useToast";
+import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
+import { isKeyboardCode } from "@/shared/lib/keyboard";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
-
-function getBindTitle(bind: Bind, language: string) {
-	return (
-		bind.translations.find((translation) => translation.language === language)
-			?.title ??
-		bind.translations.find((translation) => translation.language === "ru")
-			?.title ??
-		bind.translations.find((translation) => translation.language === "en")
-			?.title ??
-		bind.slug
-	);
-}
 
 export function CommandPalette() {
 	const navigate = useNavigate();
@@ -44,32 +36,24 @@ export function CommandPalette() {
 	const bindResults = useMemo(
 		() =>
 			normalizedQuery
-				? binds
-						.filter((bind) => {
-							if (bind.archived) return false;
-
-							const translations = bind.translations
-								.map(
-									(translation) =>
-										`${translation.title} ${translation.content}`,
-								)
-								.join(" ");
-							const haystack = [bind.slug, bind.tags.join(" "), translations]
-								.join(" ")
-								.toLowerCase();
-
-							return haystack.includes(normalizedQuery);
-						})
-						.slice(0, 8)
+				? searchBinds(
+						binds.filter((bind) => !bind.archived),
+						query,
+						{
+							categories,
+							folders,
+							language,
+						},
+					).slice(0, 8)
 				: binds.filter((bind) => !bind.archived).slice(0, 5),
-		[binds, normalizedQuery],
+		[binds, categories, folders, language, normalizedQuery, query],
 	);
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (
 				(!event.ctrlKey && !event.metaKey) ||
-				event.key.toLowerCase() !== "k"
+				!isKeyboardCode(event, "KeyK")
 			) {
 				return;
 			}
@@ -184,7 +168,7 @@ export function CommandPalette() {
 		URL.revokeObjectURL(url);
 		close();
 	};
-	const goTo = (to: "/" | "/settings") => {
+	const goTo = (to: "/" | "/settings" | "/health" | "/archive") => {
 		void navigate({ to });
 		close();
 	};
@@ -238,6 +222,18 @@ export function CommandPalette() {
 						title="Settings"
 						subtitle="Open app settings"
 						onClick={() => goTo("/settings")}
+					/>
+					<PaletteButton
+						icon={<HeartPulse size={16} />}
+						title="Knowledge health"
+						subtitle="Find duplicates, empty binds and missing translations"
+						onClick={() => goTo("/health")}
+					/>
+					<PaletteButton
+						icon={<Archive size={16} />}
+						title="Archive"
+						subtitle="Restore archived binds"
+						onClick={() => goTo("/archive")}
 					/>
 
 					<div className="mt-2 border-t border-border pt-2">
