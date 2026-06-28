@@ -1,6 +1,22 @@
 import { useRouterState } from "@tanstack/react-router";
-import { Copy, Languages, Loader2, Repeat2, Trash2, X } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
+import {
+	Copy,
+	Languages,
+	Loader2,
+	Repeat2,
+	Trash2,
+	X,
+	Zap,
+} from "lucide-react";
+import {
+	type FormEvent,
+	type KeyboardEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import {
 	type TranslatorLanguage,
@@ -10,6 +26,11 @@ import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 
 const CUSTOM_LANGUAGE = "__custom__";
+const LIVE_TRANSLATE_DELAY_MS = 700;
+
+function getFallbackTargetLanguage(languageCode: string) {
+	return languageCode === "en" ? "ru" : "en";
+}
 
 function isTranslatorPage(pathname: string) {
 	return pathname === "/translator" || pathname === "/settings/translator";
@@ -30,9 +51,10 @@ export function TranslatorWidget() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [detectedLanguage, setDetectedLanguage] = useState("");
+	const [liveTranslate, setLiveTranslate] = useState(true);
+	const liveSignatureRef = useRef("");
 	const languages = useMemo(() => translatorService.getFallbackLanguages(), []);
-
-	if (isTranslatorPage(pathname)) return null;
+	const isHiddenOnCurrentPage = isTranslatorPage(pathname);
 
 	const resolvedFromLanguage =
 		fromLanguage === CUSTOM_LANGUAGE ? customFromLanguage : fromLanguage;
@@ -45,37 +67,65 @@ export function TranslatorWidget() {
 			resolvedToLanguage.trim().toLowerCase() !== "auto",
 	);
 
-	const setLanguageSelection = (side: "from" | "to", languageCode: string) => {
-		const knownLanguage = languages.some(
-			(language) => language.code === languageCode,
-		);
+	const setLanguageSelection = useCallback(
+		(side: "from" | "to", languageCode: string) => {
+			const knownLanguage = languages.some(
+				(language) => language.code === languageCode,
+			);
 
-		if (side === "from") {
-			setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
-			setCustomFromLanguage(knownLanguage ? "" : languageCode);
-			return;
-		}
+			if (side === "from") {
+				setFromLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+				setCustomFromLanguage(knownLanguage ? "" : languageCode);
+				return;
+			}
 
-		setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
-		setCustomToLanguage(knownLanguage ? "" : languageCode);
-	};
+			setToLanguage(knownLanguage ? languageCode : CUSTOM_LANGUAGE);
+			setCustomToLanguage(knownLanguage ? "" : languageCode);
+		},
+		[languages],
+	);
 
-	const getTranslationDirection = () => {
+	const getLiveSignature = useCallback(
+		(text = sourceText, from = resolvedFromLanguage, to = resolvedToLanguage) =>
+			JSON.stringify([
+				text.trim(),
+				from.trim().toLowerCase(),
+				to.trim().toLowerCase(),
+			]),
+		[sourceText, resolvedFromLanguage, resolvedToLanguage],
+	);
+
+	const getTranslationDirection = useCallback(() => {
 		const detected = translatorService.detectLanguage(sourceText);
 		const source = resolvedFromLanguage.trim().toLowerCase();
 		const target = resolvedToLanguage.trim().toLowerCase();
+
+		if (source === "auto") {
+			const nextTarget =
+				detected === target ? getFallbackTargetLanguage(detected) : target;
+
+			setLanguageSelection("from", detected);
+			if (nextTarget !== target) {
+				setLanguageSelection("to", nextTarget);
+			}
+
+			return {
+				fromLanguage: detected,
+				toLanguage: nextTarget,
+				detected,
+				switched: true,
+			};
+		}
+
 		const shouldSwap =
-			source !== "auto" &&
-			detected === target &&
-			source !== target &&
-			Boolean(target);
+			detected === target && source !== target && Boolean(target);
 
 		if (!shouldSwap) {
 			return {
 				fromLanguage: resolvedFromLanguage,
 				toLanguage: resolvedToLanguage,
 				detected,
-				swapped: false,
+				switched: false,
 			};
 		}
 
@@ -86,47 +136,100 @@ export function TranslatorWidget() {
 			fromLanguage: detected,
 			toLanguage: source,
 			detected,
-			swapped: true,
+			switched: true,
 		};
-	};
+	}, [
+		resolvedFromLanguage,
+		resolvedToLanguage,
+		setLanguageSelection,
+		sourceText,
+	]);
 
-	const translate = async (event?: FormEvent) => {
-		event?.preventDefault();
-		if (loading) return;
+	const translate = useCallback(
+		async (event?: FormEvent, options?: { silent?: boolean }) => {
+			event?.preventDefault();
+			if (loading) return;
 
-		if (!canTranslate) {
-			setError("Enter text and choose a target language.");
+			if (!canTranslate) {
+				setError("Enter text and choose a target language.");
+				return;
+			}
+
+			setError("");
+			setLoading(true);
+
+			try {
+				const direction = getTranslationDirection();
+				liveSignatureRef.current = getLiveSignature(
+					sourceText,
+					direction.fromLanguage,
+					direction.toLanguage,
+				);
+				const result = await translatorService.translate({
+					text: sourceText,
+					fromLanguage: direction.fromLanguage,
+					toLanguage: direction.toLanguage,
+				});
+
+				setResultText(result.text);
+				setDetectedLanguage(result.fromLanguage);
+				if (direction.switched && !options?.silent) {
+					showToast(
+						`Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`,
+					);
+				}
+			} catch (translationError) {
+				setError(
+					translationError instanceof Error
+						? translationError.message
+						: "Translation failed",
+				);
+			} finally {
+				setLoading(false);
+			}
+		},
+		[
+			canTranslate,
+			getLiveSignature,
+			getTranslationDirection,
+			loading,
+			showToast,
+			sourceText,
+		],
+	);
+
+	useEffect(() => {
+		if (isHiddenOnCurrentPage || !open || !liveTranslate) return;
+
+		if (!sourceText.trim()) {
+			setResultText("");
+			setDetectedLanguage("");
+			setError("");
+			liveSignatureRef.current = "";
 			return;
 		}
 
-		setError("");
-		setLoading(true);
+		if (loading || !canTranslate) return;
 
-		try {
-			const direction = getTranslationDirection();
-			const result = await translatorService.translate({
-				text: sourceText,
-				fromLanguage: direction.fromLanguage,
-				toLanguage: direction.toLanguage,
-			});
+		const signature = getLiveSignature();
+		if (signature === liveSignatureRef.current) return;
 
-			setResultText(result.text);
-			setDetectedLanguage(result.fromLanguage);
-			if (direction.swapped) {
-				showToast(
-					`Direction switched: ${direction.fromLanguage.toUpperCase()} -> ${direction.toLanguage.toUpperCase()}`,
-				);
-			}
-		} catch (translationError) {
-			setError(
-				translationError instanceof Error
-					? translationError.message
-					: "Translation failed",
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
+		const timer = window.setTimeout(() => {
+			liveSignatureRef.current = signature;
+			void translate(undefined, { silent: true });
+		}, LIVE_TRANSLATE_DELAY_MS);
+
+		return () => window.clearTimeout(timer);
+	}, [
+		canTranslate,
+		getLiveSignature,
+		isHiddenOnCurrentPage,
+		liveTranslate,
+		loading,
+		open,
+		sourceText,
+		translate,
+	]);
 
 	const translateFromKeyboard = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key !== "Enter" || event.shiftKey) return;
@@ -140,6 +243,7 @@ export function TranslatorWidget() {
 		setResultText("");
 		setError("");
 		setDetectedLanguage("");
+		liveSignatureRef.current = "";
 	};
 
 	const swapLanguages = () => {
@@ -165,6 +269,8 @@ export function TranslatorWidget() {
 		const copied = await copyToClipboard(resultText);
 		showToast(copied ? "Result copied" : "Copy failed");
 	};
+
+	if (isHiddenOnCurrentPage) return null;
 
 	return (
 		<div className="fixed bottom-5 right-5 z-30 flex flex-col items-end gap-3">
@@ -274,6 +380,22 @@ export function TranslatorWidget() {
 								title="Clear translator"
 							>
 								<Trash2 size={15} />
+							</button>
+
+							<button
+								type="button"
+								onClick={() => setLiveTranslate((value) => !value)}
+								className={`rounded-md border p-2 transition-colors ${
+									liveTranslate
+										? "border-accent bg-accent/10 text-accent hover:bg-accent/15"
+										: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+								}`}
+								title={
+									liveTranslate ? "Live translate on" : "Live translate off"
+								}
+								aria-pressed={liveTranslate}
+							>
+								<Zap size={15} />
 							</button>
 						</div>
 
