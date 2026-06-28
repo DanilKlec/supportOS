@@ -27,7 +27,7 @@ import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useTranslatorStore } from "@/store/translator.store";
 
 const CUSTOM_LANGUAGE = "__custom__";
-const LIVE_TRANSLATE_DELAY_MS = 700;
+const LIVE_TRANSLATE_DELAY_MS = 300;
 
 function getFallbackTargetLanguage(languageCode: string) {
 	return languageCode === "en" ? "ru" : "en";
@@ -54,6 +54,7 @@ export function TranslatorPage() {
 	const [liveTranslate, setLiveTranslate] = useState(true);
 	const autoManagedFromRef = useRef(true);
 	const liveSignatureRef = useRef("");
+	const latestSourceTextRef = useRef(sourceText);
 
 	const resolvedFromLanguage =
 		fromLanguage === CUSTOM_LANGUAGE ? customFromLanguage : fromLanguage;
@@ -65,6 +66,10 @@ export function TranslatorPage() {
 			resolvedToLanguage.trim() &&
 			resolvedToLanguage.trim().toLowerCase() !== "auto",
 	);
+
+	useEffect(() => {
+		latestSourceTextRef.current = sourceText;
+	}, [sourceText]);
 
 	const languageOptions = useMemo(() => {
 		const byCode = new Map<string, TranslatorLanguage>();
@@ -284,18 +289,24 @@ export function TranslatorPage() {
 			setError("");
 			setLoading(true);
 
+			const requestText = sourceText;
+
 			try {
 				const direction = getTranslationDirection();
 				liveSignatureRef.current = getLiveSignature(
-					sourceText,
+					requestText,
 					direction.fromLanguage,
 					direction.toLanguage,
 				);
 				const result = await translatorService.translate({
-					text: sourceText,
+					text: requestText,
 					fromLanguage: direction.fromLanguage,
 					toLanguage: direction.toLanguage,
 				});
+
+				if (options?.silent && latestSourceTextRef.current !== requestText) {
+					return;
+				}
 
 				setResultText(result.text);
 				setDetectedLanguage(result.fromLanguage);
@@ -307,6 +318,10 @@ export function TranslatorPage() {
 					);
 				}
 			} catch (translationError) {
+				if (options?.silent && latestSourceTextRef.current !== requestText) {
+					return;
+				}
+
 				setError(
 					translationError instanceof Error
 						? translationError.message
@@ -535,7 +550,6 @@ export function TranslatorPage() {
 							value={sourceText}
 							onChange={(event) => setSourceText(event.target.value)}
 							onKeyDown={translateFromKeyboard}
-							disabled={loading}
 							className="supportos-scroll min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Paste text, markdown, or code here..."
 						/>
@@ -557,7 +571,6 @@ export function TranslatorPage() {
 						<textarea
 							value={resultText}
 							onChange={(event) => setResultText(event.target.value)}
-							disabled={loading}
 							className="supportos-scroll min-h-96 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="Translation result will appear here..."
 						/>
