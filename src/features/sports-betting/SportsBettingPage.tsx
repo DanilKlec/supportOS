@@ -24,6 +24,40 @@ type Movement = "new" | "up" | "down" | "flat";
 
 const ALL_FILTER = "All";
 const DEFAULT_POLL_MS = 7_200_000;
+const DEFAULT_SOURCE_ID = "football-world-cup";
+
+const SPORT_SOURCE_OPTIONS = [
+	{
+		id: DEFAULT_SOURCE_ID,
+		label: "Football / FIFA World Cup",
+		sports: "soccer_fifa_world_cup",
+	},
+	{
+		id: "football-club-world-cup",
+		label: "Football / Club World Cup",
+		sports: "soccer_fifa_club_world_cup",
+	},
+	{
+		id: "football-champions-league",
+		label: "Football / Champions League",
+		sports: "soccer_uefa_champs_league",
+	},
+	{
+		id: "football-epl",
+		label: "Football / English Premier League",
+		sports: "soccer_epl",
+	},
+	{
+		id: "football-spain",
+		label: "Football / Spain La Liga",
+		sports: "soccer_spain_la_liga",
+	},
+	{
+		id: "mixed-upcoming",
+		label: "Mixed / Upcoming",
+		sports: "upcoming",
+	},
+];
 
 const QUICK_SNIPPETS = [
 	{
@@ -176,6 +210,7 @@ export function SportsBettingPage() {
 	const previousPricesRef = useRef<Map<string, number>>(new Map());
 	const [feed, setFeed] = useState<SportsBettingFeed>();
 	const [movements, setMovements] = useState<Record<string, Movement>>({});
+	const [sourceId, setSourceId] = useState(DEFAULT_SOURCE_ID);
 	const [activeSport, setActiveSport] = useState(ALL_FILTER);
 	const [activeMarket, setActiveMarket] = useState(ALL_FILTER);
 	const [query, setQuery] = useState("");
@@ -211,6 +246,9 @@ export function SportsBettingPage() {
 		setMovements(nextMovements);
 		setFeed(nextFeed);
 	}, []);
+	const selectedSource =
+		SPORT_SOURCE_OPTIONS.find((source) => source.id === sourceId) ??
+		SPORT_SOURCE_OPTIONS[0];
 
 	const loadFeed = useCallback(
 		async (showSuccess = false) => {
@@ -218,7 +256,9 @@ export function SportsBettingPage() {
 			setError("");
 
 			try {
-				const nextFeed = await sportsBettingService.loadLiveFeed();
+				const nextFeed = await sportsBettingService.loadLiveFeed({
+					sports: selectedSource.sports,
+				});
 
 				applyFeed(nextFeed);
 				if (showSuccess) {
@@ -235,7 +275,7 @@ export function SportsBettingPage() {
 				setRefreshing(false);
 			}
 		},
-		[applyFeed, showToast],
+		[applyFeed, selectedSource.sports, showToast],
 	);
 
 	useEffect(() => {
@@ -422,7 +462,7 @@ export function SportsBettingPage() {
 					</div>
 				</div>
 
-				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1fr)_auto_auto]">
+				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1fr)_minmax(14rem,18rem)_auto_auto]">
 					<div className="relative">
 						<Search
 							size={16}
@@ -435,6 +475,27 @@ export function SportsBettingPage() {
 							placeholder="Search sport, team, market, bookmaker..."
 						/>
 					</div>
+
+					<select
+						value={sourceId}
+						onChange={(event) => {
+							setSourceId(event.target.value);
+							setActiveSport(ALL_FILTER);
+							setActiveMarket(ALL_FILTER);
+							setQuery("");
+							setFeed(undefined);
+							setLoading(true);
+							setMovements({});
+							previousPricesRef.current = new Map();
+						}}
+						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+					>
+						{SPORT_SOURCE_OPTIONS.map((source) => (
+							<option key={source.id} value={source.id}>
+								{source.label}
+							</option>
+						))}
+					</select>
 
 					<select
 						value={activeSport}
@@ -580,7 +641,8 @@ export function SportsBettingPage() {
 								))
 							) : (
 								<div className="px-4 py-12 text-center text-sm text-muted">
-									No live sports betting events match this view
+									No events for {selectedSource.label}. Try another football
+									league or Mixed / Upcoming.
 								</div>
 							)}
 						</div>
@@ -600,6 +662,12 @@ export function SportsBettingPage() {
 									<span className="text-muted">Sports</span>
 									<span className="max-w-44 truncate text-right font-medium">
 										{feed?.config.sports.join(", ") ?? "-"}
+									</span>
+								</div>
+								<div className="flex justify-between gap-3">
+									<span className="text-muted">Selected</span>
+									<span className="max-w-44 truncate text-right font-medium">
+										{selectedSource.label}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
