@@ -1,5 +1,5 @@
 const ODDS_API_HOST = "https://api.the-odds-api.com";
-const DEFAULT_SPORTS = "upcoming";
+const DEFAULT_SPORTS = "soccer_fifa_world_cup";
 const DEFAULT_REGIONS = "eu";
 const DEFAULT_MARKETS = "h2h";
 const DEFAULT_ODDS_FORMAT = "decimal";
@@ -7,6 +7,7 @@ const DEFAULT_DATE_FORMAT = "iso";
 const DEFAULT_LIMIT = 12;
 const DEFAULT_POLL_MS = 7_200_000;
 const DEFAULT_CACHE_TTL_SECONDS = 7_200;
+const DEFAULT_INCLUDE_LAY = false;
 
 const MARKET_LABELS = {
 	h2h: "Moneyline",
@@ -38,6 +39,12 @@ function normalizeInt(value, fallback, min, max) {
 	if (!Number.isFinite(parsed)) return fallback;
 
 	return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeBoolean(value, fallback) {
+	if (value === undefined || value === "") return fallback;
+
+	return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 function getLastUpdate(bookmakers) {
@@ -76,13 +83,18 @@ function toMarketLabel(key) {
 	return MARKET_LABELS[key] ?? key;
 }
 
-function normalizeEvent(event) {
+function normalizeEvent(event, config) {
 	const markets = new Map();
 	const allOutcomes = [];
 
 	for (const bookmaker of event.bookmakers ?? []) {
 		for (const market of bookmaker.markets ?? []) {
 			const marketKey = market.key ?? "market";
+
+			if (!config.includeLay && marketKey.endsWith("_lay")) {
+				continue;
+			}
+
 			const marketLabel = toMarketLabel(marketKey);
 			const normalizedMarket =
 				markets.get(marketKey) ??
@@ -244,6 +256,10 @@ function getConfig({ query = {}, env = process.env } = {}) {
 		60,
 		86_400,
 	);
+	const includeLay = normalizeBoolean(
+		readQueryValue(query, "includeLay") ?? env.SPORTS_BETTING_INCLUDE_LAY,
+		DEFAULT_INCLUDE_LAY,
+	);
 
 	return {
 		apiKey,
@@ -254,6 +270,7 @@ function getConfig({ query = {}, env = process.env } = {}) {
 		limit,
 		pollMs,
 		cacheTtlSeconds,
+		includeLay,
 	};
 }
 
@@ -339,7 +356,7 @@ export async function loadSportsBettingLive(options = {}) {
 
 	const events = fulfilled
 		.flatMap((result) => result.events)
-		.map(normalizeEvent)
+		.map((event) => normalizeEvent(event, config))
 		.filter((event) => event.id && event.bestOdds.length > 0)
 		.sort(sortEvents)
 		.slice(0, config.limit);
@@ -356,6 +373,7 @@ export async function loadSportsBettingLive(options = {}) {
 			markets: config.markets,
 			bookmakers: config.bookmakers || undefined,
 			oddsFormat: DEFAULT_ODDS_FORMAT,
+			includeLay: config.includeLay,
 		},
 		quota,
 		warnings,

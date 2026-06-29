@@ -45,6 +45,7 @@ export interface SportsBettingFeed {
 		markets: string;
 		bookmakers?: string;
 		oddsFormat: string;
+		includeLay: boolean;
 	};
 	quota?: {
 		requestsRemaining?: string;
@@ -62,6 +63,10 @@ interface SportsBettingErrorResponse {
 
 const SPORTS_BETTING_ENDPOINT = "/api/sports-betting/live";
 
+interface LiveFeedParams {
+	sports?: string;
+}
+
 async function readJson<T>(response: Response): Promise<T | undefined> {
 	try {
 		return (await response.json()) as T;
@@ -71,8 +76,14 @@ async function readJson<T>(response: Response): Promise<T | undefined> {
 }
 
 class SportsBettingService {
-	async loadLiveFeed() {
-		const response = await fetch(SPORTS_BETTING_ENDPOINT);
+	async loadLiveFeed(params: LiveFeedParams = {}) {
+		const url = new URL(SPORTS_BETTING_ENDPOINT, window.location.origin);
+
+		if (params.sports) {
+			url.searchParams.set("sports", params.sports);
+		}
+
+		const response = await fetch(url.toString());
 		const data = await readJson<SportsBettingFeed | SportsBettingErrorResponse>(
 			response,
 		);
