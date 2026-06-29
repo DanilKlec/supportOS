@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslatorRouteImport } from './routes/translator'
+import { Route as SportsBettingRouteImport } from './routes/sports-betting'
 import { Route as RecentRouteImport } from './routes/recent'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
@@ -31,6 +32,11 @@ import { Route as AiAssistantRouteImport } from './routes/ai/assistant'
 const TranslatorRoute = TranslatorRouteImport.update({
   id: '/translator',
   path: '/translator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SportsBettingRoute = SportsBettingRouteImport.update({
+  id: '/sports-betting',
+  path: '/sports-betting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RecentRoute = RecentRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -193,6 +202,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
   RecentRoute: typeof RecentRoute
+  SportsBettingRoute: typeof SportsBettingRoute
   TranslatorRoute: typeof TranslatorRoute
   AiAssistantRoute: typeof AiAssistantRoute
   AiKnowledgeRoute: typeof AiKnowledgeRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/translator'
       fullPath: '/translator'
       preLoaderRoute: typeof TranslatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sports-betting': {
+      id: '/sports-betting'
+      path: '/sports-betting'
+      fullPath: '/sports-betting'
+      preLoaderRoute: typeof SportsBettingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/recent': {
@@ -406,6 +426,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
   RecentRoute: RecentRoute,
+  SportsBettingRoute: SportsBettingRoute,
   TranslatorRoute: TranslatorRoute,
   AiAssistantRoute: AiAssistantRoute,
   AiKnowledgeRoute: AiKnowledgeRoute,
