@@ -4,8 +4,9 @@ const DEFAULT_REGIONS = "eu";
 const DEFAULT_MARKETS = "h2h";
 const DEFAULT_ODDS_FORMAT = "decimal";
 const DEFAULT_DATE_FORMAT = "iso";
-const DEFAULT_LIMIT = 24;
-const DEFAULT_POLL_MS = 60_000;
+const DEFAULT_LIMIT = 12;
+const DEFAULT_POLL_MS = 7_200_000;
+const DEFAULT_CACHE_TTL_SECONDS = 7_200;
 
 const MARKET_LABELS = {
 	h2h: "Moneyline",
@@ -235,7 +236,13 @@ function getConfig({ query = {}, env = process.env } = {}) {
 		env.SPORTS_BETTING_POLL_MS,
 		DEFAULT_POLL_MS,
 		15_000,
-		300_000,
+		86_400_000,
+	);
+	const cacheTtlSeconds = normalizeInt(
+		env.SPORTS_BETTING_CACHE_TTL_SECONDS,
+		DEFAULT_CACHE_TTL_SECONDS,
+		60,
+		86_400,
 	);
 
 	return {
@@ -246,6 +253,7 @@ function getConfig({ query = {}, env = process.env } = {}) {
 		bookmakers,
 		limit,
 		pollMs,
+		cacheTtlSeconds,
 	};
 }
 
@@ -341,6 +349,7 @@ export async function loadSportsBettingLive(options = {}) {
 		provider: "The Odds API",
 		loadedAt: new Date().toISOString(),
 		pollMs: config.pollMs,
+		cacheTtlSeconds: config.cacheTtlSeconds,
 		config: {
 			sports: config.sports,
 			regions: config.regions,

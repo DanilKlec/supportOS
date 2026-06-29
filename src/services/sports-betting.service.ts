@@ -38,6 +38,7 @@ export interface SportsBettingFeed {
 	provider: string;
 	loadedAt: string;
 	pollMs: number;
+	cacheTtlSeconds: number;
 	config: {
 		sports: string[];
 		regions: string;
@@ -71,9 +72,7 @@ async function readJson<T>(response: Response): Promise<T | undefined> {
 
 class SportsBettingService {
 	async loadLiveFeed() {
-		const response = await fetch(SPORTS_BETTING_ENDPOINT, {
-			cache: "no-store",
-		});
+		const response = await fetch(SPORTS_BETTING_ENDPOINT);
 		const data = await readJson<SportsBettingFeed | SportsBettingErrorResponse>(
 			response,
 		);

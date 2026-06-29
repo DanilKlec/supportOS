@@ -23,7 +23,7 @@ import { copyToClipboard } from "@/shared/lib/clipboard";
 type Movement = "new" | "up" | "down" | "flat";
 
 const ALL_FILTER = "All";
-const DEFAULT_POLL_MS = 60_000;
+const DEFAULT_POLL_MS = 7_200_000;
 
 const QUICK_SNIPPETS = [
 	{
@@ -86,6 +86,16 @@ function formatPrice(price: number) {
 		minimumFractionDigits: 2,
 		maximumFractionDigits: 2,
 	}).format(price);
+}
+
+function formatDurationMs(value: number) {
+	const minutes = Math.max(1, Math.round(value / 60_000));
+
+	if (minutes >= 60 && minutes % 60 === 0) {
+		return `${minutes / 60}h`;
+	}
+
+	return `${minutes}m`;
 }
 
 function formatOutcomeLabel(outcome: SportsBettingOutcome) {
@@ -236,6 +246,8 @@ export function SportsBettingPage() {
 
 	useEffect(() => {
 		const timer = window.setInterval(() => {
+			if (document.visibilityState === "hidden") return;
+
 			void loadFeed(false);
 		}, pollMs);
 
@@ -323,7 +335,7 @@ export function SportsBettingPage() {
 
 					<div className="flex flex-wrap items-center gap-2">
 						<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
-							Auto update every {Math.round(pollMs / 1000)}s
+							Auto update every {formatDurationMs(pollMs)}
 						</div>
 						<button
 							type="button"

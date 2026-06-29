@@ -6,9 +6,17 @@ function allowCors(response) {
 	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-function sendJson(response, status, body) {
+function getSuccessCacheControl(data) {
+	const ttl =
+		typeof data?.cacheTtlSeconds === "number" ? data.cacheTtlSeconds : 7200;
+	const staleTtl = Math.min(600, Math.max(60, Math.floor(ttl / 6)));
+
+	return `public, s-maxage=${ttl}, stale-while-revalidate=${staleTtl}`;
+}
+
+function sendJson(response, status, body, cacheControl = "no-store") {
 	allowCors(response);
-	response.setHeader("Cache-Control", "no-store");
+	response.setHeader("Cache-Control", cacheControl);
 	response.setHeader("Content-Type", "application/json; charset=utf-8");
 	response.status(status).json(body);
 }
@@ -35,7 +43,7 @@ export default async function handler(request, response) {
 			env: process.env,
 		});
 
-		sendJson(response, 200, data);
+		sendJson(response, 200, data, getSuccessCacheControl(data));
 	} catch (error) {
 		sendJson(response, error?.status ?? 502, {
 			error:
