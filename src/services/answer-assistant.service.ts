@@ -59,6 +59,14 @@ export interface CheckIssue {
 	detail: string;
 }
 
+export interface ReadyAnswerResult {
+	answer: string;
+	language: string;
+	issues: CheckIssue[];
+	mode: "ollama" | "free";
+	warning?: string;
+}
+
 interface OllamaGenerateResponse {
 	response?: string;
 	error?: string;
@@ -69,7 +77,7 @@ const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434";
 const DEFAULT_OLLAMA_MODEL = "llama3.1:8b";
 
 export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
-	language: "en",
+	language: "auto",
 	product: "SupportOS",
 	tone: "friendly",
 	intent: "general",
@@ -420,6 +428,100 @@ class AnswerAssistantService {
 		}
 
 		return buildRuleBasedAnswer(request);
+	}
+
+	async generateReadyAnswer(
+		request: GenerateAnswerRequest,
+	): Promise<ReadyAnswerResult> {
+		if (!request.customerMessage.trim()) {
+			throw new Error("Customer message is required");
+		}
+
+		const language =
+			request.settings.language.trim().toLowerCase() === "auto"
+				? translatorService.detectLanguage(request.customerMessage)
+				: request.settings.language.trim().toLowerCase();
+		const resolvedRequest: GenerateAnswerRequest = {
+			...request,
+			settings: {
+				...request.settings,
+				language,
+			},
+		};
+
+		let answer = "";
+		let mode: ReadyAnswerResult["mode"] = "free";
+		let warning: string | undefined;
+
+		if (resolvedRequest.settings.ollamaEnabled) {
+			try {
+				answer = await generateWithOllama(resolvedRequest);
+				mode = "ollama";
+			} catch (error) {
+				warning = `Ollama is unavailable, so the free mode was used: ${
+					error instanceof Error ? error.message : "connection failed"
+				}`;
+			}
+		}
+
+		if (!answer) {
+			answer = buildRuleBasedAnswer({
+				...resolvedRequest,
+				settings: {
+					...resolvedRequest.settings,
+					language: "en",
+				},
+			});
+
+			if (language !== "en") {
+				try {
+					answer = await this.translateAnswer({
+						text: answer,
+						toLanguage: language,
+						glossary: resolvedRequest.glossary,
+					});
+				} catch (error) {
+					const translationWarning = `Automatic translation is unavailable: ${
+						error instanceof Error ? error.message : "translation failed"
+					}`;
+
+					warning = warning
+						? `${warning}. ${translationWarning}`
+						: translationWarning;
+				}
+			}
+		}
+
+		const issues = this.checkAnswer({
+			answer,
+			customerMessage: resolvedRequest.customerMessage,
+			glossary: resolvedRequest.glossary,
+			language,
+		});
+
+		return {
+			answer,
+			language,
+			issues,
+			mode,
+			warning,
+		};
+	}
+
+	async testOllama(settings: AssistantSettings) {
+		const endpoint = settings.ollamaEndpoint.trim().replace(/\/+$/, "");
+
+		if (!endpoint) {
+			throw new Error("Ollama endpoint is required");
+		}
+
+		const response = await fetch(`${endpoint}/api/tags`);
+
+		if (!response.ok) {
+			throw new Error(`Ollama returned HTTP ${response.status}`);
+		}
+
+		return true;
 	}
 
 	async translateAnswer({
