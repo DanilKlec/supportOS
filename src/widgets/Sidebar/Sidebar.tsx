@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	Archive,
+	Bot,
 	Check,
 	Contact,
 	Download,
@@ -399,6 +400,14 @@ export function Sidebar() {
 						>
 							<Wrench size={14} />
 							<span>Bonus Tools</span>
+						</Link>
+
+						<Link
+							to="/ai/assistant"
+							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+						>
+							<Bot size={14} />
+							<span>Answer Assistant</span>
 						</Link>
 
 						<Link
