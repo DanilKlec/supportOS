@@ -72,11 +72,12 @@ export function AnswerAssistantPage() {
 	const [answer, setAnswer] = useState("");
 	const [issues, setIssues] = useState<CheckIssue[]>([]);
 	const [resultLanguage, setResultLanguage] = useState("");
-	const [mode, setMode] = useState<"ollama" | "free">("free");
+	const [mode, setMode] = useState<"gemini" | "free">("free");
 	const [warning, setWarning] = useState("");
 	const [loading, setLoading] = useState(false);
-	const [ollamaChecking, setOllamaChecking] = useState(false);
-	const [ollamaOnline, setOllamaOnline] = useState<boolean>();
+	const [geminiChecking, setGeminiChecking] = useState(false);
+	const [geminiOnline, setGeminiOnline] = useState<boolean>();
+	const [geminiModel, setGeminiModel] = useState("");
 	const [customLanguage, setCustomLanguage] = useState("");
 	const [glossarySource, setGlossarySource] = useState("");
 	const [glossaryTarget, setGlossaryTarget] = useState("");
@@ -159,18 +160,20 @@ export function AnswerAssistantPage() {
 		showToast("Ответ сохранён в память");
 	};
 
-	const checkOllama = async () => {
-		setOllamaChecking(true);
+	const checkGemini = async () => {
+		setGeminiChecking(true);
 
 		try {
-			await answerAssistantService.testOllama(settings);
-			setOllamaOnline(true);
-			showToast("Ollama подключена");
+			const model = await answerAssistantService.testGemini();
+			setGeminiOnline(true);
+			setGeminiModel(model);
+			showToast("Gemini настроен");
 		} catch (error) {
-			setOllamaOnline(false);
-			showToast(error instanceof Error ? error.message : "Ollama недоступна");
+			setGeminiOnline(false);
+			setGeminiModel("");
+			showToast(error instanceof Error ? error.message : "Gemini не настроен");
 		} finally {
-			setOllamaChecking(false);
+			setGeminiChecking(false);
 		}
 	};
 
@@ -346,7 +349,7 @@ export function AnswerAssistantPage() {
 								<p className="text-xs text-muted">
 									{answer
 										? `${resultLanguage.toUpperCase()} · ${
-												mode === "ollama" ? "Ollama" : "Бесплатный режим"
+												mode === "gemini" ? "Gemini" : "Ручной режим"
 											}`
 										: "Здесь появится текст для отправки клиенту."}
 								</p>
@@ -412,7 +415,7 @@ export function AnswerAssistantPage() {
 							<div>
 								<div className="font-semibold">Дополнительные настройки</div>
 								<div className="text-xs text-muted">
-									Тип вопроса, Ollama, словарь и память ответов
+									Тип вопроса, Gemini, словарь и память ответов
 								</div>
 							</div>
 						</div>
@@ -459,51 +462,40 @@ export function AnswerAssistantPage() {
 								<div className="mb-3 flex items-center justify-between gap-3">
 									<div className="flex items-center gap-2 font-semibold">
 										<Bot size={17} />
-										Локальный ИИ Ollama
+										Облачный ИИ Gemini
 									</div>
 									<button
 										type="button"
 										onClick={() =>
 											updateSettings({
-												ollamaEnabled: !settings.ollamaEnabled,
+												geminiEnabled: !settings.geminiEnabled,
 											})
 										}
 										className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-											settings.ollamaEnabled
+											settings.geminiEnabled
 												? "border-accent bg-accent/10 text-accent"
 												: "border-border text-muted"
 										}`}
 									>
-										{settings.ollamaEnabled ? "Включена" : "Выключена"}
+										{settings.geminiEnabled ? "Включён" : "Выключен"}
 									</button>
 								</div>
 
 								<div className="space-y-2">
-									<input
-										value={settings.ollamaEndpoint}
-										onChange={(event) =>
-											updateSettings({ ollamaEndpoint: event.target.value })
-										}
-										className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
-										placeholder="http://localhost:11434"
-									/>
-									<input
-										value={settings.ollamaModel}
-										onChange={(event) =>
-											updateSettings({ ollamaModel: event.target.value })
-										}
-										className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
-										placeholder="llama3.1:8b"
-									/>
+									<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+										Ключ хранится на Vercel в переменной GEMINI_API_KEY и
+										никогда не передаётся в браузер.
+										{geminiModel ? ` Модель: ${geminiModel}.` : ""}
+									</div>
 									<button
 										type="button"
-										onClick={() => void checkOllama()}
-										disabled={ollamaChecking}
+										onClick={() => void checkGemini()}
+										disabled={geminiChecking}
 										className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border text-sm hover:bg-surface-elevated"
 									>
-										{ollamaChecking ? (
+										{geminiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
-										) : ollamaOnline ? (
+										) : geminiOnline ? (
 											<Wifi size={15} />
 										) : (
 											<WifiOff size={15} />

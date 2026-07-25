@@ -33,9 +33,7 @@ export interface AssistantSettings {
 	product: string;
 	tone: AnswerTone;
 	intent: AnswerIntent;
-	ollamaEnabled: boolean;
-	ollamaEndpoint: string;
-	ollamaModel: string;
+	geminiEnabled: boolean;
 }
 
 export interface StoredAssistantData {
@@ -63,27 +61,24 @@ export interface ReadyAnswerResult {
 	answer: string;
 	language: string;
 	issues: CheckIssue[];
-	mode: "ollama" | "free";
+	mode: "gemini" | "free";
 	warning?: string;
 }
 
-interface OllamaGenerateResponse {
-	response?: string;
+interface GeminiGenerateResponse {
+	text?: string;
+	model?: string;
 	error?: string;
 }
 
 const STORAGE_KEY = "supportos:answer-assistant:v1";
-const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434";
-const DEFAULT_OLLAMA_MODEL = "llama3.1:8b";
 
 export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
 	language: "auto",
 	product: "SupportOS",
 	tone: "friendly",
 	intent: "general",
-	ollamaEnabled: false,
-	ollamaEndpoint: DEFAULT_OLLAMA_ENDPOINT,
-	ollamaModel: DEFAULT_OLLAMA_MODEL,
+	geminiEnabled: true,
 };
 
 const DEFAULT_GLOSSARY: GlossaryTerm[] = [
@@ -153,27 +148,6 @@ function getSimilarity(first: string, second: string) {
 	return overlap / Math.max(firstTokens.size, secondTokens.size);
 }
 
-function getIntentInstruction(intent: AnswerIntent) {
-	const instructions: Record<AnswerIntent, string> = {
-		general:
-			"Acknowledge the request, give a clear next step, and keep the reply helpful.",
-		deposit:
-			"Explain deposit status carefully, mention payment provider checks, and avoid promising exact processing times unless given.",
-		withdrawal:
-			"Explain withdrawal review, KYC/payment checks, and ask for patience without blaming the customer.",
-		bonus:
-			"Explain bonus eligibility, wagering, expiry, max win, and excluded games only when relevant.",
-		verification:
-			"Ask for required verification documents politely and explain that review protects the account.",
-		technical:
-			"Give practical troubleshooting steps and ask for device, browser, screenshot, or error code if needed.",
-		"sports-betting":
-			"Explain odds, bet settlement, void rules, or event status neutrally. Do not guarantee betting outcomes.",
-	};
-
-	return instructions[intent];
-}
-
 function getToneInstruction(tone: AnswerTone) {
 	const instructions: Record<AnswerTone, string> = {
 		friendly: "Warm, simple, and reassuring.",
@@ -202,26 +176,6 @@ function getRelevantGlossary(
 	});
 }
 
-function formatGlossary(glossary: GlossaryTerm[]) {
-	if (glossary.length === 0) return "No matching glossary terms.";
-
-	return glossary
-		.map(
-			(term) =>
-				`- ${term.source} -> ${term.target}${term.note ? ` (${term.note})` : ""}`,
-		)
-		.join("\n");
-}
-
-function formatMemory(memory: TranslationMemoryEntry[]) {
-	if (memory.length === 0) return "No close Translation Memory matches.";
-
-	return memory
-		.slice(0, 3)
-		.map((entry) => `Source: ${entry.source}\nApproved: ${entry.target}`)
-		.join("\n\n");
-}
-
 function trimAnswer(value: string) {
 	return value
 		.replace(/^(answer|reply|response)\s*:\s*/i, "")
@@ -232,8 +186,6 @@ function trimAnswer(value: string) {
 function buildRuleBasedAnswer({
 	customerMessage,
 	context,
-	settings,
-	glossary,
 	memory,
 }: GenerateAnswerRequest) {
 	const matchedMemory = findMemoryMatches(customerMessage, memory).at(0);
@@ -242,61 +194,14 @@ function buildRuleBasedAnswer({
 		return matchedMemory.entry.target;
 	}
 
-	const greeting =
-		settings.tone === "formal"
-			? "Hello,"
-			: settings.tone === "concise"
-				? ""
-				: "Hi,";
-	const productText = settings.product.trim() || "our team";
-	const contextLine = context.trim()
-		? `I checked the available details: ${context.trim()}`
-		: "";
-	const intentLine = getIntentInstruction(settings.intent);
-	const glossaryTerms = getRelevantGlossary(
-		glossary,
-		`${customerMessage} ${context}`,
-		settings.language,
-	);
-	const glossaryLine = glossaryTerms.length
-		? `I will keep the key terms consistent: ${glossaryTerms
-				.map((term) => term.target)
-				.join(", ")}.`
-		: "";
-	const nextStep =
-		settings.intent === "technical"
-			? "Please send us the error text, device, browser, and a screenshot so we can check it faster."
-			: settings.intent === "verification"
-				? "Please upload the requested document from your account so the review team can continue the check."
-				: settings.intent === "sports-betting"
-					? "Please share the bet ID or event name if you want us to check the exact settlement rule."
-					: "Please send any missing details so we can check this for you as quickly as possible.";
-	const closing =
-		settings.tone === "concise"
-			? ""
-			: `Thank you for your patience,\n${productText} Support`;
+	if (context.trim()) return context.trim();
 
-	return [
-		greeting,
-		`Thanks for contacting ${productText}.`,
-		contextLine,
-		intentLine,
-		glossaryLine,
-		nextStep,
-		closing,
-	]
-		.filter(Boolean)
-		.join("\n\n");
+	throw new Error(
+		"Gemini is disabled and no verified facts or saved answer are available.",
+	);
 }
 
-async function generateWithOllama(request: GenerateAnswerRequest) {
-	const endpoint = request.settings.ollamaEndpoint.trim().replace(/\/+$/, "");
-	const model = request.settings.ollamaModel.trim() || DEFAULT_OLLAMA_MODEL;
-
-	if (!endpoint) {
-		throw new Error("Ollama endpoint is required");
-	}
-
+async function generateWithGemini(request: GenerateAnswerRequest) {
 	const memoryMatches = findMemoryMatches(
 		request.customerMessage,
 		request.memory,
@@ -308,58 +213,39 @@ async function generateWithOllama(request: GenerateAnswerRequest) {
 		`${request.customerMessage} ${request.context}`,
 		request.settings.language,
 	);
-	const prompt = [
-		"You are a support reply generator.",
-		"Write one ready-to-send customer support answer.",
-		"Do not invent account facts, transaction IDs, dates, or policies.",
-		"Use the requested language if possible.",
-		`Language: ${request.settings.language}`,
-		`Product: ${request.settings.product || "SupportOS"}`,
-		`Intent: ${request.settings.intent}`,
-		`Tone: ${getToneInstruction(request.settings.tone)}`,
-		`Intent guidance: ${getIntentInstruction(request.settings.intent)}`,
-		"",
-		"Translation Memory:",
-		formatMemory(memoryMatches),
-		"",
-		"Glossary:",
-		formatGlossary(glossary),
-		"",
-		"Customer message:",
-		request.customerMessage,
-		"",
-		"Internal context:",
-		request.context || "No extra context.",
-	].join("\n");
-
-	const response = await fetch(`${endpoint}/api/generate`, {
+	const response = await fetch("/api/ai/generate", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			model,
-			prompt,
-			stream: false,
-			options: {
-				temperature: 0.3,
-				num_predict: 420,
-			},
+			customerMessage: request.customerMessage,
+			context: request.context,
+			language: request.settings.language,
+			product: request.settings.product,
+			intent: request.settings.intent,
+			tone: getToneInstruction(request.settings.tone),
+			glossary,
+			memory: memoryMatches,
 		}),
 	});
 	const data = (await response
 		.json()
-		.catch(() => ({}))) as OllamaGenerateResponse;
+		.catch(() => ({}))) as GeminiGenerateResponse;
 
 	if (!response.ok || data.error) {
-		throw new Error(data.error || "Ollama request failed");
+		if (response.status === 429) {
+			throw new Error("Gemini free request limit has been reached");
+		}
+
+		throw new Error(data.error || "Gemini request failed");
 	}
 
-	if (!data.response?.trim()) {
-		throw new Error("Ollama returned an empty response");
+	if (!data.text?.trim()) {
+		throw new Error("Gemini returned an empty response");
 	}
 
-	return trimAnswer(data.response);
+	return trimAnswer(data.text);
 }
 
 class AnswerAssistantService {
@@ -382,6 +268,10 @@ class AnswerAssistantService {
 				settings: {
 					...DEFAULT_ASSISTANT_SETTINGS,
 					...(parsed.settings ?? {}),
+					geminiEnabled:
+						typeof parsed.settings?.geminiEnabled === "boolean"
+							? parsed.settings.geminiEnabled
+							: true,
 				},
 				glossary: parsed.glossary?.length ? parsed.glossary : DEFAULT_GLOSSARY,
 				memory: parsed.memory ?? [],
@@ -423,8 +313,8 @@ class AnswerAssistantService {
 			throw new Error("Customer message is required");
 		}
 
-		if (request.settings.ollamaEnabled) {
-			return generateWithOllama(request);
+		if (request.settings.geminiEnabled) {
+			return generateWithGemini(request);
 		}
 
 		return buildRuleBasedAnswer(request);
@@ -453,43 +343,13 @@ class AnswerAssistantService {
 		let mode: ReadyAnswerResult["mode"] = "free";
 		let warning: string | undefined;
 
-		if (resolvedRequest.settings.ollamaEnabled) {
-			try {
-				answer = await generateWithOllama(resolvedRequest);
-				mode = "ollama";
-			} catch (error) {
-				warning = `Ollama is unavailable, so the free mode was used: ${
-					error instanceof Error ? error.message : "connection failed"
-				}`;
-			}
+		if (resolvedRequest.settings.geminiEnabled) {
+			answer = await generateWithGemini(resolvedRequest);
+			mode = "gemini";
 		}
 
 		if (!answer) {
-			answer = buildRuleBasedAnswer({
-				...resolvedRequest,
-				settings: {
-					...resolvedRequest.settings,
-					language: "en",
-				},
-			});
-
-			if (language !== "en") {
-				try {
-					answer = await this.translateAnswer({
-						text: answer,
-						toLanguage: language,
-						glossary: resolvedRequest.glossary,
-					});
-				} catch (error) {
-					const translationWarning = `Automatic translation is unavailable: ${
-						error instanceof Error ? error.message : "translation failed"
-					}`;
-
-					warning = warning
-						? `${warning}. ${translationWarning}`
-						: translationWarning;
-				}
-			}
+			answer = buildRuleBasedAnswer(resolvedRequest);
 		}
 
 		const issues = this.checkAnswer({
@@ -508,20 +368,26 @@ class AnswerAssistantService {
 		};
 	}
 
-	async testOllama(settings: AssistantSettings) {
-		const endpoint = settings.ollamaEndpoint.trim().replace(/\/+$/, "");
-
-		if (!endpoint) {
-			throw new Error("Ollama endpoint is required");
-		}
-
-		const response = await fetch(`${endpoint}/api/tags`);
+	async testGemini() {
+		const response = await fetch("/api/ai/status", {
+			method: "GET",
+			headers: { Accept: "application/json" },
+		});
+		const data = (await response.json().catch(() => ({}))) as {
+			configured?: boolean;
+			model?: string;
+			error?: string;
+		};
 
 		if (!response.ok) {
-			throw new Error(`Ollama returned HTTP ${response.status}`);
+			throw new Error(data.error || `Gemini returned HTTP ${response.status}`);
 		}
 
-		return true;
+		if (!data.configured) {
+			throw new Error("Add GEMINI_API_KEY in Vercel and redeploy the project");
+		}
+
+		return data.model ?? "gemini-2.5-flash-lite";
 	}
 
 	async translateAnswer({
