@@ -1,18 +1,23 @@
 import {
+	Check,
+	ChevronDown,
 	Copy,
 	Edit3,
 	Files,
 	History,
+	Info,
+	MoreHorizontal,
 	Pin,
 	Search,
 	Star,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { Bind, BindTranslation } from "@/entities/bind";
+import type { KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
@@ -40,6 +45,28 @@ function getTranslation(bind: Bind, language: string): BindTranslation {
 			updatedAt: new Date().toISOString(),
 		}
 	);
+}
+
+function getLanguageName(code: string) {
+	return languages.find((language) => language.code === code)?.name ?? code;
+}
+
+function getFolderPath(folder: KnowledgeFolder, folders: KnowledgeFolder[]) {
+	const names = [folder.name];
+	let parentId = folder.parentId;
+	let guard = 0;
+
+	while (parentId && guard < 20) {
+		const parent = folders.find((item) => item.id === parentId);
+
+		if (!parent) break;
+
+		names.unshift(parent.name);
+		parentId = parent.parentId;
+		guard += 1;
+	}
+
+	return names.join(" / ");
 }
 
 function normalizeDuplicateText(value: string) {
@@ -94,6 +121,40 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 	return issues;
 }
 
+function formatDate(value?: string) {
+	if (!value) return "Never";
+
+	return new Date(value).toLocaleString();
+}
+
+function ViewerMenuItem({
+	icon,
+	label,
+	onClick,
+	danger = false,
+}: {
+	icon: ReactNode;
+	label: string;
+	onClick: () => void;
+	danger?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			role="menuitem"
+			onClick={onClick}
+			className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
+				danger
+					? "text-red-400 hover:bg-red-500/10"
+					: "text-muted hover:bg-surface-elevated hover:text-foreground"
+			}`}
+		>
+			<span className="shrink-0">{icon}</span>
+			<span className="truncate">{label}</span>
+		</button>
+	);
+}
+
 export function BindViewer() {
 	const activeTab = useKnowledgeStore((state) => state.activeTab);
 	const contentWidth = useWorkspaceStore((state) => state.layout.contentWidth);
@@ -104,7 +165,13 @@ export function BindViewer() {
 	const setLanguage = useKnowledgeStore((state) => state.setLanguage);
 	const addRecent = useKnowledgeStore((state) => state.addRecent);
 	const binds = useKnowledgeStore((state) => state.binds);
+	const categories = useKnowledgeStore((state) => state.categories);
+	const folders = useKnowledgeStore((state) => state.folders);
 	const { showToast } = useToast();
+	const actionsRef = useRef<HTMLDivElement>(null);
+	const copyTimerRef = useRef<number | undefined>(undefined);
+	const [actionsOpen, setActionsOpen] = useState(false);
+	const [copied, setCopied] = useState(false);
 
 	const translation = useMemo(() => {
 		if (!bind) return undefined;
@@ -112,7 +179,27 @@ export function BindViewer() {
 		return getTranslation(bind, language);
 	}, [bind, language]);
 
+	const exactTranslation = bind?.translations.find(
+		(item) => item.language === language,
+	);
 	const title = translation?.title || bind?.slug || "";
+	const category = bind
+		? categories.find((item) => item.id === bind.categoryId)
+		: undefined;
+	const folder = bind?.folderId
+		? folders.find((item) => item.id === bind.folderId)
+		: undefined;
+	const folderPath = folder ? getFolderPath(folder, folders) : "";
+	const languageCodes = useMemo(() => {
+		if (!bind) return languages.map((item) => item.code);
+
+		return Array.from(
+			new Set([
+				...languages.map((item) => item.code),
+				...bind.translations.map((item) => item.language),
+			]),
+		);
+	}, [bind]);
 
 	const copyTranslation = async (item?: BindTranslation) => {
 		if (!bind || !item) return;
@@ -130,6 +217,9 @@ export function BindViewer() {
 		addRecent(bind.id);
 		if (ok) {
 			knowledgeService.recordBindCopied(bind.id);
+			window.clearTimeout(copyTimerRef.current);
+			setCopied(true);
+			copyTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
 		}
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
 	};
@@ -142,7 +232,7 @@ export function BindViewer() {
 		const ok = await copyToClipboard(title);
 
 		addRecent(bind.id);
-		showToast(ok ? "Title copied to clipboard" : "Copy failed");
+		showToast(ok ? "Title copied" : "Copy failed");
 	};
 
 	const toggleFavorite = () => {
@@ -182,7 +272,7 @@ export function BindViewer() {
 
 		const duplicate = knowledgeService.duplicateBind(bind.id);
 
-		showToast("Bind duplicated", {
+		showToast("Material duplicated", {
 			action: {
 				label: "Undo",
 				onClick: () => {
@@ -205,6 +295,12 @@ export function BindViewer() {
 
 		modalManager.open("findDuplicates", { bindId: bind.id });
 	};
+
+	const runAction = (action: () => void) => {
+		action();
+		setActionsOpen(false);
+	};
+
 	const qualityIssues = useMemo(
 		() => (bind ? getQualityIssues(bind, binds) : []),
 		[bind, binds],
@@ -214,6 +310,35 @@ export function BindViewer() {
 		wide: "max-w-7xl",
 		full: "max-w-none",
 	}[contentWidth];
+
+	useEffect(() => {
+		return () => {
+			window.clearTimeout(copyTimerRef.current);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!actionsOpen) return undefined;
+
+		const closeOnOutsideClick = (event: PointerEvent) => {
+			if (actionsRef.current?.contains(event.target as Node)) return;
+
+			setActionsOpen(false);
+		};
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setActionsOpen(false);
+			}
+		};
+
+		window.addEventListener("pointerdown", closeOnOutsideClick);
+		window.addEventListener("keydown", closeOnEscape);
+
+		return () => {
+			window.removeEventListener("pointerdown", closeOnOutsideClick);
+			window.removeEventListener("keydown", closeOnEscape);
+		};
+	}, [actionsOpen]);
 
 	useEffect(() => {
 		if (!bind || !translation) return undefined;
@@ -285,242 +410,337 @@ export function BindViewer() {
 	if (!bind || !translation) {
 		return (
 			<div className="flex flex-1 items-center justify-center text-muted">
-				Select bind
+				No material selected
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex flex-1 overflow-auto">
-			<div className={`mx-auto w-full ${contentWidthClass} p-8`}>
-				<div className="mb-8 flex items-start justify-between gap-6">
-					<div className="min-w-0 flex-1">
-						<div className="mb-3 flex flex-wrap items-center gap-2">
-							{bind.favorite && (
-								<span className="rounded-full border border-yellow-400/40 px-3 py-1 text-xs text-yellow-300">
-									Favorite
-								</span>
-							)}
+		<div className="flex min-h-0 flex-1 flex-col">
+			<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto">
+				<div
+					className={`mx-auto w-full ${contentWidthClass} px-4 py-5 pb-28 sm:px-6 md:px-8 md:py-7 md:pb-8`}
+				>
+					<nav
+						aria-label="Breadcrumbs"
+						className="mb-4 flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted"
+					>
+						<span className="truncate">{category?.name ?? "No category"}</span>
+						{folderPath && (
+							<>
+								<span>/</span>
+								<span className="truncate">{folderPath}</span>
+							</>
+						)}
+					</nav>
 
-							<span className="rounded-full border border-border px-3 py-1 text-xs text-muted">
-								{translation.language.toUpperCase()}
-							</span>
-							{bind.pinned && (
-								<span className="rounded-full border border-accent/40 px-3 py-1 text-xs text-accent">
-									Pinned
-								</span>
-							)}
-						</div>
-
-						<div className="flex min-w-0 items-center gap-2">
-							<h1 className="min-w-0 truncate text-3xl font-bold">{title}</h1>
-
-							<button
-								type="button"
-								onClick={copyTitle}
-								title="Copy title"
-								className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:bg-surface-elevated hover:text-foreground"
-							>
-								<Copy size={16} />
-							</button>
-						</div>
-
-						<p className="mt-2 text-sm text-muted">{bind.slug}</p>
-					</div>
-
-					<div className="flex shrink-0 gap-2">
-						<button
-							type="button"
-							onClick={copyContent}
-							title="Copy content (C)"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Copy size={18} />
-						</button>
-
-						<button
-							type="button"
-							onClick={toggleFavorite}
-							title="Favorite (F)"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Star size={18} fill={bind.favorite ? "currentColor" : "none"} />
-						</button>
-
-						<button
-							type="button"
-							onClick={togglePinned}
-							title="Pin in folder (P)"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Pin size={18} fill={bind.pinned ? "currentColor" : "none"} />
-						</button>
-
-						<button
-							type="button"
-							onClick={duplicateBind}
-							title="Duplicate bind (D)"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Files size={18} />
-						</button>
-
-						<button
-							type="button"
-							onClick={showHistory}
-							title="History"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<History size={18} />
-						</button>
-
-						<button
-							type="button"
-							onClick={findDuplicates}
-							title="Find duplicates"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Search size={18} />
-						</button>
-
-						<button
-							type="button"
-							onClick={editBind}
-							title="Edit bind (E)"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated"
-						>
-							<Edit3 size={18} />
-						</button>
-
-						<button
-							type="button"
-							onClick={deleteBind}
-							title="Delete"
-							className="rounded-lg border border-border p-2 transition hover:bg-surface-elevated hover:text-red-400"
-						>
-							<Trash2 size={18} />
-						</button>
-					</div>
-				</div>
-
-				<div className="mb-6 flex flex-wrap gap-2">
-					{languages.map((item) => {
-						const code = item.code as LanguageCode;
-						const exists = bind.translations.some(
-							(itemTranslation) => itemTranslation.language === code,
-						);
-
-						return (
-							<button
-								key={code}
-								type="button"
-								onClick={() => setLanguage(code)}
-								className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-									language === code
-										? "border-accent bg-accent text-accent-foreground"
-										: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-								} ${exists ? "" : "opacity-60"}`}
-							>
-								{code.toUpperCase()}
-							</button>
-						);
-					})}
-				</div>
-
-				{bind.tags.length > 0 && (
-					<div className="mb-6 flex flex-wrap gap-2">
-						{bind.tags.map((tag) => (
-							<div
-								key={tag}
-								className="rounded-full border border-border px-3 py-1 text-xs"
-							>
-								#{tag}
-							</div>
-						))}
-					</div>
-				)}
-
-				<div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-							Quality
-						</div>
-						{qualityIssues.length > 0 ? (
-							<div className="flex flex-wrap gap-2">
-								{qualityIssues.map((issue) => (
-									<span
-										key={issue}
-										className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-200"
-									>
-										{issue}
+					<div className="flex min-w-0 flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
+						<div className="min-w-0 flex-1">
+							<div className="flex min-w-0 items-start gap-3">
+								<h1 className="min-w-0 text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">
+									{title}
+								</h1>
+								{bind.pinned && (
+									<span className="mt-1 inline-flex h-6 items-center gap-1 rounded-full bg-accent/10 px-2 text-xs font-medium text-accent">
+										<Pin size={12} fill="currentColor" />
+										Pinned
 									</span>
-								))}
+								)}
+							</div>
+
+							{bind.tags.length > 0 && (
+								<div className="mt-3 flex flex-wrap gap-1.5">
+									{bind.tags.map((tag) => (
+										<span
+											key={tag}
+											className="max-w-full truncate rounded-full bg-surface-elevated px-2.5 py-1 text-xs text-muted"
+										>
+											#{tag}
+										</span>
+									))}
+								</div>
+							)}
+						</div>
+
+						<div className="flex shrink-0 flex-wrap items-center gap-2">
+							<div className="hidden rounded-xl bg-surface p-1 sm:flex">
+								{languageCodes.map((code) => {
+									const exists = bind.translations.some(
+										(item) => item.language === code,
+									);
+
+									return (
+										<button
+											key={code}
+											type="button"
+											onClick={() => setLanguage(code as LanguageCode)}
+											title={
+												exists
+													? getLanguageName(code)
+													: `${getLanguageName(code)} missing`
+											}
+											className={`h-8 rounded-lg px-2.5 text-xs font-semibold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
+												language === code
+													? "bg-accent text-accent-foreground"
+													: exists
+														? "text-muted hover:bg-surface-elevated hover:text-foreground"
+														: "text-muted/55 hover:bg-surface-elevated"
+											}`}
+										>
+											{code}
+										</button>
+									);
+								})}
+							</div>
+
+							<div className="relative sm:hidden">
+								<select
+									value={language}
+									onChange={(event) =>
+										setLanguage(event.target.value as LanguageCode)
+									}
+									aria-label="Language"
+									className="h-10 appearance-none rounded-xl border border-border bg-surface pl-3 pr-9 text-sm font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								>
+									{languageCodes.map((code) => {
+										const exists = bind.translations.some(
+											(item) => item.language === code,
+										);
+
+										return (
+											<option key={code} value={code}>
+												{code.toUpperCase()}
+												{exists ? "" : " missing"}
+											</option>
+										);
+									})}
+								</select>
+								<ChevronDown
+									size={16}
+									className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+								/>
+							</div>
+
+							<button
+								type="button"
+								onClick={() => void copyContent()}
+								className="hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
+							>
+								{copied ? <Check size={17} /> : <Copy size={17} />}
+								{copied ? "Copied" : "Copy"}
+							</button>
+
+							<div ref={actionsRef} className="relative">
+								<button
+									type="button"
+									aria-label="Material actions"
+									aria-haspopup="menu"
+									aria-expanded={actionsOpen}
+									onClick={() => setActionsOpen((value) => !value)}
+									className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+								>
+									<MoreHorizontal size={19} />
+								</button>
+
+								{actionsOpen && (
+									<div
+										role="menu"
+										className="absolute right-0 top-11 z-30 w-60 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-2xl"
+									>
+										<ViewerMenuItem
+											icon={<Copy size={15} />}
+											label="Copy title"
+											onClick={() => runAction(() => void copyTitle())}
+										/>
+										<ViewerMenuItem
+											icon={<Edit3 size={15} />}
+											label="Edit"
+											onClick={() => runAction(editBind)}
+										/>
+										<ViewerMenuItem
+											icon={
+												<Star
+													size={15}
+													fill={bind.favorite ? "currentColor" : "none"}
+												/>
+											}
+											label={
+												bind.favorite
+													? "Remove from favorites"
+													: "Add to favorites"
+											}
+											onClick={() => runAction(toggleFavorite)}
+										/>
+										<ViewerMenuItem
+											icon={
+												<Pin
+													size={15}
+													fill={bind.pinned ? "currentColor" : "none"}
+												/>
+											}
+											label={bind.pinned ? "Unpin" : "Pin in folder"}
+											onClick={() => runAction(togglePinned)}
+										/>
+										<ViewerMenuItem
+											icon={<Files size={15} />}
+											label="Duplicate"
+											onClick={() => runAction(duplicateBind)}
+										/>
+										<ViewerMenuItem
+											icon={<History size={15} />}
+											label="History"
+											onClick={() => runAction(showHistory)}
+										/>
+										<ViewerMenuItem
+											icon={<Search size={15} />}
+											label="Find duplicates"
+											onClick={() => runAction(findDuplicates)}
+										/>
+										<div className="my-1 border-t border-border" />
+										<ViewerMenuItem
+											icon={<Trash2 size={15} />}
+											label="Delete"
+											danger
+											onClick={() => runAction(deleteBind)}
+										/>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{!exactTranslation && (
+						<div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
+							{language.toUpperCase()} is missing. Showing{" "}
+							{translation.language.toUpperCase()} instead.
+						</div>
+					)}
+
+					<section className="mt-6 rounded-xl bg-surface px-4 py-5 sm:px-6 md:p-8">
+						{translation.content.trim() ? (
+							<div className="prose max-w-none leading-7 dark:prose-invert prose-headings:tracking-normal prose-pre:rounded-xl prose-pre:border prose-pre:border-border prose-pre:bg-background">
+								<ReactMarkdown remarkPlugins={[remarkGfm]}>
+									{translation.content}
+								</ReactMarkdown>
 							</div>
 						) : (
-							<p className="text-sm text-muted">No obvious issues</p>
-						)}
-					</div>
-
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-							Usage
-						</div>
-						<div className="text-sm">
-							{bind.copyCount ?? 0} copies
-							{bind.lastCopiedAt ? (
-								<div className="mt-1 text-xs text-muted">
-									Last: {new Date(bind.lastCopiedAt).toLocaleString()}
-								</div>
-							) : null}
-						</div>
-					</div>
-				</div>
-
-				<div className="mb-6 rounded-lg border border-border bg-surface p-4">
-					<div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
-						Translations
-					</div>
-
-					<div className="grid gap-2 sm:grid-cols-2">
-						{bind.translations.map((item) => (
-							<div
-								key={item.language}
-								className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
-							>
-								<button
-									type="button"
-									onClick={() => setLanguage(item.language as LanguageCode)}
-									className="min-w-0 flex-1 text-left hover:text-accent"
-								>
-									<div className="text-xs font-semibold uppercase text-muted">
-										{item.language}
-									</div>
-
-									<div className="truncate text-sm">
-										{item.title || bind.slug}
-									</div>
-								</button>
-
-								<button
-									type="button"
-									onClick={() => void copyTranslation(item)}
-									title={`Copy ${item.language.toUpperCase()}`}
-									className="shrink-0 rounded-md p-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-								>
-									<Copy size={15} />
-								</button>
+							<div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
+								No content in this translation
 							</div>
-						))}
-					</div>
-				</div>
+						)}
+					</section>
 
-				<div className="rounded-lg border border-border bg-surface p-8">
-					<div className="prose max-w-none leading-8 dark:prose-invert">
-						<ReactMarkdown remarkPlugins={[remarkGfm]}>
-							{translation.content}
-						</ReactMarkdown>
-					</div>
+					<details className="mt-4 rounded-xl border border-border bg-surface">
+						<summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-medium text-muted hover:text-foreground">
+							<Info size={16} />
+							Information
+						</summary>
+
+						<div className="grid gap-5 border-t border-border px-4 py-4 text-sm md:grid-cols-2">
+							<div className="space-y-3">
+								<div>
+									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+										Slug
+									</div>
+									<div className="mt-1 break-all">{bind.slug}</div>
+								</div>
+
+								<div>
+									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+										Usage
+									</div>
+									<div className="mt-1 text-muted">
+										{bind.copyCount ?? 0} copies
+										<span className="mx-2">·</span>
+										Last copied: {formatDate(bind.lastCopiedAt)}
+									</div>
+								</div>
+
+								<div>
+									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+										Quality
+									</div>
+									<div className="mt-2 flex flex-wrap gap-1.5">
+										{qualityIssues.length > 0 ? (
+											qualityIssues.map((issue) => (
+												<span
+													key={issue}
+													className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-200"
+												>
+													{issue}
+												</span>
+											))
+										) : (
+											<span className="text-muted">No obvious issues</span>
+										)}
+									</div>
+								</div>
+							</div>
+
+							<div className="space-y-3">
+								<div>
+									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+										Translations
+									</div>
+									<div className="mt-2 space-y-1">
+										{bind.translations.map((item) => (
+											<div
+												key={item.language}
+												className="flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-lg px-2 hover:bg-surface-elevated"
+											>
+												<button
+													type="button"
+													onClick={() =>
+														setLanguage(item.language as LanguageCode)
+													}
+													className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
+												>
+													<span className="mr-2 text-xs font-semibold uppercase text-muted">
+														{item.language}
+													</span>
+													<span className="truncate">
+														{item.title || bind.slug}
+													</span>
+												</button>
+												<button
+													type="button"
+													aria-label={`Copy ${item.language.toUpperCase()}`}
+													onClick={(event) => {
+														event.stopPropagation();
+														void copyTranslation(item);
+													}}
+													className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-background hover:text-foreground"
+												>
+													<Copy size={14} />
+												</button>
+											</div>
+										))}
+									</div>
+								</div>
+
+								<div>
+									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+										Updated
+									</div>
+									<div className="mt-1 text-muted">
+										{formatDate(bind.updatedAt)}
+									</div>
+								</div>
+							</div>
+						</div>
+					</details>
 				</div>
+			</div>
+
+			<div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+				<button
+					type="button"
+					onClick={() => void copyContent()}
+					className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+				>
+					{copied ? <Check size={18} /> : <Copy size={18} />}
+					{copied ? "Copied" : "Copy answer"}
+				</button>
 			</div>
 		</div>
 	);

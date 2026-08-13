@@ -47,6 +47,7 @@ interface Props {
 	selectedBindIds?: string[];
 	onToggleBindSelection?: (id: string) => void;
 	onClearBindSelection?: () => void;
+	onOpenItem?: () => void;
 }
 
 const INITIAL_CHILDREN_LIMIT = 120;
@@ -100,6 +101,7 @@ export function TreeNode({
 	selectedBindIds = [],
 	onToggleBindSelection,
 	onClearBindSelection,
+	onOpenItem,
 }: Props) {
 	const navigate = useNavigate();
 	const actionsRef = useRef<HTMLDivElement>(null);
@@ -189,6 +191,7 @@ export function TreeNode({
 		if (node.type === "bind") {
 			selectBind(node.id);
 			void navigate({ to: "/" });
+			onOpenItem?.();
 			return;
 		}
 
@@ -734,6 +737,7 @@ export function TreeNode({
 							selectedBindIds={selectedBindIds}
 							onToggleBindSelection={onToggleBindSelection}
 							onClearBindSelection={onClearBindSelection}
+							onOpenItem={onOpenItem}
 						/>
 					))}
 
