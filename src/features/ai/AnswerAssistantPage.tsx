@@ -1,8 +1,8 @@
 import {
 	Bot,
 	CheckCircle2,
-	ChevronDown,
 	Copy,
+	Languages,
 	Loader2,
 	RefreshCw,
 	Save,
@@ -25,7 +25,7 @@ import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 
 const LANGUAGES = [
-	{ code: "auto", label: "Как у клиента (автоматически)" },
+	{ code: "auto", label: "Как у клиента" },
 	{ code: "ru", label: "Русский" },
 	{ code: "en", label: "English" },
 	{ code: "el", label: "Ελληνικά" },
@@ -38,7 +38,7 @@ const LANGUAGES = [
 	{ code: "tr", label: "Türkçe" },
 	{ code: "pl", label: "Polski" },
 	{ code: "ar", label: "العربية" },
-	{ code: "custom", label: "Другой язык…" },
+	{ code: "custom", label: "Другой язык" },
 ];
 
 const INTENTS: Array<{ value: AnswerIntent; label: string }> = [
@@ -62,6 +62,10 @@ function issueColor(severity: CheckIssue["severity"]) {
 	if (severity === "error") return "border-red-500/30 bg-red-500/10";
 	if (severity === "warning") return "border-amber-500/30 bg-amber-500/10";
 	return "border-emerald-500/30 bg-emerald-500/10";
+}
+
+function getModeLabel(mode: "gemini" | "free") {
+	return mode === "gemini" ? "Gemini" : "Бесплатный режим";
 }
 
 export function AnswerAssistantPage() {
@@ -89,6 +93,12 @@ export function AnswerAssistantPage() {
 	useEffect(() => {
 		answerAssistantService.save(data);
 	}, [data]);
+
+	useEffect(() => {
+		if (!languageIsPreset && settings.language && !customLanguage) {
+			setCustomLanguage(settings.language);
+		}
+	}, [customLanguage, languageIsPreset, settings.language]);
 
 	const updateSettings = (patch: Partial<AssistantSettings>) => {
 		setData((current) => ({
@@ -195,303 +205,301 @@ export function AnswerAssistantPage() {
 		showToast("Термин добавлен");
 	};
 
+	const removeGlossaryTerm = (id: string) => {
+		setData((current) => ({
+			...current,
+			glossary: current.glossary.filter((term) => term.id !== id),
+		}));
+	};
+
+	const removeMemoryEntry = (id: string) => {
+		setData((current) => ({
+			...current,
+			memory: current.memory.filter((entry) => entry.id !== id),
+		}));
+	};
+
 	return (
-		<div className="supportos-scroll h-full overflow-auto bg-background">
-			<div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
-				<header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-					<div>
-						<div className="mb-2 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
+			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
+				<header className="flex flex-wrap items-start justify-between gap-3">
+					<div className="min-w-0">
+						<div className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold uppercase text-muted">
 							<Sparkles size={14} />
-							Помощник оператора
+							AI Assistant
 						</div>
-						<h1 className="text-2xl font-bold">Создание ответа клиенту</h1>
-						<p className="mt-1 text-sm text-muted">
-							Вставьте сообщение, укажите известные факты и получите готовый
-							ответ на языке клиента.
+						<h1 className="mt-2 text-xl font-semibold sm:text-2xl">
+							Готовый ответ клиенту
+						</h1>
+						<p className="mt-1 max-w-2xl text-sm text-muted">
+							Дай краткое описание ситуации, а ассистент соберёт аккуратный
+							полный ответ с правильным тоном и проверкой перед отправкой.
 						</p>
 					</div>
 
 					<button
 						type="button"
 						onClick={reset}
-						className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface hover:text-foreground"
+						className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 					>
 						<RefreshCw size={15} />
 						Новый ответ
 					</button>
 				</header>
 
-				<form onSubmit={generate} className="grid gap-5 lg:grid-cols-2">
-					<section className="space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5">
-						<div className="flex items-center gap-3">
-							<div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent font-bold text-accent-foreground">
-								1
-							</div>
-							<div>
-								<h2 className="font-semibold">Что написал клиент?</h2>
-								<p className="text-xs text-muted">
-									Можно вставить сообщение на любом языке.
-								</p>
+				<form
+					onSubmit={generate}
+					className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
+				>
+					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+						<div className="border-b border-border px-4 py-3">
+							<div className="text-sm font-semibold">Краткое описание</div>
+							<div className="mt-1 text-xs text-muted">
+								Можно писать коротко: что случилось и что нужно сообщить.
 							</div>
 						</div>
 
-						<textarea
-							value={customerMessage}
-							onChange={(event) => setCustomerMessage(event.target.value)}
-							className="supportos-scroll min-h-52 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Например: клиент спрашивает, почему вывод всё ещё обрабатывается…"
-						/>
-
-						<div>
-							<label
-								htmlFor="answer-facts"
-								className="mb-2 block text-sm font-semibold"
-							>
-								Что нужно сообщить в ответе?
-							</label>
-							<textarea
-								id="answer-facts"
-								value={facts}
-								onChange={(event) => setFacts(event.target.value)}
-								className="supportos-scroll min-h-32 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-								placeholder="Кратко: запрос проверяется финансовым отделом, срок — до 3 рабочих дней, результат обещать нельзя."
-							/>
-							<p className="mt-2 text-xs text-muted">
-								Помощник не должен придумывать статусы, правила или сроки —
-								укажите только подтверждённые факты.
-							</p>
-						</div>
-
-						<div className="grid gap-3 sm:grid-cols-2">
-							<label className="space-y-1.5">
-								<span className="text-xs font-semibold uppercase tracking-wide text-muted">
-									Язык ответа
+						<div className="flex flex-1 flex-col gap-3 p-4">
+							<label className="flex flex-1 flex-col gap-2">
+								<span className="text-xs font-semibold uppercase text-muted">
+									Сообщение или задача
 								</span>
-								<select
-									value={languageIsPreset ? settings.language : "custom"}
-									onChange={(event) => {
-										if (event.target.value === "custom") {
-											updateSettings({ language: customLanguage || "" });
-											return;
-										}
-										updateSettings({ language: event.target.value });
-									}}
-									className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent"
-								>
-									{LANGUAGES.map((language) => (
-										<option key={language.code} value={language.code}>
-											{language.label}
-										</option>
-									))}
-								</select>
-							</label>
-
-							<label className="space-y-1.5">
-								<span className="text-xs font-semibold uppercase tracking-wide text-muted">
-									Тон
-								</span>
-								<select
-									value={settings.tone}
-									onChange={(event) =>
-										updateSettings({
-											tone: event.target.value as AnswerTone,
-										})
-									}
-									className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent"
-								>
-									{TONES.map((tone) => (
-										<option key={tone.value} value={tone.value}>
-											{tone.label}
-										</option>
-									))}
-								</select>
-							</label>
-						</div>
-
-						{!languageIsPreset && (
-							<label className="block space-y-1.5">
-								<span className="text-xs font-semibold uppercase tracking-wide text-muted">
-									Код языка
-								</span>
-								<input
-									value={customLanguage}
-									onChange={(event) => {
-										setCustomLanguage(event.target.value);
-										updateSettings({ language: event.target.value });
-									}}
-									placeholder="Например: ro, bg, ka"
-									className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent"
+								<textarea
+									value={customerMessage}
+									onChange={(event) => setCustomerMessage(event.target.value)}
+									className="supportos-scroll min-h-48 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									placeholder="Например: клиент спрашивает, почему вывод ещё в обработке. Нужно объяснить, что заявка проверяется финансовым отделом."
 								/>
 							</label>
-						)}
 
-						<button
-							type="submit"
-							disabled={loading || !customerMessage.trim()}
-							className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-bold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{loading ? (
-								<Loader2 size={18} className="animate-spin" />
-							) : (
-								<Sparkles size={18} />
-							)}
-							{loading ? "Создаю ответ…" : "Создать готовый ответ"}
-						</button>
-					</section>
+							<label className="flex flex-col gap-2">
+								<span className="text-xs font-semibold uppercase text-muted">
+									Проверенные факты
+								</span>
+								<textarea
+									value={facts}
+									onChange={(event) => setFacts(event.target.value)}
+									className="supportos-scroll min-h-28 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									placeholder="Срок: до 3 рабочих дней. Обещать точное время нельзя. Нужно попросить дождаться обновления."
+								/>
+							</label>
 
-					<section className="flex min-h-[32rem] flex-col rounded-xl border border-border bg-surface p-4 sm:p-5">
-						<div className="mb-4 flex items-center gap-3">
-							<div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent font-bold text-accent-foreground">
-								2
-							</div>
-							<div>
-								<h2 className="font-semibold">Готовый ответ</h2>
-								<p className="text-xs text-muted">
-									{answer
-										? `${resultLanguage.toUpperCase()} · ${
-												mode === "gemini" ? "Gemini" : "Ручной режим"
-											}`
-										: "Здесь появится текст для отправки клиенту."}
-								</p>
-							</div>
-						</div>
-
-						<textarea
-							value={answer}
-							onChange={(event) => setAnswer(event.target.value)}
-							className="supportos-scroll min-h-72 flex-1 resize-none rounded-lg border border-border bg-background px-4 py-4 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Ответ ещё не создан."
-						/>
-
-						{warning && (
-							<div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-								{warning}
-							</div>
-						)}
-
-						{issues.length > 0 && answer && (
-							<div className="mt-3 space-y-2">
-								{issues.map((issue) => (
-									<div
-										key={issue.id}
-										className={`rounded-md border px-3 py-2 text-xs ${issueColor(
-											issue.severity,
-										)}`}
+							<div className="grid gap-3 sm:grid-cols-2">
+								<label className="space-y-1.5">
+									<span className="text-xs font-semibold uppercase text-muted">
+										Язык ответа
+									</span>
+									<select
+										value={languageIsPreset ? settings.language : "custom"}
+										onChange={(event) => {
+											if (event.target.value === "custom") {
+												updateSettings({ language: customLanguage || "" });
+												return;
+											}
+											updateSettings({ language: event.target.value });
+										}}
+										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
-										<div className="font-semibold">{issue.title}</div>
-										<div className="mt-0.5 text-muted">{issue.detail}</div>
-									</div>
-								))}
-							</div>
-						)}
+										{LANGUAGES.map((language) => (
+											<option key={language.code} value={language.code}>
+												{language.label}
+											</option>
+										))}
+									</select>
+								</label>
 
-						<div className="mt-4 grid gap-2 sm:grid-cols-2">
-							<button
-								type="button"
-								onClick={saveAnswer}
-								disabled={!answer.trim()}
-								className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm hover:bg-surface-elevated disabled:opacity-50"
-							>
-								<Save size={16} />
-								Запомнить ответ
-							</button>
-							<button
-								type="button"
-								onClick={() => void copyAnswer()}
-								disabled={!answer.trim()}
-								className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
-							>
-								<Copy size={16} />
-								Скопировать
-							</button>
-						</div>
-					</section>
-				</form>
-
-				<details className="group mt-5 rounded-xl border border-border bg-surface">
-					<summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-						<div className="flex items-center gap-3">
-							<Settings2 size={18} />
-							<div>
-								<div className="font-semibold">Дополнительные настройки</div>
-								<div className="text-xs text-muted">
-									Тип вопроса, Gemini, словарь и память ответов
-								</div>
-							</div>
-						</div>
-						<ChevronDown
-							size={18}
-							className="transition group-open:rotate-180"
-						/>
-					</summary>
-
-					<div className="grid gap-5 border-t border-border p-4 lg:grid-cols-2">
-						<div className="space-y-4">
-							<label className="block space-y-1.5">
-								<span className="text-sm font-semibold">Тип вопроса</span>
-								<select
-									value={settings.intent}
-									onChange={(event) =>
-										updateSettings({
-											intent: event.target.value as AnswerIntent,
-										})
-									}
-									className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
-								>
-									{INTENTS.map((intent) => (
-										<option key={intent.value} value={intent.value}>
-											{intent.label}
-										</option>
-									))}
-								</select>
-							</label>
-
-							<label className="block space-y-1.5">
-								<span className="text-sm font-semibold">Проект</span>
-								<input
-									value={settings.product}
-									onChange={(event) =>
-										updateSettings({ product: event.target.value })
-									}
-									className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
-									placeholder="SupportOS"
-								/>
-							</label>
-
-							<div className="rounded-lg border border-border bg-background p-4">
-								<div className="mb-3 flex items-center justify-between gap-3">
-									<div className="flex items-center gap-2 font-semibold">
-										<Bot size={17} />
-										Облачный ИИ Gemini
-									</div>
-									<button
-										type="button"
-										onClick={() =>
+								<label className="space-y-1.5">
+									<span className="text-xs font-semibold uppercase text-muted">
+										Тон
+									</span>
+									<select
+										value={settings.tone}
+										onChange={(event) =>
 											updateSettings({
-												geminiEnabled: !settings.geminiEnabled,
+												tone: event.target.value as AnswerTone,
 											})
 										}
-										className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-											settings.geminiEnabled
-												? "border-accent bg-accent/10 text-accent"
-												: "border-border text-muted"
-										}`}
+										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
-										{settings.geminiEnabled ? "Включён" : "Выключен"}
-									</button>
-								</div>
+										{TONES.map((tone) => (
+											<option key={tone.value} value={tone.value}>
+												{tone.label}
+											</option>
+										))}
+									</select>
+								</label>
+							</div>
 
-								<div className="space-y-2">
-									<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
-										Ключ хранится на Vercel в переменной GEMINI_API_KEY и
-										никогда не передаётся в браузер.
+							{!languageIsPreset && (
+								<label className="space-y-1.5">
+									<span className="text-xs font-semibold uppercase text-muted">
+										Код языка
+									</span>
+									<input
+										value={customLanguage}
+										onChange={(event) => {
+											setCustomLanguage(event.target.value);
+											updateSettings({ language: event.target.value });
+										}}
+										placeholder="Например: ro, bg, ka"
+										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									/>
+								</label>
+							)}
+
+							<button
+								type="submit"
+								disabled={loading || !customerMessage.trim()}
+								className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{loading ? (
+									<Loader2 size={18} className="animate-spin" />
+								) : (
+									<Sparkles size={18} />
+								)}
+								{loading ? "Создаю ответ..." : "Создать готовый ответ"}
+							</button>
+						</div>
+					</section>
+
+					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+							<div className="min-w-0">
+								<div className="text-sm font-semibold">Готовый ответ</div>
+								<div className="mt-1 text-xs text-muted">
+									{answer
+										? `${resultLanguage.toUpperCase()} / ${getModeLabel(mode)}`
+										: "Здесь появится текст для отправки клиенту."}
+								</div>
+							</div>
+							<div className="flex items-center gap-2">
+								<button
+									type="button"
+									onClick={saveAnswer}
+									disabled={!answer.trim()}
+									className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+									aria-label="Сохранить ответ в память"
+								>
+									<Save size={16} />
+								</button>
+								<button
+									type="button"
+									onClick={() => void copyAnswer()}
+									disabled={!answer.trim()}
+									className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+								>
+									<Copy size={16} />
+									Копировать
+								</button>
+							</div>
+						</div>
+
+						<div className="flex flex-1 flex-col p-4">
+							<textarea
+								value={answer}
+								onChange={(event) => setAnswer(event.target.value)}
+								className="supportos-scroll min-h-80 flex-1 resize-none rounded-lg border border-border bg-background px-4 py-4 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+								placeholder="Ответ ещё не создан."
+							/>
+
+							{warning && (
+								<div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+									{warning}
+								</div>
+							)}
+
+							{issues.length > 0 && answer && (
+								<div className="mt-3 grid gap-2">
+									{issues.map((issue) => (
+										<div
+											key={issue.id}
+											className={`rounded-lg border px-3 py-2 text-xs ${issueColor(
+												issue.severity,
+											)}`}
+										>
+											<div className="font-semibold">{issue.title}</div>
+											<div className="mt-0.5 text-muted">{issue.detail}</div>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</section>
+
+					<aside className="space-y-3 xl:sticky xl:top-0 xl:self-start">
+						<section className="rounded-xl border border-border bg-surface">
+							<div className="flex items-center gap-2 border-b border-border px-4 py-3">
+								<Settings2 size={17} />
+								<div className="font-semibold">Параметры</div>
+							</div>
+							<div className="space-y-3 p-4">
+								<label className="block space-y-1.5">
+									<span className="text-xs font-semibold uppercase text-muted">
+										Тип вопроса
+									</span>
+									<select
+										value={settings.intent}
+										onChange={(event) =>
+											updateSettings({
+												intent: event.target.value as AnswerIntent,
+											})
+										}
+										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									>
+										{INTENTS.map((intent) => (
+											<option key={intent.value} value={intent.value}>
+												{intent.label}
+											</option>
+										))}
+									</select>
+								</label>
+
+								<label className="block space-y-1.5">
+									<span className="text-xs font-semibold uppercase text-muted">
+										Проект
+									</span>
+									<input
+										value={settings.product}
+										onChange={(event) =>
+											updateSettings({ product: event.target.value })
+										}
+										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										placeholder="SupportOS"
+									/>
+								</label>
+
+								<div className="rounded-lg bg-background p-3">
+									<div className="mb-3 flex items-center justify-between gap-3">
+										<div className="flex items-center gap-2 text-sm font-semibold">
+											<Bot size={16} />
+											Gemini
+										</div>
+										<button
+											type="button"
+											onClick={() =>
+												updateSettings({
+													geminiEnabled: !settings.geminiEnabled,
+												})
+											}
+											className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
+												settings.geminiEnabled
+													? "border-accent bg-accent/10 text-accent"
+													: "border-border text-muted"
+											}`}
+										>
+											{settings.geminiEnabled ? "Включён" : "Выключен"}
+										</button>
+									</div>
+
+									<div className="text-xs leading-5 text-muted">
+										Без ключа ассистент использует бесплатный локальный шаблон.
 										{geminiModel ? ` Модель: ${geminiModel}.` : ""}
 									</div>
 									<button
 										type="button"
 										onClick={() => void checkGemini()}
 										disabled={geminiChecking}
-										className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border text-sm hover:bg-surface-elevated"
+										className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
 									>
 										{geminiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
@@ -500,111 +508,114 @@ export function AnswerAssistantPage() {
 										) : (
 											<WifiOff size={15} />
 										)}
-										Проверить подключение
+										Проверить
 									</button>
 								</div>
 							</div>
-						</div>
+						</section>
 
-						<div className="space-y-4">
-							<div className="rounded-lg border border-border bg-background p-4">
-								<div className="mb-3 font-semibold">Словарь терминов</div>
-								<div className="grid gap-2 sm:grid-cols-2">
+						<section className="rounded-xl border border-border bg-surface">
+							<div className="flex items-center gap-2 border-b border-border px-4 py-3">
+								<Languages size={17} />
+								<div className="font-semibold">Словарь</div>
+							</div>
+							<div className="space-y-3 p-4">
+								<div className="grid gap-2">
 									<input
 										value={glossarySource}
 										onChange={(event) => setGlossarySource(event.target.value)}
-										placeholder="Исходный термин"
-										className="h-10 rounded-md border border-border bg-surface px-3 text-sm"
+										placeholder="Термин"
+										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 									<input
 										value={glossaryTarget}
 										onChange={(event) => setGlossaryTarget(event.target.value)}
 										placeholder="Как писать в ответе"
-										className="h-10 rounded-md border border-border bg-surface px-3 text-sm"
+										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 								</div>
 								<button
 									type="button"
 									onClick={addGlossaryTerm}
-									className="mt-2 h-10 w-full rounded-md border border-border text-sm hover:bg-surface-elevated"
+									className="h-10 w-full rounded-lg border border-border text-sm hover:bg-surface-elevated"
 								>
 									Добавить термин
 								</button>
-								<div className="supportos-scroll mt-3 max-h-44 space-y-2 overflow-auto">
-									{data.glossary.map((term) => (
-										<div
-											key={term.id}
-											className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-xs"
-										>
-											<span className="min-w-0 truncate">
-												{term.source} → {term.target}
-											</span>
-											<button
-												type="button"
-												onClick={() =>
-													setData((current) => ({
-														...current,
-														glossary: current.glossary.filter(
-															(item) => item.id !== term.id,
-														),
-													}))
-												}
-												className="text-muted hover:text-red-300"
-											>
-												<Trash2 size={14} />
-											</button>
-										</div>
-									))}
-								</div>
-							</div>
 
-							<div className="rounded-lg border border-border bg-background p-4">
-								<div className="flex items-center justify-between gap-3">
-									<div>
-										<div className="font-semibold">Память ответов</div>
-										<div className="text-xs text-muted">
-											Сохранено: {data.memory.length}
-										</div>
-									</div>
-									<CheckCircle2 size={18} className="text-emerald-400" />
-								</div>
-								{data.memory.length > 0 && (
-									<div className="supportos-scroll mt-3 max-h-44 space-y-2 overflow-auto">
-										{data.memory.slice(0, 10).map((entry) => (
+								<div className="supportos-scroll max-h-44 space-y-1 overflow-auto">
+									{data.glossary.length > 0 ? (
+										data.glossary.map((term) => (
 											<div
-												key={entry.id}
-												className="flex items-start justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-xs"
+												key={term.id}
+												className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2 text-xs"
 											>
-												<div className="min-w-0">
-													<div className="truncate font-medium">
-														{entry.source}
-													</div>
-													<div className="mt-1 truncate text-muted">
-														{entry.target}
-													</div>
-												</div>
+												<span className="min-w-0 truncate">
+													{term.source} → {term.target}
+												</span>
 												<button
 													type="button"
-													onClick={() =>
-														setData((current) => ({
-															...current,
-															memory: current.memory.filter(
-																(item) => item.id !== entry.id,
-															),
-														}))
-													}
+													onClick={() => removeGlossaryTerm(term.id)}
 													className="shrink-0 text-muted hover:text-red-300"
+													aria-label="Удалить термин"
 												>
 													<Trash2 size={14} />
 												</button>
 											</div>
-										))}
+										))
+									) : (
+										<div className="py-4 text-center text-xs text-muted">
+											Словарь пуст
+										</div>
+									)}
+								</div>
+							</div>
+						</section>
+
+						<section className="rounded-xl border border-border bg-surface">
+							<div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+								<div>
+									<div className="font-semibold">Память ответов</div>
+									<div className="text-xs text-muted">
+										Сохранено: {data.memory.length}
+									</div>
+								</div>
+								<CheckCircle2 size={18} className="text-emerald-400" />
+							</div>
+
+							<div className="supportos-scroll max-h-56 space-y-1 overflow-auto p-4">
+								{data.memory.length > 0 ? (
+									data.memory.slice(0, 10).map((entry) => (
+										<div
+											key={entry.id}
+											className="flex items-start justify-between gap-3 rounded-lg bg-background px-3 py-2 text-xs"
+										>
+											<div className="min-w-0">
+												<div className="truncate font-medium">
+													{entry.source}
+												</div>
+												<div className="mt-1 truncate text-muted">
+													{entry.target}
+												</div>
+											</div>
+											<button
+												type="button"
+												onClick={() => removeMemoryEntry(entry.id)}
+												className="shrink-0 text-muted hover:text-red-300"
+												aria-label="Удалить сохранённый ответ"
+											>
+												<Trash2 size={14} />
+											</button>
+										</div>
+									))
+								) : (
+									<div className="py-4 text-center text-xs text-muted">
+										Пока нет сохранённых ответов
 									</div>
 								)}
 							</div>
-						</div>
-					</div>
-				</details>
+						</section>
+					</aside>
+				</form>
 			</div>
 		</div>
 	);

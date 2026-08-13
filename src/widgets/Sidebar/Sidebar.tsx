@@ -287,7 +287,7 @@ export function Sidebar({
 				void navigate({ to: "/" });
 				onNavigate?.();
 			}}
-			className="flex min-h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted hover:bg-accent/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+			className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
 		>
 			<FileText size={14} className="shrink-0" />
 			<span className="truncate">{getBindTitle(bind, language)}</span>
@@ -301,7 +301,7 @@ export function Sidebar({
 				selectFolder(folder.id);
 				void navigate({ to: "/" });
 			}}
-			className="flex min-h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted hover:bg-accent/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+			className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
 		>
 			<Folder size={14} className="shrink-0" />
 			<span className="truncate">{folder.name}</span>
@@ -310,9 +310,9 @@ export function Sidebar({
 
 	return (
 		<aside
-			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface pb-[env(safe-area-inset-bottom)]`}
+			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-background pb-[env(safe-area-inset-bottom)]`}
 		>
-			<div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-3">
+			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">
 				<div className="min-w-0 px-1">
 					<div className="truncate text-sm font-semibold">Knowledge</div>
 					<div className="text-xs text-muted">{binds.length} materials</div>
@@ -331,8 +331,8 @@ export function Sidebar({
 			</div>
 
 			{layout.showSidebarFavorites && (
-				<div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
+				<div className="shrink-0 border-b border-border/80 px-3 py-3">
+					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase text-muted">
 						<Star size={13} />
 						Favorites
 					</div>
@@ -354,9 +354,9 @@ export function Sidebar({
 			)}
 
 			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="shrink-0 border-b border-border px-3 py-3">
+				<div className="shrink-0 border-b border-border/80 px-3 py-3">
 					<div className="mb-3 flex items-center justify-between px-2">
-						<div className="text-xs font-semibold uppercase tracking-wider text-muted">
+						<div className="text-xs font-semibold uppercase text-muted">
 							Categories
 						</div>
 
@@ -364,7 +364,7 @@ export function Sidebar({
 							type="button"
 							title="New category"
 							onClick={createCategory}
-							className="rounded-md p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
 						</button>
@@ -380,7 +380,7 @@ export function Sidebar({
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Search tree"
-							className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
 							<button
@@ -390,7 +390,7 @@ export function Sidebar({
 									setTreeSearch("");
 									setSelectedTag("");
 								}}
-								className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={14} />
 							</button>
@@ -398,7 +398,7 @@ export function Sidebar({
 					</div>
 
 					{tags.length > 0 && (
-						<div className="mt-3 flex flex-wrap gap-1.5">
+						<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
 							{tags.map((tag) => (
 								<button
 									key={tag}
@@ -406,7 +406,7 @@ export function Sidebar({
 									onClick={() =>
 										setSelectedTag((current) => (current === tag ? "" : tag))
 									}
-									className={`max-w-full rounded-full border px-2 py-1 text-xs transition ${
+									className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
 										selectedTag === tag
 											? "border-accent bg-accent text-accent-foreground"
 											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
@@ -419,7 +419,7 @@ export function Sidebar({
 					)}
 
 					{selectedBindIds.length > 0 && (
-						<div className="mt-3 rounded-md border border-accent/30 bg-accent/10 p-2 text-xs text-muted">
+						<div className="mt-3 rounded-lg border border-accent/25 bg-accent/10 p-2 text-xs text-muted">
 							<div className="mb-2 flex items-center justify-between gap-2">
 								<span>
 									<span className="font-semibold text-foreground">
@@ -430,7 +430,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={() => setSelectedBindIds([])}
-									className="rounded p-1 text-foreground hover:bg-accent/15"
+									className="rounded-lg p-1 text-foreground hover:bg-accent/15"
 									title="Clear selection"
 								>
 									<X size={13} />
@@ -441,7 +441,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={setSelectedFavorite}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title={
 										allSelectedFavorite
 											? "Remove from favorites"
@@ -456,7 +456,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={setSelectedPinned}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title={allSelectedPinned ? "Unpin selected" : "Pin selected"}
 								>
 									<Pin
@@ -467,7 +467,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title="Add tag"
 								>
 									<Tag size={14} />
@@ -475,7 +475,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={exportSelected}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title="Export selected"
 								>
 									<Download size={14} />
@@ -483,7 +483,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={archiveSelected}
-									className="rounded-md border border-red-500/30 bg-background/40 p-1.5 text-red-300 hover:bg-red-500/10"
+									className="rounded-lg border border-red-500/30 bg-background p-1.5 text-red-300 hover:bg-red-500/10"
 									title="Archive selected"
 								>
 									<Archive size={14} />
@@ -501,12 +501,12 @@ export function Sidebar({
 											}
 										}}
 										placeholder="Tag"
-										className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-accent"
+										className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-accent"
 									/>
 									<button
 										type="button"
 										onClick={addTagToSelected}
-										className="rounded-md border border-accent/30 bg-accent px-2 text-accent-foreground"
+										className="rounded-lg border border-accent/30 bg-accent px-2 text-accent-foreground"
 										title="Apply tag"
 									>
 										<Check size={14} />

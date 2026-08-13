@@ -413,14 +413,19 @@ export function TranslatorPage() {
 	};
 
 	return (
-		<div className="supportos-scroll flex h-full flex-col overflow-auto bg-background">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
 			<form
 				onSubmit={translate}
-				className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-6"
+				className="supportos-scroll mx-auto flex h-full w-full max-w-6xl flex-1 flex-col gap-4 overflow-auto p-4 sm:p-6"
 			>
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-2xl font-bold">Translator</h1>
+						<div className="text-xs font-semibold uppercase text-muted">
+							Quick translation
+						</div>
+						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
+							Translator
+						</h1>
 						<p className="mt-1 text-sm text-muted">
 							Quick translation with markdown and code block preservation.
 						</p>
@@ -429,7 +434,7 @@ export function TranslatorPage() {
 					<div className="flex flex-wrap items-center gap-2">
 						<Link
 							to="/settings/translator"
-							className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Settings size={16} />
 							Settings
@@ -439,7 +444,7 @@ export function TranslatorPage() {
 							type="button"
 							onClick={loadLanguages}
 							disabled={loading || languagesLoading}
-							className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{languagesLoading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -453,7 +458,7 @@ export function TranslatorPage() {
 							type="button"
 							onClick={swapLanguages}
 							disabled={loading}
-							className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<Repeat2 size={16} />
 							Swap Languages
@@ -463,7 +468,7 @@ export function TranslatorPage() {
 							type="button"
 							onClick={clearTranslator}
 							disabled={loading || (!sourceText && !resultText && !error)}
-							className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 							title="Clear translator"
 						>
 							<Trash2 size={16} />
@@ -472,7 +477,7 @@ export function TranslatorPage() {
 						<button
 							type="button"
 							onClick={() => setLiveTranslate((value) => !value)}
-							className={`rounded-md border p-2 transition-colors ${
+							className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${
 								liveTranslate
 									? "border-accent bg-accent/10 text-accent hover:bg-accent/15"
 									: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
@@ -486,7 +491,7 @@ export function TranslatorPage() {
 						<button
 							type="submit"
 							disabled={loading || !canTranslate}
-							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -499,13 +504,13 @@ export function TranslatorPage() {
 				</div>
 
 				{languageWarning && (
-					<div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+					<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
 						{languageWarning}
 					</div>
 				)}
 
 				{error && (
-					<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+					<div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
 						{error}
 					</div>
 				)}
@@ -537,7 +542,7 @@ export function TranslatorPage() {
 				</div>
 
 				<div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
-					<div className="flex min-h-96 flex-col rounded-lg border border-border bg-surface">
+					<div className="flex min-h-96 flex-col rounded-xl border border-border bg-surface">
 						<div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div className="text-sm font-semibold">Source</div>
 							{fromLanguage === "auto" && detectedLanguage && (
@@ -555,14 +560,14 @@ export function TranslatorPage() {
 						/>
 					</div>
 
-					<div className="flex min-h-96 flex-col rounded-lg border border-border bg-surface">
+					<div className="flex min-h-96 flex-col rounded-xl border border-border bg-surface">
 						<div className="flex items-center justify-between border-b border-border px-4 py-3">
 							<div className="text-sm font-semibold">Result</div>
 							<button
 								type="button"
 								onClick={copyResult}
 								disabled={loading || !resultText.trim()}
-								className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+								className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								<Copy size={14} />
 								Copy Result
@@ -607,7 +612,7 @@ function LanguagePanel({
 		: languages.filter((language) => language.code !== "auto");
 
 	return (
-		<div className="rounded-lg border border-border bg-surface p-4">
+		<div className="rounded-xl border border-border bg-surface p-4">
 			<div className="mb-3 flex items-center justify-between gap-3">
 				<div className="text-sm font-semibold">{title}</div>
 				{loading && (
@@ -622,7 +627,7 @@ function LanguagePanel({
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
 					disabled={disabled}
-					className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					{options.map((language) => (
 						<option key={language.code} value={language.code}>
@@ -636,7 +641,7 @@ function LanguagePanel({
 					value={customValue}
 					onChange={(event) => onCustomChange(event.target.value)}
 					disabled={disabled || value !== CUSTOM_LANGUAGE}
-					className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
 					placeholder="Language code or name"
 				/>
 			</div>

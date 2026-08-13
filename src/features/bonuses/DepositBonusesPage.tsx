@@ -1,4 +1,5 @@
 import {
+	CheckCircle2,
 	Copy,
 	FileSpreadsheet,
 	Loader2,
@@ -7,6 +8,7 @@ import {
 	RefreshCw,
 	Search,
 	Trash2,
+	Upload,
 	X,
 } from "lucide-react";
 import {
@@ -411,6 +413,9 @@ export function DepositBonusesPage() {
 	const [rates, setRates] = useState<CurrencyRates>();
 	const [ratesLoading, setRatesLoading] = useState(false);
 	const [ratesError, setRatesError] = useState("");
+	const [importOpen, setImportOpen] = useState(false);
+	const [deleteProjectId, setDeleteProjectId] = useState<string>();
+	const [deleteBonusId, setDeleteBonusId] = useState<string>();
 
 	const rateCurrencies = useMemo(() => {
 		const values = new Set([
@@ -471,6 +476,17 @@ export function DepositBonusesPage() {
 			matchesTokens(buildBonusSearchText(bonus), searchTokens),
 		);
 	}, [activeProject, activeProjectMatchesSearch, searchTokens]);
+	const totalBonuses = useMemo(
+		() =>
+			projects.reduce((total, project) => total + project.bonuses.length, 0),
+		[projects],
+	);
+	const deleteProjectTarget = projects.find(
+		(project) => project.id === deleteProjectId,
+	);
+	const deleteBonusTarget = activeProject?.bonuses.find(
+		(bonus) => bonus.id === deleteBonusId,
+	);
 
 	const loadRates = useCallback(
 		async (force: boolean) => {
@@ -551,6 +567,8 @@ export function DepositBonusesPage() {
 
 			showToast(`Imported and saved ${preview.projects.length} project sheets`);
 			setPreview(undefined);
+			setSheetUrl("");
+			setImportOpen(false);
 		} finally {
 			setCommitting(false);
 		}
@@ -664,21 +682,41 @@ export function DepositBonusesPage() {
 		showToast(copied ? "Package bind copied" : "Copy failed");
 	};
 
+	const confirmDeleteProject = () => {
+		if (!deleteProjectTarget) return;
+
+		removeProject(deleteProjectTarget.id);
+		setDeleteProjectId(undefined);
+		showToast("Project sheet deleted");
+	};
+
+	const confirmDeleteBonus = () => {
+		if (!activeProject || !deleteBonusTarget) return;
+
+		removeBonus(activeProject.id, deleteBonusTarget.id);
+		setDeleteBonusId(undefined);
+		showToast("Bonus deleted");
+	};
+
 	return (
-		<div className="flex h-full flex-col overflow-auto bg-background">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
 			<datalist id="deposit-bonus-currencies">
 				{currencies.map((currency) => (
 					<option key={currency} value={currency} />
 				))}
 			</datalist>
 
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-6">
+			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
-						<h1 className="text-2xl font-bold">Deposit Bonuses</h1>
+						<div className="text-xs font-semibold uppercase text-muted">
+							Fast bonus library
+						</div>
+						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
+							Deposit Bonuses
+						</h1>
 						<p className="mt-1 text-sm text-muted">
-							Project sheets with welcome package bonuses, minimum deposits,
-							currency equivalents, and ready-to-copy binds.
+							{projects.length} projects / {totalBonuses} bonuses ready to copy.
 						</p>
 					</div>
 
@@ -716,7 +754,7 @@ export function DepositBonusesPage() {
 							type="button"
 							onClick={() => void loadRates(true)}
 							disabled={ratesLoading}
-							className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{ratesLoading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -725,6 +763,26 @@ export function DepositBonusesPage() {
 							)}
 							Rates
 						</button>
+
+						<button
+							type="button"
+							onClick={() => setImportOpen((current) => !current)}
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+						>
+							<Upload size={16} />
+							Import
+						</button>
+
+						{activeProject && (
+							<button
+								type="button"
+								onClick={() => void copyPackage(activeProject)}
+								className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+							>
+								<Copy size={16} />
+								Copy package
+							</button>
+						)}
 					</div>
 				</div>
 
@@ -735,147 +793,152 @@ export function DepositBonusesPage() {
 				)}
 
 				{rates && (
-					<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
 						Rates source: {rates.source}. Date: {rates.date}. Base: {rates.base}
 						.
 					</div>
 				)}
 
 				{activeCurrencyContext && (
-					<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
 						Currency registry: {activeCurrencyContext.rule.site} -{" "}
 						{activeCurrencyContext.table.name}. Text amounts in EUR are copied
 						as {selectedCurrency} when a matching row exists.
 					</div>
 				)}
 
-				<div className="rounded-lg border border-border bg-surface p-4">
-					<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-						<FileSpreadsheet size={16} />
-						Google Sheets Import
-					</div>
+				{importOpen && (
+					<div className="rounded-xl border border-border bg-surface p-4">
+						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+							<FileSpreadsheet size={16} />
+							Google Sheets Import
+						</div>
 
-					<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-						<textarea
-							value={sheetUrl}
-							onChange={(event) => setSheetUrl(event.target.value)}
-							className="min-h-10 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Paste one Google Spreadsheet URL. Each tab/sheet becomes one project. You can also paste several sheet URLs, one per line."
-						/>
+						<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+							<textarea
+								value={sheetUrl}
+								onChange={(event) => setSheetUrl(event.target.value)}
+								className="min-h-10 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								placeholder="Paste one Google Spreadsheet URL. Each tab/sheet becomes one project. You can also paste several sheet URLs, one per line."
+							/>
 
-						<select
-							value={mode}
-							onChange={(event) =>
-								setMode(event.target.value as DepositBonusImportMode)
-							}
-							className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-						>
-							<option value="upsert">Upsert</option>
-							<option value="replace">Replace all project sheets</option>
-						</select>
+							<select
+								value={mode}
+								onChange={(event) =>
+									setMode(event.target.value as DepositBonusImportMode)
+								}
+								className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							>
+								<option value="upsert">Upsert</option>
+								<option value="replace">Replace all project sheets</option>
+							</select>
 
-						<button
-							type="button"
-							onClick={loadPreview}
-							disabled={importing || !sheetUrl.trim()}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
-						>
-							{importing ? (
-								<Loader2 size={16} className="animate-spin" />
-							) : (
-								<FileSpreadsheet size={16} />
-							)}
-							Preview
-						</button>
-					</div>
+							<button
+								type="button"
+								onClick={loadPreview}
+								disabled={importing || !sheetUrl.trim()}
+								className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								{importing ? (
+									<Loader2 size={16} className="animate-spin" />
+								) : (
+									<FileSpreadsheet size={16} />
+								)}
+								Preview
+							</button>
+						</div>
 
-					{preview && (
-						<div className="mt-4 rounded-md border border-border bg-background p-3">
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<div className="text-sm">
-									<span className="font-semibold">
-										{preview.projects.length}
-									</span>{" "}
-									project sheets found
+						{preview && (
+							<div className="mt-4 rounded-lg bg-background p-3">
+								<div className="flex flex-wrap items-center justify-between gap-3">
+									<div className="inline-flex items-center gap-2 text-sm">
+										<CheckCircle2 size={16} className="text-accent" />
+										<span className="font-semibold">
+											{preview.projects.length}
+										</span>{" "}
+										project sheets found
+									</div>
+
+									<button
+										type="button"
+										onClick={commitPreview}
+										disabled={
+											committing ||
+											preview.projects.length === 0 ||
+											preview.errors.length > 0
+										}
+										className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+									>
+										{committing && (
+											<Loader2 size={15} className="animate-spin" />
+										)}
+										Commit Import
+									</button>
 								</div>
 
-								<button
-									type="button"
-									onClick={commitPreview}
-									disabled={
-										committing ||
-										preview.projects.length === 0 ||
-										preview.errors.length > 0
-									}
-									className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
-								>
-									{committing && <Loader2 size={15} className="animate-spin" />}
-									Commit Import
-								</button>
-							</div>
-
-							{preview.projects.length > 0 && (
-								<div className="mt-3 flex flex-wrap gap-2">
-									{preview.projects.map((project) => {
-										const languages = Array.from(
-											new Set(
-												project.bonuses.flatMap((bonus) =>
-													getBonusTranslations(bonus).map((translation) =>
-														getLanguageLabel(translation.language),
+								{preview.projects.length > 0 && (
+									<div className="mt-3 flex flex-wrap gap-2">
+										{preview.projects.map((project) => {
+											const languages = Array.from(
+												new Set(
+													project.bonuses.flatMap((bonus) =>
+														getBonusTranslations(bonus).map((translation) =>
+															getLanguageLabel(translation.language),
+														),
 													),
 												),
-											),
-										).join(", ");
+											).join(", ");
 
-										return (
-											<span
-												key={`${project.slug}-${project.sheetId ?? "sheet"}`}
-												className="rounded-md border border-border px-2 py-1 text-xs text-muted"
-											>
-												{project.name}: {project.bonuses.length}
-												{languages ? ` (${languages})` : ""}
-											</span>
-										);
-									})}
-								</div>
-							)}
+											return (
+												<span
+													key={`${project.slug}-${project.sheetId ?? "sheet"}`}
+													className="rounded-md border border-border px-2 py-1 text-xs text-muted"
+												>
+													{project.name}: {project.bonuses.length}
+													{languages ? ` (${languages})` : ""}
+												</span>
+											);
+										})}
+									</div>
+								)}
 
-							{preview.errors.length > 0 && (
-								<div className="mt-3 space-y-1 text-sm text-red-300">
-									{preview.errors.map((error) => (
-										<div key={error}>{error}</div>
-									))}
-								</div>
-							)}
+								{preview.errors.length > 0 && (
+									<div className="mt-3 space-y-1 text-sm text-red-300">
+										{preview.errors.map((error) => (
+											<div key={error}>{error}</div>
+										))}
+									</div>
+								)}
 
-							{preview.warnings.length > 0 && (
-								<div className="mt-3 max-h-24 overflow-auto text-xs text-amber-200">
-									{preview.warnings.slice(0, 12).map((warning) => (
-										<div key={warning}>{warning}</div>
-									))}
-								</div>
-							)}
-						</div>
-					)}
-				</div>
+								{preview.warnings.length > 0 && (
+									<div className="mt-3 max-h-24 overflow-auto text-xs text-amber-200">
+										{preview.warnings.slice(0, 12).map((warning) => (
+											<div key={warning}>{warning}</div>
+										))}
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+				)}
 
 				<div className="grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
-					<div className="space-y-4">
+					<div className="space-y-3">
 						<form
 							onSubmit={createProject}
-							className="rounded-lg border border-border bg-surface p-4"
+							className="rounded-xl border border-border bg-surface p-3"
 						>
-							<div className="mb-3 text-sm font-semibold">Project Sheets</div>
+							<div className="mb-3 text-sm font-semibold">Project sheets</div>
 							<div className="flex gap-2">
 								<input
 									value={newProjectName}
 									onChange={(event) => setNewProjectName(event.target.value)}
-									className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Project name"
 								/>
 								<button
 									type="submit"
-									className="inline-flex h-10 items-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+									className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 								>
 									<Plus size={16} />
 									Add
@@ -891,45 +954,51 @@ export function DepositBonusesPage() {
 							<input
 								value={query}
 								onChange={(event) => setQuery(event.target.value)}
-								className="h-10 w-full rounded-md border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 								placeholder="Search sheets or bonuses..."
 							/>
 						</div>
 
-						<div className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface p-3">
+						<div className="supportos-scroll max-h-[28rem] overflow-auto rounded-xl border border-border bg-surface">
 							{filteredProjects.length > 0 ? (
 								filteredProjects.map((project) => {
 									const active = project.id === activeProject?.id;
+									const visibleCount =
+										searchTokens.length > 0 &&
+										!matchesTokens(
+											buildProjectSearchText(project),
+											searchTokens,
+										)
+											? project.bonuses.filter((bonus) =>
+													matchesTokens(
+														buildBonusSearchText(bonus),
+														searchTokens,
+													),
+												).length
+											: project.bonuses.length;
 
 									return (
 										<button
 											key={project.id}
 											type="button"
 											onClick={() => setActiveProject(project.id)}
-											className={`min-w-0 rounded-md border px-3 py-2 text-left text-sm transition ${
+											className={`flex min-h-14 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-3 text-left text-sm transition last:border-b-0 ${
 												active
-													? "border-accent bg-accent/10 text-foreground"
-													: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+													? "bg-accent/10 text-foreground"
+													: "text-muted hover:bg-surface-elevated hover:text-foreground"
 											}`}
 										>
-											<div className="max-w-48 truncate font-medium">
-												{project.name}
-											</div>
-											<div className="mt-1 text-xs text-muted">
-												{searchTokens.length > 0 &&
-												!matchesTokens(
-													buildProjectSearchText(project),
-													searchTokens,
-												)
-													? project.bonuses.filter((bonus) =>
-															matchesTokens(
-																buildBonusSearchText(bonus),
-																searchTokens,
-															),
-														).length
-													: project.bonuses.length}{" "}
-												bonuses
-											</div>
+											<span className="min-w-0">
+												<span className="block truncate font-medium">
+													{project.name}
+												</span>
+												<span className="mt-0.5 block text-xs text-muted">
+													{visibleCount} bonuses
+												</span>
+											</span>
+											<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
+												{project.bonuses.length}
+											</span>
 										</button>
 									);
 								})
@@ -943,22 +1012,22 @@ export function DepositBonusesPage() {
 
 					{activeProject ? (
 						<div className="space-y-4">
-							<section className="rounded-lg border border-border bg-surface">
+							<section className="rounded-xl border border-border bg-surface">
 								<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
 									<div className="min-w-0 flex-1">
-										<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+										<div className="mb-2 text-xs font-semibold uppercase text-muted">
 											Active sheet
 										</div>
 										<div className="flex max-w-xl gap-2">
 											<input
 												value={renameValue}
 												onChange={(event) => setRenameValue(event.target.value)}
-												className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+												className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											/>
 											<button
 												type="button"
 												onClick={saveProjectName}
-												className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Pencil size={15} />
 												Save
@@ -969,18 +1038,10 @@ export function DepositBonusesPage() {
 									<div className="flex items-center gap-2">
 										<button
 											type="button"
-											onClick={() => void copyPackage(activeProject)}
-											className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
-										>
-											<Copy size={15} />
-											Copy Package
-										</button>
-
-										<button
-											type="button"
-											onClick={() => removeProject(activeProject.id)}
-											className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-red-400"
+											onClick={() => setDeleteProjectId(activeProject.id)}
+											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 											title="Delete project sheet"
+											aria-label="Delete project sheet"
 										>
 											<Trash2 size={16} />
 										</button>
@@ -997,7 +1058,7 @@ export function DepositBonusesPage() {
 													name: event.target.value,
 												}))
 											}
-											className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+											className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											placeholder="Bonus name"
 										/>
 										<input
@@ -1008,7 +1069,7 @@ export function DepositBonusesPage() {
 													minDepositAmount: event.target.value,
 												}))
 											}
-											className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+											className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											placeholder="Min dep."
 										/>
 										<input
@@ -1020,7 +1081,7 @@ export function DepositBonusesPage() {
 													minDepositCurrency: event.target.value,
 												}))
 											}
-											className="h-10 rounded-md border border-border bg-background px-3 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+											className="h-11 rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											placeholder="USD"
 										/>
 									</div>
@@ -1036,7 +1097,7 @@ export function DepositBonusesPage() {
 												),
 											)
 										}
-										className="min-h-24 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+										className="min-h-28 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										placeholder={`Bonus content / ready bind text (${getLanguageLabel(
 											selectedLanguage,
 										)})`}
@@ -1053,7 +1114,7 @@ export function DepositBonusesPage() {
 											<button
 												type="button"
 												onClick={resetBonusForm}
-												className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<X size={15} />
 												Cancel
@@ -1061,7 +1122,7 @@ export function DepositBonusesPage() {
 										)}
 										<button
 											type="submit"
-											className="inline-flex h-10 items-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+											className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 										>
 											<Plus size={16} />
 											{editingBonusId ? "Save Bonus" : "Add Bonus"}
@@ -1070,7 +1131,7 @@ export function DepositBonusesPage() {
 								</form>
 							</section>
 
-							<section className="rounded-lg border border-border bg-surface">
+							<section className="rounded-xl border border-border bg-surface">
 								<div className="border-b border-border px-4 py-3">
 									<div className="font-semibold">{activeProject.name}</div>
 									<div className="mt-1 text-xs text-muted">
@@ -1101,7 +1162,7 @@ export function DepositBonusesPage() {
 												return (
 													<div
 														key={bonus.id}
-														className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)_auto]"
+														className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)_auto]"
 													>
 														<div>
 															<div className="text-sm font-medium">
@@ -1110,24 +1171,28 @@ export function DepositBonusesPage() {
 															<div className="mt-1 text-xs text-muted">
 																{formatDeposit(bonus, selectedCurrency, rates)}
 															</div>
-															{languages.map((language) => (
-																<button
-																	key={language}
-																	type="button"
-																	onClick={() => setSelectedLanguage(language)}
-																	title={`Switch to ${getLanguageLabel(language)}`}
-																	className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition ${
-																		selectedLanguage === language
-																			? "border-accent bg-accent/10 text-foreground"
-																			: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-																	}`}
-																>
-																	{getLanguageLabel(language)}
-																</button>
-															))}
+															<div className="mt-2 flex flex-wrap gap-1">
+																{languages.map((language) => (
+																	<button
+																		key={language}
+																		type="button"
+																		onClick={() =>
+																			setSelectedLanguage(language)
+																		}
+																		title={`Switch to ${getLanguageLabel(language)}`}
+																		className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition ${
+																			selectedLanguage === language
+																				? "border-accent bg-accent/10 text-foreground"
+																				: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+																		}`}
+																	>
+																		{getLanguageLabel(language)}
+																	</button>
+																))}
+															</div>
 														</div>
 
-														<div className="min-w-0 whitespace-pre-wrap text-sm leading-6 text-muted">
+														<div className="min-w-0 whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-sm leading-6 text-muted">
 															{content}
 														</div>
 
@@ -1135,7 +1200,7 @@ export function DepositBonusesPage() {
 															<button
 																type="button"
 																onClick={() => void copyBonus(bonus)}
-																className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+																className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 															>
 																<Copy size={15} />
 																Copy
@@ -1143,18 +1208,18 @@ export function DepositBonusesPage() {
 															<button
 																type="button"
 																onClick={() => editBonus(bonus)}
-																className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-foreground"
+																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 																title="Edit bonus"
+																aria-label="Edit bonus"
 															>
 																<Pencil size={15} />
 															</button>
 															<button
 																type="button"
-																onClick={() =>
-																	removeBonus(activeProject.id, bonus.id)
-																}
-																className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-red-400"
+																onClick={() => setDeleteBonusId(bonus.id)}
+																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 																title="Delete bonus"
+																aria-label="Delete bonus"
 															>
 																<Trash2 size={15} />
 															</button>
@@ -1177,6 +1242,96 @@ export function DepositBonusesPage() {
 							Add a project sheet to start collecting bonuses
 						</div>
 					)}
+				</div>
+			</div>
+
+			<ConfirmDialog
+				open={Boolean(deleteProjectTarget)}
+				title="Delete project sheet?"
+				description={
+					deleteProjectTarget
+						? `${deleteProjectTarget.name} and its bonuses will be removed.`
+						: ""
+				}
+				onCancel={() => setDeleteProjectId(undefined)}
+				onConfirm={confirmDeleteProject}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(deleteBonusTarget)}
+				title="Delete bonus?"
+				description={
+					deleteBonusTarget
+						? `${deleteBonusTarget.name} will be removed from this project.`
+						: ""
+				}
+				onCancel={() => setDeleteBonusId(undefined)}
+				onConfirm={confirmDeleteBonus}
+			/>
+		</div>
+	);
+}
+
+function ConfirmDialog({
+	open,
+	title,
+	description,
+	onCancel,
+	onConfirm,
+}: {
+	open: boolean;
+	title: string;
+	description: string;
+	onCancel: () => void;
+	onConfirm: () => void;
+}) {
+	useEffect(() => {
+		if (!open) return;
+
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") onCancel();
+		};
+
+		document.addEventListener("keydown", closeOnEscape);
+
+		return () => document.removeEventListener("keydown", closeOnEscape);
+	}, [onCancel, open]);
+
+	if (!open) return null;
+
+	return (
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="deposit-bonus-confirm-title"
+			onMouseDown={(event) => {
+				if (event.currentTarget === event.target) onCancel();
+			}}
+		>
+			<div className="w-full max-w-sm rounded-xl border border-border bg-surface p-4 shadow-2xl">
+				<h2
+					id="deposit-bonus-confirm-title"
+					className="text-base font-semibold"
+				>
+					{title}
+				</h2>
+				<p className="mt-2 text-sm text-muted">{description}</p>
+				<div className="mt-5 flex justify-end gap-2">
+					<button
+						type="button"
+						onClick={onCancel}
+						className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={onConfirm}
+						className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+					>
+						Delete
+					</button>
 				</div>
 			</div>
 		</div>

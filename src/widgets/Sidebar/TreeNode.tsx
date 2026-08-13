@@ -527,18 +527,21 @@ export function TreeNode({
 				className={`
           group
           relative
+          mx-1
+          my-0.5
           flex
           items-center
           gap-1.5
           border-l-2
+          rounded-lg
           pr-2
           transition
           ${
 						dragOver
-							? "bg-accent/15 text-foreground shadow-[inset_0_0_0_1px_rgba(59,130,246,0.45)]"
+							? "bg-accent/15 text-foreground shadow-[inset_0_0_0_1px_rgba(59,130,246,0.35)]"
 							: selected
-								? "bg-accent/15 text-accent"
-								: "hover:bg-accent/10"
+								? "bg-accent/10 text-foreground"
+								: "hover:bg-surface-elevated"
 					}
           ${dragging ? "scale-[0.99] opacity-45" : ""}
           ${node.type !== "category" ? "cursor-grab active:cursor-grabbing" : ""}
@@ -618,7 +621,7 @@ export function TreeNode({
 						<>
 							<GripVertical
 								size={14}
-								className="shrink-0 text-muted opacity-0 transition group-hover:opacity-70"
+								className="shrink-0 text-muted opacity-0 transition group-hover:opacity-60"
 							/>
 							<FileText size={16} className="shrink-0" style={nodeColorStyle} />
 						</>
@@ -627,7 +630,7 @@ export function TreeNode({
 							{node.type === "folder" && (
 								<GripVertical
 									size={14}
-									className="shrink-0 text-muted opacity-0 transition group-hover:opacity-70"
+									className="shrink-0 text-muted opacity-0 transition group-hover:opacity-60"
 								/>
 							)}
 							<Folder size={16} className="shrink-0" style={nodeColorStyle} />
@@ -650,7 +653,7 @@ export function TreeNode({
 						aria-expanded={actionsOpen}
 						title="Actions"
 						onClick={() => setActionsOpen((open) => !open)}
-						className={`rounded p-1 text-muted transition hover:bg-surface hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100 ${
+						className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100 ${
 							actionsOpen || selected ? "opacity-100" : "opacity-60"
 						}`}
 					>
@@ -658,7 +661,7 @@ export function TreeNode({
 					</button>
 
 					{actionsOpen && (
-						<div className="absolute right-0 top-7 z-40 w-48 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-2xl">
+						<div className="absolute right-0 top-9 z-40 w-48 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-2xl">
 							{node.type !== "bind" && (
 								<>
 									<ActionMenuItem
@@ -688,7 +691,7 @@ export function TreeNode({
 										/>
 									)}
 
-									<div className="my-1 border-t border-border" />
+									<div className="my-1 border-t border-border/80" />
 
 									<ActionMenuItem
 										icon={<Plus size={14} />}
@@ -706,7 +709,7 @@ export function TreeNode({
 										onClick={createFolder}
 									/>
 
-									<div className="my-1 border-t border-border" />
+									<div className="my-1 border-t border-border/80" />
 								</>
 							)}
 
