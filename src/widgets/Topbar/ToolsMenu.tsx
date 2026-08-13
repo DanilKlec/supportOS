@@ -5,10 +5,8 @@ import {
 	BrainCircuit,
 	Check,
 	ChevronRight,
-	Contact,
 	Download,
 	FileJson,
-	Gift,
 	HeartPulse,
 	Import,
 	Languages,
@@ -44,10 +42,7 @@ type AppRoute =
 	| "/ai/assistant"
 	| "/ai/translator"
 	| "/ai/knowledge"
-	| "/bonuses"
-	| "/bonus-tools"
 	| "/sports-betting"
-	| "/project-emails"
 	| "/health"
 	| "/archive"
 	| "/import/google-sheets"
@@ -111,31 +106,10 @@ const WORK_TOOLS: RouteToolItem[] = [
 	},
 	{
 		type: "route",
-		label: "Deposit Bonuses",
-		description: "Bonus reference data",
-		icon: Gift,
-		to: "/bonuses",
-	},
-	{
-		type: "route",
-		label: "Bonus Tools",
-		description: "Calculators and helpers",
-		icon: Wrench,
-		to: "/bonus-tools",
-	},
-	{
-		type: "route",
 		label: "Sports Betting",
 		description: "Live odds workspace",
 		icon: Trophy,
 		to: "/sports-betting",
-	},
-	{
-		type: "route",
-		label: "Project Emails",
-		description: "Project mailbox templates",
-		icon: Contact,
-		to: "/project-emails",
 	},
 	{
 		type: "route",

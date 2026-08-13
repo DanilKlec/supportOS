@@ -122,7 +122,6 @@ export function Sidebar({
 	const categories = useKnowledgeStore((s) => s.categories);
 	const favorites = useKnowledgeStore((s) => s.favorites);
 	const favoriteFolders = useKnowledgeStore((s) => s.favoriteFolders);
-	const recentFolders = useKnowledgeStore((s) => s.recentFolders);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
@@ -149,9 +148,6 @@ export function Sidebar({
 		.map((id) => binds.find((bind) => bind.id === id))
 		.filter((bind): bind is Bind => Boolean(bind));
 	const favoriteFolderItems = favoriteFolders
-		.map((id) => folders.find((folder) => folder.id === id))
-		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
-	const recentFolderItems = recentFolders
 		.map((id) => folders.find((folder) => folder.id === id))
 		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
 	const selectedBinds = selectedBindIds
@@ -356,37 +352,6 @@ export function Sidebar({
 					) : null}
 				</div>
 			)}
-
-			{layout.showSidebarRecentFolders && (
-				<div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						Recent folders
-					</div>
-
-					{recentFolderItems.length > 0 ? (
-						<div className="space-y-0.5">
-							{recentFolderItems.map(renderFolderShortcut)}
-						</div>
-					) : (
-						<div className="px-2 text-xs text-muted">No folders opened yet</div>
-					)}
-				</div>
-			)}
-
-			{/* <div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						<Clock3 size={13} />
-						Recent
-					</div>
-
-					{recentBinds.length > 0 ? (
-						<div className="space-y-0.5">
-							{recentBinds.map(renderBindShortcut)}
-						</div>
-					) : (
-						<div className="px-2 text-xs text-muted">Nothing opened yet</div>
-					)}
-				</div> */}
 
 			<div className="flex min-h-0 flex-1 flex-col">
 				<div className="shrink-0 border-b border-border px-3 py-3">

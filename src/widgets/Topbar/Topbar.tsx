@@ -1,5 +1,16 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Cloud, LogIn, LogOut, Menu, Plus, Search, X } from "lucide-react";
+import {
+	Cloud,
+	Contact,
+	Gift,
+	LogIn,
+	LogOut,
+	Menu,
+	Plus,
+	Search,
+	Wrench,
+	X,
+} from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -26,6 +37,24 @@ import { ToolsMenu } from "./ToolsMenu";
 interface TopbarProps {
 	onOpenMobileSidebar?: () => void;
 }
+
+const QUICK_TOOLS = [
+	{
+		label: "Emails",
+		to: "/project-emails",
+		icon: Contact,
+	},
+	{
+		label: "Bonuses",
+		to: "/bonuses",
+		icon: Gift,
+	},
+	{
+		label: "Bonus Tools",
+		to: "/bonus-tools",
+		icon: Wrench,
+	},
+] as const;
 
 function getShortcutLabel() {
 	if (
@@ -388,57 +417,171 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	}, [mobileSearchOpen]);
 
 	return (
-		<header className="relative z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
-			<button
-				type="button"
-				aria-label={
-					layout.showSidebar ? "Collapse navigation" : "Open navigation"
-				}
-				onClick={toggleSidebar}
-				className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-			>
-				<Menu size={19} />
-			</button>
+		<div className="relative z-30 shrink-0">
+			<header className="relative flex h-14 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
+				<button
+					type="button"
+					aria-label={
+						layout.showSidebar ? "Collapse navigation" : "Open navigation"
+					}
+					onClick={toggleSidebar}
+					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+				>
+					<Menu size={19} />
+				</button>
 
-			<div className="flex min-w-0 shrink-0 items-center gap-2">
-				<SupportOSLogo className="h-8 w-8" />
-				<div className="hidden min-w-0 sm:block">
-					<div className="truncate text-sm font-semibold leading-5">
-						SupportOS
-					</div>
-					<div className="truncate text-[11px] text-muted">
-						Support workspace
+				<div className="flex min-w-0 shrink-0 items-center gap-2">
+					<SupportOSLogo className="h-8 w-8" />
+					<div className="hidden min-w-0 sm:block">
+						<div className="truncate text-sm font-semibold leading-5">
+							SupportOS
+						</div>
+						<div className="truncate text-[11px] text-muted">
+							Support workspace
+						</div>
 					</div>
 				</div>
-			</div>
 
-			<div className="hidden min-w-0 flex-1 justify-center px-4 md:flex">
-				<div className="relative w-full max-w-2xl">
-					<Search
-						size={17}
-						className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-					/>
-					<input
-						ref={searchInputRef}
-						value={searchValue}
-						onChange={(event) => {
-							setSearch(event.target.value);
-							setActiveResultIndex(0);
-						}}
-						onKeyDown={handleSearchKeyDown}
-						onFocus={() => setSearchFocused(true)}
-						onBlur={() => {
-							window.setTimeout(() => setSearchFocused(false), 120);
-						}}
-						className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
-						placeholder="Search materials, folders, tags..."
-					/>
-					<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
-						{shortcutLabel}
-					</kbd>
+				<div className="hidden min-w-0 flex-1 justify-center px-4 md:flex">
+					<div className="relative w-full max-w-2xl">
+						<Search
+							size={17}
+							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+						/>
+						<input
+							ref={searchInputRef}
+							value={searchValue}
+							onChange={(event) => {
+								setSearch(event.target.value);
+								setActiveResultIndex(0);
+							}}
+							onKeyDown={handleSearchKeyDown}
+							onFocus={() => setSearchFocused(true)}
+							onBlur={() => {
+								window.setTimeout(() => setSearchFocused(false), 120);
+							}}
+							className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
+							placeholder="Search materials, folders, tags..."
+						/>
+						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
+							{shortcutLabel}
+						</kbd>
 
-					{searchFocused && (
-						<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+						{searchFocused && (
+							<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+								<SearchResults
+									results={searchResults}
+									query={searchValue}
+									language={language}
+									categories={categories}
+									folders={folders}
+									activeIndex={activeResultIndex}
+									onActiveIndexChange={setActiveResultIndex}
+									onOpen={openSearchResult}
+								/>
+							</div>
+						)}
+					</div>
+				</div>
+
+				<div className="ml-auto flex shrink-0 items-center gap-2">
+					<button
+						type="button"
+						aria-label="Search"
+						onClick={() => {
+							setMobileSearchOpen(true);
+							window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
+						}}
+						className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
+					>
+						<Search size={19} />
+					</button>
+
+					<div className="hidden shrink-0 items-center gap-1 lg:flex">
+						{QUICK_TOOLS.map((item) => {
+							const Icon = item.icon;
+
+							return (
+								<button
+									key={item.to}
+									type="button"
+									title={item.label}
+									onClick={() => void navigate({ to: item.to })}
+									className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-2 text-sm font-medium text-foreground transition hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 xl:px-3"
+								>
+									<Icon size={17} />
+									<span className="hidden xl:inline">{item.label}</span>
+								</button>
+							);
+						})}
+					</div>
+
+					<button
+						type="button"
+						onClick={createBind}
+						className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					>
+						<Plus size={17} />
+						<span className="hidden xl:inline">New material</span>
+					</button>
+
+					<ToolsMenu />
+
+					{authConfigured &&
+						(authSession ? (
+							<button
+								type="button"
+								title={`Cloud: ${authSession.user.email}`}
+								onClick={signOut}
+								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+							>
+								<Cloud size={16} />
+								<LogOut size={16} />
+							</button>
+						) : (
+							<button
+								type="button"
+								title="Cloud login"
+								onClick={() => void navigate({ to: "/login" })}
+								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+							>
+								<Cloud size={16} />
+								<LogIn size={16} />
+							</button>
+						))}
+				</div>
+
+				{mobileSearchOpen && (
+					<div
+						role="dialog"
+						aria-modal="true"
+						aria-label="Search materials"
+						className="fixed inset-0 z-50 flex flex-col bg-background text-foreground md:hidden"
+					>
+						<div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
+							<Search size={18} className="shrink-0 text-muted" />
+							<input
+								ref={mobileSearchInputRef}
+								value={searchValue}
+								onChange={(event) => {
+									setSearch(event.target.value);
+									setActiveResultIndex(0);
+								}}
+								onKeyDown={handleSearchKeyDown}
+								placeholder="Search materials..."
+								className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							/>
+							<button
+								type="button"
+								aria-label="Close search"
+								onClick={() => setMobileSearchOpen(false)}
+								className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+							>
+								<X size={19} />
+							</button>
+						</div>
+
+						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 							<SearchResults
 								results={searchResults}
 								query={searchValue}
@@ -450,102 +593,27 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 								onOpen={openSearchResult}
 							/>
 						</div>
-					)}
-				</div>
-			</div>
-
-			<div className="ml-auto flex shrink-0 items-center gap-2">
-				<button
-					type="button"
-					aria-label="Search"
-					onClick={() => {
-						setMobileSearchOpen(true);
-						window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
-					}}
-					className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
-				>
-					<Search size={19} />
-				</button>
-
-				<button
-					type="button"
-					onClick={createBind}
-					className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-				>
-					<Plus size={17} />
-					<span className="hidden lg:inline">New material</span>
-				</button>
-
-				<ToolsMenu />
-
-				{authConfigured &&
-					(authSession ? (
-						<button
-							type="button"
-							title={`Cloud: ${authSession.user.email}`}
-							onClick={signOut}
-							className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
-						>
-							<Cloud size={16} />
-							<LogOut size={16} />
-						</button>
-					) : (
-						<button
-							type="button"
-							title="Cloud login"
-							onClick={() => void navigate({ to: "/login" })}
-							className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
-						>
-							<Cloud size={16} />
-							<LogIn size={16} />
-						</button>
-					))}
-			</div>
-
-			{mobileSearchOpen && (
-				<div
-					role="dialog"
-					aria-modal="true"
-					aria-label="Search materials"
-					className="fixed inset-0 z-50 flex flex-col bg-background text-foreground md:hidden"
-				>
-					<div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
-						<Search size={18} className="shrink-0 text-muted" />
-						<input
-							ref={mobileSearchInputRef}
-							value={searchValue}
-							onChange={(event) => {
-								setSearch(event.target.value);
-								setActiveResultIndex(0);
-							}}
-							onKeyDown={handleSearchKeyDown}
-							placeholder="Search materials..."
-							className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-						/>
-						<button
-							type="button"
-							aria-label="Close search"
-							onClick={() => setMobileSearchOpen(false)}
-							className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							<X size={19} />
-						</button>
 					</div>
+				)}
+			</header>
 
-					<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-						<SearchResults
-							results={searchResults}
-							query={searchValue}
-							language={language}
-							categories={categories}
-							folders={folders}
-							activeIndex={activeResultIndex}
-							onActiveIndexChange={setActiveResultIndex}
-							onOpen={openSearchResult}
-						/>
-					</div>
-				</div>
-			)}
-		</header>
+			<div className="supportos-scroll flex h-11 items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 lg:hidden">
+				{QUICK_TOOLS.map((item) => {
+					const Icon = item.icon;
+
+					return (
+						<button
+							key={item.to}
+							type="button"
+							onClick={() => void navigate({ to: item.to })}
+							className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+						>
+							<Icon size={16} />
+							<span>{item.label}</span>
+						</button>
+					);
+				})}
+			</div>
+		</div>
 	);
 }
