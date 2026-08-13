@@ -14,6 +14,7 @@ interface BonusState {
 	bonusToolsSelectedTableName: string;
 	bonusToolsSelectedBaseAmount: string;
 	bonusToolsSourceUrl: string;
+	projectCurrencyGroups: Record<string, string>;
 	setProjects: (projects: BonusProject[]) => void;
 	upsertProjects: (projects: BonusProject[]) => void;
 	replaceProjects: (projects: BonusProject[]) => void;
@@ -39,6 +40,7 @@ interface BonusState {
 	setBonusToolsSelectedTable: (name: string) => void;
 	setBonusToolsSelectedBaseAmount: (amount: string) => void;
 	setBonusToolsSourceUrl: (url: string) => void;
+	setProjectCurrencyGroup: (projectId: string, tableName: string) => void;
 }
 
 function normalizeCurrency(currency: string) {
@@ -91,6 +93,7 @@ export const useBonusStore = create<BonusState>()(
 			bonusToolsSelectedTableName: "",
 			bonusToolsSelectedBaseAmount: "",
 			bonusToolsSourceUrl: "",
+			projectCurrencyGroups: {},
 			setProjects: (projects) =>
 				set((state) => ({
 					projects: sortProjects(projects),
@@ -162,13 +165,20 @@ export const useBonusStore = create<BonusState>()(
 				}));
 			},
 			removeProject: (id) =>
-				set((state) => ({
-					projects: state.projects.filter((project) => project.id !== id),
-					activeProjectId:
-						state.activeProjectId === id
-							? state.projects.find((project) => project.id !== id)?.id
-							: state.activeProjectId,
-				})),
+				set((state) => {
+					const projectCurrencyGroups = { ...state.projectCurrencyGroups };
+
+					delete projectCurrencyGroups[id];
+
+					return {
+						projects: state.projects.filter((project) => project.id !== id),
+						activeProjectId:
+							state.activeProjectId === id
+								? state.projects.find((project) => project.id !== id)?.id
+								: state.activeProjectId,
+						projectCurrencyGroups,
+					};
+				}),
 			setActiveProject: (activeProjectId) => set({ activeProjectId }),
 			addBonus: (projectId, bonus) =>
 				set((state) => ({
@@ -232,6 +242,19 @@ export const useBonusStore = create<BonusState>()(
 				set({ bonusToolsSelectedBaseAmount }),
 			setBonusToolsSourceUrl: (bonusToolsSourceUrl) =>
 				set({ bonusToolsSourceUrl }),
+			setProjectCurrencyGroup: (projectId, tableName) =>
+				set((state) => {
+					const projectCurrencyGroups = { ...state.projectCurrencyGroups };
+					const normalizedTableName = tableName.trim();
+
+					if (normalizedTableName) {
+						projectCurrencyGroups[projectId] = normalizedTableName;
+					} else {
+						delete projectCurrencyGroups[projectId];
+					}
+
+					return { projectCurrencyGroups };
+				}),
 		}),
 		{
 			name: "supportos:deposit-bonuses:v1",
@@ -247,6 +270,7 @@ export const useBonusStore = create<BonusState>()(
 				bonusToolsSelectedTableName: state.bonusToolsSelectedTableName,
 				bonusToolsSelectedBaseAmount: state.bonusToolsSelectedBaseAmount,
 				bonusToolsSourceUrl: state.bonusToolsSourceUrl,
+				projectCurrencyGroups: state.projectCurrencyGroups,
 			}),
 		},
 	),

@@ -127,7 +127,7 @@ function createId(prefix: string) {
 }
 
 const EMOJI_PATTERN =
-	/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+	/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]|\u{FE0F}|\u{200D}|\u{20E3}/gu;
 
 function cleanImportedText(value: string) {
 	return value

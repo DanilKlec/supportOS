@@ -3,6 +3,7 @@ import { Copy, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import type { Bind } from "#/entities/bind";
+import { answerAssistantService } from "#/services/answer-assistant.service";
 import { useToast } from "#/shared/hooks/useToast";
 import { setBindDragData } from "#/shared/lib/bind-drag";
 import { copyToClipboard } from "#/shared/lib/clipboard";
@@ -34,6 +35,26 @@ function getBindContent(bind: Bind, language: string) {
 	);
 }
 
+function getCopyWarningTitle(content: string, title: string, language: string) {
+	const assistantData = answerAssistantService.load();
+	const issues = answerAssistantService.checkAnswer({
+		answer: content,
+		customerMessage: title,
+		glossary: assistantData.glossary,
+		language,
+	});
+	const importantWarnings = new Set([
+		"placeholders",
+		"promise",
+		"glossary",
+		"length",
+	]);
+
+	return issues.find(
+		(issue) => issue.severity === "error" || importantWarnings.has(issue.id),
+	)?.title;
+}
+
 export function BindCard({ bind }: BindCardProps) {
 	const navigate = useNavigate();
 	const language = useKnowledgeStore((state) => state.language);
@@ -47,10 +68,17 @@ export function BindCard({ bind }: BindCardProps) {
 	const content = getBindContent(bind, language);
 
 	const copy = async () => {
+		const warningTitle = getCopyWarningTitle(content, title, language);
 		const ok = await copyToClipboard(content);
 
 		addRecent(bind.id);
-		showToast(ok ? "Copied to clipboard" : "Copy failed");
+		showToast(
+			ok
+				? warningTitle
+					? `Copied. Check: ${warningTitle}`
+					: "Copied to clipboard"
+				: "Copy failed",
+		);
 	};
 
 	const handleDragStart = (event: DragEvent<HTMLElement>) => {
