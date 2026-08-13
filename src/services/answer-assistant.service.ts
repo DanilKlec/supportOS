@@ -45,6 +45,7 @@ export interface StoredAssistantData {
 export interface GenerateAnswerRequest {
 	customerMessage: string;
 	context: string;
+	referenceAnswer?: string;
 	settings: AssistantSettings;
 	glossary: GlossaryTerm[];
 	memory: TranslationMemoryEntry[];
@@ -324,6 +325,7 @@ function getClosing(tone: AnswerTone, locale: "ru" | "en") {
 function buildRuleBasedAnswer({
 	customerMessage,
 	context,
+	referenceAnswer,
 	memory,
 	settings,
 }: GenerateAnswerRequest) {
@@ -340,6 +342,29 @@ function buildRuleBasedAnswer({
 			: "";
 	const facts = splitIntoShortFacts(factsSource);
 	const locale = getReplyLocale(settings.language);
+	const reference = referenceAnswer?.trim();
+
+	if (reference) {
+		const factParagraph = buildFactParagraph(facts, locale);
+		const parts =
+			locale === "ru"
+				? [
+						"Здравствуйте!",
+						getIntentAcknowledgement(settings.intent, locale),
+						factParagraph,
+						reference,
+						getClosing(settings.tone, locale),
+					]
+				: [
+						"Hello!",
+						getIntentAcknowledgement(settings.intent, locale),
+						factParagraph,
+						reference,
+						getClosing(settings.tone, locale),
+					];
+
+		return parts.filter(Boolean).join("\n\n");
+	}
 
 	if (facts.length > 0) {
 		const parts =
@@ -399,6 +424,7 @@ async function generateWithGemini(request: GenerateAnswerRequest) {
 		body: JSON.stringify({
 			customerMessage: request.customerMessage,
 			context: request.context,
+			referenceAnswer: request.referenceAnswer ?? "",
 			language: request.settings.language,
 			product: request.settings.product,
 			intent: request.settings.intent,

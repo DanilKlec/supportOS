@@ -9,6 +9,7 @@ import {
 	MoreHorizontal,
 	Pin,
 	Search,
+	Sparkles,
 	Star,
 	Trash2,
 } from "lucide-react";
@@ -19,6 +20,10 @@ import remarkGfm from "remark-gfm";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
+import {
+	answerAssistantService,
+	type CheckIssue,
+} from "@/services/answer-assistant.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
@@ -127,6 +132,19 @@ function formatDate(value?: string) {
 	return new Date(value).toLocaleString();
 }
 
+function getCopyWarnings(issues: CheckIssue[]) {
+	const importantWarnings = new Set([
+		"placeholders",
+		"promise",
+		"glossary",
+		"length",
+	]);
+
+	return issues.filter(
+		(issue) => issue.severity === "error" || importantWarnings.has(issue.id),
+	);
+}
+
 function ViewerMenuItem({
 	icon,
 	label,
@@ -172,6 +190,11 @@ export function BindViewer() {
 	const copyTimerRef = useRef<number | undefined>(undefined);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [composerBrief, setComposerBrief] = useState("");
+	const [composerAnswer, setComposerAnswer] = useState("");
+	const [composerLoading, setComposerLoading] = useState(false);
+	const [composerIssues, setComposerIssues] = useState<CheckIssue[]>([]);
+	const [composerMeta, setComposerMeta] = useState("");
 
 	const translation = useMemo(() => {
 		if (!bind) return undefined;
@@ -212,6 +235,16 @@ export function BindViewer() {
 			return;
 		}
 
+		const assistantData = answerAssistantService.load();
+		const copyWarnings = getCopyWarnings(
+			answerAssistantService.checkAnswer({
+				answer: item.content,
+				customerMessage: title,
+				glossary: assistantData.glossary,
+				language: item.language,
+			}),
+		);
+
 		const ok = await copyToClipboard(item.content);
 
 		addRecent(bind.id);
@@ -221,7 +254,57 @@ export function BindViewer() {
 			setCopied(true);
 			copyTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
 		}
+		if (copyWarnings.length > 0) {
+			showToast(`Copy check: ${copyWarnings[0]?.title}`);
+		}
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
+	};
+
+	const generateComposerAnswer = async () => {
+		if (!bind || !translation || !composerBrief.trim()) return;
+
+		setComposerLoading(true);
+		setComposerIssues([]);
+		setComposerMeta("");
+
+		try {
+			const assistantData = answerAssistantService.load();
+			const result = await answerAssistantService.generateReadyAnswer({
+				customerMessage: composerBrief,
+				context: `Material: ${title}`,
+				referenceAnswer: translation.content,
+				settings: {
+					...assistantData.settings,
+					language: translation.language,
+				},
+				glossary: assistantData.glossary,
+				memory: assistantData.memory,
+			});
+
+			setComposerAnswer(result.answer);
+			setComposerIssues(result.issues);
+			setComposerMeta(
+				`${result.language.toUpperCase()} / ${
+					result.mode === "gemini" ? "Gemini" : "Free mode"
+				}`,
+			);
+			showToast("AI answer ready");
+		} catch (error) {
+			showToast(error instanceof Error ? error.message : "AI answer failed");
+		} finally {
+			setComposerLoading(false);
+		}
+	};
+
+	const copyComposerAnswer = async () => {
+		if (!composerAnswer.trim()) return;
+
+		const ok = await copyToClipboard(composerAnswer);
+
+		if (ok && bind) {
+			addRecent(bind.id);
+		}
+		showToast(ok ? "AI answer copied" : "Copy failed");
 	};
 
 	const copyContent = () => copyTranslation(translation);
@@ -628,6 +711,92 @@ export function BindViewer() {
 								No content in this translation
 							</div>
 						)}
+					</section>
+
+					<section className="mt-4 rounded-xl border border-border bg-surface">
+						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+							<div className="min-w-0">
+								<div className="flex items-center gap-2 text-sm font-semibold">
+									<Sparkles size={16} />
+									AI composer
+								</div>
+								<div className="mt-1 text-xs text-muted">
+									Use this material as the base and adapt it to the current
+									case.
+								</div>
+							</div>
+							{composerMeta && (
+								<div className="rounded-lg bg-background px-2.5 py-1 text-xs text-muted">
+									{composerMeta}
+								</div>
+							)}
+						</div>
+
+						<div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+							<div className="flex flex-col gap-3">
+								<textarea
+									value={composerBrief}
+									onChange={(event) => setComposerBrief(event.target.value)}
+									className="supportos-scroll min-h-32 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									placeholder="Short case notes: what happened, what to explain, which facts are confirmed..."
+								/>
+								<button
+									type="button"
+									onClick={() => void generateComposerAnswer()}
+									disabled={composerLoading || !composerBrief.trim()}
+									className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{composerLoading ? (
+										<Sparkles size={16} className="animate-pulse" />
+									) : (
+										<Sparkles size={16} />
+									)}
+									Generate answer
+								</button>
+							</div>
+
+							<div className="flex min-h-44 flex-col rounded-lg bg-background">
+								<div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+									<div className="text-xs font-semibold uppercase text-muted">
+										Ready reply
+									</div>
+									<button
+										type="button"
+										onClick={() => void copyComposerAnswer()}
+										disabled={!composerAnswer.trim()}
+										className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+									>
+										<Copy size={14} />
+										Copy
+									</button>
+								</div>
+								<textarea
+									value={composerAnswer}
+									onChange={(event) => setComposerAnswer(event.target.value)}
+									className="supportos-scroll min-h-32 flex-1 resize-y bg-transparent px-3 py-3 text-sm leading-6 outline-none"
+									placeholder="Generated answer will appear here."
+								/>
+								{composerIssues.length > 0 && composerAnswer && (
+									<div className="grid gap-2 border-t border-border p-3">
+										{composerIssues.map((issue) => (
+											<div
+												key={issue.id}
+												className={`rounded-lg border px-3 py-2 text-xs ${
+													issue.severity === "error"
+														? "border-red-500/30 bg-red-500/10"
+														: issue.severity === "warning"
+															? "border-amber-500/30 bg-amber-500/10"
+															: "border-emerald-500/30 bg-emerald-500/10"
+												}`}
+											>
+												<div className="font-semibold">{issue.title}</div>
+												<div className="mt-0.5 text-muted">{issue.detail}</div>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						</div>
 					</section>
 
 					<details className="mt-4 rounded-xl border border-border bg-surface">

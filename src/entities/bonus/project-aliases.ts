@@ -48,6 +48,7 @@ export const BONUS_PROJECT_ALIASES: Record<string, string[]> = {
 	NS: ["nikaspin"],
 	CJ: ["casinojoy", "crixcasino"],
 	CC: ["cosmicslot", "crixcasino"],
+	CL: ["cl"],
 	SPI: ["spinko"],
 	DN: ["dionyx"],
 	KIB: ["kairosbet"],

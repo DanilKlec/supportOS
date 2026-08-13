@@ -15,9 +15,10 @@ import {
 } from "@/services/bonus-tools.service";
 
 export interface BonusCurrencyContext {
-	rule: BonusRule;
+	rule?: BonusRule;
 	table: CurrencyTable;
 	currencies: string[];
+	source: "auto" | "manual";
 }
 
 const EUR_AMOUNT_PATTERN =
@@ -71,6 +72,14 @@ function getProjectOverrideTable(
 	return tables.find((table) => normalizeProjectKey(table.name) === tableKey);
 }
 
+function getCurrencyTableByName(tables: CurrencyTable[], tableName?: string) {
+	if (!tableName) return undefined;
+
+	const tableKey = normalizeProjectKey(tableName);
+
+	return tables.find((table) => normalizeProjectKey(table.name) === tableKey);
+}
+
 function findProjectRule(project: BonusProject, data: BonusToolsData) {
 	const projectKeys = getProjectKeys(project);
 
@@ -111,13 +120,30 @@ function getRuleTable(
 	return tables.find((table) => table.name === tableName) ?? tables[0];
 }
 
-function getCurrencyContext(project: BonusProject, data?: BonusToolsData) {
+function getCurrencyContext(
+	project: BonusProject,
+	data?: BonusToolsData,
+	tableName?: string,
+) {
 	const registryData = data ?? loadStoredBonusToolsData();
 
 	if (!registryData) return undefined;
 
 	const projectKeys = getProjectKeys(project);
 	const rule = findProjectRule(project, registryData);
+	const manualTable = getCurrencyTableByName(
+		registryData.currencyTables,
+		tableName,
+	);
+
+	if (manualTable) {
+		return {
+			rule,
+			table: manualTable,
+			currencies: manualTable.currencies,
+			source: "manual" as const,
+		};
+	}
 
 	if (!rule) return undefined;
 
@@ -129,6 +155,7 @@ function getCurrencyContext(project: BonusProject, data?: BonusToolsData) {
 		rule,
 		table,
 		currencies: table.currencies,
+		source: "auto" as const,
 	};
 }
 
@@ -159,20 +186,37 @@ function replaceEuroAmounts(
 }
 
 class BonusCurrencyRegistryService {
-	getProjectContext(project?: BonusProject, data?: BonusToolsData) {
-		return project ? getCurrencyContext(project, data) : undefined;
+	getProjectContext(
+		project?: BonusProject,
+		data?: BonusToolsData,
+		tableName?: string,
+	) {
+		return project ? getCurrencyContext(project, data, tableName) : undefined;
+	}
+
+	getCurrencyGroupOptions(data?: BonusToolsData) {
+		const registryData = data ?? loadStoredBonusToolsData();
+
+		return (
+			registryData?.currencyTables.map((table) => ({
+				name: table.name,
+				currencies: table.currencies,
+			})) ?? []
+		);
 	}
 
 	getCurrencyOptions({
 		project,
 		data,
+		tableName,
 		fallback = [],
 	}: {
 		project?: BonusProject;
 		data?: BonusToolsData;
+		tableName?: string;
 		fallback?: string[];
 	}) {
-		const context = this.getProjectContext(project, data);
+		const context = this.getProjectContext(project, data, tableName);
 		const values = new Set([
 			...(context?.currencies ?? []),
 			...fallback.map(normalizeCurrency),
@@ -181,8 +225,12 @@ class BonusCurrencyRegistryService {
 		return Array.from(values).filter(Boolean).sort();
 	}
 
-	getDefaultCurrency(project?: BonusProject, data?: BonusToolsData) {
-		return getDefaultCurrency(this.getProjectContext(project, data));
+	getDefaultCurrency(
+		project?: BonusProject,
+		data?: BonusToolsData,
+		tableName?: string,
+	) {
+		return getDefaultCurrency(this.getProjectContext(project, data, tableName));
 	}
 
 	replaceProjectMoneyText({
@@ -190,13 +238,15 @@ class BonusCurrencyRegistryService {
 		project,
 		targetCurrency,
 		data,
+		tableName,
 	}: {
 		text: string;
 		project?: BonusProject;
 		targetCurrency: string;
 		data?: BonusToolsData;
+		tableName?: string;
 	}) {
-		const context = this.getProjectContext(project, data);
+		const context = this.getProjectContext(project, data, tableName);
 
 		if (!context) return text;
 

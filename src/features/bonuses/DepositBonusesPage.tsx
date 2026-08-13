@@ -67,6 +67,16 @@ function createEmptyBonusDraft(currency = "USD"): BonusDraft {
 	};
 }
 
+function formatCurrencyGroupLabel(name: string, currencies: string[]) {
+	const visibleCurrencies = currencies.slice(0, 5).join(", ");
+
+	return visibleCurrencies ? `${name} (${visibleCurrencies})` : name;
+}
+
+function getCurrencyGroupShortName(name: string) {
+	return name.replace(/^Currency\s*/i, "");
+}
+
 function isEmptyBonusDraft(draft: BonusDraft) {
 	return (
 		!draft.name.trim() &&
@@ -104,19 +114,68 @@ function getSearchTokens(value: string) {
 	return normalizeSearchText(value).split(/\s+/).filter(Boolean);
 }
 
+function getSearchWords(value: string) {
+	return getSearchTokens(value);
+}
+
+function getCompactSearchText(value: string) {
+	return getSearchWords(value).join("");
+}
+
+function getInitials(value: string) {
+	return getSearchWords(value)
+		.map((word) => word[0])
+		.filter(Boolean)
+		.join("");
+}
+
+function matchesToken(value: string, token: string) {
+	const words = getSearchWords(value);
+
+	if (token.length <= 2) {
+		const compact = words.join("");
+
+		return (
+			words.includes(token) ||
+			compact === token ||
+			words.some((word) => word.length <= 4 && word.startsWith(token))
+		);
+	}
+
+	return normalizeSearchText(value).includes(token);
+}
+
 function matchesTokens(value: string, tokens: string[]) {
 	if (tokens.length === 0) return true;
 
-	const haystack = normalizeSearchText(value);
-
-	return tokens.every((token) => haystack.includes(token));
+	return tokens.every((token) => matchesToken(value, token));
 }
 
 function getProjectAliases(project: BonusProject) {
 	const directAliases = BONUS_PROJECT_ALIASES[project.name.toUpperCase()] ?? [];
 	const slugAliases = BONUS_PROJECT_ALIASES[project.slug.toUpperCase()] ?? [];
+	const compactName = getCompactSearchText(project.name);
+	const compactSlug = getCompactSearchText(project.slug);
+	const reverseAliases = Object.entries(BONUS_PROJECT_ALIASES)
+		.filter(([, aliases]) =>
+			aliases.some((alias) => {
+				const compactAlias = getCompactSearchText(alias);
 
-	return Array.from(new Set([...directAliases, ...slugAliases]));
+				return compactAlias === compactName || compactAlias === compactSlug;
+			}),
+		)
+		.map(([alias]) => alias.toLowerCase());
+
+	return Array.from(
+		new Set(
+			[
+				...directAliases,
+				...slugAliases,
+				...reverseAliases,
+				getInitials(project.name),
+			].filter(Boolean),
+		),
+	);
 }
 
 function buildBonusSearchText(bonus: DepositBonus) {
@@ -139,6 +198,33 @@ function buildProjectSearchText(project: BonusProject) {
 		project.sheetId ?? "",
 		...getProjectAliases(project),
 	].join(" ");
+}
+
+function getProjectSearchScore(project: BonusProject, tokens: string[]) {
+	if (tokens.length === 0) return 0;
+
+	const projectText = buildProjectSearchText(project);
+	const projectWords = new Set(getSearchWords(projectText));
+	const projectMatches = matchesTokens(projectText, tokens);
+	const bonusMatches = project.bonuses.some((bonus) =>
+		matchesTokens(buildBonusSearchText(bonus), tokens),
+	);
+
+	if (!projectMatches && !bonusMatches) return -1;
+
+	return tokens.reduce((score, token) => {
+		if (projectWords.has(token)) return score + 120;
+		if (
+			Array.from(projectWords).some(
+				(word) => word.length <= 4 && word.startsWith(token),
+			)
+		) {
+			return score + 80;
+		}
+		if (matchesToken(projectText, token)) return score + 40;
+
+		return score + 8;
+	}, 0);
 }
 
 function getConvertedDeposit(
@@ -294,16 +380,19 @@ function getDisplayBonusContent({
 	project,
 	language,
 	selectedCurrency,
+	currencyTableName,
 }: {
 	bonus: DepositBonus;
 	project?: BonusProject;
 	language: string;
 	selectedCurrency: string;
+	currencyTableName?: string;
 }) {
 	return bonusCurrencyRegistryService.replaceProjectMoneyText({
 		text: getBonusContent(bonus, language),
 		project,
 		targetCurrency: selectedCurrency,
+		tableName: currencyTableName,
 	});
 }
 
@@ -312,17 +401,20 @@ function buildBonusBind({
 	project,
 	language,
 	selectedCurrency,
+	currencyTableName,
 }: {
 	bonus: DepositBonus;
 	project?: BonusProject;
 	language: string;
 	selectedCurrency: string;
+	currencyTableName?: string;
 }) {
 	return getDisplayBonusContent({
 		bonus,
 		project,
 		language,
 		selectedCurrency,
+		currencyTableName,
 	}).trim();
 }
 
@@ -331,11 +423,13 @@ function buildPackageBind({
 	language,
 	selectedCurrency,
 	rates,
+	currencyTableName,
 }: {
 	project: BonusProject;
 	language: string;
 	selectedCurrency: string;
 	rates?: CurrencyRates;
+	currencyTableName?: string;
 }) {
 	return [
 		`${project.name} welcome package`,
@@ -348,6 +442,7 @@ function buildPackageBind({
 				project,
 				language,
 				selectedCurrency,
+				currencyTableName,
 			}),
 			"",
 		]),
@@ -382,6 +477,9 @@ export function DepositBonusesPage() {
 	const selectedCurrency = useBonusStore((state) => state.selectedCurrency);
 	const selectedLanguage = useBonusStore((state) => state.depositBonusLanguage);
 	const query = useBonusStore((state) => state.depositBonusQuery);
+	const projectCurrencyGroups = useBonusStore(
+		(state) => state.projectCurrencyGroups,
+	);
 	const addProject = useBonusStore((state) => state.addProject);
 	const renameProject = useBonusStore((state) => state.renameProject);
 	const upsertProjects = useBonusStore((state) => state.upsertProjects);
@@ -398,7 +496,11 @@ export function DepositBonusesPage() {
 		(state) => state.setDepositBonusLanguage,
 	);
 	const setQuery = useBonusStore((state) => state.setDepositBonusQuery);
+	const setProjectCurrencyGroup = useBonusStore(
+		(state) => state.setProjectCurrencyGroup,
+	);
 	const [newProjectName, setNewProjectName] = useState("");
+	const [newProjectCurrencyGroup, setNewProjectCurrencyGroup] = useState("");
 	const [renameValue, setRenameValue] = useState("");
 	const [bonusDraft, setBonusDraft] = useState<BonusDraft>(() =>
 		createEmptyBonusDraft(),
@@ -429,36 +531,56 @@ export function DepositBonusesPage() {
 	const filteredProjects = useMemo(() => {
 		if (searchTokens.length === 0) return projects;
 
-		return projects.filter((project) => {
-			if (matchesTokens(buildProjectSearchText(project), searchTokens)) {
-				return true;
-			}
+		return projects
+			.map((project) => ({
+				project,
+				score: getProjectSearchScore(project, searchTokens),
+			}))
+			.filter((item) => item.score >= 0)
+			.sort((first, second) => {
+				if (second.score !== first.score) return second.score - first.score;
 
-			return project.bonuses.some((bonus) =>
-				matchesTokens(buildBonusSearchText(bonus), searchTokens),
-			);
-		});
+				return first.project.name.localeCompare(second.project.name);
+			})
+			.map((item) => item.project);
 	}, [projects, searchTokens]);
 	const activeProject =
 		filteredProjects.find((project) => project.id === activeProjectId) ??
 		filteredProjects[0] ??
 		projects.find((project) => project.id === activeProjectId) ??
 		projects[0];
+	const activeProjectCurrencyGroup = activeProject
+		? (projectCurrencyGroups[activeProject.id] ?? "")
+		: "";
+	const currencyGroupOptions = useMemo(
+		() => bonusCurrencyRegistryService.getCurrencyGroupOptions(),
+		[],
+	);
 	const activeCurrencyContext = useMemo(
-		() => bonusCurrencyRegistryService.getProjectContext(activeProject),
-		[activeProject],
+		() =>
+			bonusCurrencyRegistryService.getProjectContext(
+				activeProject,
+				undefined,
+				activeProjectCurrencyGroup,
+			),
+		[activeProject, activeProjectCurrencyGroup],
 	);
 	const defaultBonusCurrency =
-		bonusCurrencyRegistryService.getDefaultCurrency(activeProject) ??
+		bonusCurrencyRegistryService.getDefaultCurrency(
+			activeProject,
+			undefined,
+			activeProjectCurrencyGroup,
+		) ??
 		selectedCurrency ??
 		"USD";
 	const currencies = useMemo(
 		() =>
 			bonusCurrencyRegistryService.getCurrencyOptions({
 				project: activeProject,
+				tableName: activeProjectCurrencyGroup,
 				fallback: rateCurrencies,
 			}),
-		[activeProject, rateCurrencies],
+		[activeProject, activeProjectCurrencyGroup, rateCurrencies],
 	);
 	const editingBonus = activeProject?.bonuses.find(
 		(bonus) => bonus.id === editingBonusId,
@@ -583,8 +705,26 @@ export function DepositBonusesPage() {
 			return;
 		}
 
+		if (newProjectCurrencyGroup) {
+			setProjectCurrencyGroup(project.id, newProjectCurrencyGroup);
+			const nextCurrency = bonusCurrencyRegistryService.getDefaultCurrency(
+				project,
+				undefined,
+				newProjectCurrencyGroup,
+			);
+
+			if (nextCurrency) {
+				setSelectedCurrency(nextCurrency);
+			}
+		}
+
 		setNewProjectName("");
-		showToast("Project sheet added");
+		setNewProjectCurrencyGroup("");
+		showToast(
+			newProjectCurrencyGroup
+				? "Project sheet added to currency group"
+				: "Project sheet added",
+		);
 	};
 
 	const saveProjectName = () => {
@@ -592,6 +732,28 @@ export function DepositBonusesPage() {
 
 		renameProject(activeProject.id, renameValue);
 		showToast("Project name saved");
+	};
+
+	const updateActiveProjectCurrencyGroup = (tableName: string) => {
+		if (!activeProject) return;
+
+		setProjectCurrencyGroup(activeProject.id, tableName);
+
+		const nextCurrency = bonusCurrencyRegistryService.getDefaultCurrency(
+			activeProject,
+			undefined,
+			tableName,
+		);
+
+		if (nextCurrency) {
+			setSelectedCurrency(nextCurrency);
+		}
+
+		showToast(
+			tableName
+				? "Currency group saved for project"
+				: "Automatic currency group enabled",
+		);
 	};
 
 	const resetBonusForm = () => {
@@ -663,6 +825,7 @@ export function DepositBonusesPage() {
 				project: activeProject,
 				language: selectedLanguage,
 				selectedCurrency,
+				currencyTableName: activeProjectCurrencyGroup,
 			}),
 		);
 
@@ -676,6 +839,7 @@ export function DepositBonusesPage() {
 				language: selectedLanguage,
 				selectedCurrency,
 				rates,
+				currencyTableName: projectCurrencyGroups[project.id] ?? "",
 			}),
 		);
 
@@ -801,7 +965,9 @@ export function DepositBonusesPage() {
 
 				{activeCurrencyContext && (
 					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
-						Currency registry: {activeCurrencyContext.rule.site} -{" "}
+						Currency group:{" "}
+						{activeCurrencyContext.source === "manual" ? "Manual" : "Auto"} -{" "}
+						{activeCurrencyContext.rule?.site ?? activeProject?.name} -{" "}
 						{activeCurrencyContext.table.name}. Text amounts in EUR are copied
 						as {selectedCurrency} when a matching row exists.
 					</div>
@@ -929,20 +1095,37 @@ export function DepositBonusesPage() {
 							className="rounded-xl border border-border bg-surface p-3"
 						>
 							<div className="mb-3 text-sm font-semibold">Project sheets</div>
-							<div className="flex gap-2">
-								<input
-									value={newProjectName}
-									onChange={(event) => setNewProjectName(event.target.value)}
-									className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									placeholder="Project name"
-								/>
-								<button
-									type="submit"
-									className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+							<div className="grid gap-2">
+								<div className="flex gap-2">
+									<input
+										value={newProjectName}
+										onChange={(event) => setNewProjectName(event.target.value)}
+										className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										placeholder="Project name"
+									/>
+									<button
+										type="submit"
+										className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+									>
+										<Plus size={16} />
+										Add
+									</button>
+								</div>
+								<select
+									value={newProjectCurrencyGroup}
+									onChange={(event) =>
+										setNewProjectCurrencyGroup(event.target.value)
+									}
+									className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									aria-label="Currency group for new project"
 								>
-									<Plus size={16} />
-									Add
-								</button>
+									<option value="">Auto currency group</option>
+									{currencyGroupOptions.map((group) => (
+										<option key={group.name} value={group.name}>
+											{formatCurrencyGroupLabel(group.name, group.currencies)}
+										</option>
+									))}
+								</select>
 							</div>
 						</form>
 
@@ -963,6 +1146,7 @@ export function DepositBonusesPage() {
 							{filteredProjects.length > 0 ? (
 								filteredProjects.map((project) => {
 									const active = project.id === activeProject?.id;
+									const currencyGroup = projectCurrencyGroups[project.id];
 									const visibleCount =
 										searchTokens.length > 0 &&
 										!matchesTokens(
@@ -994,6 +1178,9 @@ export function DepositBonusesPage() {
 												</span>
 												<span className="mt-0.5 block text-xs text-muted">
 													{visibleCount} bonuses
+													{currencyGroup
+														? ` - ${getCurrencyGroupShortName(currencyGroup)}`
+														: ""}
 												</span>
 											</span>
 											<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
@@ -1032,6 +1219,37 @@ export function DepositBonusesPage() {
 												<Pencil size={15} />
 												Save
 											</button>
+										</div>
+										<div className="mt-3 grid max-w-xl gap-1">
+											<label
+												htmlFor="active-project-currency-group"
+												className="text-xs font-medium text-muted"
+											>
+												Currency group
+											</label>
+											<select
+												id="active-project-currency-group"
+												value={activeProjectCurrencyGroup}
+												onChange={(event) =>
+													updateActiveProjectCurrencyGroup(event.target.value)
+												}
+												className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+											>
+												<option value="">Auto detect by project name</option>
+												{currencyGroupOptions.map((group) => (
+													<option key={group.name} value={group.name}>
+														{formatCurrencyGroupLabel(
+															group.name,
+															group.currencies,
+														)}
+													</option>
+												))}
+											</select>
+											<div className="text-xs text-muted">
+												{activeCurrencyContext
+													? `${activeCurrencyContext.source === "manual" ? "Manual" : "Auto"} uses ${activeCurrencyContext.table.name}.`
+													: "No currency table matched yet. Load Bonus Tools or choose a group manually."}
+											</div>
 										</div>
 									</div>
 
@@ -1154,6 +1372,7 @@ export function DepositBonusesPage() {
 													project: activeProject,
 													language: selectedLanguage,
 													selectedCurrency,
+													currencyTableName: activeProjectCurrencyGroup,
 												});
 												const languages = getBonusTranslations(bonus).map(
 													(translation) => translation.language,
