@@ -357,31 +357,44 @@ export function SportsBettingPage() {
 		showToast(copied ? successMessage : "Copy failed");
 	};
 
+	const selectSource = (nextSourceId: string) => {
+		setSourceId(nextSourceId);
+		setActiveSport(ALL_FILTER);
+		setActiveMarket(ALL_FILTER);
+		setQuery("");
+		setFeed(undefined);
+		setLoading(true);
+		setMovements({});
+		previousPricesRef.current = new Map();
+	};
+
 	return (
-		<div className="flex h-full flex-col overflow-auto bg-background">
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-6">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
+			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
-						<div className="mb-2 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
+						<div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold uppercase text-muted">
 							<Trophy size={14} />
-							Live sportsbook
+							Football first
 						</div>
-						<h1 className="text-2xl font-bold">Sports Betting</h1>
+						<h1 className="text-xl font-semibold sm:text-2xl">
+							Sports Betting
+						</h1>
 						<p className="mt-1 max-w-3xl text-sm text-muted">
-							Separate live page for online odds, markets, bookmakers, price
-							movement, event status, and quick support copy.
+							Live odds for football tournaments, major leagues, bookmakers,
+							markets, and quick support copy.
 						</p>
 					</div>
 
 					<div className="flex flex-wrap items-center gap-2">
-						<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+						<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
 							Auto update every {formatDurationMs(pollMs)}
 						</div>
 						<button
 							type="button"
 							onClick={() => void loadFeed(true)}
 							disabled={refreshing}
-							className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<RefreshCw
 								size={16}
@@ -390,6 +403,27 @@ export function SportsBettingPage() {
 							Update
 						</button>
 					</div>
+				</div>
+
+				<div className="supportos-scroll flex gap-2 overflow-x-auto rounded-xl border border-border bg-surface p-2">
+					{SPORT_SOURCE_OPTIONS.map((source) => {
+						const active = source.id === sourceId;
+
+						return (
+							<button
+								key={source.id}
+								type="button"
+								onClick={() => selectSource(source.id)}
+								className={`h-10 shrink-0 rounded-lg px-3 text-sm font-medium transition ${
+									active
+										? "bg-accent text-accent-foreground"
+										: "text-muted hover:bg-surface-elevated hover:text-foreground"
+								}`}
+							>
+								{source.label}
+							</button>
+						);
+					})}
 				</div>
 
 				{error && (
@@ -410,16 +444,14 @@ export function SportsBettingPage() {
 					</div>
 				)}
 
-				<section className="rounded-lg border border-border bg-surface p-4">
-					<div className="flex flex-wrap items-center gap-3">
-						<div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-300">
+				<section className="rounded-xl border border-border bg-surface px-3 py-2">
+					<div className="flex flex-wrap items-center gap-3 text-sm">
+						<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-300">
 							<ShieldCheck size={18} />
 						</div>
 						<div className="min-w-0 flex-1">
-							<div className="text-sm font-semibold">
-								Responsible betting guardrail
-							</div>
-							<div className="mt-1 text-sm text-muted">
+							<div className="font-semibold">Responsible betting guardrail</div>
+							<div className="mt-0.5 text-muted">
 								Keep 18+, local eligibility, limits, self-exclusion, and risk
 								wording visible in betting promos and support replies.
 							</div>
@@ -427,42 +459,40 @@ export function SportsBettingPage() {
 					</div>
 				</section>
 
-				<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+				<div className="flex flex-wrap gap-2 rounded-xl border border-border bg-surface p-2">
+					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
+						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<BarChart3 size={15} />
 							Events
 						</div>
-						<div className="mt-3 text-2xl font-semibold">{stats.events}</div>
+						<div className="text-sm font-semibold">{stats.events}</div>
 					</div>
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
+						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Activity size={15} />
 							Live now
 						</div>
-						<div className="mt-3 text-2xl font-semibold">{stats.live}</div>
+						<div className="text-sm font-semibold">{stats.live}</div>
 					</div>
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
+						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Trophy size={15} />
 							Bookmakers
 						</div>
-						<div className="mt-3 text-2xl font-semibold">
-							{stats.bookmakers}
-						</div>
+						<div className="text-sm font-semibold">{stats.bookmakers}</div>
 					</div>
-					<div className="rounded-lg border border-border bg-surface p-4">
-						<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
+						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Clock3 size={15} />
 							Updated
 						</div>
-						<div className="mt-3 text-2xl font-semibold">
+						<div className="text-sm font-semibold">
 							{formatTime(feed?.loadedAt)}
 						</div>
 					</div>
 				</div>
 
-				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1fr)_minmax(14rem,18rem)_auto_auto]">
+				<div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_auto_auto]">
 					<div className="relative">
 						<Search
 							size={16}
@@ -471,36 +501,15 @@ export function SportsBettingPage() {
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							className="h-10 w-full rounded-md border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							placeholder="Search sport, team, market, bookmaker..."
 						/>
 					</div>
 
 					<select
-						value={sourceId}
-						onChange={(event) => {
-							setSourceId(event.target.value);
-							setActiveSport(ALL_FILTER);
-							setActiveMarket(ALL_FILTER);
-							setQuery("");
-							setFeed(undefined);
-							setLoading(true);
-							setMovements({});
-							previousPricesRef.current = new Map();
-						}}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-					>
-						{SPORT_SOURCE_OPTIONS.map((source) => (
-							<option key={source.id} value={source.id}>
-								{source.label}
-							</option>
-						))}
-					</select>
-
-					<select
 						value={activeSport}
 						onChange={(event) => setActiveSport(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{sportOptions.map((sport) => (
 							<option key={sport} value={sport}>
@@ -512,7 +521,7 @@ export function SportsBettingPage() {
 					<select
 						value={activeMarket}
 						onChange={(event) => setActiveMarket(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{marketOptions.map((market) => (
 							<option key={market[0]} value={market[0]}>
@@ -523,7 +532,7 @@ export function SportsBettingPage() {
 				</div>
 
 				<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-					<section className="rounded-lg border border-border bg-surface">
+					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
 								<div className="font-semibold">Live Odds Feed</div>
@@ -531,7 +540,7 @@ export function SportsBettingPage() {
 									{visibleEvents.length} events visible
 								</div>
 							</div>
-							<div className="rounded-md border border-border px-2 py-1 text-xs text-muted">
+							<div className="rounded-lg border border-border px-2 py-1 text-xs text-muted">
 								{feed?.provider ?? "Live API"}
 							</div>
 						</div>
@@ -551,13 +560,13 @@ export function SportsBettingPage() {
 														{event.sportTitle}
 													</span>
 													<span
-														className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${getStatusClass(
+														className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${getStatusClass(
 															event.status,
 														)}`}
 													>
 														{event.status}
 													</span>
-													<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted">
+													<span className="rounded-lg border border-border px-2 py-0.5 text-xs text-muted">
 														{event.bookmakerCount} books
 													</span>
 												</div>
@@ -580,7 +589,7 @@ export function SportsBettingPage() {
 														"Event summary copied",
 													)
 												}
-												className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={15} />
 												Copy
@@ -606,7 +615,7 @@ export function SportsBettingPage() {
 																"Odd copied",
 															)
 														}
-														className="rounded-md border border-border bg-background p-3 text-left hover:bg-surface-elevated"
+														className="rounded-lg bg-background p-3 text-left transition hover:bg-surface-elevated"
 													>
 														<div className="flex items-start justify-between gap-2">
 															<div className="min-w-0">
@@ -649,7 +658,7 @@ export function SportsBettingPage() {
 					</section>
 
 					<div className="space-y-4">
-						<section className="rounded-lg border border-border bg-surface">
+						<section className="rounded-xl border border-border bg-surface">
 							<div className="border-b border-border px-4 py-3 font-semibold">
 								Live Source
 							</div>
@@ -698,7 +707,7 @@ export function SportsBettingPage() {
 							) : null}
 						</section>
 
-						<section className="rounded-lg border border-border bg-surface">
+						<section className="rounded-xl border border-border bg-surface">
 							<div className="border-b border-border px-4 py-3 font-semibold">
 								Quick Copy
 							</div>
@@ -710,7 +719,7 @@ export function SportsBettingPage() {
 										onClick={() =>
 											void copyText(snippet.text, `${snippet.title} copied`)
 										}
-										className="flex w-full items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+										className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-background px-3 py-2 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<span className="font-medium">{snippet.title}</span>
 										<Copy size={14} />

@@ -5,6 +5,7 @@ import {
 	RefreshCw,
 	Search,
 	Table2,
+	Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -104,6 +105,7 @@ export function BonusToolsPage() {
 		storedSourceUrl || data?.sourceUrl || DEFAULT_BONUS_TOOLS_SHEET_URL;
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [sourceOpen, setSourceOpen] = useState(false);
 
 	const updateFromGoogle = useCallback(
 		async (nextUrl: string, showSuccess = true) => {
@@ -119,6 +121,7 @@ export function BonusToolsPage() {
 				setStoredSourceUrl(nextData.sourceUrl);
 				if (showSuccess) {
 					showToast("Bonus tools updated from Google Sheet");
+					setSourceOpen(false);
 				}
 			} catch (loadError) {
 				setError(
@@ -212,81 +215,99 @@ export function BonusToolsPage() {
 	};
 
 	return (
-		<div className="flex h-full flex-col overflow-auto bg-background">
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-6">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
+			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
-						<h1 className="text-2xl font-bold">Bonus Tools</h1>
+						<div className="text-xs font-semibold uppercase text-muted">
+							Fast rules lookup
+						</div>
+						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
+							Bonus Tools
+						</h1>
 						<div className="mt-1 text-sm text-muted">
 							{data
-								? `${data.rules.length} projects · ${data.currencyTables.length} currency tables`
+								? `${data.rules.length} projects / ${data.currencyTables.length} currency tables`
 								: "Bonus rules and currency tables"}
 						</div>
 					</div>
 
-					<button
-						type="button"
-						onClick={() => void updateFromGoogle(sourceUrl)}
-						disabled={loading}
-						className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						{loading ? (
-							<Loader2 size={16} className="animate-spin" />
-						) : (
-							<RefreshCw size={16} />
-						)}
-						Update from Google
-					</button>
-				</div>
-
-				<div className="rounded-lg border border-border bg-surface p-4">
-					<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-						<FileSpreadsheet size={16} />
-						Google Sheet
-					</div>
-
-					{data && (
-						<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-							Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
-							Update from Google when the sheet changes.
-						</div>
-					)}
-
-					<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-						<input
-							value={sourceUrl}
-							onChange={(event) => setStoredSourceUrl(event.target.value)}
-							className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-						/>
+					<div className="flex flex-wrap items-center gap-2">
 						<button
 							type="button"
 							onClick={() => void updateFromGoogle(sourceUrl)}
-							disabled={loading || !sourceUrl.trim()}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={loading}
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
 								<Loader2 size={16} className="animate-spin" />
 							) : (
-								<FileSpreadsheet size={16} />
+								<RefreshCw size={16} />
 							)}
 							Update
 						</button>
+
+						<button
+							type="button"
+							onClick={() => setSourceOpen((current) => !current)}
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+						>
+							<Upload size={16} />
+							Source
+						</button>
 					</div>
-
-					{error && (
-						<div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-							{error}
-						</div>
-					)}
-
-					{data?.warnings.length ? (
-						<div className="mt-3 space-y-1 text-xs text-amber-200">
-							{data.warnings.map((warning) => (
-								<div key={warning}>{warning}</div>
-							))}
-						</div>
-					) : null}
 				</div>
+
+				{sourceOpen && (
+					<div className="rounded-xl border border-border bg-surface p-4">
+						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+							<FileSpreadsheet size={16} />
+							Google Sheet
+						</div>
+
+						{data && (
+							<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+								Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
+								Update from Google when the sheet changes.
+							</div>
+						)}
+
+						<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+							<input
+								value={sourceUrl}
+								onChange={(event) => setStoredSourceUrl(event.target.value)}
+								className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+							/>
+							<button
+								type="button"
+								onClick={() => void updateFromGoogle(sourceUrl)}
+								disabled={loading || !sourceUrl.trim()}
+								className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								{loading ? (
+									<Loader2 size={16} className="animate-spin" />
+								) : (
+									<FileSpreadsheet size={16} />
+								)}
+								Update
+							</button>
+						</div>
+
+						{error && (
+							<div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+								{error}
+							</div>
+						)}
+
+						{data?.warnings.length ? (
+							<div className="mt-3 space-y-1 text-xs text-amber-200">
+								{data.warnings.map((warning) => (
+									<div key={warning}>{warning}</div>
+								))}
+							</div>
+						) : null}
+					</div>
+				)}
 
 				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1.2fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)]">
 					<div className="relative">
@@ -297,7 +318,7 @@ export function BonusToolsPage() {
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							className="h-10 w-full rounded-md border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							placeholder="Search project, wager, note..."
 						/>
 					</div>
@@ -318,7 +339,7 @@ export function BonusToolsPage() {
 							);
 							setSelectedBaseAmount(getRuleAmount(nextRule));
 						}}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{data?.rules.map((rule) => (
 							<option key={rule.id} value={rule.id}>
@@ -330,7 +351,7 @@ export function BonusToolsPage() {
 					<select
 						value={selectedCurrency}
 						onChange={(event) => setSelectedCurrency(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{currencies.map((currency) => (
 							<option key={currency} value={currency}>
@@ -342,7 +363,7 @@ export function BonusToolsPage() {
 					<select
 						value={selectedTableName || activeTable?.name || ""}
 						onChange={(event) => setSelectedTableName(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{data?.currencyTables.map((table) => (
 							<option key={table.name} value={table.name}>
@@ -353,7 +374,7 @@ export function BonusToolsPage() {
 				</div>
 
 				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-					<section className="rounded-lg border border-border bg-surface">
+					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
 								<div className="font-semibold">
@@ -368,7 +389,7 @@ export function BonusToolsPage() {
 								<button
 									type="button"
 									onClick={() => void copyText(quickBind, "Bonus rules copied")}
-									className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+									className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 								>
 									<Copy size={15} />
 									Copy Rules
@@ -394,9 +415,9 @@ export function BonusToolsPage() {
 								return (
 									<div
 										key={column.key}
-										className="rounded-md border border-border bg-background p-3"
+										className="rounded-lg bg-background p-3"
 									>
-										<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+										<div className="mb-2 text-xs font-semibold uppercase text-muted">
 											{column.label}
 										</div>
 										<div className="min-h-10 whitespace-pre-wrap text-sm leading-5">
@@ -408,7 +429,7 @@ export function BonusToolsPage() {
 												onClick={() =>
 													void copyText(value, `${column.label} copied`)
 												}
-												className="mt-3 inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={13} />
 												Copy
@@ -420,7 +441,7 @@ export function BonusToolsPage() {
 						</div>
 					</section>
 
-					<section className="rounded-lg border border-border bg-surface">
+					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex items-center gap-2 border-b border-border px-4 py-3 font-semibold">
 							<Table2 size={16} />
 							Currency
@@ -430,7 +451,7 @@ export function BonusToolsPage() {
 							<select
 								value={selectedBaseAmount}
 								onChange={(event) => setSelectedBaseAmount(event.target.value)}
-								className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							>
 								{activeTable?.rows.map((row) => (
 									<option key={row.base} value={row.base}>
@@ -439,8 +460,8 @@ export function BonusToolsPage() {
 								))}
 							</select>
 
-							<div className="rounded-md border border-border bg-background p-3">
-								<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+							<div className="rounded-lg bg-background p-3">
+								<div className="text-xs font-semibold uppercase text-muted">
 									Selected
 								</div>
 								<div className="mt-2 text-2xl font-semibold">
@@ -452,7 +473,7 @@ export function BonusToolsPage() {
 										onClick={() =>
 											void copyText(selectedAmount, "Currency value copied")
 										}
-										className="mt-3 inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+										className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<Copy size={13} />
 										Copy
@@ -460,7 +481,7 @@ export function BonusToolsPage() {
 								)}
 							</div>
 
-							<div className="max-h-72 overflow-auto rounded-md border border-border">
+							<div className="supportos-scroll max-h-72 overflow-auto rounded-lg border border-border">
 								<table className="min-w-full text-left text-xs">
 									<thead className="sticky top-0 bg-surface-elevated text-muted">
 										<tr>
@@ -505,7 +526,7 @@ export function BonusToolsPage() {
 					</section>
 				</div>
 
-				<section className="rounded-lg border border-border bg-surface">
+				<section className="rounded-xl border border-border bg-surface">
 					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 						<div className="font-semibold">Bonus Rules</div>
 						<div className="text-sm text-muted">
@@ -513,7 +534,7 @@ export function BonusToolsPage() {
 						</div>
 					</div>
 
-					<div className="overflow-auto">
+					<div className="supportos-scroll overflow-auto">
 						<table className="min-w-[72rem] text-left text-sm">
 							<thead className="bg-surface-elevated text-xs uppercase tracking-wide text-muted">
 								<tr>
@@ -585,7 +606,7 @@ export function BonusToolsPage() {
 													onClick={() =>
 														void copyText(bind, `${rule.site} copied`)
 													}
-													className="inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+													className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 												>
 													<Copy size={13} />
 													Copy

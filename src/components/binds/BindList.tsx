@@ -12,14 +12,14 @@ export function BindList({
 }: BindListProps) {
 	if (binds.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center py-16 text-center">
+			<div className="rounded-xl border border-border bg-surface px-4 py-16 text-center">
 				<p className="text-sm text-muted">{emptyMessage}</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-2">
 			{binds.map((bind) => (
 				<BindCard key={bind.id} bind={bind} />
 			))}

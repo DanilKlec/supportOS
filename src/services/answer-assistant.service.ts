@@ -183,10 +183,149 @@ function trimAnswer(value: string) {
 		.trim();
 }
 
+function normalizeWhitespace(value: string) {
+	return value.replace(/\s+/g, " ").trim();
+}
+
+function splitIntoShortFacts(value: string) {
+	return value
+		.split(/\n+|[;•]+/g)
+		.map((line) =>
+			normalizeWhitespace(
+				line
+					.replace(/^[-–—*]\s*/, "")
+					.replace(/^(что|that)\s+/i, "")
+					.replace(
+						/^(напиши|напишите|сказать|сообщить|ответить|объяснить|tell|say|reply|explain)\s+/i,
+						"",
+					)
+					.replace(/^(клиенту|пользователю|customer|user)\s+/i, ""),
+			),
+		)
+		.filter(Boolean)
+		.slice(0, 5);
+}
+
+function looksLikeAgentBrief(value: string) {
+	return /\b(напиши|напишите|скажи|сказать|сообщить|ответить|объяснить|клиенту|пользователю|tell|say|reply|explain|customer|user)\b/i.test(
+		value,
+	);
+}
+
+function ensureSentence(value: string) {
+	const trimmed = normalizeWhitespace(value);
+
+	if (!trimmed) return "";
+	if (/[.!?。！？]$/.test(trimmed)) return trimmed;
+
+	return `${trimmed}.`;
+}
+
+function getReplyLocale(language: string) {
+	const normalized = language.trim().toLowerCase();
+
+	if (normalized.startsWith("ru") || normalized.startsWith("uk")) return "ru";
+
+	return "en";
+}
+
+function getIntentAcknowledgement(intent: AnswerIntent, locale: "ru" | "en") {
+	const ru: Record<AnswerIntent, string> = {
+		general: "Спасибо за обращение.",
+		deposit: "Понимаю, что вопрос с депозитом важно решить как можно быстрее.",
+		withdrawal: "Понимаю, что ожидание вывода средств может беспокоить.",
+		bonus: "Понимаю, что по бонусу важно получить точную информацию.",
+		verification:
+			"Понимаю, что проверка аккаунта и документов может занимать время.",
+		technical:
+			"Понимаю, что техническая ошибка мешает нормально пользоваться сервисом.",
+		"sports-betting":
+			"Понимаю, что по спортивной ставке важно быстро получить точную информацию.",
+	};
+	const en: Record<AnswerIntent, string> = {
+		general: "Thank you for reaching out.",
+		deposit: "I understand that deposit questions need to be resolved quickly.",
+		withdrawal:
+			"I understand that waiting for a withdrawal update can be frustrating.",
+		bonus:
+			"I understand that bonus details need to be clear before you proceed.",
+		verification:
+			"I understand that account and document checks can take time.",
+		technical:
+			"I understand that a technical issue can prevent you from using the service normally.",
+		"sports-betting":
+			"I understand that sports-betting questions need a quick and accurate update.",
+	};
+
+	return locale === "ru" ? ru[intent] : en[intent];
+}
+
+function getClarificationQuestion(intent: AnswerIntent, locale: "ru" | "en") {
+	const ru: Record<AnswerIntent, string> = {
+		general:
+			"Уточните, пожалуйста, несколько деталей по ситуации, чтобы мы могли проверить вопрос точнее.",
+		deposit:
+			"Уточните, пожалуйста, сумму, способ оплаты и примерное время депозита.",
+		withdrawal:
+			"Уточните, пожалуйста, сумму, метод вывода и номер заявки, если он есть.",
+		bonus:
+			"Уточните, пожалуйста, название бонуса и проект, по которому нужен ответ.",
+		verification:
+			"Уточните, пожалуйста, какие документы были загружены и когда это произошло.",
+		technical:
+			"Уточните, пожалуйста, устройство, браузер или приложение и что именно происходит на экране.",
+		"sports-betting":
+			"Уточните, пожалуйста, событие, рынок ставки и номер купона, если он есть.",
+	};
+	const en: Record<AnswerIntent, string> = {
+		general:
+			"Please share a few more details so we can check the situation more accurately.",
+		deposit:
+			"Please share the amount, payment method, and approximate deposit time.",
+		withdrawal:
+			"Please share the amount, withdrawal method, and request ID if you have one.",
+		bonus:
+			"Please share the bonus name and project so we can check the details.",
+		verification:
+			"Please clarify which documents were uploaded and when this was done.",
+		technical:
+			"Please share your device, browser or app, and what exactly happens on the screen.",
+		"sports-betting":
+			"Please share the event, bet market, and bet slip ID if available.",
+	};
+
+	return locale === "ru" ? ru[intent] : en[intent];
+}
+
+function buildFactParagraph(facts: string[], locale: "ru" | "en") {
+	if (facts.length === 0) return "";
+
+	const sentences = facts.map(ensureSentence).filter(Boolean);
+
+	if (sentences.length === 0) return "";
+
+	if (locale === "ru") {
+		return `По вашему вопросу: ${sentences.join(" ")}`;
+	}
+
+	return `Regarding your request: ${sentences.join(" ")}`;
+}
+
+function getClosing(tone: AnswerTone, locale: "ru" | "en") {
+	if (tone === "concise") return "";
+
+	if (locale === "ru") {
+		return "Спасибо за понимание.";
+	}
+
+	return "Thank you for your understanding.";
+}
+
 function buildRuleBasedAnswer({
 	customerMessage,
 	context,
 	memory,
+	settings,
 }: GenerateAnswerRequest) {
 	const matchedMemory = findMemoryMatches(customerMessage, memory).at(0);
 
@@ -194,11 +333,50 @@ function buildRuleBasedAnswer({
 		return matchedMemory.entry.target;
 	}
 
-	if (context.trim()) return context.trim();
+	const factsSource = context.trim()
+		? context
+		: looksLikeAgentBrief(customerMessage)
+			? customerMessage
+			: "";
+	const facts = splitIntoShortFacts(factsSource);
+	const locale = getReplyLocale(settings.language);
 
-	throw new Error(
-		"Gemini is disabled and no verified facts or saved answer are available.",
-	);
+	if (facts.length > 0) {
+		const parts =
+			locale === "ru"
+				? [
+						"Здравствуйте!",
+						getIntentAcknowledgement(settings.intent, locale),
+						buildFactParagraph(facts, locale),
+						getClosing(settings.tone, locale),
+					]
+				: [
+						"Hello!",
+						getIntentAcknowledgement(settings.intent, locale),
+						buildFactParagraph(facts, locale),
+						getClosing(settings.tone, locale),
+					];
+
+		return parts.filter(Boolean).join("\n\n");
+	}
+
+	const clarification = getClarificationQuestion(settings.intent, locale);
+
+	return locale === "ru"
+		? [
+				"Здравствуйте!",
+				getIntentAcknowledgement(settings.intent, locale),
+				clarification,
+			]
+				.filter(Boolean)
+				.join("\n\n")
+		: [
+				"Hello!",
+				getIntentAcknowledgement(settings.intent, locale),
+				clarification,
+			]
+				.filter(Boolean)
+				.join("\n\n");
 }
 
 async function generateWithGemini(request: GenerateAnswerRequest) {
@@ -352,6 +530,8 @@ class AnswerAssistantService {
 			answer = buildRuleBasedAnswer(resolvedRequest);
 		}
 
+		answer = applyGlossary(answer, resolvedRequest.glossary, language);
+
 		const issues = this.checkAnswer({
 			answer,
 			customerMessage: resolvedRequest.customerMessage,
@@ -477,7 +657,11 @@ class AnswerAssistantService {
 			});
 		}
 
-		if (!/\b(thank|thanks|hello|hi|please|sorry|appreciate)\b/i.test(answer)) {
+		if (
+			!/\b(thank|thanks|hello|hi|please|sorry|appreciate)\b|здравствуйте|добрый|спасибо|пожалуйста|понимаю|извин|сожале|благодар/i.test(
+				answer,
+			)
+		) {
 			issues.push({
 				id: "tone",
 				severity: "warning",
