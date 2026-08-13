@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { isLightweightRoute } from "@/app/route-mode";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
@@ -11,9 +11,30 @@ import { Topbar } from "@/widgets/Topbar";
 
 export function MainLayout({ children }: { children: ReactNode }) {
 	const layout = useWorkspaceStore((state) => state.layout);
+	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
+	const previousPathnameRef = useRef(pathname);
+
+	useEffect(() => {
+		if (!mobileSidebarOpen) return undefined;
+
+		const previousOverflow = document.body.style.overflow;
+
+		document.body.style.overflow = "hidden";
+
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
+	}, [mobileSidebarOpen]);
+
+	useEffect(() => {
+		if (previousPathnameRef.current !== pathname) {
+			previousPathnameRef.current = pathname;
+			setMobileSidebarOpen(false);
+		}
+	}, [pathname]);
 
 	if (isLightweightRoute(pathname)) {
 		return (
@@ -67,10 +88,34 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
 	return (
 		<div className="flex h-screen flex-col">
-			{layout.showTopbar && <Topbar />}
+			{layout.showTopbar && (
+				<Topbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />
+			)}
 
 			<div className="flex flex-1 overflow-hidden">
-				{layout.showSidebar && <Sidebar />}
+				{layout.showSidebar && (
+					<div className="hidden min-h-0 md:block">
+						<Sidebar />
+					</div>
+				)}
+
+				{mobileSidebarOpen && (
+					<div className="fixed inset-0 z-40 md:hidden">
+						<button
+							type="button"
+							aria-label="Close navigation"
+							onClick={() => setMobileSidebarOpen(false)}
+							className="absolute inset-0 bg-black/45"
+						/>
+						<div className="absolute inset-y-0 left-0 w-[min(19rem,calc(100vw-2rem))] max-w-full">
+							<Sidebar
+								mobile
+								onRequestClose={() => setMobileSidebarOpen(false)}
+								onNavigate={() => setMobileSidebarOpen(false)}
+							/>
+						</div>
+					</div>
+				)}
 
 				<main className="flex flex-1 flex-col overflow-hidden bg-background">
 					{children}

@@ -8,6 +8,7 @@ interface Props {
 	selectedBindIds?: string[];
 	onToggleBindSelection?: (id: string) => void;
 	onClearBindSelection?: () => void;
+	onOpenItem?: () => void;
 }
 
 export function Tree({
@@ -16,6 +17,7 @@ export function Tree({
 	selectedBindIds = [],
 	onToggleBindSelection,
 	onClearBindSelection,
+	onOpenItem,
 }: Props) {
 	return (
 		<div className="py-2">
@@ -28,6 +30,7 @@ export function Tree({
 					selectedBindIds={selectedBindIds}
 					onToggleBindSelection={onToggleBindSelection}
 					onClearBindSelection={onClearBindSelection}
+					onOpenItem={onOpenItem}
 				/>
 			))}
 		</div>
