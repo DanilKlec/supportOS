@@ -1092,20 +1092,20 @@ export function DepositBonusesPage() {
 					<div className="space-y-3">
 						<form
 							onSubmit={createProject}
-							className="rounded-xl border border-border bg-surface p-3"
+							className="min-w-0 rounded-xl border border-border bg-surface p-3"
 						>
 							<div className="mb-3 text-sm font-semibold">Project sheets</div>
 							<div className="grid gap-2">
-								<div className="flex gap-2">
+								<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
 									<input
 										value={newProjectName}
 										onChange={(event) => setNewProjectName(event.target.value)}
-										className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										placeholder="Project name"
 									/>
 									<button
 										type="submit"
-										className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+										className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
 									>
 										<Plus size={16} />
 										Add
@@ -1116,7 +1116,7 @@ export function DepositBonusesPage() {
 									onChange={(event) =>
 										setNewProjectCurrencyGroup(event.target.value)
 									}
-									className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									aria-label="Currency group for new project"
 								>
 									<option value="">Auto currency group</option>

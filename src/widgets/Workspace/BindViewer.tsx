@@ -24,6 +24,10 @@ import {
 	answerAssistantService,
 	type CheckIssue,
 } from "@/services/answer-assistant.service";
+import {
+	type CurrencyTable,
+	loadStoredBonusToolsData,
+} from "@/services/bonus-tools.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
@@ -145,6 +149,166 @@ function getCopyWarnings(issues: CheckIssue[]) {
 	);
 }
 
+const MAP_FALLBACK_CURRENCIES = ["EUR", "USD", "CAD", "AUD", "BRL", "TRY"];
+const EUR_AMOUNT_PATTERN =
+	/(\u20ac\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*(?:\u20ac|EUR))/giu;
+const EUR_AMOUNT_TEST_PATTERN =
+	/(\u20ac\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*(?:\u20ac|EUR))/iu;
+
+function normalizeMapBindName(value: string) {
+	return value
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/\u0451/g, "\u0435")
+		.replace(/[^a-zа-я0-9]+/g, "");
+}
+
+function isMapBindMaterial(bind: Bind, translation: BindTranslation) {
+	const values = [
+		bind.slug,
+		translation.title,
+		...bind.translations.map((item) => item.title),
+		...bind.tags,
+	].map(normalizeMapBindName);
+
+	return values.some((value) => value === "мапа" || value === "mapa");
+}
+
+function isDepositInstructionLine(value: string) {
+	const text = value.toLowerCase();
+
+	return [
+		"депозит",
+		"deposit",
+		"einzahl",
+		"depósito",
+		"deposito",
+		"κατάθεση",
+	].some((marker) => text.includes(marker));
+}
+
+function isLikelyBonusBlockLine(value: string) {
+	const text = value.toLowerCase();
+
+	return (
+		!isDepositInstructionLine(value) &&
+		(/bonus|free spins|\bfs\b|фрисп|спин|%/.test(text) ||
+			EUR_AMOUNT_TEST_PATTERN.test(value))
+	);
+}
+
+function detectMapBonusBlock(content: string) {
+	const lines = content.split(/\r?\n/);
+	const start =
+		lines.findIndex(
+			(line, index) => index > 0 && isLikelyBonusBlockLine(line),
+		) ?? -1;
+
+	if (start >= 0) {
+		let end = start;
+
+		while (
+			end + 1 < lines.length &&
+			lines[end + 1]?.trim() &&
+			!isDepositInstructionLine(lines[end + 1] ?? "")
+		) {
+			end += 1;
+		}
+
+		return {
+			start,
+			end,
+			text: lines
+				.slice(start, end + 1)
+				.join("\n")
+				.trim(),
+		};
+	}
+
+	const nonEmptyIndexes = lines
+		.map((line, index) => ({ line, index }))
+		.filter((item) => item.line.trim());
+	const fallback = nonEmptyIndexes[1];
+
+	return fallback
+		? {
+				start: fallback.index,
+				end: fallback.index,
+				text: fallback.line.trim(),
+			}
+		: undefined;
+}
+
+function parseMapAmount(value: string) {
+	const match = value.replace(/\s+/g, "").match(/\d+(?:[.,]\d+)?/);
+	const amount = match ? Number(match[0].replace(",", ".")) : undefined;
+
+	return Number.isFinite(amount) ? amount : undefined;
+}
+
+function findExactCurrencyValue(
+	table: CurrencyTable | undefined,
+	value: string,
+	currency: string,
+) {
+	const amount = parseMapAmount(value);
+	const code = currency.toUpperCase();
+
+	if (amount === undefined || !table?.currencies.includes(code)) return "";
+
+	const row = table.rows.find(
+		(item) =>
+			item.baseAmount !== undefined &&
+			Math.abs(item.baseAmount - amount) < 0.001,
+	);
+
+	return row?.values[code] ?? "";
+}
+
+function replaceMapCurrencyText(
+	text: string,
+	table: CurrencyTable | undefined,
+	currency: string,
+) {
+	const code = currency.toUpperCase();
+
+	if (!table || code === "EUR") return text;
+
+	return text.replace(EUR_AMOUNT_PATTERN, (match) => {
+		return findExactCurrencyValue(table, match, code) || match;
+	});
+}
+
+function buildMapBindContent({
+	content,
+	bonusBlock,
+	table,
+	currency,
+}: {
+	content: string;
+	bonusBlock: string;
+	table?: CurrencyTable;
+	currency: string;
+}) {
+	const detectedBlock = detectMapBonusBlock(content);
+	const cleanBonusBlock = bonusBlock.trim();
+
+	if (!detectedBlock || !cleanBonusBlock) {
+		return replaceMapCurrencyText(content, table, currency);
+	}
+
+	const lines = content.split(/\r?\n/);
+
+	lines.splice(
+		detectedBlock.start,
+		detectedBlock.end - detectedBlock.start + 1,
+		...cleanBonusBlock.split(/\r?\n/),
+	);
+
+	return replaceMapCurrencyText(lines.join("\n"), table, currency);
+}
+
 function ViewerMenuItem({
 	icon,
 	label,
@@ -195,6 +359,9 @@ export function BindViewer() {
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [composerIssues, setComposerIssues] = useState<CheckIssue[]>([]);
 	const [composerMeta, setComposerMeta] = useState("");
+	const [mapBonusBlock, setMapBonusBlock] = useState("");
+	const [mapCurrency, setMapCurrency] = useState("EUR");
+	const [mapTableName, setMapTableName] = useState("");
 
 	const translation = useMemo(() => {
 		if (!bind) return undefined;
@@ -206,6 +373,41 @@ export function BindViewer() {
 		(item) => item.language === language,
 	);
 	const title = translation?.title || bind?.slug || "";
+	const bonusToolsData = useMemo(() => loadStoredBonusToolsData(), []);
+	const mapCurrencyTables = bonusToolsData?.currencyTables ?? [];
+	const activeMapCurrencyTable =
+		mapCurrencyTables.find((table) => table.name === mapTableName) ??
+		mapCurrencyTables[0];
+	const mapCurrencyOptions = useMemo(
+		() =>
+			Array.from(
+				new Set([
+					...(activeMapCurrencyTable?.currencies ?? []),
+					...MAP_FALLBACK_CURRENCIES,
+				]),
+			).sort(),
+		[activeMapCurrencyTable?.currencies],
+	);
+	const isMapBind = Boolean(
+		bind && translation && isMapBindMaterial(bind, translation),
+	);
+	const mapPreparedContent = useMemo(() => {
+		if (!isMapBind || !translation) return undefined;
+
+		return buildMapBindContent({
+			content: translation.content,
+			bonusBlock: mapBonusBlock,
+			table: activeMapCurrencyTable,
+			currency: mapCurrency,
+		});
+	}, [
+		activeMapCurrencyTable,
+		isMapBind,
+		mapBonusBlock,
+		mapCurrency,
+		translation,
+	]);
+	const displayContent = mapPreparedContent ?? translation?.content ?? "";
 	const category = bind
 		? categories.find((item) => item.id === bind.categoryId)
 		: undefined;
@@ -227,7 +429,12 @@ export function BindViewer() {
 	const copyTranslation = async (item?: BindTranslation) => {
 		if (!bind || !item) return;
 
-		if (extractTemplateVariables(item.content).length > 0) {
+		const contentToCopy =
+			isMapBind && item.language === translation?.language
+				? displayContent
+				: item.content;
+
+		if (extractTemplateVariables(contentToCopy).length > 0) {
 			modalManager.open("copyBind", {
 				bindId: bind.id,
 				language: item.language,
@@ -238,14 +445,14 @@ export function BindViewer() {
 		const assistantData = answerAssistantService.load();
 		const copyWarnings = getCopyWarnings(
 			answerAssistantService.checkAnswer({
-				answer: item.content,
+				answer: contentToCopy,
 				customerMessage: title,
 				glossary: assistantData.glossary,
 				language: item.language,
 			}),
 		);
 
-		const ok = await copyToClipboard(item.content);
+		const ok = await copyToClipboard(contentToCopy);
 
 		addRecent(bind.id);
 		if (ok) {
@@ -272,7 +479,7 @@ export function BindViewer() {
 			const result = await answerAssistantService.generateReadyAnswer({
 				customerMessage: composerBrief,
 				context: `Material: ${title}`,
-				referenceAnswer: translation.content,
+				referenceAnswer: displayContent,
 				settings: {
 					...assistantData.settings,
 					language: translation.language,
@@ -393,6 +600,36 @@ export function BindViewer() {
 		wide: "max-w-7xl",
 		full: "max-w-none",
 	}[contentWidth];
+
+	useEffect(() => {
+		if (!isMapBind || !translation) {
+			setMapBonusBlock("");
+			return;
+		}
+
+		setMapBonusBlock(detectMapBonusBlock(translation.content)?.text ?? "");
+	}, [isMapBind, translation]);
+
+	useEffect(() => {
+		if (!isMapBind || mapCurrencyTables.length === 0) return;
+
+		if (
+			!mapTableName ||
+			!mapCurrencyTables.some((table) => table.name === mapTableName)
+		) {
+			setMapTableName(mapCurrencyTables[0]?.name ?? "");
+		}
+	}, [isMapBind, mapCurrencyTables, mapTableName]);
+
+	useEffect(() => {
+		if (!isMapBind || mapCurrencyOptions.length === 0) return;
+
+		if (!mapCurrencyOptions.includes(mapCurrency)) {
+			setMapCurrency(
+				mapCurrencyOptions.includes("EUR") ? "EUR" : mapCurrencyOptions[0],
+			);
+		}
+	}, [isMapBind, mapCurrency, mapCurrencyOptions]);
 
 	useEffect(() => {
 		return () => {
@@ -699,11 +936,89 @@ export function BindViewer() {
 						</div>
 					)}
 
+					{isMapBind && (
+						<section className="mt-5 rounded-xl border border-border bg-surface">
+							<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+								<div>
+									<div className="text-sm font-semibold">MAP bind</div>
+									<div className="mt-1 text-xs text-muted">
+										Bonus block and currency for this copy.
+									</div>
+								</div>
+								<button
+									type="button"
+									onClick={() => void copyContent()}
+									className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+								>
+									<Copy size={15} />
+									Copy MAP
+								</button>
+							</div>
+
+							<div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(8rem,10rem)]">
+								<label className="min-w-0">
+									<span className="mb-1 block text-xs font-medium text-muted">
+										Bonus block
+									</span>
+									<textarea
+										value={mapBonusBlock}
+										onChange={(event) => setMapBonusBlock(event.target.value)}
+										className="supportos-scroll min-h-24 w-full min-w-0 resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										placeholder="130% bonus up to €1000 + 100 FS"
+									/>
+								</label>
+
+								<label className="min-w-0">
+									<span className="mb-1 block text-xs font-medium text-muted">
+										Currency group
+									</span>
+									<select
+										value={activeMapCurrencyTable?.name ?? ""}
+										onChange={(event) => setMapTableName(event.target.value)}
+										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									>
+										{mapCurrencyTables.length > 0 ? (
+											mapCurrencyTables.map((table) => (
+												<option key={table.name} value={table.name}>
+													{table.name}
+												</option>
+											))
+										) : (
+											<option value="">No tables loaded</option>
+										)}
+									</select>
+									{mapCurrencyTables.length === 0 && (
+										<div className="mt-1 text-xs text-muted">
+											Load Bonus Tools for exact currency values.
+										</div>
+									)}
+								</label>
+
+								<label className="min-w-0">
+									<span className="mb-1 block text-xs font-medium text-muted">
+										Currency
+									</span>
+									<select
+										value={mapCurrency}
+										onChange={(event) => setMapCurrency(event.target.value)}
+										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									>
+										{mapCurrencyOptions.map((currency) => (
+											<option key={currency} value={currency}>
+												{currency}
+											</option>
+										))}
+									</select>
+								</label>
+							</div>
+						</section>
+					)}
+
 					<section className="mt-6 rounded-xl bg-surface px-4 py-5 sm:px-6 md:p-8">
-						{translation.content.trim() ? (
+						{displayContent.trim() ? (
 							<div className="prose max-w-none leading-7 dark:prose-invert prose-headings:tracking-normal prose-pre:rounded-xl prose-pre:border prose-pre:border-border prose-pre:bg-background">
 								<ReactMarkdown remarkPlugins={[remarkGfm]}>
-									{translation.content}
+									{displayContent}
 								</ReactMarkdown>
 							</div>
 						) : (
