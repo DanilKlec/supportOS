@@ -46,6 +46,7 @@ export interface GenerateAnswerRequest {
 	customerMessage: string;
 	context: string;
 	referenceAnswer?: string;
+	responseStyle?: "standard" | "expanded-bind";
 	settings: AssistantSettings;
 	glossary: GlossaryTerm[];
 	memory: TranslationMemoryEntry[];
@@ -312,6 +313,60 @@ function buildFactParagraph(facts: string[], locale: "ru" | "en") {
 	return `Regarding your request: ${sentences.join(" ")}`;
 }
 
+function getExpandedEmpathy(intent: AnswerIntent, locale: "ru" | "en") {
+	if (locale === "ru") {
+		const values: Record<AnswerIntent, string> = {
+			general:
+				"Понимаю вашу ситуацию и постараюсь объяснить всё максимально понятно.",
+			deposit:
+				"Понимаю, что ситуация с депозитом может вызывать беспокойство, особенно когда хочется быстрее увидеть результат на балансе.",
+			withdrawal:
+				"Понимаю, что ожидание вывода средств может быть неприятным, особенно если хочется заранее понимать сроки и дальнейшие шаги.",
+			bonus:
+				"Понимаю, что по бонусам важно получить понятный ответ, чтобы не возникало сомнений по условиям и дальнейшим действиям.",
+			verification:
+				"Понимаю, что проверка аккаунта может занимать время и из-за этого ситуация выглядит не самой удобной.",
+			technical:
+				"Понимаю, что техническая ошибка может мешать нормально пользоваться аккаунтом, и это действительно неприятно.",
+			"sports-betting":
+				"Понимаю, что по ставке важно получить точную информацию без лишнего ожидания.",
+		};
+
+		return values[intent];
+	}
+
+	const values: Record<AnswerIntent, string> = {
+		general:
+			"I understand the situation and will explain everything as clearly as possible.",
+		deposit:
+			"I understand that deposit issues can be worrying, especially when you expect the funds to appear quickly.",
+		withdrawal:
+			"I understand that waiting for a withdrawal update can be frustrating, especially when you need clarity on the next steps.",
+		bonus:
+			"I understand that bonus details need to be clear, so there are no doubts about the conditions or what to do next.",
+		verification:
+			"I understand that account verification can take time and may feel inconvenient.",
+		technical:
+			"I understand that a technical issue can prevent you from using your account normally, and that is unpleasant.",
+		"sports-betting":
+			"I understand that bet-related questions require accurate information without unnecessary delays.",
+	};
+
+	return values[intent];
+}
+
+function getExpandedBridge(locale: "ru" | "en") {
+	return locale === "ru"
+		? "Сейчас ориентируемся на следующую информацию:"
+		: "At the moment, we are guided by the following information:";
+}
+
+function getExpandedSupportClosing(locale: "ru" | "en") {
+	return locale === "ru"
+		? "Если после этого у вас останутся вопросы или появятся дополнительные детали, пожалуйста, напишите нам. Мы постараемся помочь и проверить всё настолько внимательно, насколько это возможно."
+		: "If you still have any questions after this or have additional details to share, please let us know. We will do our best to help and check everything as carefully as possible.";
+}
+
 function getClosing(tone: AnswerTone, locale: "ru" | "en") {
 	if (tone === "concise") return "";
 
@@ -326,6 +381,7 @@ function buildRuleBasedAnswer({
 	customerMessage,
 	context,
 	referenceAnswer,
+	responseStyle,
 	memory,
 	settings,
 }: GenerateAnswerRequest) {
@@ -346,22 +402,42 @@ function buildRuleBasedAnswer({
 
 	if (reference) {
 		const factParagraph = buildFactParagraph(facts, locale);
+		const expanded =
+			responseStyle === "expanded-bind" && settings.tone !== "concise";
 		const parts =
 			locale === "ru"
-				? [
-						"Здравствуйте!",
-						getIntentAcknowledgement(settings.intent, locale),
-						factParagraph,
-						reference,
-						getClosing(settings.tone, locale),
-					]
-				: [
-						"Hello!",
-						getIntentAcknowledgement(settings.intent, locale),
-						factParagraph,
-						reference,
-						getClosing(settings.tone, locale),
-					];
+				? expanded
+					? [
+							"Здравствуйте!",
+							getExpandedEmpathy(settings.intent, locale),
+							factParagraph,
+							getExpandedBridge(locale),
+							reference,
+							getExpandedSupportClosing(locale),
+						]
+					: [
+							"Здравствуйте!",
+							getIntentAcknowledgement(settings.intent, locale),
+							factParagraph,
+							reference,
+							getClosing(settings.tone, locale),
+						]
+				: expanded
+					? [
+							"Hello!",
+							getExpandedEmpathy(settings.intent, locale),
+							factParagraph,
+							getExpandedBridge(locale),
+							reference,
+							getExpandedSupportClosing(locale),
+						]
+					: [
+							"Hello!",
+							getIntentAcknowledgement(settings.intent, locale),
+							factParagraph,
+							reference,
+							getClosing(settings.tone, locale),
+						];
 
 		return parts.filter(Boolean).join("\n\n");
 	}
@@ -425,6 +501,7 @@ async function generateWithGemini(request: GenerateAnswerRequest) {
 			customerMessage: request.customerMessage,
 			context: request.context,
 			referenceAnswer: request.referenceAnswer ?? "",
+			responseStyle: request.responseStyle ?? "standard",
 			language: request.settings.language,
 			product: request.settings.product,
 			intent: request.settings.intent,

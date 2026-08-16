@@ -149,6 +149,26 @@ function getCopyWarnings(issues: CheckIssue[]) {
 	);
 }
 
+function buildBindComposerContext({
+	title,
+	language,
+	baseMaterial,
+}: {
+	title: string;
+	language: string;
+	baseMaterial: string;
+}) {
+	return [
+		`Current bind title: ${title}`,
+		`Reply language: ${language}`,
+		"Task: adapt the current bind into a complete ready-to-send customer support reply for the described situation.",
+		"Do not answer the agent note directly. Use the note as instructions for how to adapt the bind.",
+		"Make the reply fuller than the base if needed: include empathy, regret for inconvenience, clear explanation, next step, and a polite closing.",
+		"Do not invent facts, statuses, deadlines, checks, approvals, payments, or promises that are not present in the bind or case note.",
+		`Current bind text:\n${baseMaterial}`,
+	].join("\n\n");
+}
+
 const MAP_FALLBACK_CURRENCIES = ["EUR", "USD", "CAD", "AUD", "BRL", "TRY"];
 const EUR_AMOUNT_PATTERN =
 	/(\u20ac\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*(?:\u20ac|EUR))/giu;
@@ -476,12 +496,22 @@ export function BindViewer() {
 
 		try {
 			const assistantData = answerAssistantService.load();
+			const composerTone =
+				assistantData.settings.tone === "concise"
+					? "friendly"
+					: assistantData.settings.tone;
 			const result = await answerAssistantService.generateReadyAnswer({
 				customerMessage: composerBrief,
-				context: `Material: ${title}`,
+				context: buildBindComposerContext({
+					title,
+					language: translation.language,
+					baseMaterial: displayContent,
+				}),
 				referenceAnswer: displayContent,
+				responseStyle: "expanded-bind",
 				settings: {
 					...assistantData.settings,
+					tone: composerTone,
 					language: translation.language,
 				},
 				glossary: assistantData.glossary,
@@ -1036,8 +1066,8 @@ export function BindViewer() {
 									AI composer
 								</div>
 								<div className="mt-1 text-xs text-muted">
-									Use this material as the base and adapt it to the current
-									case.
+									Build a fuller support reply from this bind and your case
+									notes.
 								</div>
 							</div>
 							{composerMeta && (
@@ -1053,7 +1083,7 @@ export function BindViewer() {
 									value={composerBrief}
 									onChange={(event) => setComposerBrief(event.target.value)}
 									className="supportos-scroll min-h-32 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									placeholder="Short case notes: what happened, what to explain, which facts are confirmed..."
+									placeholder="Example: adapt this bind for a player who is upset because the withdrawal is still pending. Add empathy and explain what they should do next..."
 								/>
 								<button
 									type="button"
@@ -1066,7 +1096,7 @@ export function BindViewer() {
 									) : (
 										<Sparkles size={16} />
 									)}
-									Generate answer
+									Generate full answer
 								</button>
 							</div>
 

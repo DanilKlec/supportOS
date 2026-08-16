@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import {
 	type FormEvent,
 	type ReactNode,
@@ -705,6 +705,16 @@ function isEmailVariable(variable: string) {
 	return variable.trim().toLowerCase() === "email";
 }
 
+function normalizeProjectEmailSearch(value: string) {
+	return value
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/\u0451/g, "е")
+		.replace(/[^a-z0-9а-я@._-]+/g, " ")
+		.trim();
+}
+
 function buildProjectEmailOptions(records: ProjectEmailRecord[]) {
 	return records.flatMap((record) =>
 		[
@@ -716,8 +726,28 @@ function buildProjectEmailOptions(records: ProjectEmailRecord[]) {
 			.map((item) => ({
 				id: `${record.id}:${item.type}`,
 				label: `${record.projectName} - ${item.type}`,
+				projectName: record.projectName,
+				type: item.type,
 				value: item.value,
+				searchText: normalizeProjectEmailSearch(
+					`${record.projectName} ${item.type} ${item.value}`,
+				),
 			})),
+	);
+}
+
+function filterProjectEmailOptions(
+	options: ReturnType<typeof buildProjectEmailOptions>,
+	query: string,
+) {
+	const tokens = normalizeProjectEmailSearch(query)
+		.split(/\s+/)
+		.filter(Boolean);
+
+	if (tokens.length === 0) return options;
+
+	return options.filter((option) =>
+		tokens.every((token) => option.searchText.includes(token)),
 	);
 }
 
@@ -745,6 +775,11 @@ function CopyBindModal({
 	const projectEmailOptions = useMemo(
 		() => buildProjectEmailOptions(projectEmailRecords),
 		[projectEmailRecords],
+	);
+	const [emailQuery, setEmailQuery] = useState("");
+	const filteredProjectEmailOptions = useMemo(
+		() => filterProjectEmailOptions(projectEmailOptions, emailQuery),
+		[emailQuery, projectEmailOptions],
 	);
 	const [values, setValues] = useState<Record<string, string>>(() => {
 		const preset = readVariablePreset(variables);
@@ -827,45 +862,90 @@ function CopyBindModal({
 							const emailVariable = isEmailVariable(variable);
 
 							return (
-								<Field
+								<div
 									key={variable}
-									label={emailVariable ? "Email" : `{${variable}}`}
+									className={emailVariable ? "sm:col-span-2" : ""}
 								>
-									{emailVariable && projectEmailOptions.length > 0 ? (
-										<select
-											value={values[variable] ?? ""}
-											onChange={(event) =>
-												setValues((current) => ({
-													...current,
-													[variable]: event.target.value,
-												}))
-											}
-											className={inputClass}
-										>
-											{projectEmailOptions.map((option) => (
-												<option key={option.id} value={option.value}>
-													{option.label} - {option.value}
-												</option>
-											))}
-										</select>
-									) : (
-										<input
-											value={values[variable] ?? ""}
-											onChange={(event) =>
-												setValues((current) => ({
-													...current,
-													[variable]: event.target.value,
-												}))
-											}
-											className={inputClass}
-											placeholder={
-												emailVariable
-													? "Add project emails or enter email manually"
-													: variable
-											}
-										/>
-									)}
-								</Field>
+									<Field label={emailVariable ? "Email" : `{${variable}}`}>
+										{emailVariable && projectEmailOptions.length > 0 ? (
+											<div className="space-y-2">
+												<div className="relative">
+													<Search
+														size={15}
+														className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+													/>
+													<input
+														type="search"
+														value={emailQuery}
+														onChange={(event) =>
+															setEmailQuery(event.target.value)
+														}
+														className="min-h-11 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+														placeholder="Search project, type or email..."
+													/>
+												</div>
+
+												<div className="supportos-scroll max-h-56 overflow-auto rounded-lg border border-border bg-background">
+													{filteredProjectEmailOptions.length > 0 ? (
+														filteredProjectEmailOptions.map((option) => {
+															const active = values[variable] === option.value;
+
+															return (
+																<button
+																	key={option.id}
+																	type="button"
+																	onClick={() =>
+																		setValues((current) => ({
+																			...current,
+																			[variable]: option.value,
+																		}))
+																	}
+																	className={`flex min-h-12 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm last:border-b-0 ${
+																		active
+																			? "bg-accent/10 text-foreground"
+																			: "text-muted hover:bg-surface-elevated hover:text-foreground"
+																	}`}
+																>
+																	<span className="min-w-0">
+																		<span className="block truncate font-medium">
+																			{option.projectName}
+																		</span>
+																		<span className="block truncate text-xs text-muted">
+																			{option.value}
+																		</span>
+																	</span>
+																	<span className="shrink-0 rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold uppercase text-muted">
+																		{option.type}
+																	</span>
+																</button>
+															);
+														})
+													) : (
+														<div className="px-3 py-5 text-sm text-muted">
+															No emails match this search
+														</div>
+													)}
+												</div>
+											</div>
+										) : (
+											<input
+												value={values[variable] ?? ""}
+												onChange={(event) =>
+													setValues((current) => ({
+														...current,
+														[variable]: event.target.value,
+													}))
+												}
+												className={inputClass}
+												placeholder={
+													emailVariable
+														? "Add project emails or enter email manually"
+														: variable
+												}
+											/>
+										)}
+									</Field>
+								</div>
 							);
 						})}
 					</div>
