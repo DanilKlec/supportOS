@@ -12,6 +12,7 @@ import {
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
+import type { ProjectEmailRecord } from "@/entities/project-email";
 import {
 	knowledgeService,
 	type RestoreDeletedItemsInput,
@@ -23,7 +24,7 @@ import {
 	extractTemplateVariables,
 } from "@/shared/lib/template-variables";
 import { useModalStore } from "@/shared/modals/modal.store";
-import { useKnowledgeStore } from "@/store";
+import { useKnowledgeStore, useProjectEmailStore } from "@/store";
 
 import { BaseModal } from "./BaseModal";
 import type {
@@ -700,6 +701,26 @@ function MoveBindModal({
 	);
 }
 
+function isEmailVariable(variable: string) {
+	return variable.trim().toLowerCase() === "email";
+}
+
+function buildProjectEmailOptions(records: ProjectEmailRecord[]) {
+	return records.flatMap((record) =>
+		[
+			{ type: "Support", value: record.supportEmail },
+			{ type: "KYC", value: record.kycEmail },
+			{ type: "VIP", value: record.vipEmail },
+		]
+			.filter((item) => item.value.trim())
+			.map((item) => ({
+				id: `${record.id}:${item.type}`,
+				label: `${record.projectName} - ${item.type}`,
+				value: item.value,
+			})),
+	);
+}
+
 function CopyBindModal({
 	payload,
 	onClose,
@@ -716,15 +737,56 @@ function CopyBindModal({
 	const translation = bind
 		? getBindTranslation(bind, targetLanguage)
 		: undefined;
+	const projectEmailRecords = useProjectEmailStore((state) => state.records);
 	const variables = useMemo(
 		() => extractTemplateVariables(translation?.content ?? ""),
 		[translation?.content],
 	);
-	const [values, setValues] = useState<Record<string, string>>(() =>
-		readVariablePreset(variables),
+	const projectEmailOptions = useMemo(
+		() => buildProjectEmailOptions(projectEmailRecords),
+		[projectEmailRecords],
+	);
+	const [values, setValues] = useState<Record<string, string>>(() => {
+		const preset = readVariablePreset(variables);
+		const defaultEmail = projectEmailOptions[0]?.value;
+
+		if (defaultEmail) {
+			for (const variable of variables) {
+				if (isEmailVariable(variable) && !preset[variable]) {
+					preset[variable] = defaultEmail;
+				}
+			}
+		}
+
+		return preset;
+	});
+	const hasEmailVariable = variables.some(isEmailVariable);
+	const content = applyTemplateVariables(translation?.content ?? "", values);
+
+	useEffect(
+		() =>
+			setValues((current) => {
+				let changed = false;
+				const next = { ...current };
+				const defaultEmail = projectEmailOptions[0]?.value;
+
+				for (const variable of variables) {
+					if (next[variable] === undefined) {
+						next[variable] = "";
+						changed = true;
+					}
+
+					if (isEmailVariable(variable) && !next[variable] && defaultEmail) {
+						next[variable] = defaultEmail;
+						changed = true;
+					}
+				}
+
+				return changed ? next : current;
+			}),
+		[projectEmailOptions, variables],
 	);
 	const [saving, setSaving] = useState(false);
-	const content = applyTemplateVariables(translation?.content ?? "", values);
 
 	if (!bind || !translation) {
 		return (
@@ -761,26 +823,63 @@ function CopyBindModal({
 
 				{variables.length > 0 ? (
 					<div className="grid gap-3 sm:grid-cols-2">
-						{variables.map((variable) => (
-							<Field key={variable} label={`{${variable}}`}>
-								<input
-									value={values[variable] ?? ""}
-									onChange={(event) =>
-										setValues((current) => ({
-											...current,
-											[variable]: event.target.value,
-										}))
-									}
-									className={inputClass}
-									placeholder={variable}
-								/>
-							</Field>
-						))}
+						{variables.map((variable) => {
+							const emailVariable = isEmailVariable(variable);
+
+							return (
+								<Field
+									key={variable}
+									label={emailVariable ? "Email" : `{${variable}}`}
+								>
+									{emailVariable && projectEmailOptions.length > 0 ? (
+										<select
+											value={values[variable] ?? ""}
+											onChange={(event) =>
+												setValues((current) => ({
+													...current,
+													[variable]: event.target.value,
+												}))
+											}
+											className={inputClass}
+										>
+											{projectEmailOptions.map((option) => (
+												<option key={option.id} value={option.value}>
+													{option.label} - {option.value}
+												</option>
+											))}
+										</select>
+									) : (
+										<input
+											value={values[variable] ?? ""}
+											onChange={(event) =>
+												setValues((current) => ({
+													...current,
+													[variable]: event.target.value,
+												}))
+											}
+											className={inputClass}
+											placeholder={
+												emailVariable
+													? "Add project emails or enter email manually"
+													: variable
+											}
+										/>
+									)}
+								</Field>
+							);
+						})}
 					</div>
 				) : (
 					<p className="text-sm text-muted">
 						This bind has no variables. It will be copied as is.
 					</p>
+				)}
+
+				{hasEmailVariable && projectEmailOptions.length === 0 && (
+					<div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-200">
+						No project emails found yet. Add them in Project Emails to choose
+						from a list.
+					</div>
 				)}
 
 				<div className="max-h-64 overflow-auto rounded-md border border-border bg-background p-3 text-sm leading-6 text-muted">
