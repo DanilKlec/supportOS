@@ -33,7 +33,9 @@ export interface AssistantSettings {
 	product: string;
 	tone: AnswerTone;
 	intent: AnswerIntent;
-	geminiEnabled: boolean;
+	aiEnabled: boolean;
+	/** @deprecated Read only while migrating settings saved before AI providers. */
+	geminiEnabled?: boolean;
 }
 
 export interface StoredAssistantData {
@@ -63,13 +65,14 @@ export interface ReadyAnswerResult {
 	answer: string;
 	language: string;
 	issues: CheckIssue[];
-	mode: "gemini" | "free";
+	mode: "openai" | "gemini" | "free";
 	warning?: string;
 }
 
-interface GeminiGenerateResponse {
+interface AIGenerateResponse {
 	text?: string;
 	model?: string;
+	provider?: "openai" | "gemini";
 	error?: string;
 }
 
@@ -80,7 +83,7 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
 	product: "SupportOS",
 	tone: "friendly",
 	intent: "general",
-	geminiEnabled: true,
+	aiEnabled: true,
 };
 
 const DEFAULT_GLOSSARY: GlossaryTerm[] = [
@@ -480,7 +483,7 @@ function buildRuleBasedAnswer({
 				.join("\n\n");
 }
 
-async function generateWithGemini(request: GenerateAnswerRequest) {
+async function generateWithAI(request: GenerateAnswerRequest) {
 	const memoryMatches = findMemoryMatches(
 		request.customerMessage,
 		request.memory,
@@ -512,21 +515,24 @@ async function generateWithGemini(request: GenerateAnswerRequest) {
 	});
 	const data = (await response
 		.json()
-		.catch(() => ({}))) as GeminiGenerateResponse;
+		.catch(() => ({}))) as AIGenerateResponse;
 
 	if (!response.ok || data.error) {
 		if (response.status === 429) {
-			throw new Error("Gemini free request limit has been reached");
+			throw new Error("AI request limit has been reached");
 		}
 
-		throw new Error(data.error || "Gemini request failed");
+		throw new Error(data.error || "AI request failed");
 	}
 
 	if (!data.text?.trim()) {
-		throw new Error("Gemini returned an empty response");
+		throw new Error("AI provider returned an empty response");
 	}
 
-	return trimAnswer(data.text);
+	return {
+		answer: trimAnswer(data.text),
+		provider: data.provider ?? "gemini",
+	};
 }
 
 class AnswerAssistantService {
@@ -549,10 +555,10 @@ class AnswerAssistantService {
 				settings: {
 					...DEFAULT_ASSISTANT_SETTINGS,
 					...(parsed.settings ?? {}),
-					geminiEnabled:
-						typeof parsed.settings?.geminiEnabled === "boolean"
-							? parsed.settings.geminiEnabled
-							: true,
+					aiEnabled:
+						typeof parsed.settings?.aiEnabled === "boolean"
+							? parsed.settings.aiEnabled
+							: (parsed.settings?.geminiEnabled ?? true),
 				},
 				glossary: parsed.glossary?.length ? parsed.glossary : DEFAULT_GLOSSARY,
 				memory: parsed.memory ?? [],
@@ -594,8 +600,8 @@ class AnswerAssistantService {
 			throw new Error("Customer message is required");
 		}
 
-		if (request.settings.geminiEnabled) {
-			return generateWithGemini(request);
+		if (request.settings.aiEnabled) {
+			return (await generateWithAI(request)).answer;
 		}
 
 		return buildRuleBasedAnswer(request);
@@ -624,9 +630,10 @@ class AnswerAssistantService {
 		let mode: ReadyAnswerResult["mode"] = "free";
 		let warning: string | undefined;
 
-		if (resolvedRequest.settings.geminiEnabled) {
-			answer = await generateWithGemini(resolvedRequest);
-			mode = "gemini";
+		if (resolvedRequest.settings.aiEnabled) {
+			const generated = await generateWithAI(resolvedRequest);
+			answer = generated.answer;
+			mode = generated.provider;
 		}
 
 		if (!answer) {
@@ -651,7 +658,7 @@ class AnswerAssistantService {
 		};
 	}
 
-	async testGemini() {
+	async testAI() {
 		const response = await fetch("/api/ai/status", {
 			method: "GET",
 			headers: { Accept: "application/json" },
@@ -659,18 +666,22 @@ class AnswerAssistantService {
 		const data = (await response.json().catch(() => ({}))) as {
 			configured?: boolean;
 			model?: string;
+			provider?: "openai" | "gemini";
 			error?: string;
 		};
 
 		if (!response.ok) {
-			throw new Error(data.error || `Gemini returned HTTP ${response.status}`);
+			throw new Error(data.error || `AI provider returned HTTP ${response.status}`);
 		}
 
 		if (!data.configured) {
-			throw new Error("Add GEMINI_API_KEY in Vercel and redeploy the project");
+			throw new Error("Configure OPENAI_API_KEY or GEMINI_API_KEY in Vercel");
 		}
 
-		return data.model ?? "gemini-2.5-flash-lite";
+		return {
+			model: data.model ?? "unknown",
+			provider: data.provider ?? "gemini",
+		};
 	}
 
 	async translateAnswer({

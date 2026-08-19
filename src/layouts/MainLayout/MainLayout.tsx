@@ -36,6 +36,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		}
 	}, [pathname]);
 
+	if (pathname === "/livechat") {
+		return <main className="min-h-screen bg-background">{children}</main>;
+	}
+
 	if (isLightweightRoute(pathname)) {
 		return (
 			<div className="flex h-screen flex-col bg-background">

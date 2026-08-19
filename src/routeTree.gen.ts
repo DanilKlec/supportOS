@@ -14,6 +14,7 @@ import { Route as SportsBettingRouteImport } from './routes/sports-betting'
 import { Route as RecentRouteImport } from './routes/recent'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LivechatRouteImport } from './routes/livechat'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as BonusesRouteImport } from './routes/bonuses'
@@ -52,6 +53,11 @@ const ProjectEmailsRoute = ProjectEmailsRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LivechatRoute = LivechatRouteImport.update({
+  id: '/livechat',
+  path: '/livechat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HealthRoute = HealthRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/bonuses': typeof BonusesRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/bonuses'
     | '/favorites'
     | '/health'
+    | '/livechat'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/bonuses'
     | '/favorites'
     | '/health'
+    | '/livechat'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/bonuses'
     | '/favorites'
     | '/health'
+    | '/livechat'
     | '/login'
     | '/project-emails'
     | '/recent'
@@ -263,6 +275,7 @@ export interface RootRouteChildren {
   BonusesRoute: typeof BonusesRoute
   FavoritesRoute: typeof FavoritesRoute
   HealthRoute: typeof HealthRoute
+  LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
   RecentRoute: typeof RecentRoute
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/livechat': {
+      id: '/livechat'
+      path: '/livechat'
+      fullPath: '/livechat'
+      preLoaderRoute: typeof LivechatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/health': {
@@ -423,6 +443,7 @@ const rootRouteChildren: RootRouteChildren = {
   BonusesRoute: BonusesRoute,
   FavoritesRoute: FavoritesRoute,
   HealthRoute: HealthRoute,
+  LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
   RecentRoute: RecentRoute,
