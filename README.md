@@ -1,204 +1,178 @@
-Welcome to your new TanStack Start app! 
+# SupportOS
 
-# Getting Started
+SupportOS — рабочее пространство для службы поддержки: база знаний с быстрыми ответами (binds), поиск, мультиязычные материалы и набор вспомогательных инструментов для ежедневной работы оператора.
 
-To run this application:
+Приложение работает локально без обязательного бэкенда: данные базы знаний сохраняются в IndexedDB браузера. При необходимости можно включить авторизацию и облачную синхронизацию через Supabase.
+
+## Возможности
+
+- древовидная база знаний: категории, папки и готовые ответы;
+- полнотекстовый поиск, избранное, недавние и архивные материалы;
+- вкладки, копирование ответов и переменные в шаблонах;
+- импорт из Google Sheets и резервный импорт/экспорт в JSON;
+- мультиязычные ответы и перевод через LibreTranslate;
+- AI-помощник и генерация ответов через Gemini;
+- справочники проектных email и депозитных бонусов;
+- инструменты расчёта бонусов и данные спортивных коэффициентов;
+- светлая/тёмная тема и установка приложения как PWA;
+- опциональная авторизация, роли и синхронизация с Supabase.
+
+## Технологии
+
+- React 19, TypeScript и Vite;
+- TanStack Router и TanStack Query;
+- Zustand;
+- Tailwind CSS 4;
+- Vitest и Biome;
+- Vercel Functions для API-прокси;
+- Supabase REST/Auth для опционального облачного режима.
+
+## Быстрый старт
+
+Понадобятся актуальная LTS-версия Node.js и npm.
 
 ```bash
+git clone https://github.com/DanilKlec/supportOS.git
+cd supportOS
 npm install
+Copy-Item .env.example .env
 npm run dev
 ```
 
-# Building For Production
+Для macOS/Linux вместо `Copy-Item` используйте:
 
-To build this application for production:
+```bash
+cp .env.example .env
+```
+
+После запуска приложение доступно по адресу [http://localhost:3000](http://localhost:3000). Для базового локального режима секреты и внешние сервисы не требуются.
+
+## Переменные окружения
+
+Клиентские переменные с префиксом `VITE_` попадают в браузерный bundle — не храните в них секретные ключи.
+
+### Supabase (опционально)
+
+```dotenv
+VITE_SUPPORTOS_CLOUD_SYNC=false
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+Чтобы включить облачный режим:
+
+1. Создайте проект Supabase.
+2. Выполните SQL из [`supabase/schema.sql`](supabase/schema.sql) в SQL Editor проекта.
+3. Укажите URL проекта и публичный anon key.
+4. Установите `VITE_SUPPORTOS_CLOUD_SYNC=true`.
+
+Схема создаёт профили, категории, папки и binds, включает Row Level Security и разделяет глобальные и пользовательские записи. Для назначения администратора добавьте email в таблицу `supportos_admin_emails` через доверенную административную среду.
+
+### Gemini (опционально)
+
+```dotenv
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash-lite
+```
+
+Ключ используется только serverless-функциями `/api/ai/*`. `GEMINI_MODEL` можно не задавать — показанная модель используется по умолчанию.
+
+### LibreTranslate (опционально)
+
+```dotenv
+LIBRETRANSLATE_ENDPOINT=https://your-libretranslate-instance.example
+LIBRETRANSLATE_API_KEY=your-api-key
+```
+
+Также поддерживаются `LIBRETRANSLATE_URL`, список `LIBRETRANSLATE_ENDPOINTS` и резервный список `LIBRETRANSLATE_FALLBACK_ENDPOINTS`. Без явной настройки используется публичный endpoint, доступность которого не гарантируется.
+
+### Спортивные коэффициенты (опционально)
+
+```dotenv
+SPORTS_BETTING_API_KEY=your-the-odds-api-key
+SPORTS_BETTING_SPORTS=soccer_fifa_world_cup
+SPORTS_BETTING_REGIONS=eu
+SPORTS_BETTING_MARKETS=h2h
+SPORTS_BETTING_LIMIT=12
+SPORTS_BETTING_POLL_MS=7200000
+SPORTS_BETTING_CACHE_TTL_SECONDS=7200
+SPORTS_BETTING_INCLUDE_LAY=false
+```
+
+Вместо `SPORTS_BETTING_API_KEY` поддерживается `THE_ODDS_API_KEY`. Дополнительно можно ограничить букмекеров переменной `SPORTS_BETTING_BOOKMAKERS`.
+
+### CRM-ссылки (опционально)
+
+```dotenv
+VITE_CRM_ADWA_URL=https://example.com
+VITE_CRM_WHITELABELS_URL=https://example.com
+VITE_CRM_VORTEXINO_URL=https://example.com
+```
+
+## Команды
+
+| Команда | Назначение |
+| --- | --- |
+| `npm run dev` | Запуск dev-сервера на порту 3000 |
+| `npm run build` | Production-сборка в `dist/` |
+| `npm run preview` | Локальный просмотр production-сборки |
+| `npm run test` | Однократный запуск тестов Vitest |
+| `npm run lint` | Проверка кода Biome |
+| `npm run format` | Форматирование Biome |
+| `npm run check` | Комплексная проверка Biome |
+| `npm run generate-routes` | Перегенерация дерева маршрутов TanStack Router |
+
+## API
+
+В каталоге `api/` находятся функции, рассчитанные на Vercel:
+
+- `/api/ai/status` и `/api/ai/generate` — Gemini;
+- `/api/translator/languages` и `/api/translator/translate` — LibreTranslate;
+- `/api/google-sheets/fetch` — безопасный прокси публичных Google Sheets;
+- `/api/sports-betting/live` — получение и кеширование коэффициентов.
+
+Dev-сервер Vite локально эмулирует прокси Google Sheets и sports betting. Для полноценной локальной проверки остальных serverless-функций используйте Vercel CLI либо разверните проект на Vercel.
+
+## Хранение данных
+
+По умолчанию база знаний хранится в IndexedDB `supportos-local`; при недоступности IndexedDB используется localStorage. Настройки и данные отдельных инструментов также сохраняются в браузере. Очистка данных сайта удалит локальную базу, поэтому перед этим сделайте JSON-экспорт.
+
+При включённой облачной синхронизации приложение использует Supabase Auth и таблицы из `supabase/schema.sql`. Локальный JSON-экспорт остаётся способом резервного копирования базы знаний, проектных email и депозитных бонусов.
+
+## Структура проекта
+
+```text
+api/                 Vercel Functions и серверные интеграции
+public/              PWA-манифест, иконки и статические файлы
+src/
+  components/        прикладные и UI-компоненты
+  entities/          типы и начальные данные предметной области
+  features/          AI, переводчик, бонусы, email и betting
+  routes/            файловые маршруты TanStack Router
+  services/          хранение, импорт/экспорт и интеграции
+  shared/            общие хуки, утилиты и модальные окна
+  store/             Zustand-хранилища
+  widgets/           крупные блоки интерфейса
+supabase/schema.sql  схема БД и RLS-политики
+```
+
+Файл `src/routeTree.gen.ts` создаётся автоматически TanStack Router и не должен редактироваться вручную.
+
+## Production
 
 ```bash
 npm run build
+npm run preview
 ```
 
-## Testing
+Конфигурация `vercel.json` уже содержит команды установки и сборки. Перед деплоем добавьте нужные переменные окружения в настройках проекта Vercel. Публичные `VITE_*` значения задаются на этапе сборки, серверные ключи — только в окружении функций.
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+## Проверка изменений
+
+Перед отправкой изменений рекомендуется выполнить:
 
 ```bash
 npm run test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-
-```bash
-npm run lint
-npm run format
 npm run check
+npm run build
 ```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
