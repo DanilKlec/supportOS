@@ -45,6 +45,29 @@ function getBindTitle(bind: Bind, language: string) {
 	return getPreferredTranslation(bind, language)?.title || bind.slug;
 }
 
+function getBindLocation(
+	bind: Bind,
+	categories: ReturnType<typeof useKnowledgeStore.getState>["categories"],
+	folders: ReturnType<typeof useKnowledgeStore.getState>["folders"],
+) {
+	const category = categories.find((item) => item.id === bind.categoryId)?.name;
+	const folder = folders.find((item) => item.id === bind.folderId)?.name;
+	return [category, folder].filter(Boolean).join(" / ");
+}
+
+function getSearchSnippet(bind: Bind, language: string, query: string) {
+	const content = getPreferredTranslation(bind, language)
+		?.content.replace(/\s+/g, " ")
+		.trim();
+	if (!content) return bind.tags.join(" · ") || bind.slug;
+
+	const token = query.trim().toLowerCase().split(/\s+/).find(Boolean);
+	const matchIndex = token ? content.toLowerCase().indexOf(token) : -1;
+	const start = matchIndex > 45 ? matchIndex - 35 : 0;
+	const snippet = content.slice(start, start + 115);
+	return `${start > 0 ? "…" : ""}${snippet}${start + 115 < content.length ? "…" : ""}`;
+}
+
 export function LiveChatAssistantPage() {
 	const widgetRef = useRef<IDetailsWidget | undefined>(undefined);
 	const binds = useKnowledgeStore((state) => state.binds);
@@ -102,10 +125,13 @@ export function LiveChatAssistantPage() {
 	);
 
 	useEffect(() => {
-		if (!selectedBind && results[0]) {
+		const selectionIsVisible = results.some(
+			(bind) => bind.id === selectedBindId,
+		);
+		if ((!selectedBind || (query && !selectionIsVisible)) && results[0]) {
 			setSelectedBindId(results[0].id);
 		}
-	}, [results, selectedBind]);
+	}, [query, results, selectedBind, selectedBindId]);
 
 	useEffect(() => {
 		if (!selectedBind) return;
@@ -235,7 +261,14 @@ export function LiveChatAssistantPage() {
 				<input
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
-					placeholder="Search titles, tags and reply text…"
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && results[0]) {
+							event.preventDefault();
+							selectBind(results[0]);
+						}
+						if (event.key === "Escape") setQuery("");
+					}}
+					placeholder="Search by topic, phrase or tag…"
 					className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-sm outline-none focus:border-accent"
 				/>
 				{query ? (
@@ -252,12 +285,14 @@ export function LiveChatAssistantPage() {
 
 			<section className="mb-3 overflow-hidden rounded-xl border border-border bg-surface">
 				<div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs">
-					<span className="font-semibold uppercase text-muted">Replies</span>
+					<span className="font-semibold uppercase text-muted">
+						{query ? "Search results" : "Suggested replies"}
+					</span>
 					<span className="text-muted">{results.length}</span>
 				</div>
 				<div className="supportos-scroll max-h-64 overflow-auto p-1.5">
 					{results.length ? (
-						results.map((bind) => (
+						results.map((bind, index) => (
 							<button
 								type="button"
 								key={bind.id}
@@ -269,19 +304,32 @@ export function LiveChatAssistantPage() {
 								}`}
 							>
 								<div className="min-w-0 flex-1">
-									<div className="truncate text-sm font-medium">
-										{getBindTitle(bind, language)}
+									<div className="flex items-center gap-1.5">
+										<span className="min-w-0 flex-1 truncate text-sm font-medium">
+											{getBindTitle(bind, language)}
+										</span>
+										{query && index === 0 ? (
+											<span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-accent">
+												Best
+											</span>
+										) : null}
 									</div>
-									<div className="mt-0.5 truncate text-[11px] text-muted">
-										{bind.tags.join(" · ") || bind.slug}
+									<div className="mt-0.5 truncate text-[10px] font-medium text-muted">
+										{getBindLocation(bind, categories, folders) || bind.slug}
+									</div>
+									<div className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted">
+										{getSearchSnippet(bind, language, query)}
 									</div>
 								</div>
 								<ChevronRight size={15} className="shrink-0" />
 							</button>
 						))
 					) : (
-						<div className="px-3 py-8 text-center text-xs text-muted">
-							No approved replies found
+						<div className="px-5 py-8 text-center text-xs text-muted">
+							<div className="font-medium text-foreground">Nothing found</div>
+							<div className="mt-1 leading-4">
+								Try fewer words, a tag, or part of the reply text.
+							</div>
 						</div>
 					)}
 				</div>
