@@ -27,6 +27,21 @@ export function BaseModal({
 	const titleId = useId();
 
 	useEffect(() => {
+		if (closeDisabled) return undefined;
+
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				onClose();
+			}
+		};
+
+		window.addEventListener("keydown", handleEscape);
+
+		return () => window.removeEventListener("keydown", handleEscape);
+	}, [closeDisabled, onClose]);
+
+	useEffect(() => {
 		const previousOverflow = document.body.style.overflow;
 
 		document.body.style.overflow = "hidden";
@@ -47,7 +62,7 @@ export function BaseModal({
 	}
 
 	return createPortal(
-		<div className="fixed inset-0 z-40 flex items-end justify-center p-4 sm:items-center">
+		<div className="fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4">
 			<button
 				type="button"
 				aria-label="Close modal"
@@ -60,9 +75,9 @@ export function BaseModal({
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={titleId}
-				className={`relative flex max-h-[92vh] w-full ${widths[size]} animate-slide-up flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl`}
+				className={`relative flex h-[100dvh] max-h-[100dvh] w-full ${widths[size]} animate-slide-up flex-col overflow-hidden rounded-none border border-border bg-surface shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-xl`}
 			>
-				<div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+				<div className="flex min-h-14 shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
 					<h2 id={titleId} className="text-lg font-semibold text-foreground">
 						{title}
 					</h2>
@@ -78,7 +93,9 @@ export function BaseModal({
 					</button>
 				</div>
 
-				<div className="min-h-0 flex-1 overflow-auto px-5 py-4">{children}</div>
+				<div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
+					{children}
+				</div>
 			</section>
 		</div>,
 		document.body,

@@ -1,16 +1,18 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import {
 	type FormEvent,
 	type ReactNode,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
+import type { ProjectEmailRecord } from "@/entities/project-email";
 import {
 	knowledgeService,
 	type RestoreDeletedItemsInput,
@@ -22,7 +24,7 @@ import {
 	extractTemplateVariables,
 } from "@/shared/lib/template-variables";
 import { useModalStore } from "@/shared/modals/modal.store";
-import { useKnowledgeStore } from "@/store";
+import { useKnowledgeStore, useProjectEmailStore } from "@/store";
 
 import { BaseModal } from "./BaseModal";
 import type {
@@ -50,9 +52,9 @@ const COLOR_SWATCHES = [
 ];
 
 const inputClass =
-	"w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60";
+	"min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60";
 const textareaClass =
-	"min-h-40 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm leading-6 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60";
+	"min-h-64 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-6 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-56";
 
 export function ModalRoot() {
 	const activeModal = useModalStore((state) => state.activeModal);
@@ -699,6 +701,56 @@ function MoveBindModal({
 	);
 }
 
+function isEmailVariable(variable: string) {
+	return variable.trim().toLowerCase() === "email";
+}
+
+function normalizeProjectEmailSearch(value: string) {
+	return value
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/\u0451/g, "е")
+		.replace(/[^a-z0-9а-я@._-]+/g, " ")
+		.trim();
+}
+
+function buildProjectEmailOptions(records: ProjectEmailRecord[]) {
+	return records.flatMap((record) =>
+		[
+			{ type: "Support", value: record.supportEmail },
+			{ type: "KYC", value: record.kycEmail },
+			{ type: "VIP", value: record.vipEmail },
+		]
+			.filter((item) => item.value.trim())
+			.map((item) => ({
+				id: `${record.id}:${item.type}`,
+				label: `${record.projectName} - ${item.type}`,
+				projectName: record.projectName,
+				type: item.type,
+				value: item.value,
+				searchText: normalizeProjectEmailSearch(
+					`${record.projectName} ${item.type} ${item.value}`,
+				),
+			})),
+	);
+}
+
+function filterProjectEmailOptions(
+	options: ReturnType<typeof buildProjectEmailOptions>,
+	query: string,
+) {
+	const tokens = normalizeProjectEmailSearch(query)
+		.split(/\s+/)
+		.filter(Boolean);
+
+	if (tokens.length === 0) return options;
+
+	return options.filter((option) =>
+		tokens.every((token) => option.searchText.includes(token)),
+	);
+}
+
 function CopyBindModal({
 	payload,
 	onClose,
@@ -715,15 +767,61 @@ function CopyBindModal({
 	const translation = bind
 		? getBindTranslation(bind, targetLanguage)
 		: undefined;
+	const projectEmailRecords = useProjectEmailStore((state) => state.records);
 	const variables = useMemo(
 		() => extractTemplateVariables(translation?.content ?? ""),
 		[translation?.content],
 	);
-	const [values, setValues] = useState<Record<string, string>>(() =>
-		readVariablePreset(variables),
+	const projectEmailOptions = useMemo(
+		() => buildProjectEmailOptions(projectEmailRecords),
+		[projectEmailRecords],
+	);
+	const [emailQuery, setEmailQuery] = useState("");
+	const filteredProjectEmailOptions = useMemo(
+		() => filterProjectEmailOptions(projectEmailOptions, emailQuery),
+		[emailQuery, projectEmailOptions],
+	);
+	const [values, setValues] = useState<Record<string, string>>(() => {
+		const preset = readVariablePreset(variables);
+		const defaultEmail = projectEmailOptions[0]?.value;
+
+		if (defaultEmail) {
+			for (const variable of variables) {
+				if (isEmailVariable(variable) && !preset[variable]) {
+					preset[variable] = defaultEmail;
+				}
+			}
+		}
+
+		return preset;
+	});
+	const hasEmailVariable = variables.some(isEmailVariable);
+	const content = applyTemplateVariables(translation?.content ?? "", values);
+
+	useEffect(
+		() =>
+			setValues((current) => {
+				let changed = false;
+				const next = { ...current };
+				const defaultEmail = projectEmailOptions[0]?.value;
+
+				for (const variable of variables) {
+					if (next[variable] === undefined) {
+						next[variable] = "";
+						changed = true;
+					}
+
+					if (isEmailVariable(variable) && !next[variable] && defaultEmail) {
+						next[variable] = defaultEmail;
+						changed = true;
+					}
+				}
+
+				return changed ? next : current;
+			}),
+		[projectEmailOptions, variables],
 	);
 	const [saving, setSaving] = useState(false);
-	const content = applyTemplateVariables(translation?.content ?? "", values);
 
 	if (!bind || !translation) {
 		return (
@@ -760,26 +858,108 @@ function CopyBindModal({
 
 				{variables.length > 0 ? (
 					<div className="grid gap-3 sm:grid-cols-2">
-						{variables.map((variable) => (
-							<Field key={variable} label={`{${variable}}`}>
-								<input
-									value={values[variable] ?? ""}
-									onChange={(event) =>
-										setValues((current) => ({
-											...current,
-											[variable]: event.target.value,
-										}))
-									}
-									className={inputClass}
-									placeholder={variable}
-								/>
-							</Field>
-						))}
+						{variables.map((variable) => {
+							const emailVariable = isEmailVariable(variable);
+
+							return (
+								<div
+									key={variable}
+									className={emailVariable ? "sm:col-span-2" : ""}
+								>
+									<Field label={emailVariable ? "Email" : `{${variable}}`}>
+										{emailVariable && projectEmailOptions.length > 0 ? (
+											<div className="space-y-2">
+												<div className="relative">
+													<Search
+														size={15}
+														className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+													/>
+													<input
+														type="search"
+														value={emailQuery}
+														onChange={(event) =>
+															setEmailQuery(event.target.value)
+														}
+														className="min-h-11 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+														placeholder="Search project, type or email..."
+													/>
+												</div>
+
+												<div className="supportos-scroll max-h-56 overflow-auto rounded-lg border border-border bg-background">
+													{filteredProjectEmailOptions.length > 0 ? (
+														filteredProjectEmailOptions.map((option) => {
+															const active = values[variable] === option.value;
+
+															return (
+																<button
+																	key={option.id}
+																	type="button"
+																	onClick={() =>
+																		setValues((current) => ({
+																			...current,
+																			[variable]: option.value,
+																		}))
+																	}
+																	className={`flex min-h-12 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm last:border-b-0 ${
+																		active
+																			? "bg-accent/10 text-foreground"
+																			: "text-muted hover:bg-surface-elevated hover:text-foreground"
+																	}`}
+																>
+																	<span className="min-w-0">
+																		<span className="block truncate font-medium">
+																			{option.projectName}
+																		</span>
+																		<span className="block truncate text-xs text-muted">
+																			{option.value}
+																		</span>
+																	</span>
+																	<span className="shrink-0 rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold uppercase text-muted">
+																		{option.type}
+																	</span>
+																</button>
+															);
+														})
+													) : (
+														<div className="px-3 py-5 text-sm text-muted">
+															No emails match this search
+														</div>
+													)}
+												</div>
+											</div>
+										) : (
+											<input
+												value={values[variable] ?? ""}
+												onChange={(event) =>
+													setValues((current) => ({
+														...current,
+														[variable]: event.target.value,
+													}))
+												}
+												className={inputClass}
+												placeholder={
+													emailVariable
+														? "Add project emails or enter email manually"
+														: variable
+												}
+											/>
+										)}
+									</Field>
+								</div>
+							);
+						})}
 					</div>
 				) : (
 					<p className="text-sm text-muted">
 						This bind has no variables. It will be copied as is.
 					</p>
+				)}
+
+				{hasEmailVariable && projectEmailOptions.length === 0 && (
+					<div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-200">
+						No project emails found yet. Add them in Project Emails to choose
+						from a list.
+					</div>
 				)}
 
 				<div className="max-h-64 overflow-auto rounded-md border border-border bg-background p-3 text-sm leading-6 text-muted">
@@ -999,6 +1179,19 @@ function BindFormModal({
 	const [addLanguageError, setAddLanguageError] = useState("");
 	const [errors, setErrors] = useState<FieldErrors>({});
 	const [saving, setSaving] = useState(false);
+	const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
+	const initialFingerprintRef = useRef("");
+
+	if (!initialFingerprintRef.current) {
+		initialFingerprintRef.current = JSON.stringify({
+			slug: bind?.slug ?? "",
+			color: bind?.color ?? "",
+			tags: bind?.tags.join(", ") ?? "",
+			categoryId: initialCategoryId,
+			folderId: initialFolderId,
+			translationDrafts: initialTranslations,
+		});
+	}
 
 	const availableFolders = useMemo(
 		() => folders.filter((folder) => folder.categoryId === categoryId),
@@ -1017,6 +1210,25 @@ function BindFormModal({
 		translationDrafts.find(
 			(translation) => translation.language === activeLanguage,
 		) ?? translationDrafts[0];
+	const currentFingerprint = JSON.stringify({
+		slug,
+		color,
+		tags,
+		categoryId,
+		folderId,
+		translationDrafts,
+	});
+	const dirty = currentFingerprint !== initialFingerprintRef.current;
+	const requestClose = () => {
+		if (saving) return;
+
+		if (dirty) {
+			setCloseConfirmationOpen(true);
+			return;
+		}
+
+		onClose();
+	};
 
 	useEffect(() => {
 		if (
@@ -1029,13 +1241,13 @@ function BindFormModal({
 
 	if (mode === "edit" && !bind) {
 		return (
-			<BaseModal title="Edit bind" onClose={onClose} size="lg">
+			<BaseModal title="Edit bind" onClose={requestClose} size="lg">
 				<div className="space-y-4">
 					<FormError message="Bind was not found" />
 					<div className="flex justify-end">
 						<button
 							type="button"
-							onClick={onClose}
+							onClick={requestClose}
 							className="rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-elevated"
 						>
 							Close
@@ -1159,85 +1371,18 @@ function BindFormModal({
 	return (
 		<BaseModal
 			title={mode === "create" ? "Create bind" : "Edit bind"}
-			onClose={onClose}
+			onClose={requestClose}
 			closeDisabled={saving}
 			size="xl"
 		>
 			<form onSubmit={submit} className="space-y-5">
 				<FormError message={errors.form} />
 
-				<div className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr]">
-					<Field label="Slug" error={errors.slug}>
-						<input
-							value={slug}
-							onChange={(event) => setSlug(event.target.value)}
-							disabled={saving}
-							className={inputClass}
-						/>
-					</Field>
-
-					<Field label="Category" error={errors.categoryId}>
-						<select
-							value={categoryId}
-							onChange={(event) => setCategoryId(event.target.value)}
-							disabled={saving || categories.length === 0}
-							className={inputClass}
-						>
-							{categories.length === 0 ? (
-								<option value="">No categories</option>
-							) : (
-								categories.map((category) => (
-									<option key={category.id} value={category.id}>
-										{category.name}
-									</option>
-								))
-							)}
-						</select>
-					</Field>
-
-					<Field label="Folder" hint="Optional">
-						<select
-							value={folderId}
-							onChange={(event) => setFolderId(event.target.value)}
-							disabled={saving || !categoryId}
-							className={inputClass}
-						>
-							<option value="">No folder</option>
-							{availableFolders.map((folder) => (
-								<option key={folder.id} value={folder.id}>
-									{getFolderPath(folder, folders)}
-								</option>
-							))}
-						</select>
-					</Field>
-				</div>
-
-				<ColorField value={color} onChange={setColor} disabled={saving} />
-
-				<Field label="Tags" hint="Comma separated">
-					<input
-						value={tags}
-						onChange={(event) => setTags(event.target.value)}
-						disabled={saving}
-						className={inputClass}
-						placeholder="kyc, withdrawal, bonus"
-					/>
-					{tagSuggestions.length > 0 && (
-						<div className="mt-2 flex flex-wrap gap-1">
-							{tagSuggestions.map((tag) => (
-								<button
-									key={tag}
-									type="button"
-									onClick={() => setTags((current) => toggleTag(current, tag))}
-									disabled={saving}
-									className="rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-								>
-									#{tag}
-								</button>
-							))}
-						</div>
-					)}
-				</Field>
+				{dirty && (
+					<div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-200">
+						Unsaved changes
+					</div>
+				)}
 
 				<div className="space-y-3">
 					<div className="flex flex-wrap items-center justify-between gap-3">
@@ -1349,11 +1494,126 @@ function BindFormModal({
 					)}
 				</div>
 
+				<details className="rounded-xl border border-border bg-background">
+					<summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium text-muted hover:text-foreground">
+						Metadata
+					</summary>
+
+					<div className="space-y-4 border-t border-border p-4">
+						<div className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr]">
+							<Field label="Slug" error={errors.slug}>
+								<input
+									value={slug}
+									onChange={(event) => setSlug(event.target.value)}
+									disabled={saving}
+									className={inputClass}
+								/>
+							</Field>
+
+							<Field label="Category" error={errors.categoryId}>
+								<select
+									value={categoryId}
+									onChange={(event) => setCategoryId(event.target.value)}
+									disabled={saving || categories.length === 0}
+									className={inputClass}
+								>
+									{categories.length === 0 ? (
+										<option value="">No categories</option>
+									) : (
+										categories.map((category) => (
+											<option key={category.id} value={category.id}>
+												{category.name}
+											</option>
+										))
+									)}
+								</select>
+							</Field>
+
+							<Field label="Folder" hint="Optional">
+								<select
+									value={folderId}
+									onChange={(event) => setFolderId(event.target.value)}
+									disabled={saving || !categoryId}
+									className={inputClass}
+								>
+									<option value="">No folder</option>
+									{availableFolders.map((folder) => (
+										<option key={folder.id} value={folder.id}>
+											{getFolderPath(folder, folders)}
+										</option>
+									))}
+								</select>
+							</Field>
+						</div>
+
+						<ColorField value={color} onChange={setColor} disabled={saving} />
+
+						<Field label="Tags" hint="Comma separated">
+							<input
+								value={tags}
+								onChange={(event) => setTags(event.target.value)}
+								disabled={saving}
+								className={inputClass}
+								placeholder="kyc, withdrawal, bonus"
+							/>
+							{tagSuggestions.length > 0 && (
+								<div className="mt-2 flex flex-wrap gap-1">
+									{tagSuggestions.map((tag) => (
+										<button
+											key={tag}
+											type="button"
+											onClick={() =>
+												setTags((current) => toggleTag(current, tag))
+											}
+											disabled={saving}
+											className="rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+										>
+											#{tag}
+										</button>
+									))}
+								</div>
+							)}
+						</Field>
+					</div>
+				</details>
+
 				<ModalActions
 					submitLabel={mode === "create" ? "Create" : "Save"}
 					saving={saving}
-					onCancel={onClose}
+					onCancel={requestClose}
 				/>
+
+				{closeConfirmationOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+						<div
+							role="alertdialog"
+							aria-modal="true"
+							aria-label="Discard changes"
+							className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl"
+						>
+							<div className="text-base font-semibold">Discard changes?</div>
+							<p className="mt-2 text-sm leading-6 text-muted">
+								Your unsaved edits in this material will be lost.
+							</p>
+							<div className="mt-5 flex justify-end gap-2">
+								<button
+									type="button"
+									onClick={() => setCloseConfirmationOpen(false)}
+									className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+								>
+									Keep editing
+								</button>
+								<button
+									type="button"
+									onClick={onClose}
+									className="min-h-10 rounded-lg bg-red-500 px-4 text-sm font-semibold text-white hover:bg-red-400"
+								>
+									Discard
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
 			</form>
 		</BaseModal>
 	);
@@ -1432,12 +1692,12 @@ function ModalActions({
 	danger?: boolean;
 }) {
 	return (
-		<div className="flex justify-end gap-2 border-t border-border pt-4">
+		<div className="sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:-mx-5 sm:-mb-4 sm:px-5">
 			<button
 				type="button"
 				onClick={onCancel}
 				disabled={saving}
-				className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+				className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 			>
 				Cancel
 			</button>
@@ -1445,7 +1705,7 @@ function ModalActions({
 			<button
 				type="submit"
 				disabled={saving}
-				className={`rounded-md px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+				className={`min-h-10 rounded-lg px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
 					danger
 						? "bg-red-500 hover:bg-red-400"
 						: "bg-accent hover:bg-accent/90"

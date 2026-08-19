@@ -70,11 +70,18 @@ export function WorkspaceTabs() {
 
 			setOverflowOpen(false);
 		};
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setOverflowOpen(false);
+			}
+		};
 
 		window.addEventListener("pointerdown", closeOnOutsideClick);
+		window.addEventListener("keydown", closeOnEscape);
 
 		return () => {
 			window.removeEventListener("pointerdown", closeOnOutsideClick);
+			window.removeEventListener("keydown", closeOnEscape);
 		};
 	}, [overflowOpen]);
 
@@ -93,147 +100,157 @@ export function WorkspaceTabs() {
 		setOverflowOpen(false);
 	};
 
+	if (visibleTabs.length === 0 && overflowTabs.length === 0) {
+		return (
+			<div className="flex h-10 shrink-0 items-center border-b border-border bg-surface px-4 text-sm text-muted">
+				No material opened
+			</div>
+		);
+	}
+
 	return (
-		<div className="min-h-11 border-b border-border bg-surface">
-			{visibleTabs.length > 0 || overflowTabs.length > 0 ? (
-				<div className="flex min-w-0 flex-wrap content-start gap-1 px-2 py-2">
-					{visibleTabs.map((bind) => {
-						const active = bind.id === activeTab;
-						const pinned = pinnedTabs.includes(bind.id);
+		<div
+			ref={overflowRef}
+			className="relative h-10 shrink-0 border-b border-border bg-surface"
+		>
+			<div className="supportos-scroll flex h-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden px-2">
+				{visibleTabs.map((bind) => {
+					const active = bind.id === activeTab;
+					const pinned = pinnedTabs.includes(bind.id);
 
-						return (
-							<div
-								key={bind.id}
-								className={`group flex h-9 max-w-64 basis-52 items-center gap-1.5 rounded-md border px-2 text-sm transition ${
-									active
-										? "border-accent/60 bg-background text-foreground"
-										: pinned
-											? "border-accent/30 bg-accent/10 text-foreground hover:bg-accent/15"
-											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-								}`}
-							>
-								<button
-									type="button"
-									onClick={() => activateTab(bind.id)}
-									className="flex min-w-0 flex-1 items-center gap-2"
-								>
-									<FileText size={15} className="shrink-0" />
-
-									<span className="truncate">
-										{getBindTitle(bind, language)}
-									</span>
-								</button>
-
-								<button
-									type="button"
-									aria-label={pinned ? "Unpin tab" : "Pin tab"}
-									title={pinned ? "Unpin" : "Pin"}
-									onClick={() => pinTab(bind.id)}
-									className={`rounded p-0.5 hover:bg-surface ${
-										pinned
-											? "text-accent opacity-100"
-											: "opacity-50 group-hover:opacity-100"
-									}`}
-								>
-									<Pin size={13} fill={pinned ? "currentColor" : "none"} />
-								</button>
-
-								{!pinned && (
-									<button
-										type="button"
-										aria-label="Close tab"
-										onClick={() => removeTab(bind.id)}
-										className="rounded p-0.5 opacity-50 hover:bg-surface hover:opacity-100"
-									>
-										<X size={14} />
-									</button>
-								)}
-							</div>
-						);
-					})}
-
-					{overflowTabs.length > 0 && (
-						<div ref={overflowRef} className="relative shrink-0">
+					return (
+						<div
+							key={bind.id}
+							className={`group flex h-8 max-w-[13rem] shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm transition ${
+								active
+									? "bg-background text-foreground shadow-[inset_0_0_0_1px_var(--color-border)]"
+									: pinned
+										? "bg-accent/10 text-foreground hover:bg-accent/15"
+										: "text-muted hover:bg-surface-elevated hover:text-foreground"
+							}`}
+						>
 							<button
 								type="button"
-								aria-label="More tabs"
-								aria-expanded={overflowOpen}
-								title="More tabs"
-								onClick={() => setOverflowOpen((open) => !open)}
-								className="flex h-9 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								onClick={() => activateTab(bind.id)}
+								className="flex min-w-0 flex-1 items-center gap-2 focus-visible:outline-none"
+								title={getBindTitle(bind, language)}
 							>
-								<MoreHorizontal size={16} />
-								<span className="min-w-4 text-xs">{overflowTabs.length}</span>
+								{pinned ? (
+									<Pin
+										size={13}
+										className="shrink-0 text-accent"
+										fill="currentColor"
+									/>
+								) : (
+									<FileText size={14} className="shrink-0" />
+								)}
+
+								<span className="truncate">{getBindTitle(bind, language)}</span>
 							</button>
 
-							{overflowOpen && (
-								<div className="absolute right-0 top-10 z-30 w-72 overflow-hidden rounded-md border border-border bg-surface shadow-2xl">
-									<div className="max-h-80 overflow-y-auto py-1">
-										{overflowTabs.map((bind) => {
-											const active = bind.id === activeTab;
-											const pinned = pinnedTabs.includes(bind.id);
+							<button
+								type="button"
+								aria-label={pinned ? "Unpin tab" : "Pin tab"}
+								title={pinned ? "Unpin" : "Pin"}
+								onClick={() => pinTab(bind.id)}
+								className={`flex h-6 w-6 items-center justify-center rounded-md hover:bg-surface ${
+									pinned
+										? "text-accent opacity-100"
+										: "opacity-50 group-hover:opacity-100 group-focus-within:opacity-100"
+								}`}
+							>
+								<Pin size={13} fill={pinned ? "currentColor" : "none"} />
+							</button>
 
-											return (
-												<div
-													key={bind.id}
-													className={`group flex h-10 items-center gap-2 px-2 text-sm ${
-														active
-															? "bg-accent/15 text-foreground"
-															: "text-muted hover:bg-surface-elevated hover:text-foreground"
-													}`}
-												>
-													<button
-														type="button"
-														onClick={() => activateTab(bind.id)}
-														className="flex min-w-0 flex-1 items-center gap-2 text-left"
-													>
-														<FileText size={15} className="shrink-0" />
-
-														<span className="truncate">
-															{getBindTitle(bind, language)}
-														</span>
-													</button>
-
-													<button
-														type="button"
-														aria-label={pinned ? "Unpin tab" : "Pin tab"}
-														title={pinned ? "Unpin" : "Pin"}
-														onClick={() => pinTab(bind.id)}
-														className={`rounded p-0.5 hover:bg-background ${
-															pinned
-																? "text-accent opacity-100"
-																: "opacity-60 group-hover:opacity-100"
-														}`}
-													>
-														<Pin
-															size={13}
-															fill={pinned ? "currentColor" : "none"}
-														/>
-													</button>
-
-													{!pinned && (
-														<button
-															type="button"
-															aria-label="Close tab"
-															onClick={() => removeTab(bind.id)}
-															className="rounded p-0.5 opacity-60 hover:bg-background hover:opacity-100"
-														>
-															<X size={14} />
-														</button>
-													)}
-												</div>
-											);
-										})}
-									</div>
-								</div>
+							{!pinned && (
+								<button
+									type="button"
+									aria-label="Close tab"
+									title="Close"
+									onClick={() => removeTab(bind.id)}
+									className="flex h-6 w-6 items-center justify-center rounded-md opacity-60 hover:bg-surface hover:opacity-100 group-focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+								>
+									<X size={14} />
+								</button>
 							)}
 						</div>
-					)}
+					);
+				})}
+
+				{overflowTabs.length > 0 && (
+					<div className="shrink-0">
+						<button
+							type="button"
+							aria-label="More tabs"
+							aria-expanded={overflowOpen}
+							title="More tabs"
+							onClick={() => setOverflowOpen((open) => !open)}
+							className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-sm text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+						>
+							<MoreHorizontal size={16} />
+							<span className="min-w-4 text-xs">{overflowTabs.length}</span>
+						</button>
+					</div>
+				)}
+			</div>
+
+			{overflowOpen && (
+				<div className="absolute right-2 top-9 z-30 w-72 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-2xl">
+					<div className="supportos-scroll max-h-80 overflow-y-auto">
+						{overflowTabs.map((bind) => {
+							const active = bind.id === activeTab;
+							const pinned = pinnedTabs.includes(bind.id);
+
+							return (
+								<div
+									key={bind.id}
+									className={`group flex min-h-10 items-center gap-2 px-2 text-sm ${
+										active
+											? "bg-accent/10 text-foreground"
+											: "text-muted hover:bg-surface-elevated hover:text-foreground"
+									}`}
+								>
+									<button
+										type="button"
+										onClick={() => activateTab(bind.id)}
+										className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left focus-visible:outline-none"
+									>
+										<FileText size={15} className="shrink-0" />
+
+										<span className="truncate">
+											{getBindTitle(bind, language)}
+										</span>
+									</button>
+
+									<button
+										type="button"
+										aria-label={pinned ? "Unpin tab" : "Pin tab"}
+										title={pinned ? "Unpin" : "Pin"}
+										onClick={() => pinTab(bind.id)}
+										className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-background ${
+											pinned
+												? "text-accent opacity-100"
+												: "opacity-60 group-hover:opacity-100"
+										}`}
+									>
+										<Pin size={13} fill={pinned ? "currentColor" : "none"} />
+									</button>
+
+									{!pinned && (
+										<button
+											type="button"
+											aria-label="Close tab"
+											onClick={() => removeTab(bind.id)}
+											className="flex h-7 w-7 items-center justify-center rounded-md opacity-60 hover:bg-background hover:opacity-100"
+										>
+											<X size={14} />
+										</button>
+									)}
+								</div>
+							);
+						})}
+					</div>
 				</div>
-			) : (
-				<span className="block px-4 py-3 text-sm text-muted">
-					No bind opened
-				</span>
 			)}
 		</div>
 	);

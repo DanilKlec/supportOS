@@ -1,20 +1,16 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
 	Archive,
 	Check,
-	Contact,
 	Download,
 	FileText,
 	Folder,
-	Gift,
-	HeartPulse,
+	PanelLeftClose,
 	Pin,
 	Plus,
 	Search,
 	Star,
 	Tag,
-	Trophy,
-	Wrench,
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -106,16 +102,26 @@ const sidebarWidthClass = {
 	wide: "w-80",
 };
 
-export function Sidebar() {
+interface SidebarProps {
+	mobile?: boolean;
+	onRequestClose?: () => void;
+	onNavigate?: () => void;
+}
+
+export function Sidebar({
+	mobile = false,
+	onRequestClose,
+	onNavigate,
+}: SidebarProps) {
 	const navigate = useNavigate();
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
+	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const tree = useKnowledgeStore((s) => s.tree);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const favorites = useKnowledgeStore((s) => s.favorites);
 	const favoriteFolders = useKnowledgeStore((s) => s.favoriteFolders);
-	const recentFolders = useKnowledgeStore((s) => s.recentFolders);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
@@ -142,9 +148,6 @@ export function Sidebar() {
 		.map((id) => binds.find((bind) => bind.id === id))
 		.filter((bind): bind is Bind => Boolean(bind));
 	const favoriteFolderItems = favoriteFolders
-		.map((id) => folders.find((folder) => folder.id === id))
-		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
-	const recentFolderItems = recentFolders
 		.map((id) => folders.find((folder) => folder.id === id))
 		.filter((folder): folder is KnowledgeFolder => Boolean(folder));
 	const selectedBinds = selectedBindIds
@@ -282,8 +285,9 @@ export function Sidebar() {
 			onClick={() => {
 				openBind(bind.id);
 				void navigate({ to: "/" });
+				onNavigate?.();
 			}}
-			className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+			className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
 		>
 			<FileText size={14} className="shrink-0" />
 			<span className="truncate">{getBindTitle(bind, language)}</span>
@@ -297,7 +301,7 @@ export function Sidebar() {
 				selectFolder(folder.id);
 				void navigate({ to: "/" });
 			}}
-			className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted hover:bg-accent/10 hover:text-foreground"
+			className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
 		>
 			<Folder size={14} className="shrink-0" />
 			<span className="truncate">{folder.name}</span>
@@ -306,11 +310,29 @@ export function Sidebar() {
 
 	return (
 		<aside
-			className={`flex h-full ${sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface`}
+			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-background pb-[env(safe-area-inset-bottom)]`}
 		>
+			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">
+				<div className="min-w-0 px-1">
+					<div className="truncate text-sm font-semibold">Knowledge</div>
+					<div className="text-xs text-muted">{binds.length} materials</div>
+				</div>
+
+				<button
+					type="button"
+					aria-label={mobile ? "Close navigation" : "Collapse navigation"}
+					onClick={() =>
+						mobile ? onRequestClose?.() : setLayout({ showSidebar: false })
+					}
+					className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+				>
+					{mobile ? <X size={18} /> : <PanelLeftClose size={18} />}
+				</button>
+			</div>
+
 			{layout.showSidebarFavorites && (
-				<div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
+				<div className="shrink-0 border-b border-border/80 px-3 py-3">
+					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase text-muted">
 						<Star size={13} />
 						Favorites
 					</div>
@@ -331,139 +353,10 @@ export function Sidebar() {
 				</div>
 			)}
 
-			{layout.showSidebarRecentFolders && (
-				<div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						Recent folders
-					</div>
-
-					{recentFolderItems.length > 0 ? (
-						<div className="space-y-0.5">
-							{recentFolderItems.map(renderFolderShortcut)}
-						</div>
-					) : (
-						<div className="px-2 text-xs text-muted">No folders opened yet</div>
-					)}
-				</div>
-			)}
-
-			{/* <div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						<Clock3 size={13} />
-						Recent
-					</div>
-
-					{recentBinds.length > 0 ? (
-						<div className="space-y-0.5">
-							{recentBinds.map(renderBindShortcut)}
-						</div>
-					) : (
-						<div className="px-2 text-xs text-muted">Nothing opened yet</div>
-					)}
-				</div> */}
-
-			{layout.showSidebarTools && (
-				<div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						Tools
-					</div>
-
-					<div className="space-y-0.5">
-						{/* <Link
-							to="/translator"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Languages size={14} />
-							<span>Translator</span>
-						</Link> */}
-
-						{/* <Link
-							to="/settings/translator"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Settings size={14} />
-							<span>Translator Settings</span>
-						</Link> */}
-
-						<Link
-							to="/bonuses"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Gift size={14} />
-							<span>Deposit Bonuses</span>
-						</Link>
-
-						<Link
-							to="/bonus-tools"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Wrench size={14} />
-							<span>Bonus Tools</span>
-						</Link>
-
-						<Link
-							to="/sports-betting"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Trophy size={14} />
-							<span>Sports Betting</span>
-						</Link>
-
-						<Link
-							to="/project-emails"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Contact size={14} />
-							<span>Project Emails</span>
-						</Link>
-
-						<Link
-							to="/health"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<HeartPulse size={14} />
-							<span>Knowledge Health</span>
-						</Link>
-
-						<Link
-							to="/archive"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Archive size={14} />
-							<span>Archive</span>
-						</Link>
-					</div>
-				</div>
-			)}
-
-			{/* <div className="shrink-0 border-b border-border px-3 py-3">
-					<div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted">
-						AI
-					</div>
-
-					<div className="space-y-0.5">
-						<Link
-							to="/ai/assistant"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<Bot size={14} />
-							<span>AI Assistant</span>
-						</Link>
-
-						<Link
-							to="/ai/knowledge"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-accent/10 hover:text-foreground"
-						>
-							<BrainCircuit size={14} />
-							<span>AI Knowledge</span>
-						</Link>
-					</div>
-				</div> */}
-
 			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="shrink-0 border-b border-border px-3 py-3">
+				<div className="shrink-0 border-b border-border/80 px-3 py-3">
 					<div className="mb-3 flex items-center justify-between px-2">
-						<div className="text-xs font-semibold uppercase tracking-wider text-muted">
+						<div className="text-xs font-semibold uppercase text-muted">
 							Categories
 						</div>
 
@@ -471,7 +364,7 @@ export function Sidebar() {
 							type="button"
 							title="New category"
 							onClick={createCategory}
-							className="rounded-md p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
 						</button>
@@ -487,7 +380,7 @@ export function Sidebar() {
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Search tree"
-							className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
 							<button
@@ -497,7 +390,7 @@ export function Sidebar() {
 									setTreeSearch("");
 									setSelectedTag("");
 								}}
-								className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={14} />
 							</button>
@@ -505,7 +398,7 @@ export function Sidebar() {
 					</div>
 
 					{tags.length > 0 && (
-						<div className="mt-3 flex flex-wrap gap-1.5">
+						<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
 							{tags.map((tag) => (
 								<button
 									key={tag}
@@ -513,7 +406,7 @@ export function Sidebar() {
 									onClick={() =>
 										setSelectedTag((current) => (current === tag ? "" : tag))
 									}
-									className={`max-w-full rounded-full border px-2 py-1 text-xs transition ${
+									className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
 										selectedTag === tag
 											? "border-accent bg-accent text-accent-foreground"
 											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
@@ -526,7 +419,7 @@ export function Sidebar() {
 					)}
 
 					{selectedBindIds.length > 0 && (
-						<div className="mt-3 rounded-md border border-accent/30 bg-accent/10 p-2 text-xs text-muted">
+						<div className="mt-3 rounded-lg border border-accent/25 bg-accent/10 p-2 text-xs text-muted">
 							<div className="mb-2 flex items-center justify-between gap-2">
 								<span>
 									<span className="font-semibold text-foreground">
@@ -537,7 +430,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={() => setSelectedBindIds([])}
-									className="rounded p-1 text-foreground hover:bg-accent/15"
+									className="rounded-lg p-1 text-foreground hover:bg-accent/15"
 									title="Clear selection"
 								>
 									<X size={13} />
@@ -548,7 +441,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={setSelectedFavorite}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title={
 										allSelectedFavorite
 											? "Remove from favorites"
@@ -563,7 +456,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={setSelectedPinned}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title={allSelectedPinned ? "Unpin selected" : "Pin selected"}
 								>
 									<Pin
@@ -574,7 +467,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title="Add tag"
 								>
 									<Tag size={14} />
@@ -582,7 +475,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={exportSelected}
-									className="rounded-md border border-accent/30 bg-background/40 p-1.5 text-foreground hover:bg-accent/15"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title="Export selected"
 								>
 									<Download size={14} />
@@ -590,7 +483,7 @@ export function Sidebar() {
 								<button
 									type="button"
 									onClick={archiveSelected}
-									className="rounded-md border border-red-500/30 bg-background/40 p-1.5 text-red-300 hover:bg-red-500/10"
+									className="rounded-lg border border-red-500/30 bg-background p-1.5 text-red-300 hover:bg-red-500/10"
 									title="Archive selected"
 								>
 									<Archive size={14} />
@@ -608,12 +501,12 @@ export function Sidebar() {
 											}
 										}}
 										placeholder="Tag"
-										className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-accent"
+										className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-accent"
 									/>
 									<button
 										type="button"
 										onClick={addTagToSelected}
-										className="rounded-md border border-accent/30 bg-accent px-2 text-accent-foreground"
+										className="rounded-lg border border-accent/30 bg-accent px-2 text-accent-foreground"
 										title="Apply tag"
 									>
 										<Check size={14} />
@@ -631,6 +524,7 @@ export function Sidebar() {
 						selectedBindIds={selectedBindIds}
 						onToggleBindSelection={toggleSelectedBind}
 						onClearBindSelection={() => setSelectedBindIds([])}
+						onOpenItem={onNavigate}
 					/>
 				</div>
 			</div>

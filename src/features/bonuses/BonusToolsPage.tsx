@@ -2,11 +2,21 @@ import {
 	Copy,
 	FileSpreadsheet,
 	Loader2,
+	Pencil,
+	Plus,
 	RefreshCw,
 	Search,
 	Table2,
+	Upload,
+	X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 
 import {
 	type BonusRule,
@@ -26,6 +36,61 @@ import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useBonusStore } from "@/store/bonus.store";
 
+type EditableRuleField = Exclude<keyof BonusRule, "id" | "searchText">;
+type RuleDraft = Record<EditableRuleField, string>;
+
+const EMPTY_RULE_DRAFT: RuleDraft = {
+	group: "",
+	site: "",
+	welcomeWager: "",
+	welcomeMaxWin: "",
+	noDeposit: "",
+	retentionWager: "",
+	retentionMaxWin: "",
+	events: "",
+	map: "",
+	note: "",
+};
+
+const RULE_FORM_FIELDS: Array<{
+	key: EditableRuleField;
+	label: string;
+	placeholder?: string;
+	multiline?: boolean;
+}> = [
+	{ key: "group", label: "Group", placeholder: "B2C / GZ / CS" },
+	{ key: "site", label: "Project", placeholder: "Project name" },
+	{
+		key: "welcomeWager",
+		label: "Welcome wager",
+		placeholder: "35x bonus + 40x FS",
+	},
+	{
+		key: "welcomeMaxWin",
+		label: "Welcome max / FS",
+		placeholder: "Max win / FS release",
+	},
+	{ key: "noDeposit", label: "No deposit", placeholder: "50 EUR" },
+	{
+		key: "retentionWager",
+		label: "Retention wager",
+		placeholder: "Wager for retention",
+	},
+	{
+		key: "retentionMaxWin",
+		label: "Retention max / FS",
+		placeholder: "Max win / FS release",
+	},
+	{
+		key: "events",
+		label: "Events",
+		placeholder: "Event rules",
+		multiline: true,
+	},
+	{ key: "map", label: "Map", placeholder: "Map details", multiline: true },
+	{ key: "note", label: "Note", placeholder: "Internal note", multiline: true },
+];
+
 function getRuleFieldValue(rule: BonusRule, field: keyof BonusRule) {
 	const value = rule[field];
 
@@ -40,12 +105,142 @@ function getRuleAmount(rule?: BonusRule) {
 	return rule?.noDeposit || "50";
 }
 
-function matchesRule(rule: BonusRule, query: string) {
+function getRuleSearchWords(rule: BonusRule) {
+	return normalizeBonusToolsSearch(
+		[
+			rule.group,
+			rule.site,
+			rule.welcomeWager,
+			rule.welcomeMaxWin,
+			rule.noDeposit,
+			rule.retentionWager,
+			rule.retentionMaxWin,
+			rule.events,
+			rule.map,
+			rule.note,
+		].join(" "),
+	)
+		.split(/\s+/)
+		.filter(Boolean);
+}
+
+function matchesRuleToken(rule: BonusRule, token: string) {
+	if (token.length <= 2) {
+		const words = getRuleSearchWords(rule);
+		const site = normalizeBonusToolsSearch(rule.site).replace(/\s+/g, "");
+		const group = normalizeBonusToolsSearch(rule.group).replace(/\s+/g, "");
+
+		return (
+			site === token ||
+			group === token ||
+			words.includes(token) ||
+			words.some((word) => word.length <= 4 && word.startsWith(token))
+		);
+	}
+
+	return rule.searchText.includes(token);
+}
+
+function getRuleSearchScore(rule: BonusRule, query: string) {
 	const tokens = normalizeBonusToolsSearch(query).split(/\s+/).filter(Boolean);
 
-	if (tokens.length === 0) return true;
+	if (tokens.length === 0) return 0;
 
-	return tokens.every((token) => rule.searchText.includes(token));
+	const words = new Set(getRuleSearchWords(rule));
+	const site = normalizeBonusToolsSearch(rule.site).replace(/\s+/g, "");
+
+	if (!tokens.every((token) => matchesRuleToken(rule, token))) return -1;
+
+	return tokens.reduce((score, token) => {
+		if (site === token) return score + 150;
+		if (words.has(token)) return score + 100;
+		if (
+			Array.from(words).some(
+				(word) => word.length <= 4 && word.startsWith(token),
+			)
+		) {
+			return score + 70;
+		}
+
+		return score + 10;
+	}, 0);
+}
+
+function normalizeRuleIdPart(value: string) {
+	return normalizeBonusToolsSearch(value).replace(/\s+/g, "-");
+}
+
+function buildEditableRuleSearchText(draft: RuleDraft) {
+	return normalizeBonusToolsSearch(
+		RULE_FORM_FIELDS.map((field) => draft[field.key]).join(" "),
+	);
+}
+
+function toRuleDraft(rule?: BonusRule): RuleDraft {
+	if (!rule) return { ...EMPTY_RULE_DRAFT };
+
+	return {
+		group: rule.group,
+		site: rule.site,
+		welcomeWager: rule.welcomeWager,
+		welcomeMaxWin: rule.welcomeMaxWin,
+		noDeposit: rule.noDeposit,
+		retentionWager: rule.retentionWager,
+		retentionMaxWin: rule.retentionMaxWin,
+		events: rule.events,
+		map: rule.map,
+		note: rule.note,
+	};
+}
+
+function createRuleId(draft: RuleDraft, rules: BonusRule[]) {
+	const base =
+		normalizeRuleIdPart(`${draft.group}-${draft.site}`) ||
+		`bonus-rule-${Date.now()}`;
+	let candidate = base;
+	let suffix = 2;
+
+	while (rules.some((rule) => rule.id === candidate)) {
+		candidate = `${base}-${suffix}`;
+		suffix += 1;
+	}
+
+	return candidate;
+}
+
+function createRuleFromDraft({
+	draft,
+	rules,
+	id,
+}: {
+	draft: RuleDraft;
+	rules: BonusRule[];
+	id?: string;
+}): BonusRule {
+	const cleanDraft = RULE_FORM_FIELDS.reduce(
+		(nextDraft, field) => {
+			nextDraft[field.key] = draft[field.key].trim();
+
+			return nextDraft;
+		},
+		{ ...EMPTY_RULE_DRAFT },
+	);
+
+	return {
+		id: id ?? createRuleId(cleanDraft, rules),
+		...cleanDraft,
+		searchText: buildEditableRuleSearchText(cleanDraft),
+	};
+}
+
+function createEmptyBonusToolsData(sourceUrl: string): BonusToolsData {
+	return {
+		sourceUrl: sourceUrl.trim() || DEFAULT_BONUS_TOOLS_SHEET_URL,
+		rules: [],
+		currencyTables: [],
+		loadedAt: new Date().toISOString(),
+		warnings: [],
+	};
 }
 
 function formatCell(value: string) {
@@ -104,6 +299,11 @@ export function BonusToolsPage() {
 		storedSourceUrl || data?.sourceUrl || DEFAULT_BONUS_TOOLS_SHEET_URL;
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [sourceOpen, setSourceOpen] = useState(false);
+	const [ruleEditorOpen, setRuleEditorOpen] = useState(false);
+	const [editingRuleId, setEditingRuleId] = useState<string>();
+	const [ruleDraft, setRuleDraft] = useState<RuleDraft>(() => toRuleDraft());
+	const [ruleFormError, setRuleFormError] = useState("");
 
 	const updateFromGoogle = useCallback(
 		async (nextUrl: string, showSuccess = true) => {
@@ -119,6 +319,7 @@ export function BonusToolsPage() {
 				setStoredSourceUrl(nextData.sourceUrl);
 				if (showSuccess) {
 					showToast("Bonus tools updated from Google Sheet");
+					setSourceOpen(false);
 				}
 			} catch (loadError) {
 				setError(
@@ -139,8 +340,32 @@ export function BonusToolsPage() {
 		void updateFromGoogle(DEFAULT_BONUS_TOOLS_SHEET_URL, false);
 	}, [data, updateFromGoogle]);
 
+	useEffect(() => {
+		if (!ruleEditorOpen) return;
+
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setRuleEditorOpen(false);
+		};
+
+		document.addEventListener("keydown", closeOnEscape);
+
+		return () => document.removeEventListener("keydown", closeOnEscape);
+	}, [ruleEditorOpen]);
+
 	const filteredRules = useMemo(
-		() => data?.rules.filter((rule) => matchesRule(rule, query)) ?? [],
+		() =>
+			data?.rules
+				.map((rule) => ({
+					rule,
+					score: getRuleSearchScore(rule, query),
+				}))
+				.filter((item) => item.score >= 0)
+				.sort((first, second) => {
+					if (second.score !== first.score) return second.score - first.score;
+
+					return first.rule.site.localeCompare(second.rule.site);
+				})
+				.map((item) => item.rule) ?? [],
 		[data?.rules, query],
 	);
 	const selectedRule =
@@ -211,82 +436,174 @@ export function BonusToolsPage() {
 		showToast(copied ? successMessage : "Copy failed");
 	};
 
+	const openCreateRule = () => {
+		setEditingRuleId(undefined);
+		setRuleDraft(toRuleDraft());
+		setRuleFormError("");
+		setRuleEditorOpen(true);
+	};
+
+	const openEditRule = (rule: BonusRule) => {
+		setEditingRuleId(rule.id);
+		setRuleDraft(toRuleDraft(rule));
+		setRuleFormError("");
+		setRuleEditorOpen(true);
+	};
+
+	const updateRuleDraft = (field: EditableRuleField, value: string) => {
+		setRuleDraft((current) => ({
+			...current,
+			[field]: value,
+		}));
+	};
+
+	const submitRule = (event: FormEvent) => {
+		event.preventDefault();
+		setRuleFormError("");
+
+		if (!ruleDraft.site.trim()) {
+			setRuleFormError("Project name is required");
+			return;
+		}
+
+		const baseData = data ?? createEmptyBonusToolsData(sourceUrl);
+		const editingRule = baseData.rules.find(
+			(rule) => rule.id === editingRuleId,
+		);
+		const rule = createRuleFromDraft({
+			draft: ruleDraft,
+			rules: baseData.rules,
+			id: editingRule?.id,
+		});
+		const nextRules = editingRule
+			? baseData.rules.map((currentRule) =>
+					currentRule.id === editingRule.id ? rule : currentRule,
+				)
+			: [...baseData.rules, rule];
+		const nextData: BonusToolsData = {
+			...baseData,
+			rules: nextRules,
+			loadedAt: new Date().toISOString(),
+		};
+
+		saveStoredBonusToolsData(nextData);
+		setData(nextData);
+		setSelectedRuleId(rule.id);
+		setSelectedTableName(
+			getCurrencyTableNameForRule(rule, nextData.currencyTables) ?? "",
+		);
+		setSelectedBaseAmount(getRuleAmount(rule));
+		setRuleEditorOpen(false);
+		setEditingRuleId(undefined);
+		setRuleDraft(toRuleDraft());
+		setQuery("");
+		showToast(editingRule ? "Bonus rule saved" : "Bonus rule added");
+	};
+
 	return (
-		<div className="flex h-full flex-col overflow-auto bg-background">
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-6">
+		<div className="flex h-full flex-col overflow-hidden bg-background">
+			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
-						<h1 className="text-2xl font-bold">Bonus Tools</h1>
+						<div className="text-xs font-semibold uppercase text-muted">
+							Fast rules lookup
+						</div>
+						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
+							Bonus Tools
+						</h1>
 						<div className="mt-1 text-sm text-muted">
 							{data
-								? `${data.rules.length} projects · ${data.currencyTables.length} currency tables`
+								? `${data.rules.length} projects / ${data.currencyTables.length} currency tables`
 								: "Bonus rules and currency tables"}
 						</div>
 					</div>
 
-					<button
-						type="button"
-						onClick={() => void updateFromGoogle(sourceUrl)}
-						disabled={loading}
-						className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						{loading ? (
-							<Loader2 size={16} className="animate-spin" />
-						) : (
-							<RefreshCw size={16} />
-						)}
-						Update from Google
-					</button>
-				</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<button
+							type="button"
+							onClick={openCreateRule}
+							className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+						>
+							<Plus size={16} />
+							Add rule
+						</button>
 
-				<div className="rounded-lg border border-border bg-surface p-4">
-					<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-						<FileSpreadsheet size={16} />
-						Google Sheet
-					</div>
-
-					{data && (
-						<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-							Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
-							Update from Google when the sheet changes.
-						</div>
-					)}
-
-					<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-						<input
-							value={sourceUrl}
-							onChange={(event) => setStoredSourceUrl(event.target.value)}
-							className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-						/>
 						<button
 							type="button"
 							onClick={() => void updateFromGoogle(sourceUrl)}
-							disabled={loading || !sourceUrl.trim()}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={loading}
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
 								<Loader2 size={16} className="animate-spin" />
 							) : (
-								<FileSpreadsheet size={16} />
+								<RefreshCw size={16} />
 							)}
 							Update
 						</button>
+
+						<button
+							type="button"
+							onClick={() => setSourceOpen((current) => !current)}
+							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+						>
+							<Upload size={16} />
+							Source
+						</button>
 					</div>
-
-					{error && (
-						<div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-							{error}
-						</div>
-					)}
-
-					{data?.warnings.length ? (
-						<div className="mt-3 space-y-1 text-xs text-amber-200">
-							{data.warnings.map((warning) => (
-								<div key={warning}>{warning}</div>
-							))}
-						</div>
-					) : null}
 				</div>
+
+				{sourceOpen && (
+					<div className="rounded-xl border border-border bg-surface p-4">
+						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+							<FileSpreadsheet size={16} />
+							Google Sheet
+						</div>
+
+						{data && (
+							<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
+								Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
+								Update from Google when the sheet changes. Local edits can be
+								replaced by the next Google Sheet update.
+							</div>
+						)}
+
+						<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+							<input
+								value={sourceUrl}
+								onChange={(event) => setStoredSourceUrl(event.target.value)}
+								className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+							/>
+							<button
+								type="button"
+								onClick={() => void updateFromGoogle(sourceUrl)}
+								disabled={loading || !sourceUrl.trim()}
+								className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								{loading ? (
+									<Loader2 size={16} className="animate-spin" />
+								) : (
+									<FileSpreadsheet size={16} />
+								)}
+								Update
+							</button>
+						</div>
+
+						{error && (
+							<div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+								{error}
+							</div>
+						)}
+
+						{data?.warnings.length ? (
+							<div className="mt-3 space-y-1 text-xs text-amber-200">
+								{data.warnings.map((warning) => (
+									<div key={warning}>{warning}</div>
+								))}
+							</div>
+						) : null}
+					</div>
+				)}
 
 				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1.2fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)]">
 					<div className="relative">
@@ -297,7 +614,7 @@ export function BonusToolsPage() {
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							className="h-10 w-full rounded-md border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							placeholder="Search project, wager, note..."
 						/>
 					</div>
@@ -318,7 +635,7 @@ export function BonusToolsPage() {
 							);
 							setSelectedBaseAmount(getRuleAmount(nextRule));
 						}}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{data?.rules.map((rule) => (
 							<option key={rule.id} value={rule.id}>
@@ -330,7 +647,7 @@ export function BonusToolsPage() {
 					<select
 						value={selectedCurrency}
 						onChange={(event) => setSelectedCurrency(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{currencies.map((currency) => (
 							<option key={currency} value={currency}>
@@ -342,7 +659,7 @@ export function BonusToolsPage() {
 					<select
 						value={selectedTableName || activeTable?.name || ""}
 						onChange={(event) => setSelectedTableName(event.target.value)}
-						className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{data?.currencyTables.map((table) => (
 							<option key={table.name} value={table.name}>
@@ -353,27 +670,41 @@ export function BonusToolsPage() {
 				</div>
 
 				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-					<section className="rounded-lg border border-border bg-surface">
+					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
 								<div className="font-semibold">
 									{selectedRule?.site ?? "No project selected"}
 								</div>
 								<div className="mt-1 text-xs text-muted">
-									{selectedRule?.group ?? "-"} · {activeTable?.name ?? "-"}
+									{selectedRule?.group ?? "-"} - {activeTable?.name ?? "-"}
 								</div>
 							</div>
 
-							{quickBind && (
-								<button
-									type="button"
-									onClick={() => void copyText(quickBind, "Bonus rules copied")}
-									className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
-								>
-									<Copy size={15} />
-									Copy Rules
-								</button>
-							)}
+							<div className="flex flex-wrap items-center gap-2">
+								{selectedRule && (
+									<button
+										type="button"
+										onClick={() => openEditRule(selectedRule)}
+										className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+									>
+										<Pencil size={15} />
+										Edit
+									</button>
+								)}
+								{quickBind && (
+									<button
+										type="button"
+										onClick={() =>
+											void copyText(quickBind, "Bonus rules copied")
+										}
+										className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+									>
+										<Copy size={15} />
+										Copy Rules
+									</button>
+								)}
+							</div>
 						</div>
 
 						<div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
@@ -394,9 +725,9 @@ export function BonusToolsPage() {
 								return (
 									<div
 										key={column.key}
-										className="rounded-md border border-border bg-background p-3"
+										className="rounded-lg bg-background p-3"
 									>
-										<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+										<div className="mb-2 text-xs font-semibold uppercase text-muted">
 											{column.label}
 										</div>
 										<div className="min-h-10 whitespace-pre-wrap text-sm leading-5">
@@ -408,7 +739,7 @@ export function BonusToolsPage() {
 												onClick={() =>
 													void copyText(value, `${column.label} copied`)
 												}
-												className="mt-3 inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={13} />
 												Copy
@@ -420,7 +751,7 @@ export function BonusToolsPage() {
 						</div>
 					</section>
 
-					<section className="rounded-lg border border-border bg-surface">
+					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex items-center gap-2 border-b border-border px-4 py-3 font-semibold">
 							<Table2 size={16} />
 							Currency
@@ -430,7 +761,7 @@ export function BonusToolsPage() {
 							<select
 								value={selectedBaseAmount}
 								onChange={(event) => setSelectedBaseAmount(event.target.value)}
-								className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							>
 								{activeTable?.rows.map((row) => (
 									<option key={row.base} value={row.base}>
@@ -439,8 +770,8 @@ export function BonusToolsPage() {
 								))}
 							</select>
 
-							<div className="rounded-md border border-border bg-background p-3">
-								<div className="text-xs font-semibold uppercase tracking-wide text-muted">
+							<div className="rounded-lg bg-background p-3">
+								<div className="text-xs font-semibold uppercase text-muted">
 									Selected
 								</div>
 								<div className="mt-2 text-2xl font-semibold">
@@ -452,7 +783,7 @@ export function BonusToolsPage() {
 										onClick={() =>
 											void copyText(selectedAmount, "Currency value copied")
 										}
-										className="mt-3 inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+										className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<Copy size={13} />
 										Copy
@@ -460,7 +791,7 @@ export function BonusToolsPage() {
 								)}
 							</div>
 
-							<div className="max-h-72 overflow-auto rounded-md border border-border">
+							<div className="supportos-scroll max-h-72 overflow-auto rounded-lg border border-border">
 								<table className="min-w-full text-left text-xs">
 									<thead className="sticky top-0 bg-surface-elevated text-muted">
 										<tr>
@@ -505,7 +836,7 @@ export function BonusToolsPage() {
 					</section>
 				</div>
 
-				<section className="rounded-lg border border-border bg-surface">
+				<section className="rounded-xl border border-border bg-surface">
 					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 						<div className="font-semibold">Bonus Rules</div>
 						<div className="text-sm text-muted">
@@ -513,7 +844,7 @@ export function BonusToolsPage() {
 						</div>
 					</div>
 
-					<div className="overflow-auto">
+					<div className="supportos-scroll overflow-auto">
 						<table className="min-w-[72rem] text-left text-sm">
 							<thead className="bg-surface-elevated text-xs uppercase tracking-wide text-muted">
 								<tr>
@@ -524,7 +855,7 @@ export function BonusToolsPage() {
 											{column.label}
 										</th>
 									))}
-									<th className="px-3 py-2 font-semibold">Copy</th>
+									<th className="px-3 py-2 font-semibold">Actions</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border">
@@ -580,16 +911,26 @@ export function BonusToolsPage() {
 												);
 											})}
 											<td className="whitespace-nowrap px-3 py-2">
-												<button
-													type="button"
-													onClick={() =>
-														void copyText(bind, `${rule.site} copied`)
-													}
-													className="inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
-												>
-													<Copy size={13} />
-													Copy
-												</button>
+												<div className="flex items-center gap-2">
+													<button
+														type="button"
+														onClick={() => openEditRule(rule)}
+														className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+													>
+														<Pencil size={13} />
+														Edit
+													</button>
+													<button
+														type="button"
+														onClick={() =>
+															void copyText(bind, `${rule.site} copied`)
+														}
+														className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+													>
+														<Copy size={13} />
+														Copy
+													</button>
+												</div>
 											</td>
 										</tr>
 									);
@@ -599,6 +940,112 @@ export function BonusToolsPage() {
 					</div>
 				</section>
 			</div>
+
+			{ruleEditorOpen && (
+				<div
+					className="fixed inset-0 z-50 flex items-end bg-black/45 p-0 sm:items-center sm:justify-center sm:p-4"
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="bonus-rule-editor-title"
+					onMouseDown={(event) => {
+						if (event.currentTarget === event.target) {
+							setRuleEditorOpen(false);
+						}
+					}}
+				>
+					<form
+						onSubmit={submitRule}
+						className="supportos-scroll flex max-h-[92vh] w-full flex-col overflow-auto rounded-t-2xl border border-border bg-surface shadow-2xl sm:max-w-3xl sm:rounded-2xl"
+					>
+						<div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3">
+							<div>
+								<h2
+									id="bonus-rule-editor-title"
+									className="text-base font-semibold"
+								>
+									{editingRuleId ? "Edit bonus rule" : "Add bonus rule"}
+								</h2>
+								<p className="mt-1 text-xs text-muted">
+									Saved locally and available in search, copy, and currency
+									matching.
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => setRuleEditorOpen(false)}
+								className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+								aria-label="Close editor"
+							>
+								<X size={16} />
+							</button>
+						</div>
+
+						<div className="grid gap-3 p-4 sm:grid-cols-2">
+							{RULE_FORM_FIELDS.map((field) => {
+								const inputId = `bonus-rule-${field.key}`;
+								const className =
+									"w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25";
+
+								return (
+									<label
+										key={field.key}
+										htmlFor={inputId}
+										className={field.multiline ? "sm:col-span-2" : ""}
+									>
+										<span className="mb-1 block text-xs font-medium text-muted">
+											{field.label}
+										</span>
+										{field.multiline ? (
+											<textarea
+												id={inputId}
+												value={ruleDraft[field.key]}
+												onChange={(event) =>
+													updateRuleDraft(field.key, event.target.value)
+												}
+												className={`${className} min-h-24 py-2`}
+												placeholder={field.placeholder}
+											/>
+										) : (
+											<input
+												id={inputId}
+												value={ruleDraft[field.key]}
+												onChange={(event) =>
+													updateRuleDraft(field.key, event.target.value)
+												}
+												className={`${className} h-11`}
+												placeholder={field.placeholder}
+											/>
+										)}
+									</label>
+								);
+							})}
+
+							{ruleFormError && (
+								<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300 sm:col-span-2">
+									{ruleFormError}
+								</div>
+							)}
+						</div>
+
+						<div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+							<button
+								type="button"
+								onClick={() => setRuleEditorOpen(false)}
+								className="inline-flex h-11 items-center rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+							>
+								{editingRuleId ? <Pencil size={16} /> : <Plus size={16} />}
+								{editingRuleId ? "Save rule" : "Add rule"}
+							</button>
+						</div>
+					</form>
+				</div>
+			)}
 		</div>
 	);
 }

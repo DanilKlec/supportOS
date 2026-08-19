@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	Bot,
 	Check,
-	Clock3,
 	Cloud,
 	Database,
 	Download,
@@ -22,7 +21,6 @@ import {
 	Sun,
 	Upload,
 	User,
-	Wrench,
 	Zap,
 } from "lucide-react";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
@@ -143,8 +141,6 @@ type WorkspaceToggleKey = keyof Pick<
 	| "showTabs"
 	| "showTranslatorWidget"
 	| "showSidebarFavorites"
-	| "showSidebarRecentFolders"
-	| "showSidebarTools"
 >;
 
 const workspaceToggleOptions: Array<{
@@ -182,18 +178,6 @@ const workspaceToggleOptions: Array<{
 		title: "Favorites block",
 		description: "Pinned shortcuts in the tree.",
 		icon: Star,
-	},
-	{
-		key: "showSidebarRecentFolders",
-		title: "Recent folders",
-		description: "Fast return to opened folders.",
-		icon: Clock3,
-	},
-	{
-		key: "showSidebarTools",
-		title: "Tools block",
-		description: "Bonus tools and project links.",
-		icon: Wrench,
 	},
 ];
 
