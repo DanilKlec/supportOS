@@ -1,3 +1,4 @@
+export * from "./access.store";
 export * from "./ai.store";
 export * from "./auth.store";
 export * from "./bind.store";

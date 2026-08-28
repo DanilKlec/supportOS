@@ -1,11 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, LogIn } from "lucide-react";
+import { LockKeyhole, LogIn, ShieldCheck } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
-import { knowledgeService } from "@/services/knowledge.service";
-import { supabaseService } from "@/services/supabase.service";
-import { useToast } from "@/shared/hooks/useToast";
-import { useAuthStore } from "@/store/auth.store";
+import { isTemporaryAccessEnabled, useAccessStore } from "@/store/access.store";
 
 export const Route = createFileRoute("/login")({
 	component: LoginPage,
@@ -13,121 +10,99 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
 	const navigate = useNavigate();
-	const { showToast } = useToast();
-	const configured = useAuthStore((state) => state.configured);
-	const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
-	const [email, setEmail] = useState("");
+	const signIn = useAccessStore((state) => state.signIn);
+	const [login, setLogin] = useState("");
 	const [password, setPassword] = useState("");
-	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const enabled = isTemporaryAccessEnabled();
 
-	const submit = async (event: FormEvent) => {
+	const submit = (event: FormEvent) => {
 		event.preventDefault();
 		setError("");
-		setLoading(true);
 
-		try {
-			const session =
-				mode === "signIn"
-					? await supabaseService.signIn(email.trim(), password)
-					: await supabaseService.signUp(email.trim(), password);
-
-			if (!session) {
-				showToast("Check your email to confirm the account");
-				return;
-			}
-
-			await knowledgeService.loadCloudKnowledge();
-			showToast("Cloud sync connected");
-			void navigate({ to: "/" });
-		} catch (authError) {
-			setError(
-				authError instanceof Error
-					? authError.message
-					: "Authentication failed",
-			);
-		} finally {
-			setLoading(false);
+		if (!signIn(login, password)) {
+			setError("Неверный логин или пароль");
+			return;
 		}
+
+		void navigate({ to: "/" });
 	};
 
 	return (
-		<div className="flex h-full items-center justify-center overflow-auto bg-background p-6">
+		<div className="flex min-h-screen items-center justify-center overflow-auto bg-background p-6">
 			<form
 				onSubmit={submit}
-				className="w-full max-w-md rounded-lg border border-border bg-surface p-6"
+				className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl"
 			>
+				<div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-accent">
+					<LockKeyhole size={24} />
+				</div>
+
 				<div className="mb-6">
-					<h1 className="text-2xl font-bold">Cloud Login</h1>
+					<h1 className="text-2xl font-bold">Вход в SupportOS</h1>
 					<p className="mt-1 text-sm text-muted">
-						Sign in to sync SupportOS across devices.
+						Введите данные временного аккаунта администратора.
 					</p>
 				</div>
 
-				{!configured && (
+				{!enabled ? (
 					<div className="mb-4 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
-						Cloud sync is disabled or Supabase is not configured.
+						Временная авторизация отключена в настройках окружения.
 					</div>
-				)}
+				) : null}
 
-				{error && (
+				{error ? (
 					<div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
 						{error}
 					</div>
-				)}
+				) : null}
 
 				<div className="space-y-4">
 					<label className="block space-y-2">
-						<span className="text-sm font-medium">Email</span>
+						<span className="text-sm font-medium">Логин</span>
 						<input
-							type="email"
-							value={email}
-							onChange={(event) => setEmail(event.target.value)}
-							disabled={loading || !configured}
+							type="text"
+							value={login}
+							onChange={(event) => setLogin(event.target.value)}
+							disabled={!enabled}
 							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-							placeholder="you@example.com"
+							placeholder="admin"
+							autoComplete="username"
 							required
 						/>
 					</label>
 
 					<label className="block space-y-2">
-						<span className="text-sm font-medium">Password</span>
+						<span className="text-sm font-medium">Пароль</span>
 						<input
 							type="password"
 							value={password}
 							onChange={(event) => setPassword(event.target.value)}
-							disabled={loading || !configured}
+							disabled={!enabled}
 							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 							placeholder="••••••••"
+							autoComplete="current-password"
 							required
-							minLength={6}
 						/>
 					</label>
 				</div>
 
 				<button
 					type="submit"
-					disabled={loading || !configured}
+					disabled={!enabled}
 					className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					{loading ? (
-						<Loader2 size={16} className="animate-spin" />
-					) : (
-						<LogIn size={16} />
-					)}
-					{mode === "signIn" ? "Sign In" : "Create Account"}
+					<LogIn size={16} />
+					Войти
 				</button>
 
-				<button
-					type="button"
-					onClick={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
-					disabled={loading}
-					className="mt-3 w-full rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-				>
-					{mode === "signIn"
-						? "Need an account? Create one"
-						: "Already have an account? Sign in"}
-				</button>
+				<div className="mt-5 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-5 text-muted">
+					<ShieldCheck size={16} className="mt-0.5 shrink-0" />
+					<span>
+						Это временный локальный доступ. Полноценная серверная авторизация
+						будет подключена позднее.
+					</span>
+				</div>
 			</form>
 		</div>
 	);

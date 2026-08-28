@@ -40,6 +40,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		return <main className="min-h-screen bg-background">{children}</main>;
 	}
 
+	if (pathname === "/login") {
+		return <main className="min-h-screen bg-background">{children}</main>;
+	}
+
 	if (isLightweightRoute(pathname)) {
 		return (
 			<div className="flex h-screen flex-col bg-background">
