@@ -1,4 +1,5 @@
-import { generateGeminiReply, sendJson } from "./_gemini.js";
+import { sendJson } from "./_gemini.js";
+import { generateAIReply } from "./_provider.js";
 
 export default async function handler(request, response) {
 	if (request.method !== "POST") {
@@ -7,7 +8,7 @@ export default async function handler(request, response) {
 	}
 
 	try {
-		const result = await generateGeminiReply(request.body ?? {});
+		const result = await generateAIReply(request.body ?? {});
 		sendJson(response, 200, result);
 	} catch (error) {
 		sendJson(

@@ -522,7 +522,11 @@ export function BindViewer() {
 			setComposerIssues(result.issues);
 			setComposerMeta(
 				`${result.language.toUpperCase()} / ${
-					result.mode === "gemini" ? "Gemini" : "Free mode"
+			result.mode === "openai"
+				? "OpenAI"
+				: result.mode === "gemini"
+					? "Gemini"
+					: "Free mode"
 				}`,
 			);
 			showToast("AI answer ready");

@@ -1,4 +1,5 @@
-import { getGeminiConfig, sendJson } from "./_gemini.js";
+import { sendJson } from "./_gemini.js";
+import { getAIStatus } from "./_provider.js";
 
 export default function handler(request, response) {
 	if (request.method !== "GET") {
@@ -6,10 +7,5 @@ export default function handler(request, response) {
 		return;
 	}
 
-	const { apiKey, model } = getGeminiConfig();
-
-	sendJson(response, 200, {
-		configured: Boolean(apiKey),
-		model,
-	});
+	sendJson(response, 200, getAIStatus());
 }

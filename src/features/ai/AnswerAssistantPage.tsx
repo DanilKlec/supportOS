@@ -64,8 +64,10 @@ function issueColor(severity: CheckIssue["severity"]) {
 	return "border-emerald-500/30 bg-emerald-500/10";
 }
 
-function getModeLabel(mode: "gemini" | "free") {
-	return mode === "gemini" ? "Gemini" : "Бесплатный режим";
+function getModeLabel(mode: "openai" | "gemini" | "free") {
+	if (mode === "openai") return "OpenAI";
+	if (mode === "gemini") return "Gemini";
+	return "Бесплатный режим";
 }
 
 export function AnswerAssistantPage() {
@@ -76,12 +78,13 @@ export function AnswerAssistantPage() {
 	const [answer, setAnswer] = useState("");
 	const [issues, setIssues] = useState<CheckIssue[]>([]);
 	const [resultLanguage, setResultLanguage] = useState("");
-	const [mode, setMode] = useState<"gemini" | "free">("free");
+	const [mode, setMode] = useState<"openai" | "gemini" | "free">("free");
 	const [warning, setWarning] = useState("");
 	const [loading, setLoading] = useState(false);
-	const [geminiChecking, setGeminiChecking] = useState(false);
-	const [geminiOnline, setGeminiOnline] = useState<boolean>();
-	const [geminiModel, setGeminiModel] = useState("");
+	const [aiChecking, setAIChecking] = useState(false);
+	const [aiOnline, setAIOnline] = useState<boolean>();
+	const [aiModel, setAIModel] = useState("");
+	const [aiProvider, setAIProvider] = useState("");
 	const [customLanguage, setCustomLanguage] = useState("");
 	const [glossarySource, setGlossarySource] = useState("");
 	const [glossaryTarget, setGlossaryTarget] = useState("");
@@ -170,20 +173,22 @@ export function AnswerAssistantPage() {
 		showToast("Ответ сохранён в память");
 	};
 
-	const checkGemini = async () => {
-		setGeminiChecking(true);
+	const checkAI = async () => {
+		setAIChecking(true);
 
 		try {
-			const model = await answerAssistantService.testGemini();
-			setGeminiOnline(true);
-			setGeminiModel(model);
-			showToast("Gemini настроен");
+			const status = await answerAssistantService.testAI();
+			setAIOnline(true);
+			setAIModel(status.model);
+			setAIProvider(status.provider);
+			showToast(`${status.provider === "openai" ? "OpenAI" : "Gemini"} настроен`);
 		} catch (error) {
-			setGeminiOnline(false);
-			setGeminiModel("");
-			showToast(error instanceof Error ? error.message : "Gemini не настроен");
+			setAIOnline(false);
+			setAIModel("");
+			setAIProvider("");
+			showToast(error instanceof Error ? error.message : "AI не настроен");
 		} finally {
-			setGeminiChecking(false);
+			setAIChecking(false);
 		}
 	};
 
@@ -472,38 +477,40 @@ export function AnswerAssistantPage() {
 									<div className="mb-3 flex items-center justify-between gap-3">
 										<div className="flex items-center gap-2 text-sm font-semibold">
 											<Bot size={16} />
-											Gemini
+											AI provider
 										</div>
 										<button
 											type="button"
 											onClick={() =>
 												updateSettings({
-													geminiEnabled: !settings.geminiEnabled,
+													aiEnabled: !settings.aiEnabled,
 												})
 											}
 											className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-												settings.geminiEnabled
+											settings.aiEnabled
 													? "border-accent bg-accent/10 text-accent"
 													: "border-border text-muted"
 											}`}
 										>
-											{settings.geminiEnabled ? "Включён" : "Выключен"}
+										{settings.aiEnabled ? "Включён" : "Выключен"}
 										</button>
 									</div>
 
 									<div className="text-xs leading-5 text-muted">
 										Без ключа ассистент использует бесплатный локальный шаблон.
-										{geminiModel ? ` Модель: ${geminiModel}.` : ""}
+										{aiModel
+											? ` ${aiProvider === "openai" ? "OpenAI" : "Gemini"}: ${aiModel}.`
+											: ""}
 									</div>
 									<button
 										type="button"
-										onClick={() => void checkGemini()}
-										disabled={geminiChecking}
+									onClick={() => void checkAI()}
+									disabled={aiChecking}
 										className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
 									>
-										{geminiChecking ? (
+									{aiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
-										) : geminiOnline ? (
+									) : aiOnline ? (
 											<Wifi size={15} />
 										) : (
 											<WifiOff size={15} />

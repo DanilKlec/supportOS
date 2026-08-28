@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	createRootRoute,
 	Outlet,
+	useNavigate,
 	useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -20,6 +21,7 @@ import {
 	getAppearanceSettings,
 	onSystemThemeChange,
 } from "@/shared/lib/appearance";
+import { isTemporaryAccessEnabled, useAccessStore } from "@/store/access.store";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -37,11 +39,27 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
 
 	const lightweight = isLightweightRoute(pathname);
+	const accessSession = useAccessStore((state) => state.session);
+	const accessRequired = isTemporaryAccessEnabled();
+	const isLoginRoute = pathname === "/login";
+	const accessGranted = !accessRequired || Boolean(accessSession);
+
+	useEffect(() => {
+		if (!accessGranted && !isLoginRoute) {
+			void navigate({ to: "/login", replace: true });
+			return;
+		}
+
+		if (accessGranted && isLoginRoute) {
+			void navigate({ to: "/", replace: true });
+		}
+	}, [accessGranted, isLoginRoute, navigate]);
 
 	useEffect(() => {
 		const applyStoredAppearance = () =>
@@ -70,9 +88,13 @@ function RootComponent() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
-				<MainLayout>
-					<Outlet />
-				</MainLayout>
+				{accessGranted || isLoginRoute ? (
+					<MainLayout>
+						<Outlet />
+					</MainLayout>
+				) : (
+					<div className="min-h-screen bg-background" />
+				)}
 
 				<ModalRoot />
 
