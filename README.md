@@ -77,6 +77,26 @@ GEMINI_MODEL=gemini-2.5-flash-lite
 
 Ключ используется только serverless-функциями `/api/ai/*`. `GEMINI_MODEL` можно не задавать — показанная модель используется по умолчанию.
 
+### OpenAI (опционально)
+
+```dotenv
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-5.6-luna
+```
+
+`OPENAI_API_KEY` используется только serverless-функциями. Если `AI_PROVIDER` не задан, приложение автоматически выбирает OpenAI при наличии ключа, иначе использует Gemini. Для принудительного выбора Gemini установите `AI_PROVIDER=gemini`.
+
+### LiveChat Agent App
+
+Маршрут `/livechat` предназначен для размещения в LiveChat как Details Widget. В LiveChat Developer Console создайте приложение, добавьте блок **LiveChat Widgets** и укажите production URL:
+
+```text
+https://your-supportos-domain.example/livechat
+```
+
+После private installation виджет получает профиль активного клиента, позволяет искать готовые ответы в базе знаний, выбирать перевод, заполнять переменные шаблона и вставлять отредактированный текст в Message Box. Отправка остаётся за оператором. Чтение истории переписки через Agent Chat API и OAuth будет добавлено отдельным этапом.
+
 ### LibreTranslate (опционально)
 
 ```dotenv
