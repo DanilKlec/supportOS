@@ -36,6 +36,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^9.0.0",
+    "read-excel-file": "9.3.10",
     "remark-gfm": "^4.0.0",
     "tailwindcss": "^4.1.18",
     "zustand": "^4.4.0"

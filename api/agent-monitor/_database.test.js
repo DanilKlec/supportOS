@@ -7,11 +7,29 @@ beforeAll(async()=>{
  await pg.exec('create role anon; create role authenticated; create role service_role bypassrls;');
  const sql=await readFile(new URL('../../supabase/agent-monitor.sql',import.meta.url),'utf8');
  await pg.exec(sql);await pg.exec(sql); // migration is repeatable
+ const schedule=await readFile(new URL('../../supabase/agent-monitor-schedule.sql',import.meta.url),'utf8');
+ await pg.exec(schedule);await pg.exec(schedule);
 },30000);
 beforeEach(async()=>{await pg.exec('reset role; truncate monitor_observations,monitor_assignments,monitor_assignment_audit,monitor_agents,monitor_control restart identity cascade;');});
 afterAll(async()=>{await pg.close();});
 const ingest=(at,status='on',source='poll')=>pg.query('select monitor_ingest($1::jsonb,$2::timestamptz,$3)',[JSON.stringify([{id:'a',name:'Agent',status}]),at,source]);
 describe('Postgres monitor persistence',()=>{
+ it('replaces only included employees in the month, audits changes and is idempotent',async()=>{
+  await ingest('2026-09-08T06:00:00Z');
+  await pg.query("select monitor_ingest($1::jsonb,now(),'poll')",[JSON.stringify([{id:'b',status:'on'}])]);
+  await pg.exec("select monitor_assign('2026-09-08','a','day',true,'old'); select monitor_assign('2026-10-08','a','day',true,'old'); select monitor_assign('2026-09-08','b','day',true,'old');");
+  const call=()=>pg.query("select monitor_import_schedule('2026-09-01',$1,$2,'supervisor') as result",[JSON.stringify(['a']),JSON.stringify([{day:'2026-09-09',agent_id:'a',shift:'night'}])]);
+  expect((await call()).rows[0].result).toEqual({added:1,removed:1});
+  expect((await call()).rows[0].result).toEqual({added:0,removed:0});
+  expect((await pg.query('select count(*)::int as n from monitor_assignments')).rows[0].n).toBe(3);
+  expect((await pg.query("select operation,actor from monitor_assignment_audit where actor='supervisor' order by id")).rows).toEqual([{operation:'removed',actor:'supervisor'},{operation:'assigned',actor:'supervisor'}]);
+  await expect(pg.query("select monitor_import_schedule('2026-09-01','[\"a\"]','[{\"day\":\"2026-10-01\",\"agent_id\":\"a\",\"shift\":\"night\"}]','supervisor')")).rejects.toThrow();
+  expect((await pg.query('select count(*)::int as n from monitor_assignments')).rows[0].n).toBe(3);
+  await pg.exec('set role authenticated');
+  await expect(call()).rejects.toThrow('permission denied');
+  await pg.exec('reset role');
+  expect((await pg.query("select monitor_import_schedule('2026-09-01','[\"a\"]','[]','supervisor') as result")).rows[0].result).toEqual({added:0,removed:1});
+ });
  it('serializes transitions and ignores stale poll results',async()=>{
   await ingest('2026-09-08T06:00:00Z');await ingest('2026-09-08T06:00:30Z');
   await ingest('2026-09-08T06:01:00Z','off','webhook');

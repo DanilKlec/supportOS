@@ -79,6 +79,9 @@ it("uses individual bearer auth and signs out through Supabase", async () => {
 	});
 	vi.stubGlobal("fetch", fetch);
 	const client = mount();
+	fireEvent.change(await screen.findByLabelText("Состав списка"), {
+		target: { value: "online" },
+	});
 	await screen.findByText("Agent A");
 	fireEvent.click(screen.getByRole("button", { name: "Выйти из мониторинга" }));
 	await waitFor(() => expect(auth.signOut).toHaveBeenCalledOnce());
@@ -159,7 +162,18 @@ it("filters offline and stale agents, searches email, and filters reception even
 		),
 	);
 	const client = mount();
+	fireEvent.change(await screen.findByLabelText("Состав списка"), {
+		target: { value: "online" },
+	});
 	await screen.findByText("Anna");
+	fireEvent.change(screen.getByLabelText("Состав списка"), {
+		target: { value: "current" },
+	});
+	expect(screen.queryByText("Anna")).toBeNull();
+	expect(screen.queryByText("Boris")).toBeNull();
+	fireEvent.change(screen.getByLabelText("Состав списка"), {
+		target: { value: "online" },
+	});
 	expect(screen.queryByText("Offline Person")).toBeNull();
 	expect(screen.queryByText("Stale Person")).toBeNull();
 	fireEvent.change(screen.getByLabelText("Поиск агента"), {

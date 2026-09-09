@@ -1,4 +1,5 @@
 import {requireUser} from '../_auth.js';
+import {validateSchedule} from './_schedule.js';
 import {allRows,collect,config,db,equal,normalizeStatus} from './_server.js';
 
 export default async function handler(req,res) {
@@ -37,6 +38,14 @@ export default async function handler(req,res) {
   const user=await requireUser(req,{supervisor:true});
   env=config();
   if(action==='sync' && method==='POST') return send(200,await collect(env));
+  if(action==='schedule-import' && method==='POST') {
+   const payload=validateSchedule(body);
+   const agents=await allRows(env,'monitor_agents?select=id&order=id');
+   const known=new Map(agents.map(agent=>[agent.id.toLowerCase(),agent.id]));
+   if(payload.people.some(email=>!known.has(email))) return send(400,{error:'Некоторые почты не найдены в LiveChat. Обновите предпросмотр графика.'});
+   const result=await db(env,'rpc/monitor_import_schedule',{work_month:`${payload.month}-01`,people:payload.people.map(email=>known.get(email)),records:payload.records.map(row=>({day:row.day,agent_id:known.get(row.email),shift:row.shift})),username:user.id});
+   return send(200,{ok:true,...result});
+  }
   const day=url.searchParams.get('day');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day ?? '')||Number.isNaN(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day) return send(400,{error:'Некорректная дата'});
   if(action==='assignment' && method==='POST') {
@@ -55,6 +64,7 @@ export default async function handler(req,res) {
    const observations=await db(env,`monitor_observations?select=*&changed=eq.true&at=gte.${from}&at=lte.${to}&id=lt.${before}&order=id.desc&limit=500`);
    return send(200,{observations,hasMore:observations.length===500});
   }
+  const currentDay=new Date(Date.now()-6*3600000).toISOString().slice(0,10);
   const [agents,observations,assignments,audit,health,totals]=await Promise.all([
    allRows(env,'monitor_agents?select=*&order=id'),
    db(env,`monitor_observations?select=*&changed=eq.true&at=gte.${from}&at=lte.${to}&order=id.desc&limit=1000`),
@@ -63,7 +73,8 @@ export default async function handler(req,res) {
    db(env,'monitor_control?select=id,updated_at&id=in.(collect,webhook)'),
    db(env,'rpc/monitor_report',{work_day:day,cutoff:new Date().toISOString()})
   ]);
-  return send(200,{agents,observations,assignments,audit,totals,historyLimited:observations.length>=1000,lastSync:health.find(row=>row.id==='collect')?.updated_at ?? null,lastWebhook:health.find(row=>row.id==='webhook')?.updated_at ?? null,serverTime:Date.now()});
+  const currentAssignments=currentDay===day ? assignments : await allRows(env,`monitor_assignments?select=*&day=eq.${currentDay}&order=agent_id,shift`);
+  return send(200,{agents,observations,assignments,currentAssignments,audit,totals,historyLimited:observations.length>=1000,lastSync:health.find(row=>row.id==='collect')?.updated_at ?? null,lastWebhook:health.find(row=>row.id==='webhook')?.updated_at ?? null,serverTime:Date.now()});
  } catch(error) {return send(error.status ?? 500,{error:error.status?error.message:'Ошибка мониторинга. Проверьте настройки сервера и соединение.'});}
 }
 

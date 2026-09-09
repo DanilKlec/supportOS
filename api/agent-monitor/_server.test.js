@@ -7,6 +7,16 @@ const request = (extra = {}) => ({ method:'GET', url:'/?day=2026-09-08', headers
 beforeEach(() => { for (const [key,value] of Object.entries(env)) vi.stubEnv(key,value); });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe('monitor server security', () => {
+ it('imports with verified actor and rejects unknown agents before saving',async()=>{
+  const payload={month:'2026-09',people:['work@example.com'],records:[],username:'forged'};
+  const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({id:'verified',app_metadata:{role:'supervisor'}}))).mockResolvedValueOnce(new Response('[{"id":"work@example.com"}]')).mockResolvedValueOnce(new Response('{"added":0,"removed":1}'));
+  vi.stubGlobal('fetch',fetch);const res=response();
+  await handler(request({method:'POST',url:'/?action=schedule-import',body:payload}),res);
+  expect(res.statusCode).toBe(200);expect(JSON.parse(fetch.mock.calls[2][1].body).username).toBe('verified');
+  fetch.mockReset().mockResolvedValueOnce(new Response(JSON.stringify({id:'verified',app_metadata:{role:'supervisor'}}))).mockResolvedValueOnce(new Response('[]'));
+  const rejected=response();await handler(request({method:'POST',url:'/?action=schedule-import',body:payload}),rejected);
+  expect(rejected.statusCode).toBe(400);expect(fetch).toHaveBeenCalledTimes(2);
+ });
  it('fails closed without database configuration', () => { expect(() => config({})).toThrow('Настройте'); });
  it('maps routing status without inventing offline', () => { expect(normalizeStatus('accepting chats')).toBe('on'); expect(normalizeStatus(null)).toBe('unknown'); });
  it('rejects forged legacy cookies before database access', async () => {

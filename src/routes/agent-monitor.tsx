@@ -1,3 +1,8 @@
+import { ScheduleUpload } from "@/features/agent-monitor/ScheduleUpload";
+import {
+	matchesRoster,
+	type RosterScope,
+} from "@/features/agent-monitor/schedule";
 import {
 	agentEmail,
 	isOnline,
@@ -99,7 +104,7 @@ function AgentMonitor() {
 	const [sortBy, setSortBy] = useState("off");
 	const [eventFilter, setEventFilter] = useState("all");
 	const [selectedAgent, setSelectedAgent] = useState("all");
-	const [allAgents, setAllAgents] = useState(true);
+	const [rosterScope, setRosterScope] = useState<RosterScope>("current");
 	const [manage, setManage] = useState(false);
 	const [now, setNow] = useState(Date.now);
 	const [busy, setBusy] = useState(false);
@@ -173,13 +178,20 @@ function AgentMonitor() {
 	const data = authenticated ? query.data : undefined;
 	const range = bounds(day, shift);
 	const online = (data?.agents ?? []).filter((agent) => isOnline(agent, now));
+	const currentAssignments =
+		data?.currentAssignments ??
+		(day === workDay(now) ? (data?.assignments ?? []) : []);
 	const filtered = online.filter(
 		(agent) =>
 			matchesAgent(agent, search) &&
-			(allAgents ||
-				data?.assignments.some(
-					(a) => a.agent_id === agent.id && a.shift === shift,
-				)) &&
+			matchesRoster(
+				agent.id,
+				rosterScope,
+				currentAssignments,
+				data?.assignments ?? [],
+				shift,
+				now,
+			) &&
 			(statusFilter === "all" || currentStatus(agent, now) === statusFilter),
 	);
 	const totals = filtered.map((agent) => {
@@ -335,6 +347,13 @@ function AgentMonitor() {
 					</section>
 				) : (
 					<>
+						<ScheduleUpload
+							agents={data.agents}
+							onSave={async (payload) => {
+								await api("schedule-import", `${payload.month}-01`, payload);
+								await client.invalidateQueries({ queryKey: ["monitor"] });
+							}}
+						/>
 						<div
 							className={`rounded-xl border p-4 text-sm ${data.lastSync && now - Date.parse(data.lastSync) < 90000 && !syncError ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}
 						>
@@ -436,12 +455,21 @@ function AgentMonitor() {
 									))}
 							</select>
 							<label className="text-sm">
-								<input
-									type="checkbox"
-									checked={allAgents}
-									onChange={(e) => setAllAgents(e.target.checked)}
-								/>{" "}
-								Включая онлайн-агентов без смены
+								Состав списка{" "}
+								<select
+									aria-label="Состав списка"
+									className={control}
+									value={rosterScope}
+									onChange={(e) =>
+										setRosterScope(e.target.value as RosterScope)
+									}
+								>
+									<option value="current">Сейчас на смене и онлайн</option>
+									<option value="selected">
+										По графику выбранной смены и онлайн
+									</option>
+									<option value="online">Все онлайн</option>
+								</select>
 							</label>
 							<button
 								className={control}
@@ -465,6 +493,15 @@ function AgentMonitor() {
 								<option value="name">По имени</option>
 							</select>
 						</div>
+						{rosterScope !== "online" && (
+							<p className="text-xs text-muted">
+								График проверяется в GMT+3. Ночная смена относится к дате
+								начала; с 16:00 до 16:30 учитываются обе смены.{" "}
+								{rosterScope === "current" && !currentAssignments.length
+									? "На текущую дату назначений нет: загрузите график или выберите «Все онлайн»."
+									: ""}
+							</p>
+						)}
 						{manage && (
 							<section className="rounded-xl border border-border bg-surface p-4">
 								<h2 className="font-semibold">Расписание на {day}</h2>
@@ -515,7 +552,7 @@ function AgentMonitor() {
 						)}
 						<section className="rounded-xl border border-border bg-surface p-4">
 							<h2 className="font-semibold">
-								Аналитика выбранной смены · {filtered.length} онлайн
+								Аналитика выбранной смены · {filtered.length} агентов
 							</h2>
 							<div className="mt-3 grid gap-4 sm:grid-cols-2">
 								<div>
@@ -532,9 +569,14 @@ function AgentMonitor() {
 								</div>
 							</div>
 							<p className="mt-3 text-xs text-muted">
-								Только подтверждённые онлайн-агенты: приём включён или выключен.
-								Не в сети и без свежего статуса скрыты. Длительности — за
-								выбранную смену.
+								Состав списка:{" "}
+								{rosterScope === "current"
+									? "сейчас на смене по графику"
+									: rosterScope === "selected"
+										? "назначены на выбранную смену"
+										: "все онлайн"}
+								. Приём включён или выключен. Не в сети и без свежего статуса
+								скрыты. Длительности — за выбранную смену.
 							</p>
 						</section>
 						<section className="overflow-auto rounded-xl border border-border bg-surface">
@@ -608,7 +650,7 @@ function AgentMonitor() {
 							</table>
 							{!filtered.length && (
 								<p className="p-8 text-center text-muted">
-									Нет онлайн-агентов по выбранным фильтрам. Проверьте
+									Нет агентов по выбранным фильтрам. Проверьте график и
 									подключение LiveChat.
 								</p>
 							)}
@@ -625,7 +667,7 @@ function AgentMonitor() {
 										value={selectedAgent}
 										onChange={(e) => setSelectedAgent(e.target.value)}
 									>
-										<option value="all">Все онлайн-агенты</option>
+										<option value="all">Все агенты в списке</option>
 										{filtered.map((agent) => (
 											<option key={agent.id} value={agent.id}>
 												{agent.name} · {agent.id}
@@ -657,8 +699,8 @@ function AgentMonitor() {
 							<p className="mt-1 text-xs text-muted">
 								Время — момент получения webhook или обнаружения статуса
 								опросом. LiveChat не сообщает здесь автора и причину
-								переключения. Показаны события агентов, которые сейчас онлайн.
-								Первое доступное наблюдение не считается переключением.
+								переключения. Показаны события агентов выбранного состава
+								списка. Первое доступное наблюдение не считается переключением.
 								Повторные подтверждения одинакового статуса скрыты.
 							</p>
 							<div className="mt-4 max-h-96 divide-y divide-border overflow-auto">

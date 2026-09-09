@@ -16,6 +16,12 @@ export interface LiveAgent {
 	changed_at: string | null;
 }
 export interface MonitorData {
+	currentAssignments?: {
+		day: string;
+		agent_id: string;
+		shift: ShiftId;
+		actor: string;
+	}[];
 	totals: {
 		agent_id: string;
 		shift: ShiftId;
@@ -107,4 +113,3 @@ export function csvCell(value: unknown) {
 	if (/^[\s]*[=+@-]/.test(text)) text = `'${text}`;
 	return `"${text.replaceAll('"', '""')}"`;
 }
-
