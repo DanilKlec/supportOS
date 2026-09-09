@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/store/auth.store";
 import { defaultLocalDataService } from "@/services/default-local-data.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
@@ -32,7 +33,8 @@ export async function bootstrapApp() {
 	await knowledgeService.loadKnowledge();
 	defaultLocalDataService.apply();
 
-	const session = await bootstrapAuth();
+	await bootstrapAuth();
+	const session = useAuthStore.getState().session;
 
 	if (session && shouldAutoSyncCloud()) {
 		await knowledgeService.loadCloudKnowledge();

@@ -1,9 +1,10 @@
 import { loadSportsBettingLive } from "./_live.js";
+import { authorize } from "../_auth.js";
 
 function allowCors(response) {
 	response.setHeader("Access-Control-Allow-Origin", "*");
 	response.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+	response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 function getSuccessCacheControl(data) {
@@ -30,6 +31,7 @@ function handleOptions(request, response) {
 }
 
 export default async function handler(request, response) {
+	if (!await authorize(request, response)) return;
 	if (handleOptions(request, response)) return;
 
 	if (request.method !== "GET") {
@@ -43,7 +45,7 @@ export default async function handler(request, response) {
 			env: process.env,
 		});
 
-		sendJson(response, 200, data, getSuccessCacheControl(data));
+		sendJson(response, 200, data, "private, no-store");
 	} catch (error) {
 		sendJson(response, error?.status ?? 502, {
 			error:

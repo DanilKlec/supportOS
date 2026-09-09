@@ -83,7 +83,7 @@ class SportsBettingService {
 			url.searchParams.set("sports", params.sports);
 		}
 
-		const response = await fetch(url.toString());
+		const response = await authenticatedFetch(url.toString());
 		const data = await readJson<SportsBettingFeed | SportsBettingErrorResponse>(
 			response,
 		);
@@ -105,3 +105,4 @@ class SportsBettingService {
 }
 
 export const sportsBettingService = new SportsBettingService();
+import { authenticatedFetch } from "@/services/authenticated-fetch";

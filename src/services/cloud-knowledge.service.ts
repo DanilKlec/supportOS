@@ -216,7 +216,7 @@ function writeQueue(queue: CloudOperation[]) {
 class CloudKnowledgeService {
 	canUseCloud() {
 		return (
-			supabaseService.isConfigured() && Boolean(supabaseService.getSession())
+			import.meta.env.VITE_SUPPORTOS_CLOUD_SYNC === "true" && supabaseService.isConfigured() && Boolean(supabaseService.getSession())
 		);
 	}
 

@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/services/authenticated-fetch";
 import {
 	DEFAULT_LINGVA_ENDPOINT,
 	DEFAULT_TRANSLATOR_ENDPOINT,
@@ -647,7 +648,7 @@ class TranslatorService {
 		let response: Response;
 
 		try {
-			response = await fetch(url, init);
+			response = await authenticatedFetch(url, init);
 		} catch (error) {
 			throw new TranslatorServiceError(
 				error instanceof Error ? error.message : "Unable to reach translator",

@@ -1,3 +1,4 @@
+import { authorize } from '../_auth.js';
 import {
 	createLibreTranslateForm,
 	handleOptions,
@@ -8,6 +9,7 @@ import {
 } from "./_shared.js";
 
 export default async function handler(request, response) {
+ if (!await authorize(request, response)) return;
 	if (handleOptions(request, response)) return;
 
 	if (request.method !== "POST") {

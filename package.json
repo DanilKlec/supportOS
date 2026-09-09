@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@livechat/agent-app-sdk": "^1.16.0",
+    "@supabase/supabase-js": "2.116.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-query": "latest",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",
     "@tanstack/router-cli": "^1.132.0",

@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { translatorService } from "@/services/translator.service";
 
 export type AnswerIntent =
@@ -495,7 +496,7 @@ async function generateWithAI(request: GenerateAnswerRequest) {
 		`${request.customerMessage} ${request.context}`,
 		request.settings.language,
 	);
-	const response = await fetch("/api/ai/generate", {
+	const response = await authenticatedFetch("/api/ai/generate", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -659,7 +660,7 @@ class AnswerAssistantService {
 	}
 
 	async testAI() {
-		const response = await fetch("/api/ai/status", {
+		const response = await authenticatedFetch("/api/ai/status", {
 			method: "GET",
 			headers: { Accept: "application/json" },
 		});

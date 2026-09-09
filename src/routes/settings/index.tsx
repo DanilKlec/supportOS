@@ -292,7 +292,7 @@ function SettingsPage() {
 	};
 
 	const signOut = async () => {
-		await supabaseService.signOut();
+		try { await supabaseService.signOut(); } catch { showToast("Не удалось выйти. Повторите попытку."); return; }
 		await knowledgeService.loadKnowledge();
 		showToast("Signed out");
 	};

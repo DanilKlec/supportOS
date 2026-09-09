@@ -1,3 +1,4 @@
+import { requireAppAuth } from "@/app/auth-guard";
 import "#/styles.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -21,7 +22,8 @@ import {
 	getAppearanceSettings,
 	onSystemThemeChange,
 } from "@/shared/lib/appearance";
-import { isTemporaryAccessEnabled, useAccessStore } from "@/store/access.store";
+import { useAuthStore } from "@/store/auth.store";
+import { safeAuthRedirect } from "@/app/auth-redirect";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -33,7 +35,12 @@ const queryClient = new QueryClient({
 	},
 });
 
+useAuthStore.subscribe((state, previous) => {
+	if (state.session?.user.id !== previous.session?.user.id) queryClient.clear();
+});
+
 export const Route = createRootRoute({
+	beforeLoad: requireAppAuth,
 	component: RootComponent,
 	notFoundComponent: NotFoundPage,
 });
@@ -45,22 +52,27 @@ function RootComponent() {
 	});
 
 	const lightweight = isLightweightRoute(pathname);
-	const accessSession = useAccessStore((state) => state.session);
-	const accessRequired = isTemporaryAccessEnabled();
-	const isLoginRoute = pathname === "/login";
-	const accessGranted = !accessRequired || Boolean(accessSession);
-
+	const session = useAuthStore((state) => state.session);
+	const loading = useAuthStore((state) => state.loading);
+	const isLoginRoute = pathname.replace(/\/+$/, "") === "/login";
+	const accessGranted = !loading && Boolean(session);
 	useEffect(() => {
-		if (!accessGranted && !isLoginRoute) {
-			void navigate({ to: "/login", replace: true });
-			return;
+		if (loading) return;
+		if (!session && !isLoginRoute) {
+			queryClient.clear();
+			void navigate({
+				to: "/login",
+				search: {
+					redirect: safeAuthRedirect(
+						window.location.pathname +
+							window.location.search +
+							window.location.hash,
+					),
+				},
+				replace: true,
+			});
 		}
-
-		if (accessGranted && isLoginRoute) {
-			void navigate({ to: "/", replace: true });
-		}
-	}, [accessGranted, isLoginRoute, navigate]);
-
+	}, [session, loading, isLoginRoute, navigate]);
 	useEffect(() => {
 		const applyStoredAppearance = () =>
 			applyAppearance(getAppearanceSettings());
@@ -72,6 +84,7 @@ function RootComponent() {
 
 	useEffect(() => {
 		cleanupDevelopmentCaches();
+		if (!accessGranted || isLoginRoute) return;
 
 		const timer = window.setTimeout(() => {
 			if (lightweight) {
@@ -83,7 +96,7 @@ function RootComponent() {
 		}, 50);
 
 		return () => window.clearTimeout(timer);
-	}, [lightweight]);
+	}, [lightweight, accessGranted, isLoginRoute]);
 
 	return (
 		<QueryClientProvider client={queryClient}>
@@ -96,7 +109,7 @@ function RootComponent() {
 					<div className="min-h-screen bg-background" />
 				)}
 
-				<ModalRoot />
+				{accessGranted && <ModalRoot />}
 
 				<ToastContainer />
 			</ToastProvider>

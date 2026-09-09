@@ -1,3 +1,4 @@
+import { authorize } from '../_auth.js';
 const ALLOWED_GOOGLE_HOSTS = new Set([
 	"docs.google.com",
 	"spreadsheets.google.com",
@@ -6,7 +7,7 @@ const ALLOWED_GOOGLE_HOSTS = new Set([
 function allowCors(response) {
 	response.setHeader("Access-Control-Allow-Origin", "*");
 	response.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+	response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 function sendResponse(response, status, body, contentType) {
@@ -54,6 +55,7 @@ function readTargetUrl(request) {
 }
 
 export default async function handler(request, response) {
+ if (!await authorize(request, response)) return;
 	if (handleOptions(request, response)) return;
 
 	if (request.method !== "GET") {

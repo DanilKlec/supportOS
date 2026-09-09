@@ -30,7 +30,6 @@ import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { isKeyboardCode } from "@/shared/lib/keyboard";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
-import { useAccessStore } from "@/store/access.store";
 import { useAuthStore } from "@/store/auth.store";
 
 import { ToolsMenu } from "./ToolsMenu";
@@ -243,8 +242,6 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 
 	const authConfigured = useAuthStore((s) => s.configured);
 	const authSession = useAuthStore((s) => s.session);
-	const accessSession = useAccessStore((s) => s.session);
-	const signOutAccess = useAccessStore((s) => s.signOut);
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const searchValue = useKnowledgeStore((s) => s.search);
@@ -299,14 +296,9 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	}, [categories, folders, selectedCategory, selectedFolder, showToast]);
 
 	const signOut = async () => {
-		await supabaseService.signOut();
+		try { await supabaseService.signOut(); } catch { showToast("Не удалось выйти. Повторите попытку."); return; }
 		await knowledgeService.loadKnowledge();
 		showToast("Signed out");
-	};
-
-	const leaveWorkspace = () => {
-		signOutAccess();
-		void navigate({ to: "/login", replace: true });
 	};
 
 	const openGlobalSearch = useCallback(() => {
@@ -557,20 +549,6 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 								<LogIn size={16} />
 							</button>
 						))}
-
-					{accessSession ? (
-						<button
-							type="button"
-							title={`Выйти: ${accessSession.username} (${accessSession.role})`}
-							onClick={leaveWorkspace}
-							className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
-						>
-							<span className="max-w-24 truncate">
-								{accessSession.username}
-							</span>
-							<LogOut size={16} />
-						</button>
-					) : null}
 				</div>
 
 				{mobileSearchOpen && (

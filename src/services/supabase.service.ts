@@ -1,383 +1,149 @@
-import type { AuthRole, AuthSession, AuthUser } from "@/store/auth.store";
-import { useAuthStore } from "@/store/auth.store";
-
-const SESSION_KEY = "supportos:supabase-session:v1";
-
-interface SupabaseAuthUser {
-	id: string;
-	email?: string;
-}
-
-interface SupabaseAuthResponse {
-	access_token?: string;
-	refresh_token?: string;
-	expires_at?: number;
-	user?: SupabaseAuthUser;
-	error?: string;
-	error_description?: string;
-	msg?: string;
-}
-
-interface SupabaseProfileRow {
-	id: string;
-	email: string | null;
-	role: AuthRole | null;
-}
+import type { Session } from "@supabase/supabase-js";
+import { useAuthStore, type AuthSession } from "@/store/auth.store";
+import { supabase } from "./supabase-client";
 
 type QueryValue = string | number | boolean | null | undefined;
-
-function getEnv(name: string) {
-	return (import.meta.env[name] as string | undefined)?.trim() ?? "";
-}
-
-function isBrowser() {
-	return typeof window !== "undefined" && typeof localStorage !== "undefined";
-}
-
-function normalizeBaseUrl(url: string) {
-	return url.replace(/\/+$/, "");
-}
-
-function getErrorMessage(payload: unknown, fallback: string) {
-	if (!payload || typeof payload !== "object") return fallback;
-
-	const record = payload as Record<string, unknown>;
-	const message =
-		record.message ?? record.error_description ?? record.error ?? record.msg;
-
-	return typeof message === "string" && message.trim() ? message : fallback;
-}
-
-function encodeQuery(query?: Record<string, QueryValue>) {
-	if (!query) return "";
-
-	const params = new URLSearchParams();
-
-	for (const [key, value] of Object.entries(query)) {
-		if (value === undefined) continue;
-		params.set(key, value === null ? "is.null" : String(value));
-	}
-
-	const text = params.toString();
-	return text ? `?${text}` : "";
-}
-
 class SupabaseService {
-	private readonly cloudSyncEnabled =
-		getEnv("VITE_SUPPORTOS_CLOUD_SYNC") === "true";
-	private readonly url = normalizeBaseUrl(getEnv("VITE_SUPABASE_URL"));
-	private readonly anonKey = getEnv("VITE_SUPABASE_ANON_KEY");
-
+	private initialized?: Promise<AuthSession | undefined>;
+	private revision = 0;
 	isConfigured() {
-		return this.cloudSyncEnabled && Boolean(this.url && this.anonKey);
+		return Boolean(supabase);
 	}
-
 	getSession() {
 		return useAuthStore.getState().session;
 	}
-
-	async initialize() {
-		const configured = this.isConfigured();
-
-		useAuthStore.getState().setConfigured(configured);
-
-		if (!configured) {
-			useAuthStore.getState().setLoading(false);
+	private accept(session: Session | null) {
+		const next: AuthSession | undefined = session
+			? {
+					accessToken: session.access_token,
+					refreshToken: session.refresh_token,
+					expiresAt: session.expires_at ? session.expires_at * 1000 : undefined,
+					user: {
+						id: session.user.id,
+						email: session.user.email ?? "",
+						role:
+							session.user.app_metadata?.role === "admin" ? "admin" : "user",
+					},
+				}
+			: undefined;
+		useAuthStore.setState({ session: next, error: undefined });
+		return next;
+	}
+	initialize() {
+		return (this.initialized ??= this.initializeOnce());
+	}
+	private async initializeOnce() {
+		useAuthStore.setState({ configured: this.isConfigured(), loading: true });
+		if (!supabase) {
+			useAuthStore.setState({ loading: false });
 			return undefined;
 		}
-
-		const cached = this.readSession();
-
-		if (!cached) {
-			useAuthStore.getState().setLoading(false);
-			return undefined;
-		}
-
+		// SDK owns refresh, persistence and cross-tab session events. Never trust the old local access store.
+		supabase.auth.onAuthStateChange((_event, session) => {
+			this.revision++;
+			this.accept(session);
+		});
 		try {
-			const session =
-				cached.expiresAt && cached.refreshToken && cached.expiresAt < Date.now()
-					? await this.refreshSession(cached.refreshToken)
-					: await this.withProfile(cached);
-
-			this.setSession(session);
-			return session;
+			const { data, error } = await supabase.auth.getSession();
+			if (error) throw error;
+			if (!data.session) return this.accept(null);
+			const revision = this.revision;
+			const verified = await supabase.auth.getUser();
+			if (revision !== this.revision) return this.getSession();
+			if (verified.error || !verified.data.user)
+				throw verified.error ?? new Error("Session expired");
+			return this.accept({ ...data.session, user: verified.data.user });
 		} catch (error) {
-			this.clearSession();
-			useAuthStore
-				.getState()
-				.setError(error instanceof Error ? error.message : "Sign in expired");
+			this.accept(null);
+			useAuthStore.setState({
+				error: error instanceof Error ? error.message : "Session expired",
+			});
 			return undefined;
 		} finally {
-			useAuthStore.getState().setLoading(false);
+			useAuthStore.setState({ loading: false });
 		}
 	}
-
 	async signIn(email: string, password: string) {
-		const response = await this.authRequest(
-			"/token?grant_type=password",
-			"POST",
-			{
-				email,
-				password,
-			},
-		);
-
-		const session = await this.sessionFromAuthResponse(response);
-		this.setSession(session);
-
-		return session;
-	}
-
-	async signUp(email: string, password: string) {
-		const response = await this.authRequest("/signup", "POST", {
-			email,
+		if (!supabase) throw new Error("Supabase is not configured");
+		const { data, error } = await supabase.auth.signInWithPassword({
+			email: email.trim(),
 			password,
 		});
-
-		if (!response.access_token) {
-			return undefined;
-		}
-
-		const session = await this.sessionFromAuthResponse(response);
-		this.setSession(session);
-
-		return session;
+		if (error) throw error;
+		return this.accept(data.session);
 	}
-
+	async signUp(email: string, password: string) {
+		if (!supabase) throw new Error("Supabase is not configured");
+		const { data, error } = await supabase.auth.signUp({
+			email: email.trim(),
+			password,
+			options: { emailRedirectTo: `${window.location.origin}/login` },
+		});
+		if (error) throw error;
+		return this.accept(data.session);
+	}
 	async signOut() {
-		const session = this.getSession();
-
-		if (session) {
-			await this.authRequest("/logout", "POST", undefined, session.accessToken);
+		if (supabase) {
+			const { error } = await supabase.auth.signOut({ scope: "local" });
+			if (error) throw error;
 		}
-
-		this.clearSession();
+		this.accept(null);
+		localStorage.removeItem("supportos:temporary-access:v1");
+		localStorage.removeItem("supportos:supabase-session:v1");
 	}
-
+	async getAccessToken() {
+		if (!supabase) throw new Error("Supabase is not configured");
+		const { data, error } = await supabase.auth.getSession();
+		if (error || !data.session) throw error ?? new Error("Sign in required");
+		return data.session.access_token;
+	}
 	async select<T>(table: string, query?: Record<string, QueryValue>) {
-		return this.restRequest<T[]>(
-			`/${table}${encodeQuery({ select: "*", ...query })}`,
-			{
-				method: "GET",
-			},
-		);
+		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries({ select: "*", ...query })) {
+			if (value !== undefined)
+				params.set(key, value === null ? "is.null" : String(value));
+		}
+		return this.rest<T[]>(`/${table}?${params}`, { method: "GET" });
 	}
-
 	async upsert<T extends Record<string, unknown>>(table: string, rows: T[]) {
-		if (rows.length === 0) return [];
-
-		return this.restRequest<T[]>(`/${table}?on_conflict=id`, {
+		if (!rows.length) return [];
+		return this.rest<T[]>(`/${table}?on_conflict=id`, {
 			method: "POST",
-			headers: {
-				Prefer: "resolution=merge-duplicates,return=representation",
-			},
+			headers: { Prefer: "resolution=merge-duplicates,return=representation" },
 			body: JSON.stringify(rows),
 		});
 	}
-
 	async rpc<T>(name: string, body?: Record<string, unknown>) {
-		return this.restRequest<T>(`/rpc/${name}`, {
+		return this.rest<T>(`/rpc/${name}`, {
 			method: "POST",
 			body: JSON.stringify(body ?? {}),
 		});
 	}
-
 	async delete(table: string, id: string) {
-		await this.restRequest(`/${table}?id=eq.${encodeURIComponent(id)}`, {
+		await this.rest(`/${table}?id=eq.${encodeURIComponent(id)}`, {
 			method: "DELETE",
-			headers: {
-				Prefer: "return=minimal",
-			},
+			headers: { Prefer: "return=minimal" },
 		});
 	}
-
-	private async sessionFromAuthResponse(response: SupabaseAuthResponse) {
-		if (!response.access_token || !response.user?.id) {
-			throw new Error(getErrorMessage(response, "Authentication failed"));
-		}
-
-		const email = response.user.email ?? "";
-		const baseSession: AuthSession = {
-			accessToken: response.access_token,
-			refreshToken: response.refresh_token,
-			expiresAt: response.expires_at ? response.expires_at * 1000 : undefined,
-			user: {
-				id: response.user.id,
-				email,
-				role: "user",
-			},
-		};
-
-		return this.withProfile(baseSession);
-	}
-
-	private async withProfile(session: AuthSession) {
-		await this.ensureProfile(session);
-
-		let role: AuthRole = "user";
-
-		try {
-			const profiles = await this.restRequest<SupabaseProfileRow[]>(
-				`/supportos_profiles?select=*&id=eq.${encodeURIComponent(
-					session.user.id,
-				)}`,
-				{
-					method: "GET",
-				},
-				session.accessToken,
-			);
-			const profile = profiles[0];
-
-			if (profile?.role === "admin" || profile?.role === "user") {
-				role = profile.role;
-			}
-		} catch {
-			role = "user";
-		}
-
-		const admin = await this.rpc<boolean>("supportos_is_admin", {}).catch(
-			() => false,
-		);
-		const user: AuthUser = {
-			...session.user,
-			role: admin ? "admin" : role,
-		};
-
-		return { ...session, user };
-	}
-
-	private async ensureProfile(session: AuthSession) {
-		try {
-			await this.restRequest(
-				"/supportos_profiles?on_conflict=id",
-				{
-					method: "POST",
-					headers: {
-						Prefer: "resolution=merge-duplicates,return=minimal",
-					},
-					body: JSON.stringify([
-						{
-							id: session.user.id,
-							email: session.user.email,
-						},
-					]),
-				},
-				session.accessToken,
-			);
-		} catch {
-			// Profiles are a convenience cache; auth can still work without it.
-		}
-	}
-
-	private async refreshSession(refreshToken: string) {
-		const response = await this.authRequest(
-			"/token?grant_type=refresh_token",
-			"POST",
-			{
-				refresh_token: refreshToken,
-			},
-		);
-
-		return this.sessionFromAuthResponse(response);
-	}
-
-	private async authRequest(
-		path: string,
-		method: string,
-		body?: unknown,
-		accessToken?: string,
-	) {
-		return this.request<SupabaseAuthResponse>(
-			`${this.url}/auth/v1${path}`,
-			{
-				method,
-				headers: {
-					"Content-Type": "application/json",
-					...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-				},
-				body: body ? JSON.stringify(body) : undefined,
-			},
-			"Authentication request failed",
-		);
-	}
-
-	private async restRequest<T>(
-		path: string,
-		init: RequestInit,
-		accessToken = this.getSession()?.accessToken,
-	) {
-		if (!accessToken) {
-			throw new Error("Sign in required");
-		}
-
-		return this.request<T>(
-			`${this.url}/rest/v1${path}`,
+	private async rest<T>(path: string, init: RequestInit) {
+		const token = await this.getAccessToken();
+		const response = await fetch(
+			`${import.meta.env.VITE_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1${path}`,
 			{
 				...init,
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
-					...(init.headers ?? {}),
+					apikey:
+						import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+						import.meta.env.VITE_SUPABASE_ANON_KEY,
+					Authorization: `Bearer ${token}`,
+					...init.headers,
 				},
 			},
-			"Database request failed",
 		);
-	}
-
-	private async request<T>(url: string, init: RequestInit, fallback: string) {
-		if (!this.isConfigured()) {
-			throw new Error("Supabase is not configured");
-		}
-
-		const response = await fetch(url, {
-			...init,
-			headers: {
-				apikey: this.anonKey,
-				...(init.headers ?? {}),
-			},
-		});
-		const text = await response.text();
-		const payload = text ? JSON.parse(text) : null;
-
-		if (!response.ok) {
-			throw new Error(getErrorMessage(payload, fallback));
-		}
-
-		return payload as T;
-	}
-
-	private setSession(session: AuthSession) {
-		useAuthStore.getState().setSession(session);
-		useAuthStore.getState().setError(undefined);
-		this.writeSession(session);
-	}
-
-	private clearSession() {
-		useAuthStore.getState().setSession(undefined);
-		useAuthStore.getState().setError(undefined);
-
-		if (isBrowser()) {
-			localStorage.removeItem(SESSION_KEY);
-		}
-	}
-
-	private readSession() {
-		if (!isBrowser()) return undefined;
-
-		try {
-			const raw = localStorage.getItem(SESSION_KEY);
-
-			return raw ? (JSON.parse(raw) as AuthSession) : undefined;
-		} catch {
-			return undefined;
-		}
-	}
-
-	private writeSession(session: AuthSession) {
-		if (!isBrowser()) return;
-
-		localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+		const payload = await response.text();
+		if (!response.ok) throw new Error("Database request failed");
+		return (payload ? JSON.parse(payload) : null) as T;
 	}
 }
-
 export const supabaseService = new SupabaseService();

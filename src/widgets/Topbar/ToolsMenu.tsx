@@ -8,6 +8,7 @@ import {
 	Download,
 	FileJson,
 	HeartPulse,
+	type LucideIcon,
 	Import,
 	Languages,
 	Moon,
@@ -21,7 +22,6 @@ import {
 import {
 	type ChangeEvent,
 	type KeyboardEvent,
-	type LucideIcon,
 	useCallback,
 	useEffect,
 	useRef,
@@ -44,6 +44,7 @@ type AppRoute =
 	| "/ai/knowledge"
 	| "/sports-betting"
 	| "/health"
+	| "/agent-monitor"
 	| "/archive"
 	| "/import/google-sheets"
 	| "/settings"
@@ -76,6 +77,7 @@ interface ToolGroup {
 }
 
 const WORK_TOOLS: RouteToolItem[] = [
+	{ type: "route", label: "Контроль агентов", description: "Приём чатов и история смен", icon: HeartPulse, to: "/agent-monitor" },
 	{
 		type: "route",
 		label: "Translator",

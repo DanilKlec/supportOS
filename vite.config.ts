@@ -1,8 +1,9 @@
+import { authorize } from "./api/_auth.js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
-
+import { agentMonitorPlugin } from "./api/agent-monitor/_vite.js";
 import { loadSportsBettingLive } from "./api/sports-betting/_live.js";
 
 const GOOGLE_SHEETS_PROXY_PATH = "/api/google-sheets/fetch";
@@ -178,9 +179,33 @@ export default defineConfig({
 	},
 
 	plugins: [
+		{
+			name: "supportos-api-auth",
+			configureServer(server) {
+				const env = loadEnv(server.config.mode, server.config.root, "");
+				for (const [key, value] of Object.entries(env)) {
+					if (
+						/^(SUPABASE_|VITE_SUPABASE_)/.test(key) &&
+						process.env[key] === undefined
+					)
+						process.env[key] = value;
+				}
+				server.middlewares.use(async (req, res, next) => {
+					const path = new URL(req.url ?? "", "http://localhost").pathname;
+					if (
+						!/^\/api\/(ai|translator|google-sheets|sports-betting)(\/|$)/.test(
+							path,
+						)
+					)
+						return next();
+					if (await authorize(req, res)) next();
+				});
+			},
+		},
+		agentMonitorPlugin(),
 		tanstackRouter({
 			target: "react",
-			autoCodeSplitting: true,
+			autoCodeSplitting: !process.env.VITEST,
 		}),
 
 		googleSheetsProxyPlugin(),
