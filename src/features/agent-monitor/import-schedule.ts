@@ -80,7 +80,7 @@ export function parseSchedule(
 	const preview: { name: string; email: string; shifts: number }[] = [];
 	for (const [index, row] of rows.entries()) {
 		const name = str(row[2]);
-		if (!/\((sup|shift)\)/i.test(name)) continue;
+		if (!/\(sup\)/i.test(name)) continue;
 		const matches = [...(emails.get(key(name)) ?? [])];
 		if (matches.length !== 1) {
 			issues.push(
@@ -119,6 +119,6 @@ export function parseSchedule(
 		preview.push({ name, email, shifts: count });
 	}
 	if (!people.length)
-		issues.push("Не найдены сотрудники с пометкой (sup) или (shift).");
+		issues.push("Не найдены сотрудники с пометкой (sup).");
 	return { payload: { month, people, records }, issues, preview };
 }

@@ -12,7 +12,7 @@ const directory = [
 const agents = [{ id: "work@example.com" }];
 it("reads corporate emails, all four shift codes and days off", () => {
 	const result = parseSchedule(
-		[header, [null, null, "Иван Иванов (sup)", 7, 6.5, 9, 13, 0]],
+		[header, [null, null, "Иван Иванов (sup)", 7, 6.5, 9, 13, 0], [null, null, "Руководитель (shift)", 7]],
 		directory,
 		"September 26",
 		agents,

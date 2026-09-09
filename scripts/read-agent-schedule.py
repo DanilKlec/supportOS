@@ -43,7 +43,7 @@ def read_schedule(path, sheet_name):
         records, issues, people = [], [], []
         for row_number,row in source_rows:
             name = row.get('C','')
-            if not re.search(r'\((?:sup|shift)\)',name,re.I): continue
+            if not re.search(r'\(sup\)',name,re.I): continue
             matches = emails[name_key(name)]
             if len(matches) != 1:
                 issues.append({'row':row_number,'name':name,'reason':'No unique corporate email','candidates':sorted(matches)})
