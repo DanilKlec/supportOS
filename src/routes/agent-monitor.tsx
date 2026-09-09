@@ -1,3 +1,9 @@
+import {
+	agentEmail,
+	isOnline,
+	matchesAgent,
+	statusEvents,
+} from "@/features/agent-monitor/analytics";
 import { supabaseService } from "@/services/supabase.service";
 import { useAuthStore } from "@/store/auth.store";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
@@ -90,6 +96,9 @@ function AgentMonitor() {
 	const [shift, setShift] = useState<ShiftId>(() => currentShift());
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState("all");
+	const [sortBy, setSortBy] = useState("off");
+	const [eventFilter, setEventFilter] = useState("all");
+	const [selectedAgent, setSelectedAgent] = useState("all");
 	const [allAgents, setAllAgents] = useState(true);
 	const [manage, setManage] = useState(false);
 	const [now, setNow] = useState(Date.now);
@@ -163,9 +172,10 @@ function AgentMonitor() {
 	}
 	const data = authenticated ? query.data : undefined;
 	const range = bounds(day, shift);
-	const filtered = (data?.agents ?? []).filter(
+	const online = (data?.agents ?? []).filter((agent) => isOnline(agent, now));
+	const filtered = online.filter(
 		(agent) =>
-			agent.name.toLowerCase().includes(search.toLowerCase()) &&
+			matchesAgent(agent, search) &&
 			(allAgents ||
 				data?.assignments.some(
 					(a) => a.agent_id === agent.id && a.shift === shift,
@@ -184,6 +194,14 @@ function AgentMonitor() {
 			unknown: Number(total?.unknown_ms ?? 0),
 		};
 	});
+	totals.sort((a, b) =>
+		sortBy === "name"
+			? a.agent.name.localeCompare(b.agent.name)
+			: sortBy === "changed"
+				? Date.parse(b.agent.changed_at ?? "1970-01-01") -
+					Date.parse(a.agent.changed_at ?? "1970-01-01")
+				: b.off - a.off || a.agent.name.localeCompare(b.agent.name),
+	);
 	const mergedHistory = Array.from(
 		new Map(
 			[...(data?.observations ?? []), ...older].map((item) => [item.id, item]),
@@ -210,10 +228,13 @@ function AgentMonitor() {
 			setBusy(false);
 		}
 	}
-	const history = mergedHistory
+	const history = statusEvents(mergedHistory)
 		.filter(
 			(event) =>
 				event.changed &&
+				(selectedAgent === "all" || selectedAgent === event.agent_id) &&
+				(eventFilter === "all" ||
+					(event.toggle && event.status === eventFilter)) &&
 				filtered.some((agent) => agent.id === event.agent_id) &&
 				Date.parse(event.at) >= range.start &&
 				Date.parse(event.at) < range.end,
@@ -224,6 +245,7 @@ function AgentMonitor() {
 		const rows = [
 			[
 				"Агент",
+				"Email / ID",
 				"Дата смены",
 				"Смена GMT+3",
 				"Принимает, мин",
@@ -233,6 +255,7 @@ function AgentMonitor() {
 			],
 			...totals.map((row) => [
 				row.agent.name,
+				row.agent.id,
 				day,
 				shifts.find((s) => s.id === shift)?.time,
 				...(["on", "off", "offline", "unknown"] as const).map((status) =>
@@ -324,8 +347,8 @@ function AgentMonitor() {
 							{(!data.lastSync || now - Date.parse(data.lastSync) >= 90000) &&
 								"Нет свежего подтверждения связи."}
 						</div>
-						<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-							{(["on", "off", "offline", "unknown"] as const).map((status) => (
+						<div className="grid grid-cols-2 gap-3">
+							{(["on", "off"] as const).map((status) => (
 								<div
 									key={status}
 									className="rounded-xl border border-border bg-surface p-4"
@@ -393,7 +416,7 @@ function AgentMonitor() {
 							<input
 								aria-label="Поиск агента"
 								className={control}
-								placeholder="Поиск агента…"
+								placeholder="Имя или почта агента…"
 								value={search}
 								onChange={(e) => setSearch(e.target.value)}
 							/>
@@ -403,12 +426,14 @@ function AgentMonitor() {
 								value={statusFilter}
 								onChange={(e) => setStatusFilter(e.target.value)}
 							>
-								<option value="all">Все статусы</option>
-								{Object.entries(labels).map(([value, label]) => (
-									<option key={value} value={value}>
-										{label}
-									</option>
-								))}
+								<option value="all">Все онлайн</option>
+								{Object.entries(labels)
+									.filter(([value]) => value === "on" || value === "off")
+									.map(([value, label]) => (
+										<option key={value} value={value}>
+											{label}
+										</option>
+									))}
 							</select>
 							<label className="text-sm">
 								<input
@@ -416,7 +441,7 @@ function AgentMonitor() {
 									checked={allAgents}
 									onChange={(e) => setAllAgents(e.target.checked)}
 								/>{" "}
-								Все агенты, включая неназначенных
+								Включая онлайн-агентов без смены
 							</label>
 							<button
 								className={control}
@@ -426,6 +451,20 @@ function AgentMonitor() {
 								<Users size={16} className="inline" /> Назначить смены
 							</button>
 						</div>
+						<div className="flex items-center gap-3 text-sm">
+							<label htmlFor="agent-sort">Порядок в аналитике</label>
+							<select
+								id="agent-sort"
+								aria-label="Сортировка агентов"
+								className={control}
+								value={sortBy}
+								onChange={(e) => setSortBy(e.target.value)}
+							>
+								<option value="off">Дольше выключен за смену</option>
+								<option value="changed">Последние изменения</option>
+								<option value="name">По имени</option>
+							</select>
+						</div>
 						{manage && (
 							<section className="rounded-xl border border-border bg-surface p-4">
 								<h2 className="font-semibold">Расписание на {day}</h2>
@@ -434,45 +473,77 @@ function AgentMonitor() {
 									LiveChat не изменяется.
 								</p>
 								<div className="mt-3 max-h-80 overflow-auto">
-									{data.agents.map((agent) => (
-										<div
-											key={agent.id}
-											className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3"
-										>
-											<span>{agent.name}</span>
-											<div className="flex flex-wrap gap-3">
-												{shifts.map((s) => (
-													<label className="text-sm" key={s.id}>
-														<input
-															type="checkbox"
-															disabled={busy}
-															checked={data.assignments.some(
-																(a) =>
-																	a.agent_id === agent.id && a.shift === s.id,
-															)}
-															onChange={(e) =>
-																void act("assignment", {
-																	agentId: agent.id,
-																	shift: s.id,
-																	enabled: e.target.checked,
-																})
-															}
-														/>{" "}
-														{s.label}
-													</label>
-												))}
+									{online
+										.filter((agent) => matchesAgent(agent, search))
+										.map((agent) => (
+											<div
+												key={agent.id}
+												className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3"
+											>
+												<span>
+													{agent.name}
+													<small className="block text-muted">
+														{agentEmail(agent) || `ID: ${agent.id}`}
+													</small>
+												</span>
+												<div className="flex flex-wrap gap-3">
+													{shifts.map((s) => (
+														<label className="text-sm" key={s.id}>
+															<input
+																type="checkbox"
+																disabled={busy}
+																checked={data.assignments.some(
+																	(a) =>
+																		a.agent_id === agent.id && a.shift === s.id,
+																)}
+																onChange={(e) =>
+																	void act("assignment", {
+																		agentId: agent.id,
+																		shift: s.id,
+																		enabled: e.target.checked,
+																	})
+																}
+															/>{" "}
+															{s.label}
+														</label>
+													))}
+												</div>
 											</div>
-										</div>
-									))}
+										))}
 								</div>
 							</section>
 						)}
+						<section className="rounded-xl border border-border bg-surface p-4">
+							<h2 className="font-semibold">
+								Аналитика выбранной смены · {filtered.length} онлайн
+							</h2>
+							<div className="mt-3 grid gap-4 sm:grid-cols-2">
+								<div>
+									<p className="text-sm text-muted">Приём включён, суммарно</p>
+									<p className="mt-1 text-2xl font-semibold text-emerald-500">
+										{duration(totals.reduce((sum, row) => sum + row.on, 0))}
+									</p>
+								</div>
+								<div>
+									<p className="text-sm text-muted">Приём выключен, суммарно</p>
+									<p className="mt-1 text-2xl font-semibold text-amber-500">
+										{duration(totals.reduce((sum, row) => sum + row.off, 0))}
+									</p>
+								</div>
+							</div>
+							<p className="mt-3 text-xs text-muted">
+								Только подтверждённые онлайн-агенты: приём включён или выключен.
+								Не в сети и без свежего статуса скрыты. Длительности — за
+								выбранную смену.
+							</p>
+						</section>
 						<section className="overflow-auto rounded-xl border border-border bg-surface">
 							<table className="w-full text-left text-sm">
 								<thead className="border-b border-border text-muted">
 									<tr>
 										{[
 											"Агент / сейчас",
+											"Последнее изменение",
 											"Приём включён",
 											"Выключен",
 											"Не в сети",
@@ -490,6 +561,9 @@ function AgentMonitor() {
 										<tr key={row.agent.id} className="border-b border-border">
 											<td className="p-4">
 												<div className="font-semibold">{row.agent.name}</div>
+												<div className="mt-1 text-xs text-muted">
+													{agentEmail(row.agent) || `ID: ${row.agent.id}`}
+												</div>
 												<div
 													className={`mt-1 text-xs ${colors[currentStatus(row.agent, now)]}`}
 												>
@@ -498,6 +572,20 @@ function AgentMonitor() {
 												<div className="mt-1 text-xs text-muted">
 													Проверен: {stamp(row.agent.observed_at)}
 												</div>
+											</td>
+											<td className="p-4 whitespace-nowrap">
+												{stamp(row.agent.changed_at)}
+												<span className="block text-xs text-muted">
+													Статус наблюдается{" "}
+													{row.agent.changed_at
+														? duration(
+																Math.max(
+																	0,
+																	now - Date.parse(row.agent.changed_at),
+																),
+															)
+														: "—"}
+												</span>
 											</td>
 											{(["on", "off", "offline", "unknown"] as const).map(
 												(status) => (
@@ -520,13 +608,42 @@ function AgentMonitor() {
 							</table>
 							{!filtered.length && (
 								<p className="p-8 text-center text-muted">
-									Агенты не найдены. Проверьте фильтры, назначения и подключение
-									LiveChat.
+									Нет онлайн-агентов по выбранным фильтрам. Проверьте
+									подключение LiveChat.
 								</p>
 							)}
 						</section>
 						<section className="rounded-xl border border-border bg-surface p-4">
-							<h2 className="font-semibold">Журнал смены · {history.length}</h2>
+							<div className="flex flex-wrap items-center justify-between gap-3">
+								<h2 className="font-semibold">
+									Журнал приёма чатов · {history.length}
+								</h2>
+								<div className="flex flex-wrap gap-2">
+									<select
+										aria-label="Агент в журнале"
+										className={control}
+										value={selectedAgent}
+										onChange={(e) => setSelectedAgent(e.target.value)}
+									>
+										<option value="all">Все онлайн-агенты</option>
+										{filtered.map((agent) => (
+											<option key={agent.id} value={agent.id}>
+												{agent.name} · {agent.id}
+											</option>
+										))}
+									</select>
+									<select
+										aria-label="События журнала"
+										className={control}
+										value={eventFilter}
+										onChange={(e) => setEventFilter(e.target.value)}
+									>
+										<option value="all">Все события</option>
+										<option value="off">Только выключения</option>
+										<option value="on">Только включения</option>
+									</select>
+								</div>
+							</div>
 							{data.historyLimited && !historyEnded && (
 								<button
 									className={`${control} mt-2`}
@@ -540,8 +657,9 @@ function AgentMonitor() {
 							<p className="mt-1 text-xs text-muted">
 								Время — момент получения webhook или обнаружения статуса
 								опросом. LiveChat не сообщает здесь автора и причину
-								переключения. Повторные подтверждения одинакового статуса
-								скрыты.
+								переключения. Показаны события агентов, которые сейчас онлайн.
+								Первое доступное наблюдение не считается переключением.
+								Повторные подтверждения одинакового статуса скрыты.
 							</p>
 							<div className="mt-4 max-h-96 divide-y divide-border overflow-auto">
 								{history.map((event) => (
@@ -554,9 +672,14 @@ function AgentMonitor() {
 												event.agent_id}{" "}
 											·{" "}
 											<span className={colors[event.status]}>
-												{labels[event.status]}
+												{event.action}
 											</span>
 											<p className="mt-1 text-xs text-muted">
+												{event.previous
+													? `${labels[event.previous]} → ${labels[event.status]}`
+													: labels[event.status]}{" "}
+												· {event.agent_id}
+												<br />
 												{event.source === "webhook"
 													? "Webhook LiveChat"
 													: "Обнаружено опросом LiveChat"}

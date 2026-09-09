@@ -84,3 +84,93 @@ it("uses individual bearer auth and signs out through Supabase", async () => {
 	await waitFor(() => expect(auth.signOut).toHaveBeenCalledOnce());
 	client.clear();
 });
+
+it("filters offline and stale agents, searches email, and filters reception events", async () => {
+	const now = Date.now();
+	const agents = [
+		{
+			id: "anna@example.com",
+			name: "Anna",
+			status: "on",
+			observed_at: new Date(now).toISOString(),
+			changed_at: new Date(now - 2000).toISOString(),
+		},
+		{
+			id: "boris@example.com",
+			name: "Boris",
+			status: "off",
+			observed_at: new Date(now).toISOString(),
+			changed_at: new Date(now - 1000).toISOString(),
+		},
+		{
+			id: "offline@example.com",
+			name: "Offline Person",
+			status: "offline",
+			observed_at: new Date(now).toISOString(),
+			changed_at: new Date(now).toISOString(),
+		},
+		{
+			id: "stale@example.com",
+			name: "Stale Person",
+			status: "on",
+			observed_at: new Date(now - 120000).toISOString(),
+			changed_at: new Date(now - 120000).toISOString(),
+		},
+	];
+	const observations = [
+		{
+			id: 1,
+			agent_id: "boris@example.com",
+			at: new Date(now - 3000).toISOString(),
+			status: "on",
+			source: "poll",
+			changed: true,
+		},
+		{
+			id: 2,
+			agent_id: "boris@example.com",
+			at: new Date(now - 1000).toISOString(),
+			status: "off",
+			source: "webhook",
+			changed: true,
+		},
+	];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async (url) =>
+				new Response(
+					JSON.stringify(
+						new URL(url, "http://localhost").searchParams.get("action") ===
+							"sync"
+							? {}
+							: {
+									agents,
+									observations,
+									assignments: [],
+									audit: [],
+									totals: [],
+									historyLimited: false,
+									lastSync: new Date(now).toISOString(),
+									serverTime: now,
+								},
+					),
+				),
+		),
+	);
+	const client = mount();
+	await screen.findByText("Anna");
+	expect(screen.queryByText("Offline Person")).toBeNull();
+	expect(screen.queryByText("Stale Person")).toBeNull();
+	fireEvent.change(screen.getByLabelText("Поиск агента"), {
+		target: { value: "boris@example.com" },
+	});
+	expect(screen.queryByText("Anna")).toBeNull();
+	expect(screen.getAllByText("boris@example.com").length).toBeGreaterThan(0);
+	fireEvent.change(screen.getByLabelText("События журнала"), {
+		target: { value: "off" },
+	});
+	expect(screen.queryByText("Первое доступное наблюдение")).toBeNull();
+	expect(screen.getByText("Журнал приёма чатов · 1")).toBeTruthy();
+	client.clear();
+});
