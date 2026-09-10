@@ -1,10 +1,10 @@
-import { authorize } from "./api/_auth.js";
+import { authorize } from "./server/_auth.js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { agentMonitorPlugin } from "./api/agent-monitor/_vite.js";
-import { loadSportsBettingLive } from "./api/sports-betting/_live.js";
+import { agentMonitorPlugin } from "./server/agent-monitor/_vite.js";
+import { loadSportsBettingLive } from "./server/sports-betting/_live.js";
 
 const GOOGLE_SHEETS_PROXY_PATH = "/api/google-sheets/fetch";
 const SPORTS_BETTING_LIVE_PATH = "/api/sports-betting/live";
