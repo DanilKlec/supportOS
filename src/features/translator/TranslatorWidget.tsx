@@ -366,7 +366,7 @@ export function TranslatorWidget() {
 	if (isHiddenOnCurrentPage) return null;
 
 	return (
-		<div className="fixed bottom-5 right-5 z-30 flex flex-col items-end gap-3">
+		<div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-20 flex flex-col items-end gap-3">
 			{open && (
 				<form
 					onSubmit={translate}

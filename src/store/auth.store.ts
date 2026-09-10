@@ -1,11 +1,15 @@
 import { create } from "zustand";
 
-export type AuthRole = "admin" | "user";
+export type AuthRole =
+	| import("../../shared/access.js").Role
+	| "user"
+	| "supervisor";
 
 export interface AuthUser {
 	id: string;
 	email: string;
 	role: AuthRole;
+	access?: import('../../shared/access.js').Access;
 }
 
 export interface AuthSession {

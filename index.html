@@ -13,8 +13,10 @@
     <script>
       (() => {
         try {
-          const theme = localStorage.getItem("supportos-theme") || "dark";
-          document.documentElement.classList.toggle("dark", theme === "dark");
+          const mode = localStorage.getItem("supportos-theme-mode") || localStorage.getItem("supportos-theme") || "dark";
+          const theme = mode === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : mode;
+          document.documentElement.classList.toggle("dark", theme !== "light");
+          document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
         } catch {
           document.documentElement.classList.add("dark");
         }

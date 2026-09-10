@@ -1,4 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { can, routePermission } from "../../../shared/access.js";
+import { useAuthStore } from "@/store/auth.store";
 import {
 	Archive,
 	Bot,
@@ -16,7 +18,10 @@ import {
 	Sparkles,
 	Sun,
 	Trophy,
-	Wrench,
+	LayoutGrid,
+	Search,
+	ChevronDown,
+	Calculator,
 	X,
 } from "lucide-react";
 import {
@@ -43,6 +48,7 @@ type AppRoute =
 	| "/ai/translator"
 	| "/ai/knowledge"
 	| "/sports-betting"
+	| "/bonus-tools"
 	| "/health"
 	| "/agent-monitor"
 	| "/archive"
@@ -77,53 +83,66 @@ interface ToolGroup {
 }
 
 const WORK_TOOLS: RouteToolItem[] = [
-	{ type: "route", label: "Контроль агентов", description: "Приём чатов и история смен", icon: HeartPulse, to: "/agent-monitor" },
 	{
 		type: "route",
-		label: "Translator",
-		description: "Translate support text",
+		label: "Калькуляторы бонусов",
+		description: "Расчёты и условия",
+		icon: Calculator,
+		to: "/bonus-tools",
+	},
+	{
+		type: "route",
+		label: "Контроль агентов",
+		description: "Приём чатов и история смен",
+		icon: HeartPulse,
+		to: "/agent-monitor",
+	},
+	{
+		type: "route",
+		label: "Переводчик",
+		description: "Перевод рабочих текстов",
 		icon: Languages,
 		to: "/translator",
 	},
 	{
 		type: "route",
-		label: "Answer Assistant",
-		description: "Generate and check replies",
+		label: "AI-помощник",
+		description: "Подготовка и проверка ответов",
 		icon: Bot,
 		to: "/ai/assistant",
 	},
 	{
 		type: "route",
-		label: "AI Translator",
-		description: "Translate with AI workflow",
+		label: "AI-переводчик",
+		description: "Перевод с учётом контекста",
 		icon: Sparkles,
 		to: "/ai/translator",
 	},
 	{
 		type: "route",
-		label: "AI Knowledge",
-		description: "Knowledge AI utilities",
+		label: "Обучение AI",
+		description: "Общие инструкции для помощника",
 		icon: BrainCircuit,
 		to: "/ai/knowledge",
 	},
 	{
 		type: "route",
-		label: "Sports Betting",
-		description: "Live odds workspace",
+		label: "Спортивные ставки",
+		description: "Коэффициенты и события",
 		icon: Trophy,
 		to: "/sports-betting",
 	},
 	{
 		type: "route",
-		label: "Knowledge Health",
-		description: "Find gaps and duplicates",
+		label: "Качество базы",
+		description: "Проверка полноты и дубликатов",
 		icon: HeartPulse,
 		to: "/health",
 	},
 	{
 		type: "route",
-		label: "Archive",
-		description: "Restore archived materials",
+		label: "Архив",
+		description: "Архивные материалы",
 		icon: Archive,
 		to: "/archive",
 	},
@@ -152,7 +171,12 @@ function getFocusableItems(container: HTMLDivElement | null) {
 	);
 }
 
-export function ToolsMenu() {
+export function ToolsMenu({
+	placement = "down",
+}: {
+	placement?: "up" | "down";
+}) {
+	const role = useAuthStore((s) => s.session?.user.access);
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
@@ -162,6 +186,9 @@ export function ToolsMenu() {
 	const menuRef = useRef<HTMLDivElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const [groupIndex, setGroupIndex] = useState(0);
+	const searchRef = useRef<HTMLInputElement>(null);
 	const [themeMode, setThemeMode] = useState(
 		() => getAppearanceSettings().themeMode,
 	);
@@ -209,7 +236,7 @@ export function ToolsMenu() {
 
 	const toggleTheme = () => {
 		const settings = getAppearanceSettings();
-		const nextTheme =
+		const nextTheme: "light" | "dark" =
 			resolveThemeMode(settings.themeMode) === "dark" ? "light" : "dark";
 		const nextSettings = {
 			...settings,
@@ -226,65 +253,69 @@ export function ToolsMenu() {
 
 	const groups: ToolGroup[] = [
 		{
-			title: "Work tools",
-			items: WORK_TOOLS,
+			title: "Инструменты",
+			items: WORK_TOOLS.filter(
+				(item) =>
+					!["/bonus-tools", "/agent-monitor", "/ai/assistant"].includes(
+						item.to,
+					),
+			),
 		},
 		{
-			title: "Data",
+			title: "Данные",
 			items: [
 				{
 					type: "action",
-					label: "Import JSON",
-					description: "Restore SupportOS export",
+					label: "Импорт JSON",
+					description: "Восстановление из файла",
 					icon: Import,
 					action: importJson,
 				},
 				{
 					type: "action",
-					label: "Export JSON",
-					description: "Download full backup",
+					label: "Экспорт JSON",
+					description: "Скачать резервную копию",
 					icon: Download,
 					action: exportJson,
 				},
 				{
 					type: "route",
-					label: "Google Sheets Import",
-					description: "Import published sheets",
+					label: "Импорт Google Sheets",
+					description: "Добавить данные из таблицы",
 					icon: FileJson,
 					to: "/import/google-sheets",
 				},
 			],
 		},
 		{
-			title: "Interface",
+			title: "Настройки",
 			items: [
 				{
 					type: "action",
-					label:
-						resolvedTheme === "dark" ? "Switch to Light" : "Switch to Dark",
-					description: "Change workspace theme",
+					label: resolvedTheme === "dark" ? "Светлая тема" : "Тёмная тема",
+					description: "Оформление рабочего пространства",
 					icon: resolvedTheme === "dark" ? Sun : Moon,
 					action: toggleTheme,
 					active: true,
 				},
 				{
 					type: "route",
-					label: "Settings",
-					description: "Workspace preferences",
+					label: "Управление",
+					description: "Аккаунт, роли и оформление",
 					icon: Settings,
 					to: "/settings",
 				},
 				{
 					type: "route",
-					label: "Translator Settings",
-					description: "Provider and endpoint",
+					label: "Настройки перевода",
+					description: "Подключение провайдера",
 					icon: Languages,
 					to: "/settings/translator",
 				},
 				{
 					type: "route",
-					label: "AI Settings",
-					description: "Provider and model setup",
+					label: "Настройки AI",
+					description: "Провайдер и модель",
 					icon: BrainCircuit,
 					to: "/settings/ai",
 				},
@@ -313,23 +344,16 @@ export function ToolsMenu() {
 				closeMenu();
 			}
 		};
-		const previousOverflow = document.body.style.overflow;
-		const mobile = window.matchMedia("(max-width: 767px)").matches;
-
-		if (mobile) {
-			document.body.style.overflow = "hidden";
-		}
 
 		window.addEventListener("pointerdown", closeOnOutsideClick);
 		window.addEventListener("keydown", closeOnEscape);
 		window.setTimeout(() => {
-			getFocusableItems(menuRef.current)[0]?.focus();
+			searchRef.current?.focus();
 		}, 0);
 
 		return () => {
 			window.removeEventListener("pointerdown", closeOnOutsideClick);
 			window.removeEventListener("keydown", closeOnEscape);
-			document.body.style.overflow = previousOverflow;
 		};
 	}, [open, closeMenu]);
 
@@ -347,32 +371,65 @@ export function ToolsMenu() {
 			items[(currentIndex - 1 + items.length) % items.length]?.focus();
 		}
 
-		if (event.key === "Home") {
+		if (event.key === "Home" && event.target !== searchRef.current) {
 			event.preventDefault();
 			items[0]?.focus();
 		}
 
-		if (event.key === "End") {
+		if (event.key === "End" && event.target !== searchRef.current) {
 			event.preventDefault();
 			items[items.length - 1]?.focus();
 		}
 	};
 
+	const visibleGroups = groups
+		.map((group) => ({
+			...group,
+			items: group.items.filter(
+				(item) => item.type !== "route" || can(role, routePermission(item.to)),
+			),
+		}))
+		.filter((group) => group.items.length);
+	const displayed = (
+		query.trim()
+			? visibleGroups.flatMap((g) => g.items)
+			: (visibleGroups[groupIndex]?.items ?? [])
+	).filter((item) =>
+		`${item.label} ${item.description ?? ""}`
+			.toLocaleLowerCase()
+			.includes(query.trim().toLocaleLowerCase()),
+	);
 	return (
-		<>
+		<div
+			className="relative"
+			onBlur={(event) => {
+				if (
+					event.relatedTarget &&
+					!event.currentTarget.contains(event.relatedTarget as Node)
+				)
+					setOpen(false);
+			}}
+		>
 			<button
 				ref={buttonRef}
 				type="button"
-				aria-haspopup="menu"
+				aria-label="Открыть инструменты"
+				aria-haspopup="dialog"
 				aria-expanded={open}
 				aria-controls={menuId}
-				onClick={() => setOpen((value) => !value)}
-				className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground transition hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+				onClick={() => {
+					setOpen((v) => !v);
+					setQuery("");
+				}}
+				className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition ${open ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
 			>
-				<Wrench size={17} />
-				<span className="hidden sm:inline">Tools</span>
+				<LayoutGrid size={18} />
+				<span className="hidden sm:inline">Инструменты</span>
+				<ChevronDown
+					size={13}
+					className={`transition-transform ${open ? "rotate-180" : ""}`}
+				/>
 			</button>
-
 			<input
 				ref={fileInputRef}
 				type="file"
@@ -380,111 +437,104 @@ export function ToolsMenu() {
 				onChange={handleImportFile}
 				className="hidden"
 			/>
-
 			{open && (
-				<>
-					<button
-						type="button"
-						aria-label="Close Tools"
-						onClick={closeMenu}
-						className="fixed inset-0 z-40 bg-black/45 md:hidden"
-					/>
-
-					<div
-						ref={menuRef}
-						id={menuId}
-						role="menu"
-						aria-label="Tools"
-						onKeyDown={handleMenuKeyDown}
-						className="fixed inset-x-0 bottom-0 z-50 max-h-[86dvh] overflow-hidden rounded-t-xl border border-border bg-surface shadow-2xl animate-slide-up md:absolute md:right-5 md:top-[3.25rem] md:bottom-auto md:left-auto md:w-[22rem] md:max-h-[min(76vh,46rem)] md:rounded-xl"
-					>
-						<div className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
-							<div className="text-sm font-semibold">Tools</div>
-							<button
-								type="button"
-								onClick={closeMenu}
-								aria-label="Close Tools"
-								className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
-							>
-								<X size={18} />
-							</button>
-						</div>
-
-						<div className="supportos-scroll max-h-[calc(86dvh-64px)] overflow-y-auto p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:max-h-[min(76vh,46rem)] md:pb-2">
-							{groups.map((group) => (
-								<section key={group.title} className="py-1">
-									<div className="px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-										{group.title}
-									</div>
-
-									<div className="space-y-1">
-										{group.items.map((item) => {
-											const Icon = item.icon;
-											const active =
-												item.type === "route" && pathname === item.to;
-
-											return (
-												<button
-													key={`${group.title}-${item.label}`}
-													type="button"
-													role="menuitem"
-													data-tools-item
-													onClick={() =>
-														item.type === "route"
-															? navigateTo(item.to)
-															: item.action()
-													}
-													className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
-														item.danger
-															? "text-red-400 hover:bg-red-500/10"
-															: active
-																? "bg-accent/10 text-foreground"
-																: "text-foreground hover:bg-surface-elevated"
-													}`}
-												>
-													<span
-														className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-															active
-																? "bg-accent text-accent-foreground"
-																: "bg-background text-muted"
-														}`}
-													>
-														<Icon size={16} />
-													</span>
-													<span className="min-w-0 flex-1">
-														<span className="flex items-center gap-2">
-															<span className="truncate font-medium">
-																{item.label}
-															</span>
-															{item.type === "action" && item.active && (
-																<Check
-																	size={14}
-																	className="shrink-0 text-accent"
-																/>
-															)}
-														</span>
-														{item.description && (
-															<span className="mt-0.5 block truncate text-xs text-muted">
-																{item.description}
-															</span>
-														)}
-													</span>
-													{item.type === "route" && (
-														<ChevronRight
-															size={15}
-															className="shrink-0 text-muted"
-														/>
-													)}
-												</button>
-											);
-										})}
-									</div>
-								</section>
+				<div
+					ref={menuRef}
+					id={menuId}
+					role="dialog"
+					aria-label="Инструменты"
+					onKeyDown={handleMenuKeyDown}
+					className={`tools-popover fixed right-3 z-50 flex w-[min(350px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-black/30 sm:absolute sm:right-0 ${placement === "up" ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-[calc(100%+12px)] origin-bottom-right" : "top-[4.5rem] sm:top-[calc(100%+12px)]"}`}
+				>
+					<div className="flex items-center gap-2 border-b border-border px-4 py-3">
+						<Search size={16} className="shrink-0 text-muted" />
+						<input
+							ref={searchRef}
+							aria-label="Найти инструмент"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							placeholder="Найти инструмент…"
+							className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+						/>
+						<button
+							type="button"
+							aria-label="Закрыть инструменты"
+							onClick={closeMenu}
+							className="rounded-lg p-1.5 text-muted hover:bg-surface-elevated"
+						>
+							<X size={16} />
+						</button>
+					</div>
+					{!query && (
+						<div
+							className="flex gap-1 px-3 pt-3"
+							aria-label="Группы инструментов"
+						>
+							{visibleGroups.map((group, index) => (
+								<button
+									type="button"
+									key={group.title}
+									aria-pressed={groupIndex === index}
+									onClick={() => setGroupIndex(index)}
+									className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium ${groupIndex === index ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
+								>
+									{group.title}
+								</button>
 							))}
 						</div>
+					)}
+					<div className="supportos-scroll max-h-[min(390px,calc(100dvh-220px))] overflow-y-auto p-2">
+						{displayed.map((item) => {
+							const Icon = item.icon;
+							const active = item.type === "route" && pathname === item.to;
+							return (
+								<button
+									key={item.label}
+									type="button"
+									data-tools-item
+									onClick={() =>
+										item.type === "route" ? navigateTo(item.to) : item.action()
+									}
+									className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-accent/10 text-accent" : "hover:bg-surface-elevated"}`}
+								>
+									<Icon
+										size={18}
+										strokeWidth={1.6}
+										className={
+											active ? "shrink-0 text-accent" : "shrink-0 text-muted"
+										}
+									/>
+									<span className="min-w-0 flex-1">
+										<span className="block text-sm font-medium">
+											{item.label}
+										</span>
+										<span className="mt-0.5 block text-[11px] text-muted">
+											{item.description}
+										</span>
+									</span>
+									{active ? (
+										<Check size={14} />
+									) : (
+										<ChevronRight
+											size={14}
+											className="text-muted opacity-0 group-hover:opacity-100"
+										/>
+									)}
+								</button>
+							);
+						})}
+						{!displayed.length && (
+							<p className="px-4 py-8 text-center text-sm text-muted">
+								Инструмент не найден
+							</p>
+						)}
 					</div>
-				</>
+					<div className="flex justify-between border-t border-border px-4 py-2.5 text-[10px] text-muted">
+						<span>↑ ↓ выбор · Enter открыть</span>
+						<span>Esc закрыть</span>
+					</div>
+				</div>
 			)}
-		</>
+		</div>
 	);
 }

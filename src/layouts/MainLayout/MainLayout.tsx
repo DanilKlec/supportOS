@@ -1,8 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
+import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { isLightweightRoute } from "@/app/route-mode";
-import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
 import { useWorkspaceStore } from "@/store";
 import { CommandPalette } from "@/widgets/CommandPalette/CommandPalette";
@@ -16,6 +15,14 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		select: (state) => state.location.pathname,
 	});
 	const previousPathnameRef = useRef(pathname);
+	const knowledgeRoute = [
+		"/",
+		"/binds",
+		"/favorites",
+		"/recent",
+		"/archive",
+		"/health",
+	].includes(pathname.replace(/\/+$/, "") || "/");
 
 	useEffect(() => {
 		if (!mobileSidebarOpen) return undefined;
@@ -44,70 +51,23 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		return <main className="min-h-screen bg-background">{children}</main>;
 	}
 
-	if (isLightweightRoute(pathname)) {
-		return (
-			<div className="flex h-screen flex-col bg-background">
-				<header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
-					<Link
-						to="/"
-						className="inline-flex items-center gap-2 font-semibold hover:text-accent"
-					>
-						<SupportOSLogo className="h-7 w-7" />
-						SupportOS
-					</Link>
-
-					<nav className="flex items-center gap-2 text-sm">
-						<Link
-							to="/"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Knowledge
-						</Link>
-						<Link
-							to="/translator"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Translator
-						</Link>
-						<Link
-							to="/ai/assistant"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Assistant
-						</Link>
-						<Link
-							to="/settings"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Settings
-						</Link>
-					</nav>
-				</header>
-
-				<main className="flex flex-1 flex-col overflow-hidden bg-background">
-					{children}
-				</main>
-
-				{layout.showTranslatorWidget && <TranslatorWidget />}
-				<CommandPalette />
-			</div>
-		);
-	}
-
 	return (
-		<div className="flex h-screen flex-col">
-			{layout.showTopbar && (
-				<Topbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />
-			)}
+		<div className="app-shell flex h-dvh flex-col">
+			{
+				<Topbar
+					showKnowledgeControls={knowledgeRoute}
+					onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+				/>
+			}
 
-			<div className="flex flex-1 overflow-hidden">
-				{layout.showSidebar && (
+			<div className="flex min-h-0 flex-1 overflow-hidden">
+				{knowledgeRoute && layout.showSidebar && (
 					<div className="hidden min-h-0 md:block">
 						<Sidebar />
 					</div>
 				)}
 
-				{mobileSidebarOpen && (
+				{knowledgeRoute && mobileSidebarOpen && (
 					<div className="fixed inset-0 z-40 md:hidden">
 						<button
 							type="button"
@@ -125,11 +85,12 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					</div>
 				)}
 
-				<main className="flex flex-1 flex-col overflow-hidden bg-background">
+				<main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
 					{children}
 				</main>
 			</div>
 
+			<WorkspaceDock />
 			{layout.showTranslatorWidget && <TranslatorWidget />}
 			<CommandPalette />
 		</div>

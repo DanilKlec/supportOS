@@ -1,4 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
+import { can, routePermission } from "../../shared/access.js";
+import { supabaseService } from "@/services/supabase.service";
 import "#/styles.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -37,6 +39,12 @@ const queryClient = new QueryClient({
 
 useAuthStore.subscribe((state, previous) => {
 	if (state.session?.user.id !== previous.session?.user.id) queryClient.clear();
+	if (
+		previous.session?.user.access &&
+		state.session?.user.id !== previous.session.user.id &&
+		typeof window !== "undefined"
+	)
+		window.location.reload();
 });
 
 export const Route = createRootRoute({
@@ -46,6 +54,15 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+	useEffect(() => {
+		const check = () => void supabaseService.refreshIdentity();
+		const timer = setInterval(check, 30000);
+		window.addEventListener("focus", check);
+		return () => {
+			clearInterval(timer);
+			window.removeEventListener("focus", check);
+		};
+	}, []);
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
@@ -55,7 +72,10 @@ function RootComponent() {
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
 	const isLoginRoute = pathname.replace(/\/+$/, "") === "/login";
-	const accessGranted = !loading && Boolean(session);
+	const accessGranted =
+		!loading &&
+		Boolean(session) &&
+		can(session?.user.access, routePermission(pathname));
 	useEffect(() => {
 		if (loading) return;
 		if (!session && !isLoginRoute) {
@@ -106,7 +126,19 @@ function RootComponent() {
 						<Outlet />
 					</MainLayout>
 				) : (
-					<div className="min-h-screen bg-background" />
+					<div className="min-h-screen bg-background p-8">
+						{!loading && session && (
+							<>
+								<p>Нет доступа к этому разделу. Обратитесь к администратору.</p>
+								<button onClick={() => void navigate({ to: "/settings" })}>
+									Мой аккаунт
+								</button>
+								<button onClick={() => void supabaseService.signOut()}>
+									Выйти
+								</button>
+							</>
+						)}
+					</div>
 				)}
 
 				{accessGranted && <ModalRoot />}

@@ -38,12 +38,12 @@ it("permits a signed-in route and the public login", async () => {
 	useAuthStore.setState({
 		session: {
 			accessToken: "token",
-			user: { id: "u", email: "test@example.test", role: "user" },
+			user: { id: "u", email: "test@example.test", role: "support",access:{status:'active',permissions:['work','binds.read'],roles:[{id:'support',name:'Support'}],version:1,display_name:''} },
 		},
 	});
 	await expect(
 		requireAppAuth({
-			location: { pathname: "/agent-monitor", href: "/agent-monitor" },
+			location: { pathname: "/binds", href: "/binds" },
 		}),
 	).resolves.toBeUndefined();
 });

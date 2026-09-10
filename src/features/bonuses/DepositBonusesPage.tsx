@@ -1,3 +1,5 @@
+import { can } from "../../../shared/access.js";
+import { useAuthStore } from "@/store/auth.store";
 import {
 	CheckCircle2,
 	Copy,
@@ -471,6 +473,9 @@ function toDraft(bonus: DepositBonus): BonusDraft {
 }
 
 export function DepositBonusesPage() {
+	const canEdit = useAuthStore((s) =>
+		can(s.session?.user.access, "bonuses.write"),
+	);
 	const { showToast } = useToast();
 	const projects = useBonusStore((state) => state.projects);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
@@ -676,6 +681,7 @@ export function DepositBonusesPage() {
 	};
 
 	const commitPreview = () => {
+		if (!canEdit) return;
 		if (!preview || preview.projects.length === 0) return;
 
 		setCommitting(true);
@@ -697,6 +703,10 @@ export function DepositBonusesPage() {
 	};
 
 	const createProject = (event: FormEvent) => {
+		if (!canEdit) {
+			event.preventDefault();
+			return;
+		}
 		event.preventDefault();
 		const project = addProject(newProjectName);
 
@@ -728,6 +738,7 @@ export function DepositBonusesPage() {
 	};
 
 	const saveProjectName = () => {
+		if (!canEdit) return;
 		if (!activeProject) return;
 
 		renameProject(activeProject.id, renameValue);
@@ -735,6 +746,7 @@ export function DepositBonusesPage() {
 	};
 
 	const updateActiveProjectCurrencyGroup = (tableName: string) => {
+		if (!canEdit) return;
 		if (!activeProject) return;
 
 		setProjectCurrencyGroup(activeProject.id, tableName);
@@ -763,6 +775,10 @@ export function DepositBonusesPage() {
 	};
 
 	const submitBonus = (event: FormEvent) => {
+		if (!canEdit) {
+			event.preventDefault();
+			return;
+		}
 		event.preventDefault();
 		setFormError("");
 
@@ -847,6 +863,7 @@ export function DepositBonusesPage() {
 	};
 
 	const confirmDeleteProject = () => {
+		if (!canEdit) return;
 		if (!deleteProjectTarget) return;
 
 		removeProject(deleteProjectTarget.id);
@@ -855,6 +872,7 @@ export function DepositBonusesPage() {
 	};
 
 	const confirmDeleteBonus = () => {
+		if (!canEdit) return;
 		if (!activeProject || !deleteBonusTarget) return;
 
 		removeBonus(activeProject.id, deleteBonusTarget.id);
@@ -930,6 +948,7 @@ export function DepositBonusesPage() {
 
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={() => setImportOpen((current) => !current)}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
@@ -1094,39 +1113,43 @@ export function DepositBonusesPage() {
 							onSubmit={createProject}
 							className="min-w-0 rounded-xl border border-border bg-surface p-3"
 						>
-							<div className="mb-3 text-sm font-semibold">Project sheets</div>
-							<div className="grid gap-2">
-								<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-									<input
-										value={newProjectName}
-										onChange={(event) => setNewProjectName(event.target.value)}
-										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-										placeholder="Project name"
-									/>
-									<button
-										type="submit"
-										className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
+							<fieldset disabled={!canEdit}>
+								<div className="mb-3 text-sm font-semibold">Project sheets</div>
+								<div className="grid gap-2">
+									<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+										<input
+											value={newProjectName}
+											onChange={(event) =>
+												setNewProjectName(event.target.value)
+											}
+											className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+											placeholder="Project name"
+										/>
+										<button
+											type="submit"
+											className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
+										>
+											<Plus size={16} />
+											Add
+										</button>
+									</div>
+									<select
+										value={newProjectCurrencyGroup}
+										onChange={(event) =>
+											setNewProjectCurrencyGroup(event.target.value)
+										}
+										className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										aria-label="Currency group for new project"
 									>
-										<Plus size={16} />
-										Add
-									</button>
+										<option value="">Auto currency group</option>
+										{currencyGroupOptions.map((group) => (
+											<option key={group.name} value={group.name}>
+												{formatCurrencyGroupLabel(group.name, group.currencies)}
+											</option>
+										))}
+									</select>
 								</div>
-								<select
-									value={newProjectCurrencyGroup}
-									onChange={(event) =>
-										setNewProjectCurrencyGroup(event.target.value)
-									}
-									className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									aria-label="Currency group for new project"
-								>
-									<option value="">Auto currency group</option>
-									{currencyGroupOptions.map((group) => (
-										<option key={group.name} value={group.name}>
-											{formatCurrencyGroupLabel(group.name, group.currencies)}
-										</option>
-									))}
-								</select>
-							</div>
+							</fieldset>
 						</form>
 
 						<div className="relative">
@@ -1213,6 +1236,7 @@ export function DepositBonusesPage() {
 											/>
 											<button
 												type="button"
+												disabled={!canEdit}
 												onClick={saveProjectName}
 												className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
@@ -1256,6 +1280,7 @@ export function DepositBonusesPage() {
 									<div className="flex items-center gap-2">
 										<button
 											type="button"
+											disabled={!canEdit}
 											onClick={() => setDeleteProjectId(activeProject.id)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 											title="Delete project sheet"
@@ -1267,85 +1292,87 @@ export function DepositBonusesPage() {
 								</div>
 
 								<form onSubmit={submitBonus} className="space-y-3 p-4">
-									<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem]">
-										<input
-											value={bonusDraft.name}
-											onChange={(event) =>
-												setBonusDraft((current) => ({
-													...current,
-													name: event.target.value,
-												}))
-											}
-											className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder="Bonus name"
-										/>
-										<input
-											value={bonusDraft.minDepositAmount}
-											onChange={(event) =>
-												setBonusDraft((current) => ({
-													...current,
-													minDepositAmount: event.target.value,
-												}))
-											}
-											className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder="Min dep."
-										/>
-										<input
-											value={bonusDraft.minDepositCurrency}
-											list="deposit-bonus-currencies"
-											onChange={(event) =>
-												setBonusDraft((current) => ({
-													...current,
-													minDepositCurrency: event.target.value,
-												}))
-											}
-											className="h-11 rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder="USD"
-										/>
-									</div>
-
-									<textarea
-										value={getDraftContent(bonusDraft, selectedLanguage)}
-										onChange={(event) =>
-											setBonusDraft((current) =>
-												setDraftLanguageContent(
-													current,
-													selectedLanguage,
-													event.target.value,
-												),
-											)
-										}
-										className="min-h-28 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-										placeholder={`Bonus content / ready bind text (${getLanguageLabel(
-											selectedLanguage,
-										)})`}
-									/>
-
-									{formError && (
-										<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-											{formError}
+									<fieldset disabled={!canEdit}>
+										<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem]">
+											<input
+												value={bonusDraft.name}
+												onChange={(event) =>
+													setBonusDraft((current) => ({
+														...current,
+														name: event.target.value,
+													}))
+												}
+												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												placeholder="Bonus name"
+											/>
+											<input
+												value={bonusDraft.minDepositAmount}
+												onChange={(event) =>
+													setBonusDraft((current) => ({
+														...current,
+														minDepositAmount: event.target.value,
+													}))
+												}
+												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												placeholder="Min dep."
+											/>
+											<input
+												value={bonusDraft.minDepositCurrency}
+												list="deposit-bonus-currencies"
+												onChange={(event) =>
+													setBonusDraft((current) => ({
+														...current,
+														minDepositCurrency: event.target.value,
+													}))
+												}
+												className="h-11 rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												placeholder="USD"
+											/>
 										</div>
-									)}
 
-									<div className="flex flex-wrap justify-end gap-2">
-										{editingBonusId && (
-											<button
-												type="button"
-												onClick={resetBonusForm}
-												className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
-											>
-												<X size={15} />
-												Cancel
-											</button>
+										<textarea
+											value={getDraftContent(bonusDraft, selectedLanguage)}
+											onChange={(event) =>
+												setBonusDraft((current) =>
+													setDraftLanguageContent(
+														current,
+														selectedLanguage,
+														event.target.value,
+													),
+												)
+											}
+											className="min-h-28 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+											placeholder={`Bonus content / ready bind text (${getLanguageLabel(
+												selectedLanguage,
+											)})`}
+										/>
+
+										{formError && (
+											<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+												{formError}
+											</div>
 										)}
-										<button
-											type="submit"
-											className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
-										>
-											<Plus size={16} />
-											{editingBonusId ? "Save Bonus" : "Add Bonus"}
-										</button>
-									</div>
+
+										<div className="flex flex-wrap justify-end gap-2">
+											{editingBonusId && (
+												<button
+													type="button"
+													onClick={resetBonusForm}
+													className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												>
+													<X size={15} />
+													Cancel
+												</button>
+											)}
+											<button
+												type="submit"
+												className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+											>
+												<Plus size={16} />
+												{editingBonusId ? "Save Bonus" : "Add Bonus"}
+											</button>
+										</div>
+									</fieldset>
 								</form>
 							</section>
 
@@ -1426,6 +1453,7 @@ export function DepositBonusesPage() {
 															</button>
 															<button
 																type="button"
+																disabled={!canEdit}
 																onClick={() => editBonus(bonus)}
 																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 																title="Edit bonus"
@@ -1435,6 +1463,7 @@ export function DepositBonusesPage() {
 															</button>
 															<button
 																type="button"
+																disabled={!canEdit}
 																onClick={() => setDeleteBonusId(bonus.id)}
 																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 																title="Delete bonus"

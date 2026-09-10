@@ -327,6 +327,7 @@ export function applyAppearance(settings = getAppearanceSettings()) {
 		settings.density === "compact" ? baseFontSize - 1 : baseFontSize;
 
 	root.classList.toggle("dark", resolvedTheme === "dark");
+	root.style.colorScheme = resolvedTheme;
 	root.dataset.themeMode = settings.themeMode;
 	root.dataset.density = settings.density;
 	root.dataset.palette = settings.palette;

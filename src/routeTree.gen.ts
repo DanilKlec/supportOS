@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslatorRouteImport } from './routes/translator'
 import { Route as SportsBettingRouteImport } from './routes/sports-betting'
+import { Route as SharedBindsRouteImport } from './routes/shared-binds'
 import { Route as RecentRouteImport } from './routes/recent'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
@@ -39,6 +40,11 @@ const TranslatorRoute = TranslatorRouteImport.update({
 const SportsBettingRoute = SportsBettingRouteImport.update({
   id: '/sports-betting',
   path: '/sports-betting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SharedBindsRoute = SharedBindsRouteImport.update({
+  id: '/shared-binds',
+  path: '/shared-binds',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RecentRoute = RecentRouteImport.update({
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/project-emails'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
     | '/translator'
     | '/ai/assistant'
@@ -292,6 +304,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
   RecentRoute: typeof RecentRoute
+  SharedBindsRoute: typeof SharedBindsRoute
   SportsBettingRoute: typeof SportsBettingRoute
   TranslatorRoute: typeof TranslatorRoute
   AiAssistantRoute: typeof AiAssistantRoute
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       path: '/sports-betting'
       fullPath: '/sports-betting'
       preLoaderRoute: typeof SportsBettingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shared-binds': {
+      id: '/shared-binds'
+      path: '/shared-binds'
+      fullPath: '/shared-binds'
+      preLoaderRoute: typeof SharedBindsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/recent': {
@@ -468,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
   RecentRoute: RecentRoute,
+  SharedBindsRoute: SharedBindsRoute,
   SportsBettingRoute: SportsBettingRoute,
   TranslatorRoute: TranslatorRoute,
   AiAssistantRoute: AiAssistantRoute,

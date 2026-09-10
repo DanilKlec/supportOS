@@ -98,8 +98,8 @@ function filterTree(
 
 const sidebarWidthClass = {
 	narrow: "w-64",
-	standard: "w-72",
-	wide: "w-80",
+	standard: "w-64",
+	wide: "w-72",
 };
 
 interface SidebarProps {
@@ -310,12 +310,14 @@ export function Sidebar({
 
 	return (
 		<aside
-			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-background pb-[env(safe-area-inset-bottom)]`}
+			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface/40 pb-[env(safe-area-inset-bottom)]`}
 		>
 			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">
 				<div className="min-w-0 px-1">
-					<div className="truncate text-sm font-semibold">Knowledge</div>
-					<div className="text-xs text-muted">{binds.length} materials</div>
+					<div className="truncate text-sm font-semibold">Материалы</div>
+					<div className="text-xs text-muted">
+						{binds.filter((b) => !b.archived).length} ответов
+					</div>
 				</div>
 
 				<button
@@ -330,39 +332,33 @@ export function Sidebar({
 				</button>
 			</div>
 
-			{layout.showSidebarFavorites && (
-				<div className="shrink-0 border-b border-border/80 px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase text-muted">
-						<Star size={13} />
-						Favorites
-					</div>
-
-					{favoriteFolderItems.length > 0 && (
-						<div className="mb-2 space-y-0.5">
+			{layout.showSidebarFavorites &&
+				(favoriteBinds.length > 0 || favoriteFolderItems.length > 0) && (
+					<details className="shrink-0 border-b border-border/60 px-4 py-3">
+						<summary className="cursor-pointer text-xs font-medium text-muted">
+							Избранное{" "}
+							<span className="ml-2 text-accent">
+								{favoriteBinds.length + favoriteFolderItems.length}
+							</span>
+						</summary>
+						<div className="supportos-scroll mt-3 max-h-40 space-y-1 overflow-auto">
 							{favoriteFolderItems.map(renderFolderShortcut)}
-						</div>
-					)}
-
-					{favoriteBinds.length > 0 ? (
-						<div className="space-y-0.5">
 							{favoriteBinds.map(renderBindShortcut)}
 						</div>
-					) : favoriteFolderItems.length === 0 ? (
-						<div className="px-2 text-xs text-muted">No favorites yet</div>
-					) : null}
-				</div>
-			)}
+					</details>
+				)}
 
 			<div className="flex min-h-0 flex-1 flex-col">
 				<div className="shrink-0 border-b border-border/80 px-3 py-3">
 					<div className="mb-3 flex items-center justify-between px-2">
 						<div className="text-xs font-semibold uppercase text-muted">
-							Categories
+							Категории
 						</div>
 
 						<button
 							type="button"
-							title="New category"
+							title="Добавить категорию"
+							aria-label="Добавить категорию"
 							onClick={createCategory}
 							className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
@@ -379,7 +375,7 @@ export function Sidebar({
 							type="search"
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
-							placeholder="Search tree"
+							placeholder="Поиск в папках…"
 							className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
@@ -398,24 +394,29 @@ export function Sidebar({
 					</div>
 
 					{tags.length > 0 && (
-						<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
-							{tags.map((tag) => (
-								<button
-									key={tag}
-									type="button"
-									onClick={() =>
-										setSelectedTag((current) => (current === tag ? "" : tag))
-									}
-									className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
-										selectedTag === tag
-											? "border-accent bg-accent text-accent-foreground"
-											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-									}`}
-								>
-									<span className="break-all">#{tag}</span>
-								</button>
-							))}
-						</div>
+						<details className="mt-3">
+							<summary className="cursor-pointer text-xs text-muted">
+								Фильтр по тегам{selectedTag ? ` · #${selectedTag}` : ""}
+							</summary>
+							<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
+								{tags.map((tag) => (
+									<button
+										key={tag}
+										type="button"
+										onClick={() =>
+											setSelectedTag((current) => (current === tag ? "" : tag))
+										}
+										className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
+											selectedTag === tag
+												? "border-accent bg-accent text-accent-foreground"
+												: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+										}`}
+									>
+										<span className="break-all">#{tag}</span>
+									</button>
+								))}
+							</div>
+						</details>
 					)}
 
 					{selectedBindIds.length > 0 && (

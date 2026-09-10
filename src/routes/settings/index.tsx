@@ -1,4 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AccountsPanel } from "@/features/accounts/AccountsPanel";
+import { PasswordPanel } from "@/features/accounts/PasswordPanel";
+import { can } from "../../../shared/access.js";
 import {
 	Bot,
 	Check,
@@ -292,7 +295,12 @@ function SettingsPage() {
 	};
 
 	const signOut = async () => {
-		try { await supabaseService.signOut(); } catch { showToast("Не удалось выйти. Повторите попытку."); return; }
+		try {
+			await supabaseService.signOut();
+		} catch {
+			showToast("Не удалось выйти. Повторите попытку.");
+			return;
+		}
 		await knowledgeService.loadKnowledge();
 		showToast("Signed out");
 	};
@@ -843,6 +851,9 @@ function SettingsPage() {
 					<GoogleSheetsImportPanel showHeading={false} />
 				</section>
 
+				{authSession && <PasswordPanel />}
+				{(can(authSession?.user.access, "users.manage") ||
+					can(authSession?.user.access, "roles.manage")) && <AccountsPanel />}
 				<section className="grid gap-5 lg:grid-cols-2">
 					<div className="rounded-lg border border-border bg-surface p-5">
 						<div className="mb-4 flex items-center gap-2 text-lg font-semibold">
@@ -858,7 +869,10 @@ function SettingsPage() {
 											{authSession.user.email}
 										</div>
 										<div className="mt-1 text-xs text-muted">
-											Role: {authSession.user.role}
+											Роли:{" "}
+											{authSession.user.access?.roles
+												.map((role) => role.name)
+												.join(", ") || "Без доступа"}
 										</div>
 									</div>
 									<button
@@ -901,15 +915,18 @@ function SettingsPage() {
 							<div>
 								<div className="text-sm font-semibold">{aiModel}</div>
 								<div className="mt-1 text-xs text-muted">
-									{aiApiKey.trim() ? "API key saved" : "API key is not set"}
+									{can(authSession?.user.access, "technical") &&
+										(aiApiKey.trim() ? "API key saved" : "API key is not set")}
 								</div>
 							</div>
-							<Link
-								to="/settings/ai"
-								className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
-							>
-								Open AI settings
-							</Link>
+							{can(authSession?.user.access, "technical") && (
+								<Link
+									to="/settings/ai"
+									className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+								>
+									Open AI settings
+								</Link>
+							)}
 						</div>
 					</div>
 				</section>

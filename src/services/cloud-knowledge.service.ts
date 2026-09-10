@@ -1,9 +1,11 @@
 import type { Bind } from "@/entities/bind";
+import {can} from '../../shared/access.js';
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import type { KnowledgeDatabase } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 
 const QUEUE_KEY = "supportos:cloud-sync-queue:v1";
+const queueKey=()=>`${QUEUE_KEY}:${supabaseService.getSession()?.user.id ?? 'signed-out'}`;
 const CATEGORIES_TABLE = "supportos_categories";
 const FOLDERS_TABLE = "supportos_folders";
 const BINDS_TABLE = "supportos_binds";
@@ -45,7 +47,7 @@ interface FolderRow {
 	updated_at?: string;
 }
 
-interface BindRow {
+export interface BindRow {
 	id: string;
 	owner_id: string | null;
 	source_bind_id: string | null;
@@ -81,7 +83,8 @@ function currentOwnerId(entityOwnerId?: string | null) {
 
 	const session = supabaseService.getSession();
 
-	if (!session || session.user.role === "admin") return null;
+	if (can(session?.user.access,'knowledge.write')) return null;
+	if(!session) throw new Error('Войдите с личным аккаунтом');
 
 	return session.user.id;
 }
@@ -110,7 +113,7 @@ function toFolderRow(folder: KnowledgeFolder): FolderRow {
 	};
 }
 
-function toBindRow(bind: Bind): BindRow {
+export function toBindRow(bind: Bind): BindRow {
 	return {
 		id: bind.id,
 		owner_id: currentOwnerId(bind.ownerId),
@@ -159,7 +162,7 @@ function fromFolderRow(row: FolderRow): KnowledgeFolder {
 	};
 }
 
-function fromBindRow(row: BindRow): Bind {
+export function fromBindRow(row: BindRow): Bind {
 	return {
 		id: row.id,
 		ownerId: row.owner_id,
@@ -195,11 +198,11 @@ function mergeBinds(rows: BindRow[]) {
 	return binds.filter((bind) => bind.ownerId || !hiddenGlobalIds.has(bind.id));
 }
 
-function readQueue() {
+function readQueue(key=queueKey()) {
 	if (!isBrowser()) return [];
 
 	try {
-		const raw = localStorage.getItem(QUEUE_KEY);
+		const raw = localStorage.getItem(key);
 
 		return raw ? (JSON.parse(raw) as CloudOperation[]) : [];
 	} catch {
@@ -207,10 +210,10 @@ function readQueue() {
 	}
 }
 
-function writeQueue(queue: CloudOperation[]) {
+function writeQueue(queue: CloudOperation[],key=queueKey()) {
 	if (!isBrowser()) return;
 
-	localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+	localStorage.setItem(key, JSON.stringify(queue));
 }
 
 class CloudKnowledgeService {
@@ -352,11 +355,13 @@ class CloudKnowledgeService {
 
 	async flushQueue() {
 		if (!this.canUseCloud()) return;
+		const key=queueKey();
 
 		const queue = readQueue();
 		const remaining: CloudOperation[] = [];
 
 		for (const operation of queue) {
+			if(queueKey()!==key){remaining.push(operation);continue;}
 			try {
 				await this.execute(operation);
 			} catch {
@@ -364,16 +369,17 @@ class CloudKnowledgeService {
 			}
 		}
 
-		writeQueue(remaining);
+		writeQueue(remaining,key);
 	}
 
 	private async runOrQueue(operation: CloudOperation) {
 		if (!this.canUseCloud()) return;
+		const key=queueKey();
 
 		try {
 			await this.execute(operation);
 		} catch {
-			writeQueue([...readQueue(), operation]);
+			writeQueue([...readQueue(key), operation],key);
 		}
 	}
 

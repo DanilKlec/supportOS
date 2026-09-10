@@ -1,4 +1,5 @@
 import type { Bind, BindHistoryEntry, BindTranslation } from "@/entities/bind";
+import {can} from '../../shared/access.js';
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import {
 	mockBinds,
@@ -1610,7 +1611,8 @@ class KnowledgeService {
 	private getDefaultOwnerId() {
 		const session = supabaseService.getSession();
 
-		if (!session || session.user.role === "admin") return null;
+		if (can(session?.user.access,'knowledge.write')) return null;
+		if(!session) throw new Error('Войдите с личным аккаунтом');
 
 		return session.user.id;
 	}
@@ -1618,7 +1620,7 @@ class KnowledgeService {
 	private shouldCreatePersonalOverride(bind: Bind) {
 		const session = supabaseService.getSession();
 
-		return session?.user.role === "user" && bind.ownerId === null;
+		return Boolean(session) && !can(session?.user.access,'knowledge.write') && bind.ownerId === null;
 	}
 
 	private createPersonalBindOverride(

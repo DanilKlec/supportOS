@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../_rbac.js',()=>({loadAccess:async(id)=>({status:'active',roles:[],permissions:id==='ordinary'?[]:['work','monitor.read','monitor.write']})}));
 import { normalizeStatus, collect, config } from './_server.js';
 import handler from './index.js';
 const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'test-public', SUPABASE_SERVICE_ROLE_KEY: 'test-service', LIVECHAT_AUTHORIZATION: 'Basic test', LIVECHAT_ORGANIZATION_ID: 'org', LIVECHAT_WEBHOOK_SECRET: 'webhook-test', MONITOR_COLLECTOR_SECRET: 'collector-test' };

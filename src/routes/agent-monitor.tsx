@@ -1,4 +1,5 @@
 import { ScheduleUpload } from "@/features/agent-monitor/ScheduleUpload";
+import { can } from "../../shared/access.js";
 import {
 	matchesRoster,
 	type RosterScope,
@@ -93,6 +94,9 @@ const stamp = (at: string | number | null) =>
 			}).format(new Date(at))
 		: "—";
 function AgentMonitor() {
+	const canManage = useAuthStore((s) =>
+		can(s.session?.user.access, "monitor.write"),
+	);
 	const client = useQueryClient();
 	const userId = useAuthStore((state) => state.session?.user.id);
 	const [day, setDay] = useState(() => workDay());
@@ -347,13 +351,15 @@ function AgentMonitor() {
 					</section>
 				) : (
 					<>
-						<ScheduleUpload
-							agents={data.agents}
-							onSave={async (payload) => {
-								await api("schedule-import", `${payload.month}-01`, payload);
-								await client.invalidateQueries({ queryKey: ["monitor"] });
-							}}
-						/>
+						{canManage && (
+							<ScheduleUpload
+								agents={data.agents}
+								onSave={async (payload) => {
+									await api("schedule-import", `${payload.month}-01`, payload);
+									await client.invalidateQueries({ queryKey: ["monitor"] });
+								}}
+							/>
+						)}
 						<div
 							className={`rounded-xl border p-4 text-sm ${data.lastSync && now - Date.parse(data.lastSync) < 90000 && !syncError ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}
 						>
@@ -475,6 +481,7 @@ function AgentMonitor() {
 								className={control}
 								type="button"
 								onClick={() => setManage(!manage)}
+								disabled={!canManage}
 							>
 								<Users size={16} className="inline" /> Назначить смены
 							</button>
@@ -502,7 +509,7 @@ function AgentMonitor() {
 									: ""}
 							</p>
 						)}
-						{manage && (
+						{manage && canManage && (
 							<section className="rounded-xl border border-border bg-surface p-4">
 								<h2 className="font-semibold">Расписание на {day}</h2>
 								<p className="mt-1 text-xs text-muted">

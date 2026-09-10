@@ -1,16 +1,9 @@
+import { can } from "../../../shared/access.js";
+import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
+import { useQueryClient } from "@tanstack/react-query";
+import { AppNavigation } from "./AppNavigation";
 import { useNavigate } from "@tanstack/react-router";
-import {
-	Cloud,
-	Contact,
-	Gift,
-	LogIn,
-	LogOut,
-	Menu,
-	Plus,
-	Search,
-	Wrench,
-	X,
-} from "lucide-react";
+import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -28,33 +21,13 @@ import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { isKeyboardCode } from "@/shared/lib/keyboard";
-import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 
-import { ToolsMenu } from "./ToolsMenu";
-
 interface TopbarProps {
 	onOpenMobileSidebar?: () => void;
+	showKnowledgeControls?: boolean;
 }
-
-const QUICK_TOOLS = [
-	{
-		label: "Emails",
-		to: "/project-emails",
-		icon: Contact,
-	},
-	{
-		label: "Bonuses",
-		to: "/bonuses",
-		icon: Gift,
-	},
-	{
-		label: "Bonus Tools",
-		to: "/bonus-tools",
-		icon: Wrench,
-	},
-] as const;
 
 function getShortcutLabel() {
 	if (
@@ -231,8 +204,13 @@ function SearchResults({
 	);
 }
 
-export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
+export function Topbar({
+	onOpenMobileSidebar,
+	showKnowledgeControls = true,
+}: TopbarProps) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+	const [newShared, setNewShared] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
 	const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 	const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -250,8 +228,6 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
-	const selectedCategory = useKnowledgeStore((s) => s.selectedCategory);
-	const selectedFolder = useKnowledgeStore((s) => s.selectedFolder);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const shortcutLabel = useMemo(getShortcutLabel, []);
@@ -276,27 +252,17 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	};
 
 	const createBind = useCallback(() => {
-		const categoryId = selectedCategory ?? categories[0]?.id;
-
-		if (!categoryId) {
-			showToast("Create a category first");
-			return;
-		}
-
-		const selectedFolderEntity = folders.find(
-			(folder) => folder.id === selectedFolder,
-		);
-		modalManager.open("createBind", {
-			categoryId,
-			folderId:
-				selectedFolderEntity?.categoryId === categoryId
-					? selectedFolderEntity.id
-					: undefined,
-		});
-	}, [categories, folders, selectedCategory, selectedFolder, showToast]);
+		if (can(authSession?.user.access, "knowledge.write")) setNewShared(true);
+		else void navigate({ to: "/shared-binds" });
+	}, [authSession?.user.access, navigate]);
 
 	const signOut = async () => {
-		try { await supabaseService.signOut(); } catch { showToast("Не удалось выйти. Повторите попытку."); return; }
+		try {
+			await supabaseService.signOut();
+		} catch {
+			showToast("Не удалось выйти. Повторите попытку.");
+			return;
+		}
 		await knowledgeService.loadKnowledge();
 		showToast("Signed out");
 	};
@@ -418,13 +384,14 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 
 	return (
 		<div className="relative z-30 shrink-0">
-			<header className="relative flex h-14 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
+			<header className="relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
 				<button
 					type="button"
 					aria-label={
 						layout.showSidebar ? "Collapse navigation" : "Open navigation"
 					}
 					onClick={toggleSidebar}
+					style={!showKnowledgeControls ? { display: "none" } : undefined}
 					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 				>
 					<Menu size={19} />
@@ -437,7 +404,7 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 							SupportOS
 						</div>
 						<div className="truncate text-[11px] text-muted">
-							Support workspace
+							Рабочее пространство
 						</div>
 					</div>
 				</div>
@@ -461,7 +428,7 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
 							className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Search materials, folders, tags..."
+							placeholder="Поиск по базе знаний…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
 							{shortcutLabel}
@@ -497,45 +464,19 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 						<Search size={19} />
 					</button>
 
-					<div className="hidden shrink-0 items-center gap-1 lg:flex">
-						{QUICK_TOOLS.map((item) => {
-							const Icon = item.icon;
-
-							return (
-								<button
-									key={item.to}
-									type="button"
-									title={item.label}
-									onClick={() => void navigate({ to: item.to })}
-									className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-2 text-sm font-medium text-foreground transition hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 xl:px-3"
-								>
-									<Icon size={17} />
-									<span className="hidden xl:inline">{item.label}</span>
-								</button>
-							);
-						})}
-					</div>
-
-					<button
-						type="button"
-						onClick={createBind}
-						className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-					>
-						<Plus size={17} />
-						<span className="hidden xl:inline">New material</span>
-					</button>
-
-					<ToolsMenu />
-
 					{authConfigured &&
 						(authSession ? (
 							<button
 								type="button"
-								title={`Cloud: ${authSession.user.email}`}
+								title={`Выйти: ${authSession.user.email}`}
+								aria-label="Выйти из аккаунта"
 								onClick={signOut}
-								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+								className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
-								<Cloud size={16} />
+								<span className="hidden max-w-28 truncate lg:block">
+									{authSession.user.access?.display_name ||
+										authSession.user.email?.split("@")[0]}
+								</span>
 								<LogOut size={16} />
 							</button>
 						) : (
@@ -543,9 +484,8 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 								type="button"
 								title="Cloud login"
 								onClick={() => void navigate({ to: "/login" })}
-								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+								className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
-								<Cloud size={16} />
 								<LogIn size={16} />
 							</button>
 						))}
@@ -568,7 +508,7 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 									setActiveResultIndex(0);
 								}}
 								onKeyDown={handleSearchKeyDown}
-								placeholder="Search materials..."
+								placeholder="Найти бинд…"
 								className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							/>
 							<button
@@ -597,23 +537,18 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 				)}
 			</header>
 
-			<div className="supportos-scroll flex h-11 items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 lg:hidden">
-				{QUICK_TOOLS.map((item) => {
-					const Icon = item.icon;
-
-					return (
-						<button
-							key={item.to}
-							type="button"
-							onClick={() => void navigate({ to: item.to })}
-							className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-						>
-							<Icon size={16} />
-							<span>{item.label}</span>
-						</button>
-					);
-				})}
-			</div>
+			<AppNavigation />
+			{newShared && can(authSession?.user.access, "knowledge.write") && (
+				<SharedBindEditor
+					onClose={() => setNewShared(false)}
+					onSaved={() => {
+						setNewShared(false);
+						void queryClient.invalidateQueries({ queryKey: ["shared-binds"] });
+						showToast("Бинд сохранён для всей команды");
+						void navigate({ to: "/shared-binds" });
+					}}
+				/>
+			)}
 		</div>
 	);
 }

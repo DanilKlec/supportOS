@@ -1,4 +1,5 @@
 import { authorize } from '../_auth.js';
+import {readGuidance} from './_knowledge.js';
 import { sendJson } from "./_gemini.js";
 import { generateAIReply } from "./_provider.js";
 
@@ -10,7 +11,8 @@ export default async function handler(request, response) {
 	}
 
 	try {
-		const result = await generateAIReply(request.body ?? {});
+		const guidance=await readGuidance();
+		const result = await generateAIReply({...request.body,approvedGuidance:guidance.content});
 		sendJson(response, 200, result);
 	} catch (error) {
 		sendJson(

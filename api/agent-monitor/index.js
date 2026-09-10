@@ -1,4 +1,5 @@
 import {requireUser} from '../_auth.js';
+import {can} from '../../shared/access.js';
 import {validateSchedule} from './_schedule.js';
 import {allRows,collect,config,db,equal,normalizeStatus} from './_server.js';
 
@@ -36,6 +37,7 @@ export default async function handler(req,res) {
    if(!origin||new URL(origin).host!==req.headers.host) return send(403,{error:'Invalid origin'});
   }
   const user=await requireUser(req,{supervisor:true});
+  if(['assignment','schedule-import'].includes(action)&&!can(user.access,'monitor.write')) return send(403,{error:'Нет прав на изменение графика'});
   env=config();
   if(action==='sync' && method==='POST') return send(200,await collect(env));
   if(action==='schedule-import' && method==='POST') {
@@ -77,5 +79,3 @@ export default async function handler(req,res) {
   return send(200,{agents,observations,assignments,currentAssignments,audit,totals,historyLimited:observations.length>=1000,lastSync:health.find(row=>row.id==='collect')?.updated_at ?? null,lastWebhook:health.find(row=>row.id==='webhook')?.updated_at ?? null,serverTime:Date.now()});
  } catch(error) {return send(error.status ?? 500,{error:error.status?error.message:'Ошибка мониторинга. Проверьте настройки сервера и соединение.'});}
 }
-
-
