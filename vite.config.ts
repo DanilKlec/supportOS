@@ -174,6 +174,10 @@ function sportsBettingLivePlugin(): Plugin {
 }
 
 export default defineConfig({
+	build: {
+		// Current main bundle is about 1.23 MB minified; warn on further growth.
+		chunkSizeWarningLimit: 1500,
+	},
 	resolve: {
 		tsconfigPaths: true,
 	},
