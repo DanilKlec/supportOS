@@ -546,12 +546,19 @@ function RolesChoice({
 	disabled: boolean;
 }) {
 	return (
-		<fieldset disabled={disabled} className="flex flex-wrap gap-4">
-			<legend className="mb-2">Роли сотрудника</legend>
+		<fieldset disabled={disabled} className="role-choice-grid">
+			<legend className="mb-3 text-sm font-semibold">
+				Роли сотрудника{" "}
+				<span className="ml-2 text-xs font-normal text-muted">
+					Выбрано: {selected.length}
+				</span>
+			</legend>
 			{roles.map((r) => (
-				<label key={r.id}>
+				<label key={r.id} className="access-role-card">
 					<input
+						className="sr-only"
 						type="checkbox"
+						aria-label={r.name}
 						checked={selected.includes(r.id)}
 						onChange={(e) =>
 							onChange(
@@ -560,13 +567,28 @@ function RolesChoice({
 									: selected.filter((id) => id !== r.id),
 							)
 						}
-					/>{" "}
-					{r.name}
+					/>
+					<span className="access-role-heading">
+						<span className="access-role-avatar" aria-hidden="true">
+							{r.name.slice(0, 2).toUpperCase()}
+						</span>
+						<span className="font-semibold">{r.name}</span>
+						<span className="access-role-state" aria-hidden="true">
+							{selected.includes(r.id) ? "Выбрана" : "Добавить"}
+						</span>
+					</span>
+					<span className="mt-3 block text-xs leading-5 text-muted">
+						{r.description || "Набор разрешений сотрудника"}
+					</span>
+					<span className="mt-3 block text-[11px] text-muted">
+						Разрешений: {r.permissions.length}
+					</span>
 				</label>
 			))}
 		</fieldset>
 	);
 }
+
 function CreateUser({
 	roles,
 	busy,
@@ -586,7 +608,7 @@ function CreateUser({
 	);
 	return (
 		<form
-			className="space-y-3 rounded border border-border p-4"
+			className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -684,7 +706,7 @@ function EditUser({
 	];
 	return (
 		<form
-			className="space-y-3 rounded border border-border p-4"
+			className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -771,7 +793,7 @@ function EditRole({
 	const [deleting, setDeleting] = useState(false);
 	return (
 		<form
-			className="space-y-3 rounded border border-border p-4"
+			className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -818,24 +840,65 @@ function EditRole({
 				onChange={(e) => setDescription(e.target.value)}
 				disabled={busy}
 			/>
-			<fieldset disabled={busy} className="grid gap-2 md:grid-cols-2">
-				<legend>Разрешения</legend>
-				{permissions.map((p) => (
-					<label key={p.id} className="rounded border border-border p-2">
-						<input
-							type="checkbox"
-							checked={selected.includes(p.id)}
-							onChange={(e) =>
-								setSelected(
-									e.target.checked
-										? [...selected, p.id]
-										: selected.filter((id) => id !== p.id),
-								)
-							}
-						/>{" "}
-						{p.name}
-						<span className="block text-xs text-muted">{p.description}</span>
-					</label>
+			<fieldset disabled={busy} className="space-y-4">
+				<legend className="mb-3 text-sm font-semibold">
+					Разрешения{" "}
+					<span className="text-muted">· {selected.length} включено</span>
+				</legend>
+				{Object.entries(
+					permissions.reduce<Record<string, Permission[]>>((groups, p) => {
+						const key = p.id.split(".")[0];
+						(groups[key] ??= []).push(p);
+						return groups;
+					}, {}),
+				).map(([group, items]) => (
+					<section key={group} className="rounded-2xl border border-border p-4">
+						<h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">
+							{(
+								{
+									binds: "Бинды",
+									knowledge: "Общая база",
+									users: "Пользователи",
+									roles: "Роли",
+									monitor: "Мониторинг",
+									ai: "Искусственный интеллект",
+									bonuses: "Бонусы",
+									projects: "Проекты",
+									work: "Рабочее пространство",
+									tools: "Инструменты",
+									settings: "Настройки",
+								} as Record<string, string>
+							)[group] ?? group}
+						</h4>
+						<div className="grid gap-2 md:grid-cols-2">
+							{items.map((p) => (
+								<label key={p.id} className="access-permission">
+									<input
+										className="sr-only"
+										type="checkbox"
+										aria-label={p.name}
+										checked={selected.includes(p.id)}
+										onChange={(e) =>
+											setSelected(
+												e.target.checked
+													? [...selected, p.id]
+													: selected.filter((id) => id !== p.id),
+											)
+										}
+									/>
+									<span className="min-w-0 flex-1">
+										<span className="block text-sm font-medium">{p.name}</span>
+										<span className="mt-1 block text-xs leading-5 text-muted">
+											{p.description}
+										</span>
+									</span>
+									<span className="access-switch" aria-hidden="true">
+										<span />
+									</span>
+								</label>
+							))}
+						</div>
+					</section>
 				))}
 			</fieldset>
 			<button className={control} disabled={busy}>

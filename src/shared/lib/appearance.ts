@@ -24,6 +24,7 @@ export interface AppearanceSettings {
 }
 
 export const ACCENT_COLORS = [
+	{ name: "Graphite", value: "#a1a1aa" },
 	{ name: "Blue", value: "#3b82f6" },
 	{ name: "Cyan", value: "#06b6d4" },
 	{ name: "Emerald", value: "#10b981" },
@@ -302,7 +303,7 @@ export function getAppearanceSettings(): AppearanceSettings {
 		themeMode: isThemeMode(themeMode)
 			? themeMode
 			: DEFAULT_APPEARANCE.themeMode,
-		accent: accent || DEFAULT_APPEARANCE.accent,
+		accent: !accent || accent.toLowerCase() === "#3b82f6" ? DEFAULT_APPEARANCE.accent : accent,
 		density: isDensityMode(density) ? density : DEFAULT_APPEARANCE.density,
 		palette: isPaletteMode(palette) ? palette : DEFAULT_APPEARANCE.palette,
 		customPalette,
@@ -339,7 +340,7 @@ export function applyAppearance(settings = getAppearanceSettings()) {
 	root.style.setProperty("--color-border", palette.border);
 	root.style.setProperty("--color-muted", palette.muted);
 	root.style.setProperty("--color-accent", settings.accent);
-	root.style.setProperty("--color-accent-foreground", "#ffffff");
+	root.style.setProperty("--color-accent-foreground", settings.accent === "#a1a1aa" ? "#09090b" : "#ffffff");
 	root.style.setProperty("--supportos-font-size", `${fontSize}px`);
 
 	for (const [key, value] of Object.entries(RADIUS_VALUES[settings.radius])) {
