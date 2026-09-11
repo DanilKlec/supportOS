@@ -5,6 +5,12 @@ import { can, routePermission } from "../../../shared/access.js";
 
 const sections = [
 	{
+		to: "/settings/users",
+		label: "Пользователи",
+		icon: Users,
+		matches: ["/settings/users"],
+	},
+	{
 		to: "/",
 		label: "База знаний",
 		icon: BookOpen,

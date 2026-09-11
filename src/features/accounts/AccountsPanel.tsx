@@ -1,3 +1,4 @@
+import { BaseModal } from "@/shared/modals/BaseModal";
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
@@ -55,7 +56,11 @@ export async function accessApi(
 		throw new Error(data.error ?? "Ошибка управления доступами");
 	return data;
 }
-export function AccountsPanel() {
+export function AccountsPanel({
+	standalone = false,
+}: {
+	standalone?: boolean;
+}) {
 	const identity = useAuthStore((s) => s.session?.user);
 	const access = identity?.access;
 	const usersAllowed = can(access, "users.manage");
@@ -140,8 +145,10 @@ export function AccountsPanel() {
 	};
 	const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 	return (
-		<section className="space-y-4 rounded-xl border border-border bg-surface p-5">
-			<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
+		<section className="accounts-registry space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+			{!standalone && (
+				<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
+			)}
 			<div
 				className="flex flex-wrap gap-2"
 				role="tablist"
@@ -158,7 +165,7 @@ export function AccountsPanel() {
 							key={id}
 							role="tab"
 							aria-selected={tab === id}
-							className={control}
+							className={`${control} ${tab === id ? "border-accent/30 bg-accent/10 text-accent" : "border-transparent text-muted"}`}
 							disabled={busy}
 							onClick={() => {
 								setTab(id);
@@ -175,7 +182,7 @@ export function AccountsPanel() {
 				</button>
 			</div>
 			{busy && <p role="status">Загрузка…</p>}
-			{error && (
+			{error && !create && !userEdit && (
 				<p role="alert" className="text-red-400">
 					{error}
 				</p>
@@ -220,28 +227,52 @@ export function AccountsPanel() {
 						их разрешения объединяются.
 					</p>
 					{create && (
-						<CreateUser
-							key="create"
-							roles={assignable}
-							busy={busy}
-							onSave={mutate}
-							onCancel={() => setCreate(false)}
-						/>
+						<BaseModal
+							title="Новый сотрудник"
+							size="lg"
+							onClose={() => setCreate(false)}
+							closeDisabled={busy}
+						>
+							{error && (
+								<p role="alert" className="mb-4 text-red-400">
+									{error}
+								</p>
+							)}
+							<CreateUser
+								key="create"
+								roles={assignable}
+								busy={busy}
+								onSave={mutate}
+								onCancel={() => setCreate(false)}
+							/>
+						</BaseModal>
 					)}
 					{userEdit && (
-						<EditUser
-							key={`${userEdit.id}-${userEdit.version}`}
-							user={userEdit}
-							roles={assignable}
-							permissions={permissions}
-							busy={busy}
-							onSave={mutate}
-							onCancel={() => setUserEdit(null)}
-						/>
+						<BaseModal
+							title="Профиль и доступы сотрудника"
+							size="lg"
+							onClose={() => setUserEdit(null)}
+							closeDisabled={busy}
+						>
+							{error && (
+								<p role="alert" className="mb-4 text-red-400">
+									{error}
+								</p>
+							)}
+							<EditUser
+								key={`${userEdit.id}-${userEdit.version}`}
+								user={userEdit}
+								roles={assignable}
+								permissions={permissions}
+								busy={busy}
+								onSave={mutate}
+								onCancel={() => setUserEdit(null)}
+							/>
+						</BaseModal>
 					)}
-					<div className="overflow-auto">
-						<table className="w-full text-left text-sm">
-							<thead>
+					<div className="overflow-auto rounded-xl border border-border">
+						<table className="w-full min-w-[680px] text-left text-sm">
+							<thead className="bg-background/70 text-xs text-muted">
 								<tr>
 									<th>Сотрудник</th>
 									<th>Роли</th>
@@ -251,20 +282,56 @@ export function AccountsPanel() {
 							</thead>
 							<tbody>
 								{users.map((u) => (
-									<tr key={u.id} className="border-t border-border">
+									<tr
+										key={u.id}
+										className="border-t border-border/60 transition hover:bg-surface-elevated/40"
+									>
 										<td className="py-3">
-											<p>{u.display_name || "Имя не указано"}</p>
-											<p className="text-muted">{u.email}</p>
+											<div className="flex items-center gap-3">
+												<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-sm font-semibold uppercase text-accent">
+													{(u.display_name || u.email).slice(0, 2)}
+												</span>
+												<div>
+													<p className="font-medium">
+														{u.display_name || u.email.split("@")[0]}
+														{u.id === identity?.id && (
+															<span className="ml-2 text-xs font-normal text-muted">
+																Это вы
+															</span>
+														)}
+													</p>
+													<p className="mt-1 text-xs text-muted">{u.email}</p>
+												</div>
+											</div>
 										</td>
-										<td>{u.roles.map(roleName).join(", ") || "Без роли"}</td>
 										<td>
-											{
+											<div className="flex max-w-xs flex-wrap gap-1.5">
+												{u.roles.length ? (
+													u.roles.map((id) => (
+														<span
+															key={id}
+															className={`registry-role registry-role-${id}`}
+														>
+															{roleName(id)}
+														</span>
+													))
+												) : (
+													<span className="text-xs text-muted">Без роли</span>
+												)}
+											</div>
+										</td>
+										<td>
+											<span
+												className={`registry-status registry-status-${u.status}`}
+											>
 												{
-													active: "Активен",
-													disabled: "Отключён",
-													pending: "Ожидает доступа",
-												}[u.status]
-											}
+													{
+														active: "Активен",
+														disabled: "Отключён",
+														pending: "Ожидает доступа",
+													}[u.status]
+												}
+											</span>
 										</td>
 										<td>
 											<button
@@ -288,6 +355,15 @@ export function AccountsPanel() {
 										</td>
 									</tr>
 								))}
+								{!busy && !users.length && (
+									<tr>
+										<td colSpan={4} className="py-12 text-center text-muted">
+											{query
+												? "По вашему запросу сотрудники не найдены"
+												: "В реестре пока нет пользователей"}
+										</td>
+									</tr>
+								)}
 							</tbody>
 						</table>
 					</div>
@@ -353,7 +429,7 @@ export function AccountsPanel() {
 						{roles.map((r) => (
 							<div
 								key={r.id}
-								className="space-y-2 rounded border border-border p-4"
+								className="space-y-3 rounded-2xl border border-border bg-background/40 p-5"
 							>
 								<h3 className="font-semibold">
 									{r.name}{" "}

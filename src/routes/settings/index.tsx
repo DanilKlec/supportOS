@@ -852,8 +852,22 @@ function SettingsPage() {
 				</section>
 
 				{authSession && <PasswordPanel />}
-				{(can(authSession?.user.access, "users.manage") ||
-					can(authSession?.user.access, "roles.manage")) && <AccountsPanel />}
+				{can(authSession?.user.access, "users.manage") ? (
+					<Link
+						to="/settings/users"
+						className="flex items-center justify-between rounded-2xl border border-accent/20 bg-accent/5 p-5"
+					>
+						<div>
+							<h2 className="font-semibold">Пользователи и роли</h2>
+							<p className="mt-1 text-sm text-muted">
+								Открыть отдельный реестр команды и управление доступами
+							</p>
+						</div>
+						<span className="text-accent">→</span>
+					</Link>
+				) : can(authSession?.user.access, "roles.manage") ? (
+					<AccountsPanel />
+				) : null}
 				<section className="grid gap-5 lg:grid-cols-2">
 					<div className="rounded-lg border border-border bg-surface p-5">
 						<div className="mb-4 flex items-center gap-2 text-lg font-semibold">

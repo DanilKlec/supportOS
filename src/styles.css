@@ -156,3 +156,15 @@ textarea {
 .tools-popover { transform-origin: top right; animation: tools-appear 140ms ease-out; }
 @keyframes tools-appear { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
 .app-shell > div > main { background-image: radial-gradient(ellipse at top right, color-mix(in srgb, var(--color-accent) 3%, transparent), transparent 65%); }
+
+.accounts-registry th { padding: 14px 18px; font-weight: 500; white-space: nowrap; }
+.accounts-registry td { padding: 18px; }
+.registry-role { display: inline-flex; border-radius: 7px; padding: 4px 9px; font-size: 11px; font-weight: 600; color: var(--color-accent); background: color-mix(in srgb,var(--color-accent) 10%,transparent); }
+.registry-role-admin,.registry-role-creator { color: #a78bfa; background: #8b5cf615; }
+.registry-role-qc { color: #2dd4bf; background: #14b8a615; }
+.registry-role-shift { color: #fbbf24; background: #f59e0b15; }
+.registry-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; white-space: nowrap; color: var(--color-muted); }
+.registry-status::before { content: ''; width: 6px; height: 6px; border-radius: 100%; background: currentColor; }
+.registry-status-active { color: #34d399; }
+.registry-status-pending { color: #fbbf24; }
+.registry-status-disabled { color: #fb7185; }
