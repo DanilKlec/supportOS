@@ -40,9 +40,19 @@ export function useWorkspaceSharedBinds() {
 	return { user, common, personal, branches };
 }
 
+export function matchLocalBind(base: Bind, locals: Bind[]) {
+	const exact = locals.find(
+		(b) => b.id === base.id || b.sourceBindId === base.id,
+	);
+	if (exact) return exact;
+	const matches = locals.filter((b) => b.slug === base.slug && !b.archived);
+	return matches.length === 1 ? matches[0] : undefined;
+}
+
 // Keep cloud records separate from the browser's editable knowledge snapshot.
 export function WorkspaceSharedBindsSync() {
 	const { user, common, personal, branches } = useWorkspaceSharedBinds();
+	const locals = useKnowledgeStore((s) => s.binds);
 	useEffect(() => {
 		const values = (common.data ?? [])
 			.filter((b) => !b.archived)
@@ -50,10 +60,15 @@ export function WorkspaceSharedBindsSync() {
 				const own = (personal.data ?? []).find(
 					(b) => b.sourceBindId === base.id && !b.archived,
 				);
-				return { ...resolveBranch(base, own, branches.data).bind, id: base.id };
+				const local = matchLocalBind(base, locals);
+				return {
+					...resolveBranch(base, own ?? local, branches.data).bind,
+					id: local?.id ?? base.id,
+					sourceBindId: base.id,
+				};
 			});
 		useKnowledgeStore.setState({ remoteBinds: values });
-	}, [user?.id, common.data, personal.data, branches.data]);
+	}, [user?.id, common.data, personal.data, branches.data, locals]);
 	useEffect(
 		() => () => {
 			useKnowledgeStore.setState({ remoteBinds: [] });
@@ -74,22 +89,18 @@ export function WorkspaceSharedTree({
 		search = useKnowledgeStore((s) => s.search),
 		active = useKnowledgeStore((s) => s.activeTab);
 	const navigate = useNavigate();
-	const items = binds.filter(
-		(b) =>
-			!search.trim() ||
-			JSON.stringify(b.translations)
-				.toLowerCase()
-				.includes(search.trim().toLowerCase()),
-	);
+	const locals = useKnowledgeStore((s) => s.binds);
+	const items = binds
+		.filter((b) => !locals.some((local) => local.id === b.id))
+		.filter(
+			(b) =>
+				!search.trim() ||
+				JSON.stringify(b.translations)
+					.toLowerCase()
+					.includes(search.trim().toLowerCase()),
+		);
 	return (
-		<details
-			open
-			className="mb-3 rounded-xl border border-border bg-background/40 p-2"
-		>
-			<summary className="cursor-pointer px-2 py-2 text-sm font-semibold">
-				Бинды команды{" "}
-				<span className="ml-1 text-xs text-muted">{binds.length}</span>
-			</summary>
+		<div>
 			{(common.error || personal.error) && (
 				<p role="alert" className="p-2 text-xs text-red-400">
 					{(common.error ?? personal.error)?.message}
@@ -97,11 +108,6 @@ export function WorkspaceSharedTree({
 			)}
 			{common.isPending && (
 				<p className="p-2 text-xs text-muted">Загрузка биндов…</p>
-			)}
-			{!common.isPending && !items.length && (
-				<p className="p-2 text-xs text-muted">
-					{search ? "Совпадений нет" : "Общие бинды пока не опубликованы"}
-				</p>
 			)}
 			{items.map((bind) => (
 				<button
@@ -121,17 +127,9 @@ export function WorkspaceSharedTree({
 							bind.translations[0]
 						)?.title ?? bind.slug}
 					</span>
-					{branches.data?.incoming.some((s) => s.sourceId === bind.id) && (
-						<span
-							className="ml-auto text-[10px] text-accent"
-							title="Коллега поделился своей веткой"
-						>
-							От коллег
-						</span>
-					)}
 				</button>
 			))}
-		</details>
+		</div>
 	);
 }
 
@@ -160,7 +158,10 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 	const client = useQueryClient();
 	const { showToast } = useToast();
 	const base = common.data?.find((b) => b.id === id),
-		own = personal.data?.find((b) => b.sourceBindId === id && !b.archived);
+		savedOwn = personal.data?.find((b) => b.sourceBindId === id && !b.archived);
+	const locals = useKnowledgeStore((s) => s.binds);
+	const local = base ? matchLocalBind(base, locals) : undefined;
+	const own = savedOwn ?? local;
 	const [editor, setEditor] = useState<Bind | null>(null),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState("");
@@ -242,6 +243,27 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-5 sm:p-8">
 			<div className="mx-auto max-w-5xl space-y-5">
 				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div
+						role="group"
+						aria-label="Быстрый выбор версии"
+						className="flex gap-1 rounded-xl border border-border bg-surface p-1"
+					>
+						{[
+							{ id: "main", label: "Общая" },
+							{ id: "mine", label: "Моя" },
+						].map((v) => (
+							<button
+								key={v.id}
+								type="button"
+								disabled={busy}
+								aria-pressed={selected.branch === v.id}
+								onClick={() => void action(() => choose(v.id))}
+								className="rounded-lg px-4 py-2 text-sm text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+							>
+								{v.label}
+							</button>
+						))}
+					</div>
 					<label className="flex items-center gap-3 text-xs text-muted">
 						Ветка
 						<select
@@ -281,14 +303,14 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						</button>
 						<button
 							type="button"
-							disabled={!own || busy}
+							disabled={busy}
 							onClick={() => {
 								setError("");
 								setShareOpen(true);
 							}}
 							className="rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-40"
 						>
-							Поделиться моей веткой
+							Поделиться
 						</button>
 					</div>
 				</div>
@@ -433,7 +455,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						))}
 					</section>
 				)}
-				{own && (
+				{savedOwn && (
 					<div className="flex flex-wrap gap-2">
 						<button
 							type="button"
@@ -464,7 +486,13 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									)
 								)
 									void action(async () => {
-										await sharedBindsService.resetPersonal(base, own, user!.id);
+										if (savedOwn)
+											await sharedBindsService.resetPersonal(
+												base,
+												savedOwn,
+												user!.id,
+											);
+										await choose("main");
 										await Promise.all([
 											client.invalidateQueries({
 												queryKey: ["personal-binds"],
@@ -490,7 +518,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						save={(draft) =>
 							sharedBindsService.savePersonal({
 								source: base,
-								original: own,
+								original: savedOwn,
 								userId: user.id,
 								...draft,
 							})
@@ -522,6 +550,18 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							onSubmit={(e) => {
 								e.preventDefault();
 								void action(async () => {
+									if (!savedOwn) {
+										await sharedBindsService.savePersonal({
+											source: base,
+											original: undefined,
+											userId: user!.id,
+											translations: (own ?? base).translations,
+											tags: (own ?? base).tags,
+										});
+										await client.invalidateQueries({
+											queryKey: ["personal-binds"],
+										});
+									}
 									await sharedBindsService.branchAction("share", {
 										sourceId: id,
 										email,

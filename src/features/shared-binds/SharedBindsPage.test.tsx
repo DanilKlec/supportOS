@@ -27,7 +27,7 @@ vi.mock("@/services/shared-binds.service", () => ({
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
-import { WorkspaceSharedBindViewer } from "./WorkspaceSharedBinds";
+import { WorkspaceSharedBindViewer, matchLocalBind } from "./WorkspaceSharedBinds";
 const base = {
 	id: "common",
 	slug: "common",
@@ -146,4 +146,14 @@ it("recipient selects a shared branch and can only copy it into their own", asyn
  fireEvent.click(screen.getByRole("button",{name:"Скопировать в мою ветку"}));
  expect((screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value).toBe("Чужая формулировка");
  expect(screen.queryByRole("button",{name:"Изменить для всех"})).toBeNull();
+});
+
+it("matches stable ids or a unique slug without guessing duplicate titles",()=>{
+ expect(matchLocalBind(base,[{...base,id:'local'}])?.id).toBe('local');
+ expect(matchLocalBind(base,[{...base,id:'one'},{...base,id:'two'}])).toBeUndefined();
+ expect(matchLocalBind(base,[{...base,id:'linked',slug:'different',sourceBindId:base.id}])?.id).toBe('linked');
+});
+it("offers sharing before a personal branch exists",async()=>{
+ show(); fireEvent.click(await screen.findByRole('button',{name:'Поделиться'}));
+ expect(screen.getByRole('textbox',{name:'Почта сотрудника'})).toBeTruthy();
 });

@@ -8,7 +8,7 @@ export function BindWorkspace() {
 	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const showTabs = useWorkspaceStore((s) => s.layout.showTabs);
 	const remote = useKnowledgeStore((s) =>
-		s.remoteBinds.some((b) => b.id === activeTab),
+		s.remoteBinds.find((b) => b.id === activeTab),
 	);
 
 	return (
@@ -17,7 +17,10 @@ export function BindWorkspace() {
 
 			{activeTab ? (
 				remote ? (
-					<WorkspaceSharedBindViewer key={activeTab} id={activeTab} />
+					<WorkspaceSharedBindViewer
+						key={activeTab}
+						id={remote.sourceBindId ?? remote.id}
+					/>
 				) : (
 					<BindViewer />
 				)

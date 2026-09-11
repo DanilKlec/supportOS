@@ -521,9 +521,6 @@ export function Sidebar({
 
 				<div className="supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
 					<WorkspaceSharedTree onNavigate={onNavigate} />
-					<div className="px-2 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
-						Личная библиотека
-					</div>
 					<Tree
 						nodes={filteredTree}
 						forceExpanded={treeSearchActive}
