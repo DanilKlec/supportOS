@@ -1,3 +1,4 @@
+import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	CheckCircle2,
 	Copy,
@@ -101,6 +102,8 @@ export function ProjectEmailsPage() {
 	const upsertRecords = useProjectEmailStore((state) => state.upsertRecords);
 	const replaceRecords = useProjectEmailStore((state) => state.replaceRecords);
 	const removeRecord = useProjectEmailStore((state) => state.removeRecord);
+	const publication = useSharedPublication("emails", records, replaceRecords);
+	const canEdit = publication.canEdit;
 	const [query, setQuery] = useState("");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 	const [editingId, setEditingId] = useState<string>();
@@ -151,12 +154,14 @@ export function ProjectEmailsPage() {
 	};
 
 	const openCreate = () => {
+		if (!canEdit) return;
 		resetForm();
 		setWorkPanel("editor");
 	};
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
+		if (!canEdit) return;
 		setFormError("");
 
 		const existing = editingId
@@ -194,6 +199,7 @@ export function ProjectEmailsPage() {
 	};
 
 	const editRecord = (record: ProjectEmailRecord) => {
+		if (!canEdit) return;
 		setSelectedId(record.id);
 		setEditingId(record.id);
 		setDraft({
@@ -214,6 +220,7 @@ export function ProjectEmailsPage() {
 	};
 
 	const loadPreview = async () => {
+		if (!canEdit) return;
 		setImporting(true);
 
 		try {
@@ -229,6 +236,7 @@ export function ProjectEmailsPage() {
 	};
 
 	const commitPreview = () => {
+		if (!canEdit) return;
 		if (!preview || preview.records.length === 0) return;
 
 		setCommitting(true);
@@ -251,6 +259,7 @@ export function ProjectEmailsPage() {
 	};
 
 	const confirmDelete = () => {
+		if (!canEdit) return;
 		if (!deleteTarget) return;
 
 		removeRecord(deleteTarget.id);
@@ -261,8 +270,10 @@ export function ProjectEmailsPage() {
 		showToast("Project emails deleted");
 	};
 
+	if (!publication.ready) return publication.banner;
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-background">
+			{publication.banner}
 			<div className="mx-auto grid h-full w-full max-w-7xl grid-rows-[auto_minmax(0,1fr)] gap-4 p-4 sm:p-6">
 				<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">
@@ -278,6 +289,7 @@ export function ProjectEmailsPage() {
 					<div className="flex flex-wrap items-center gap-2">
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={openCreate}
 							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
 						>
@@ -286,6 +298,7 @@ export function ProjectEmailsPage() {
 						</button>
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={() =>
 								setWorkPanel((current) =>
 									current === "import" ? "closed" : "import",
@@ -374,7 +387,7 @@ export function ProjectEmailsPage() {
 					</aside>
 
 					<main className="supportos-scroll min-h-0 overflow-auto rounded-xl border border-border bg-surface">
-						{workPanel === "editor" && (
+						{canEdit && workPanel === "editor" && (
 							<ProjectEmailEditor
 								draft={draft}
 								editing={Boolean(editingId)}
@@ -385,7 +398,7 @@ export function ProjectEmailsPage() {
 							/>
 						)}
 
-						{workPanel === "import" && (
+						{canEdit && workPanel === "import" && (
 							<ProjectEmailImportPanel
 								committing={committing}
 								importing={importing}
@@ -432,6 +445,7 @@ export function ProjectEmailsPage() {
 										</button>
 										<button
 											type="button"
+											disabled={!canEdit}
 											onClick={() => editRecord(selectedRecord)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 											aria-label="Edit project emails"
@@ -440,6 +454,7 @@ export function ProjectEmailsPage() {
 										</button>
 										<button
 											type="button"
+											disabled={!canEdit}
 											onClick={() => setDeleteId(selectedRecord.id)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
 											aria-label="Delete project emails"

@@ -16,6 +16,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import { useAuthStore } from "@/store/auth.store";
+import { CommonBindImport } from "./CommonBindImport";
 import { can } from "../../../shared/access.js";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { copyToClipboard } from "@/shared/lib/clipboard";
@@ -192,6 +193,7 @@ export function SharedBindsPage() {
 						</button>
 					))}
 				</div>
+				{mode === "common" && canEdit && <CommonBindImport />}
 				{mode === "manage" && canManage && (
 					<div className="mb-5 space-y-3 rounded-2xl border border-border bg-surface p-4">
 						<p className="text-sm text-muted">

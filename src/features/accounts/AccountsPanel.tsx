@@ -476,6 +476,8 @@ export function AccountsPanel({
 								{new Date(row.created_at).toLocaleString("ru")} ·{" "}
 								{row.actor_label || "Система"} ·{" "}
 								{{
+									"content.publish": "Опубликован общий справочник",
+									"content.binds_import": "Импорт общих биндов",
 									"bind.save": "Изменена личная версия бинда",
 									"bind.reset": "Сброс личной версии бинда",
 									"user.update": "Изменение пользователя",
@@ -899,6 +901,8 @@ function AuditState({
 			) : (
 				<>
 					<p>{value.display_name ?? value.name ?? ""}</p>
+					{value.version != null && <p>Версия: {value.version}</p>}
+					{value.records != null && <p>Записей: {value.records}</p>}
 					{value.source_bind_id && (
 						<p className="text-xs text-muted">
 							Общий бинд: {value.source_bind_id}

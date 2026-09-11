@@ -1,5 +1,4 @@
-import { can } from "../../../shared/access.js";
-import { useAuthStore } from "@/store/auth.store";
+import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	CheckCircle2,
 	Copy,
@@ -473,9 +472,6 @@ function toDraft(bonus: DepositBonus): BonusDraft {
 }
 
 export function DepositBonusesPage() {
-	const canEdit = useAuthStore((s) =>
-		can(s.session?.user.access, "bonuses.write"),
-	);
 	const { showToast } = useToast();
 	const projects = useBonusStore((state) => state.projects);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
@@ -489,6 +485,12 @@ export function DepositBonusesPage() {
 	const renameProject = useBonusStore((state) => state.renameProject);
 	const upsertProjects = useBonusStore((state) => state.upsertProjects);
 	const replaceProjects = useBonusStore((state) => state.replaceProjects);
+	const publication = useSharedPublication(
+		"bonuses",
+		projects,
+		replaceProjects,
+	);
+	const canEdit = publication.canEdit;
 	const removeProject = useBonusStore((state) => state.removeProject);
 	const setActiveProject = useBonusStore((state) => state.setActiveProject);
 	const addBonus = useBonusStore((state) => state.addBonus);
@@ -880,8 +882,10 @@ export function DepositBonusesPage() {
 		showToast("Bonus deleted");
 	};
 
+	if (!publication.ready) return publication.banner;
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-background">
+			{publication.banner}
 			<datalist id="deposit-bonus-currencies">
 				{currencies.map((currency) => (
 					<option key={currency} value={currency} />

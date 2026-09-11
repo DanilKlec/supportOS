@@ -1,3 +1,4 @@
+import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	Copy,
 	FileSpreadsheet,
@@ -295,6 +296,15 @@ export function BonusToolsPage() {
 	const [data, setData] = useState<BonusToolsData | undefined>(() =>
 		loadStoredBonusToolsData(),
 	);
+	const publication = useSharedPublication(
+		"bonus-tools",
+		data ? [{ ...data, id: "rules", slug: "rules" }] : [],
+		(rows) => {
+			setData(rows[0]);
+			if (rows[0]) saveStoredBonusToolsData(rows[0]);
+		},
+	);
+	const canEdit = publication.canEdit;
 	const sourceUrl =
 		storedSourceUrl || data?.sourceUrl || DEFAULT_BONUS_TOOLS_SHEET_URL;
 	const [loading, setLoading] = useState(false);
@@ -307,6 +317,7 @@ export function BonusToolsPage() {
 
 	const updateFromGoogle = useCallback(
 		async (nextUrl: string, showSuccess = true) => {
+			if (!canEdit) return;
 			setLoading(true);
 			setError("");
 
@@ -331,14 +342,8 @@ export function BonusToolsPage() {
 				setLoading(false);
 			}
 		},
-		[showToast, selectedRuleId, setSelectedRuleId, setStoredSourceUrl],
+		[canEdit, showToast, selectedRuleId, setSelectedRuleId, setStoredSourceUrl],
 	);
-
-	useEffect(() => {
-		if (data) return;
-
-		void updateFromGoogle(DEFAULT_BONUS_TOOLS_SHEET_URL, false);
-	}, [data, updateFromGoogle]);
 
 	useEffect(() => {
 		if (!ruleEditorOpen) return;
@@ -437,6 +442,7 @@ export function BonusToolsPage() {
 	};
 
 	const openCreateRule = () => {
+		if (!canEdit) return;
 		setEditingRuleId(undefined);
 		setRuleDraft(toRuleDraft());
 		setRuleFormError("");
@@ -444,6 +450,7 @@ export function BonusToolsPage() {
 	};
 
 	const openEditRule = (rule: BonusRule) => {
+		if (!canEdit) return;
 		setEditingRuleId(rule.id);
 		setRuleDraft(toRuleDraft(rule));
 		setRuleFormError("");
@@ -459,6 +466,7 @@ export function BonusToolsPage() {
 
 	const submitRule = (event: FormEvent) => {
 		event.preventDefault();
+		if (!canEdit) return;
 		setRuleFormError("");
 
 		if (!ruleDraft.site.trim()) {
@@ -500,8 +508,10 @@ export function BonusToolsPage() {
 		showToast(editingRule ? "Bonus rule saved" : "Bonus rule added");
 	};
 
+	if (!publication.ready) return publication.banner;
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-background">
+			{publication.banner}
 			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
@@ -521,6 +531,7 @@ export function BonusToolsPage() {
 					<div className="flex flex-wrap items-center gap-2">
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={openCreateRule}
 							className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 						>
@@ -531,7 +542,7 @@ export function BonusToolsPage() {
 						<button
 							type="button"
 							onClick={() => void updateFromGoogle(sourceUrl)}
-							disabled={loading}
+							disabled={loading || !canEdit}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
@@ -544,6 +555,7 @@ export function BonusToolsPage() {
 
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={() => setSourceOpen((current) => !current)}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
@@ -553,7 +565,7 @@ export function BonusToolsPage() {
 					</div>
 				</div>
 
-				{sourceOpen && (
+				{canEdit && sourceOpen && (
 					<div className="rounded-xl border border-border bg-surface p-4">
 						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
 							<FileSpreadsheet size={16} />
@@ -685,6 +697,7 @@ export function BonusToolsPage() {
 								{selectedRule && (
 									<button
 										type="button"
+										disabled={!canEdit}
 										onClick={() => openEditRule(selectedRule)}
 										className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
@@ -914,6 +927,7 @@ export function BonusToolsPage() {
 												<div className="flex items-center gap-2">
 													<button
 														type="button"
+														disabled={!canEdit}
 														onClick={() => openEditRule(rule)}
 														className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
@@ -941,7 +955,7 @@ export function BonusToolsPage() {
 				</section>
 			</div>
 
-			{ruleEditorOpen && (
+			{canEdit && ruleEditorOpen && (
 				<div
 					className="fixed inset-0 z-50 flex items-end bg-black/45 p-0 sm:items-center sm:justify-center sm:p-4"
 					role="dialog"
