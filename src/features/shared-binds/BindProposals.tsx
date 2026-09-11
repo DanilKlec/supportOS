@@ -1,3 +1,4 @@
+import { BindDiff } from "./BindDiff";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth.store";
@@ -67,49 +68,23 @@ export function BindProposals({ sourceId }: { sourceId?: string }) {
 								· {p.author} · {new Date(p.created_at).toLocaleDateString("ru")}
 							</span>
 						</summary>
-						<div className="mt-3 grid gap-3 md:grid-cols-2">
-							<div className="rounded-xl bg-background p-3">
-								<h3 className="mb-2 text-xs font-semibold text-muted">
-									Основная сейчас
-								</h3>
-								<p className="text-xs text-muted">
-									Теги: {base?.tags.join(", ") || "—"}
+						<div className="mt-3">
+							{base ? (
+								<BindDiff
+									before={{ translations: base.translations, tags: base.tags }}
+									after={p}
+								/>
+							) : (
+								<p className="text-sm text-muted">
+									Общая версия недоступна для сравнения.
 								</p>
-								{base?.translations.map((t) => (
-									<p
-										key={t.language}
-										className="mb-3 whitespace-pre-wrap break-words text-sm"
-									>
-										{t.language} · {t.title}
-										{"\n"}
-										{t.content}
-									</p>
-								))}
-							</div>
-							<div className="rounded-xl bg-background p-3">
-								<h3 className="mb-2 text-xs font-semibold text-muted">
-									Предложение
-								</h3>
-								<p className="text-xs text-muted">
-									Теги: {p.tags.join(", ") || "—"}
-								</p>
-								{p.translations.map((t) => (
-									<p
-										key={t.language}
-										className="mb-3 whitespace-pre-wrap break-words text-sm"
-									>
-										{t.language} · {t.title}
-										{"\n"}
-										{t.content}
-									</p>
-								))}
-							</div>
+							)}
 						</div>
 						<div className="mt-3 flex flex-wrap gap-2">
 							{review && (
 								<>
 									<button
-										disabled={!!busy}
+										disabled={!!busy || !base}
 										type="button"
 										onClick={() => void resolve("accept", p.id)}
 										className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"

@@ -168,3 +168,10 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
 .chrome-tab:not(:has([aria-current="page"]))::after { content: ''; position: absolute; right: -3px; top: 11px; bottom: 11px; width: 1px; background: var(--color-border); pointer-events: none; }
 @keyframes drawer-enter { from { opacity: .6; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .workspace-drawer { animation: none; } }
+
+.bind-version-switch { display:flex; gap:4px; max-width:100%; width:fit-content; overflow-x:auto; padding:4px; border:1px solid var(--color-border); border-radius:16px; background:var(--color-surface); }
+.bind-version-option { position:relative; flex-shrink:0; min-width:110px; max-width:220px; overflow-wrap:anywhere; padding:9px 16px; border-radius:12px; text-align:left; color:var(--color-muted); border:1px solid transparent; transition:background .12s,border-color .12s,color .12s; }
+.bind-version-option:hover { background:var(--color-surface-elevated); color:var(--color-foreground); }
+.bind-version-option[aria-pressed="true"] { background:var(--color-surface-elevated); border-color:#52525b; color:var(--color-foreground); box-shadow:0 2px 6px #0002,inset 0 1px 0 #ffffff08; }
+.bind-version-option:disabled { cursor:wait; }
+@media (prefers-reduced-motion:reduce) { .bind-version-option { transition:none; } }

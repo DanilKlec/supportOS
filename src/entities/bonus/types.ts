@@ -5,6 +5,10 @@ export interface DepositBonusTranslation {
 }
 
 export interface DepositBonus {
+	validUntil?: string;
+	reviewDue?: string;
+	checkedAt?: string;
+	responsible?: string;
 	id: string;
 	name: string;
 	minDepositAmount?: number;

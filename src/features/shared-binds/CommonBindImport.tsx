@@ -1,3 +1,6 @@
+import { BindDiff } from "./BindDiff";
+import { bindChange } from "./bind-diff";
+import type { Bind } from "@/entities/bind";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { googleSheetsService } from "@/services/google-sheets.service";
@@ -7,6 +10,8 @@ import type { BindTranslation } from "@/entities/bind";
 
 export function CommonBindImport() {
 	const client = useQueryClient();
+	const [originals, setOriginals] = useState<Bind[]>([]);
+	const [expanded, setExpanded] = useState<string | null>(null);
 	const [url, setUrl] = useState(""),
 		[rows, setRows] = useState<
 			{
@@ -97,6 +102,7 @@ export function CommonBindImport() {
 			new Set(prepared.map((r) => r.id)).size !== prepared.length
 		)
 			throw new Error("В файле повторяются бинды или slug. Уберите дубликаты.");
+		setOriginals(existing);
 		setRows(prepared);
 		if (skippedTranslations || skippedBinds)
 			setMessage(
@@ -124,8 +130,8 @@ export function CommonBindImport() {
 		setBusy(true);
 		setError("");
 		try {
-			await contentApi("binds", rows);
-			setMessage(`Опубликовано биндов: ${rows.length}`);
+			await contentApi("binds", changedRows);
+			setMessage(`Опубликовано биндов: ${changedRows.length}`);
 			setRows([]);
 			await client.invalidateQueries({ queryKey: ["shared-binds"] });
 		} catch (e) {
@@ -134,6 +140,12 @@ export function CommonBindImport() {
 			setBusy(false);
 		}
 	};
+	const status = (row: (typeof rows)[number]) =>
+		bindChange(
+			originals.find((b) => b.id === row.id),
+			row,
+		);
+	const changedRows = rows.filter((r) => status(r) !== "unchanged");
 	return (
 		<details className="mb-5 rounded-2xl border border-border bg-surface p-4">
 			<summary className="cursor-pointer font-semibold">
@@ -213,8 +225,14 @@ export function CommonBindImport() {
 			{!!rows.length && (
 				<div className="mt-4">
 					<p className="mb-2 text-sm">
-						Новых: {rows.filter((r) => !r.expected).length} · Обновлений:{" "}
-						{rows.filter((r) => r.expected).length}
+						Новых: {rows.filter((r) => status(r) === "added").length} ·
+						Изменённых: {rows.filter((r) => status(r) === "changed").length} ·
+						Без изменений:{" "}
+						{rows.filter((r) => status(r) === "unchanged").length}
+					</p>
+					<p className="mb-3 text-xs text-muted">
+						Отсутствующие в файле бинды не удаляются. В обновляемом бинде список
+						переводов заменяется: удаляемые языки показаны в сравнении.
 					</p>
 					<div className="max-h-64 overflow-auto rounded-xl border border-border">
 						<table className="w-full text-left text-sm">
@@ -229,22 +247,37 @@ export function CommonBindImport() {
 								{rows.map((r) => (
 									<tr key={r.id} className="border-t border-border">
 										<td className="p-3">
-											<details>
+											<details
+												onToggle={(e) => {
+													if (e.currentTarget.open) setExpanded(r.id);
+												}}
+											>
 												<summary className="cursor-pointer">
 													{r.translations[0].title}
 												</summary>
-												{r.translations.map((t) => (
-													<p
-														key={t.language}
-														className="mt-2 whitespace-pre-wrap text-muted"
-													>
-														{t.language}: {t.content}
-													</p>
-												))}
+												{expanded === r.id &&
+													(status(r) === "unchanged" ? (
+														<p className="p-3 text-xs text-muted">
+															Содержимое совпадает. Повторная запись не нужна.
+														</p>
+													) : (
+														<BindDiff
+															before={originals.find((b) => b.id === r.id)}
+															after={r}
+														/>
+													))}
 											</details>
 										</td>
 										<td>{r.translations.map((t) => t.language).join(", ")}</td>
-										<td>{r.expected ? "Обновить" : "Добавить"}</td>
+										<td>
+											{
+												{
+													added: "Добавить",
+													changed: "Обновить",
+													unchanged: "Без изменений",
+												}[status(r)]
+											}
+										</td>
 									</tr>
 								))}
 							</tbody>
@@ -252,11 +285,11 @@ export function CommonBindImport() {
 					</div>
 					<button
 						type="button"
-						disabled={busy}
+						disabled={busy || !changedRows.length}
 						onClick={() => void publish()}
 						className="mt-3 rounded-xl bg-accent px-4 py-3 font-semibold text-accent-foreground disabled:opacity-40"
 					>
-						Опубликовать {rows.length} биндов для всех
+						Опубликовать {changedRows.length} изменений
 					</button>
 				</div>
 			)}

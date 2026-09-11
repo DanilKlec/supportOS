@@ -1,3 +1,5 @@
+import { draftKey, readDraft, writeDraft, removeDraft } from "./bind-drafts";
+import { BindDiff } from "./BindDiff";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -467,6 +469,8 @@ export function SharedBindsPage() {
 					<SharedBindEditor
 						original={editor.original ?? editor.source}
 						personal={Boolean(editor.userId)}
+						draftSourceId={editor.source?.id ?? editor.original?.id}
+						draftTargetId={editor.userId}
 						onClose={() => setEditor(null)}
 						save={
 							editor.userId && editor.source
@@ -508,17 +512,33 @@ export function SharedBindEditor({
 	onClose,
 	onSaved,
 	personal = false,
+	draftSourceId,
+	draftTargetId,
 	save,
 }: {
 	original?: Bind;
 	onClose: () => void;
 	onSaved: (bind: Bind) => void;
 	personal?: boolean;
+	draftSourceId?: string;
+	draftTargetId?: string;
 	save?: (draft: {
 		translations: BindTranslation[];
 		tags: string[];
 	}) => Promise<Bind>;
 }) {
+	const actor = useAuthStore((s) => s.session?.user.id) ?? "anonymous";
+	const key = draftKey(
+		actor,
+		draftTargetId ?? actor,
+		draftSourceId ?? original?.sourceBindId ?? original?.id ?? "new",
+		personal,
+	);
+	const [recovery, setRecovery] = useState(() => readDraft(key));
+	const [draftStatus, setDraftStatus] = useState("");
+	const [baseVersion, setBaseVersion] = useState<string | null>(
+		original?.updatedAt ?? null,
+	);
 	const [translations, setTranslations] = useState<BindTranslation[]>(
 		() =>
 			original?.translations.map((t) => ({ ...t })) ?? [
@@ -530,8 +550,39 @@ export function SharedBindEditor({
 	);
 	const [tags, setTags] = useState(original?.tags.join(", ") ?? "");
 	const [saving, setSaving] = useState(false);
+	const [reviewed, setReviewed] = useState(false);
+	const reviewDraft = {
+		translations: translations
+			.filter((t) => t.title.trim() || t.content.trim())
+			.map((t) => ({ ...t, title: t.title.trim(), content: t.content.trim() })),
+		tags: [
+			...new Set(
+				tags
+					.split(",")
+					.map((t) => t.trim())
+					.filter(Boolean),
+			),
+		],
+	};
 	const [error, setError] = useState("");
 	const dirty = useRef(false);
+	useEffect(() => {
+		if (!dirty.current || recovery) return;
+		try {
+			writeDraft(key, {
+				translations,
+				tags,
+				language,
+				baseVersion,
+				savedAt: new Date().toISOString(),
+			});
+			setDraftStatus("Черновик сохранён в этом браузере");
+		} catch {
+			setDraftStatus(
+				"Не удалось сохранить черновик. Не закрывайте редактор до сохранения ответа.",
+			);
+		}
+	}, [key, translations, tags, language, baseVersion, recovery]);
 	const initialFocus = useRef<HTMLInputElement>(null);
 	const translation = translations.find((t) => t.language === language);
 	useEffect(() => {
@@ -549,7 +600,9 @@ export function SharedBindEditor({
 		if (
 			!saving &&
 			(!dirty.current ||
-				window.confirm("Закрыть редактор без сохранения изменений?"))
+				window.confirm(
+					"Закрыть редактор? Локальный черновик можно восстановить при следующем открытии.",
+				))
 		)
 			onClose();
 	};
@@ -581,9 +634,14 @@ export function SharedBindEditor({
 			size="lg"
 		>
 			<form
+				onChange={() => setReviewed(false)}
 				onSubmit={async (e) => {
 					e.preventDefault();
-					if (saving) return;
+					if (saving || recovery) return;
+					if (!personal && !reviewed) {
+						setReviewed(true);
+						return;
+					}
 					setSaving(true);
 					setError("");
 					try {
@@ -592,6 +650,13 @@ export function SharedBindEditor({
 							? save(draft)
 							: sharedBindsService.save({ original, ...draft }));
 						dirty.current = false;
+						try {
+							removeDraft(key);
+						} catch {
+							setDraftStatus(
+								"Ответ сохранён, но старый локальный черновик не удалось удалить.",
+							);
+						}
 						onSaved(saved);
 					} catch (e) {
 						setError(e instanceof Error ? e.message : "Не удалось сохранить");
@@ -601,6 +666,65 @@ export function SharedBindEditor({
 				}}
 				className="space-y-5"
 			>
+				{recovery && (
+					<section className="rounded-xl border border-border bg-surface-elevated p-4">
+						<h3 className="text-sm font-semibold">
+							Найден несохранённый черновик
+						</h3>
+						<p className="my-2 text-xs text-muted">
+							{new Date(recovery.savedAt).toLocaleString("ru")} · только в этом
+							браузере
+						</p>
+						{recovery.baseVersion !== (original?.updatedAt ?? null) && (
+							<p className="mb-3 text-xs text-amber-400">
+								Сохранённый ответ изменился после создания черновика. Перед
+								публикацией сравните версии.
+							</p>
+						)}
+						<div className="flex gap-2">
+							<button
+								type="button"
+								onClick={() => {
+									setTranslations(recovery.translations);
+									setTags(recovery.tags);
+									setLanguage(recovery.language);
+									setBaseVersion(recovery.baseVersion);
+									dirty.current = true;
+									setRecovery(null);
+									setReviewed(false);
+								}}
+								className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
+							>
+								Восстановить черновик
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									try {
+										removeDraft(key);
+										setRecovery(null);
+									} catch {
+										setDraftStatus("Не удалось удалить черновик");
+									}
+								}}
+								className="rounded-lg border border-border px-3 py-2 text-sm"
+							>
+								Удалить черновик
+							</button>
+						</div>
+					</section>
+				)}
+				{draftStatus && (
+					<p role="status" className="text-xs text-muted">
+						{draftStatus}
+					</p>
+				)}
+				{dirty.current && baseVersion !== (original?.updatedAt ?? null) && (
+					<p className="text-xs text-amber-400">
+						Восстановлен черновик прежней версии. Проверьте текст перед
+						сохранением.
+					</p>
+				)}
 				<p className="flex items-start gap-2 rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm leading-6 text-muted">
 					<Users size={18} className="mt-1 shrink-0 text-accent" />
 					{personal
@@ -615,7 +739,10 @@ export function SharedBindEditor({
 						{error}
 					</p>
 				)}
-				<fieldset disabled={saving} className="space-y-4 disabled:opacity-60">
+				<fieldset
+					disabled={saving || !!recovery}
+					className="space-y-4 disabled:opacity-60"
+				>
 					<label className="block text-sm font-medium">
 						Язык перевода
 						<select
@@ -675,6 +802,22 @@ export function SharedBindEditor({
 						/>
 					</label>
 				</fieldset>
+				{!personal && reviewed && (
+					<section className="rounded-2xl border border-border p-4">
+						<h3 className="mb-3 font-semibold">Проверка перед публикацией</h3>
+						<BindDiff
+							before={
+								original
+									? { translations: original.translations, tags: original.tags }
+									: undefined
+							}
+							after={reviewDraft}
+						/>
+						<p className="mt-3 text-xs text-muted">
+							Подтвердите публикацию изменений для всей команды.
+						</p>
+					</section>
+				)}
 				<div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
 					<button
 						type="button"
@@ -686,7 +829,7 @@ export function SharedBindEditor({
 					</button>
 					<button
 						type="submit"
-						disabled={saving}
+						disabled={saving || !!recovery}
 						className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
 					>
 						<Check size={17} />
@@ -694,7 +837,9 @@ export function SharedBindEditor({
 							? "Сохраняем…"
 							: personal
 								? "Сохранить личную версию"
-								: "Сохранить для всех"}
+								: reviewed
+									? "Опубликовать для всех"
+									: "Проверить изменения"}
 					</button>
 				</div>
 			</form>

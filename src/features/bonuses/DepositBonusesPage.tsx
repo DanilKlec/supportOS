@@ -1,3 +1,4 @@
+import { BonusFreshness } from "./BonusFreshness";
 import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	CheckCircle2,
@@ -814,6 +815,20 @@ export function DepositBonusesPage({
 
 		if (editingBonus) {
 			updateBonus(activeProject.id, editingBonus.id, {
+				checkedAt:
+					name !== editingBonus.name ||
+					content !== editingBonus.content ||
+					JSON.stringify(translations.map((t) => [t.language, t.content])) !==
+						JSON.stringify(
+							(editingBonus.translations ?? []).map((t) => [
+								t.language,
+								t.content,
+							]),
+						) ||
+					amount !== editingBonus.minDepositAmount ||
+					currency !== editingBonus.minDepositCurrency
+						? ""
+						: editingBonus.checkedAt,
 				name,
 				content,
 				translations,
@@ -1424,6 +1439,13 @@ export function DepositBonusesPage({
 															<div className="text-sm font-medium">
 																{bonus.name}
 															</div>
+															<BonusFreshness
+																bonus={bonus}
+																canEdit={canEdit}
+																onChange={(patch) =>
+																	updateBonus(activeProject.id, bonus.id, patch)
+																}
+															/>
 															<div className="mt-1 text-xs text-muted">
 																{formatDeposit(bonus, selectedCurrency, rates)}
 															</div>

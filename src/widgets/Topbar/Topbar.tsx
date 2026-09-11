@@ -1,3 +1,11 @@
+import { Inbox } from "@/features/shared-binds/Inbox";
+import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
+import { catalogResults, type CatalogResult } from "./search-catalog";
+import { useQuery } from "@tanstack/react-query";
+import { contentApi } from "@/services/shared-content.service";
+import { BaseModal } from "@/shared/modals/BaseModal";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { useBonusStore } from "@/store/bonus.store";
 import { can } from "../../../shared/access.js";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
 import { useQueryClient } from "@tanstack/react-query";
@@ -130,19 +138,19 @@ function SearchResults({
 	onActiveIndexChange,
 	onOpen,
 }: {
-	results: Bind[];
+	results: CatalogResult[];
 	query: string;
 	language: string;
 	categories: KnowledgeCategory[];
 	folders: KnowledgeFolder[];
 	activeIndex: number;
 	onActiveIndexChange: (index: number) => void;
-	onOpen: (bind: Bind) => void;
+	onOpen: (bind: CatalogResult) => void;
 }) {
 	if (!query.trim()) {
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
-				Type a title, tag, folder or answer text.
+				Введите название, проект, почту или текст ответа.
 			</div>
 		);
 	}
@@ -150,7 +158,7 @@ function SearchResults({
 	if (results.length === 0) {
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
-				Nothing found for “{query.trim()}”.
+				Ничего не найдено по запросу «{query.trim()}».
 			</div>
 		);
 	}
@@ -162,9 +170,11 @@ function SearchResults({
 				const folderPath = getFolderPath(bind.folderId, folders);
 				const title = getBindTitle(bind, language);
 				const resultLanguage = getResultLanguage(bind, language);
-				const location = `${category?.name ?? "No category"}${
-					folderPath ? ` / ${folderPath}` : ""
-				}`;
+				const location = bind.resultKind
+					? `${bind.resultKind === "email" ? "Почты" : "Бонусы"} · ${bind.projectName}`
+					: `${category?.name ?? "Бинды"}${
+							folderPath ? ` / ${folderPath}` : ""
+						}`;
 				const active = index === activeIndex;
 
 				return (
@@ -174,9 +184,9 @@ function SearchResults({
 						role="option"
 						aria-selected={active}
 						onMouseEnter={() => onActiveIndexChange(index)}
+						onClick={() => onOpen(bind)}
 						onMouseDown={(event) => {
 							event.preventDefault();
-							onOpen(bind);
 						}}
 						className={`flex min-h-16 w-full min-w-0 flex-col gap-1 px-4 py-3 text-left transition ${
 							active
@@ -211,6 +221,8 @@ export function Topbar({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [newShared, setNewShared] = useState(false);
+	const [preview, setPreview] = useState<CatalogResult | null>(null);
+	const [kind, setKind] = useState("all");
 	const [searchFocused, setSearchFocused] = useState(false);
 	const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 	const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -220,6 +232,38 @@ export function Topbar({
 
 	const authConfigured = useAuthStore((s) => s.configured);
 	const authSession = useAuthStore((s) => s.session);
+	const access = authSession?.user.access;
+	const enabled = searchFocused || mobileSearchOpen;
+	const emails = useQuery({
+		queryKey: ["search-emails", authSession?.user.id],
+		enabled: enabled && can(access, "projects.read"),
+		staleTime: 10000,
+		queryFn: () => contentApi("emails"),
+	});
+	const bonuses = useQuery({
+		queryKey: ["search-bonuses", authSession?.user.id],
+		enabled: enabled && can(access, "bonuses.read"),
+		staleTime: 10000,
+		queryFn: async () => {
+			const [shared, personal] = await Promise.all([
+				contentApi("bonuses"),
+				contentApi("bonuses", undefined, undefined, "personal"),
+			]);
+			return personal ?? shared;
+		},
+	});
+	const catalog = useMemo(
+		() =>
+			catalogResults(
+				can(access, "projects.read") && !emails.error
+					? (emails.data?.data ?? [])
+					: [],
+				can(access, "bonuses.read") && !bonuses.error
+					? (bonuses.data?.data ?? [])
+					: [],
+			),
+		[access, emails.data, bonuses.data, emails.error, bonuses.error],
+	);
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const searchValue = useKnowledgeStore((s) => s.search);
@@ -242,7 +286,11 @@ export function Topbar({
 
 	const searchResults = searchValue.trim()
 		? searchBinds(
-				binds.filter((bind) => !bind.archived),
+				[...(can(access, "binds.read") ? binds : []), ...catalog].filter(
+					(bind: CatalogResult) =>
+						!bind.archived &&
+						(kind === "all" || (bind.resultKind ?? "bind") === kind),
+				),
 				searchValue,
 				{
 					categories,
@@ -252,9 +300,67 @@ export function Topbar({
 			).slice(0, 9)
 		: [];
 
-	const openSearchResult = (bind: Bind) => {
-		openBind(bind.id);
-		void navigate({ to: "/" });
+	const searchFilters = (
+		<div className="border-b border-border p-2">
+			<div className="flex gap-1">
+				{[
+					{ id: "all", label: "Всё" },
+					...(can(access, "binds.read")
+						? [{ id: "bind", label: "Бинды" }]
+						: []),
+					...(can(access, "projects.read")
+						? [{ id: "email", label: "Почты" }]
+						: []),
+					...(can(access, "bonuses.read")
+						? [{ id: "bonus", label: "Бонусы" }]
+						: []),
+				].map((item) => (
+					<button
+						key={item.id}
+						type="button"
+						aria-pressed={kind === item.id}
+						onMouseDown={(e) => e.preventDefault()}
+						onClick={() => {
+							setKind(item.id);
+							setActiveResultIndex(0);
+						}}
+						className="rounded-lg px-3 py-1 text-xs text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+					>
+						{item.label}
+					</button>
+				))}
+			</div>
+			{((can(access, "projects.read") && emails.isFetching) ||
+				(can(access, "bonuses.read") && bonuses.isFetching)) && (
+				<p role="status" className="p-2 text-xs text-muted">
+					Обновляем справочники…
+				</p>
+			)}
+			{((can(access, "projects.read") && emails.error) ||
+				(can(access, "bonuses.read") && bonuses.error)) && (
+				<p role="alert" className="p-2 text-xs text-red-400">
+					Часть справочников недоступна.{" "}
+					<button
+						type="button"
+						onMouseDown={(e) => e.preventDefault()}
+						onClick={() => {
+							if (can(access, "projects.read")) void emails.refetch();
+							if (can(access, "bonuses.read")) void bonuses.refetch();
+						}}
+						className="underline"
+					>
+						Повторить
+					</button>
+				</p>
+			)}
+		</div>
+	);
+	const openSearchResult = (bind: CatalogResult) => {
+		if (bind.resultKind) setPreview(bind);
+		else {
+			openBind(bind.id);
+			void navigate({ to: "/" });
+		}
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
@@ -392,6 +498,72 @@ export function Topbar({
 
 	return (
 		<div className="relative z-30 shrink-0">
+			{preview &&
+				can(
+					access,
+					preview.resultKind === "email" ? "projects.read" : "bonuses.read",
+				) && (
+					<BaseModal
+						title={getBindTitle(preview, language)}
+						onClose={() => setPreview(null)}
+					>
+						<p className="mb-3 text-xs text-muted">
+							{preview.resultKind === "email"
+								? "Почта проекта"
+								: "Сохранённые условия бонуса"}
+						</p>
+						{preview.freshness && <BonusFreshness bonus={preview.freshness} />}
+						<p className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border p-4 text-sm leading-6">
+							{
+								(
+									preview.translations.find((t) => t.language === language) ??
+									preview.translations[0]
+								)?.content
+							}
+						</p>
+						<div className="mt-4 flex gap-2">
+							<button
+								type="button"
+								onClick={() =>
+									void copyToClipboard(
+										(
+											preview.translations.find(
+												(t) => t.language === language,
+											) ?? preview.translations[0]
+										)?.content ?? "",
+									).then((ok) =>
+										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
+									)
+								}
+								className="rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
+							>
+								Копировать
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									if (preview.resultKind === "bonus") {
+										useBonusStore
+											.getState()
+											.setActiveProject(preview.projectId);
+										useBonusStore.getState().setDepositBonusQuery("");
+									}
+									void navigate({
+										to:
+											preview.resultKind === "email"
+												? "/project-emails"
+												: "/bonuses",
+									});
+									setPreview(null);
+								}}
+								className="rounded-xl border border-border px-4 py-2 text-sm"
+							>
+								Открыть раздел
+							</button>
+						</div>
+					</BaseModal>
+				)}
+
 			<header className="relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
 				<button
 					type="button"
@@ -436,7 +608,7 @@ export function Topbar({
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
 							className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Поиск по базе знаний…"
+							placeholder="Бинды, почты, бонусы…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
 							{shortcutLabel}
@@ -444,6 +616,7 @@ export function Topbar({
 
 						{searchFocused && (
 							<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+								{searchFilters}
 								<SearchResults
 									results={searchResults}
 									query={searchValue}
@@ -497,6 +670,7 @@ export function Topbar({
 								<LogIn size={16} />
 							</button>
 						))}
+					<Inbox />
 					<ToolsMenu />
 				</div>
 
@@ -531,6 +705,7 @@ export function Topbar({
 						</div>
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+							{searchFilters}
 							<SearchResults
 								results={searchResults}
 								query={searchValue}

@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { reconcileBindLinks } from "./bind-links";
+import { BindLinkEditor } from "./BindLinkEditor";
+import { useBindLinksStore, EMPTY_BIND_LINKS } from "@/store/bind-links.store";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { FileText, Copy, Pencil, RotateCcw } from "lucide-react";
@@ -23,21 +26,32 @@ export function useWorkspaceSharedBinds() {
 		queryKey: ["shared-binds", user?.id],
 		queryFn: () => sharedBindsService.list(),
 		enabled,
+		staleTime: 30000,
 		refetchInterval: 30000,
 	});
 	const personal = useQuery({
 		queryKey: ["personal-binds", user?.id, user?.id],
 		queryFn: () => sharedBindsService.personal(user!.id),
 		enabled,
+		staleTime: 30000,
 		refetchInterval: 30000,
 	});
 	const branches = useQuery({
 		queryKey: ["bind-branches", user?.id],
 		queryFn: () => sharedBindsService.branches(),
 		enabled,
+		staleTime: 30000,
 		refetchInterval: 30000,
 	});
-	return { user, common, personal, branches };
+	const locals = useKnowledgeStore((s) => s.binds);
+	const saved = useBindLinksStore((s) =>
+		user?.id ? (s.accounts[user.id] ?? EMPTY_BIND_LINKS) : EMPTY_BIND_LINKS,
+	);
+	const links = useMemo(
+		() => reconcileBindLinks(common.data ?? [], locals, saved),
+		[common.data, locals, saved],
+	);
+	return { user, common, personal, branches, links };
 }
 
 export function matchLocalBind(base: Bind, locals: Bind[]) {
@@ -51,7 +65,7 @@ export function matchLocalBind(base: Bind, locals: Bind[]) {
 
 // Keep cloud records separate from the browser's editable knowledge snapshot.
 export function WorkspaceSharedBindsSync() {
-	const { user, common, personal, branches } = useWorkspaceSharedBinds();
+	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
 	const locals = useKnowledgeStore((s) => s.binds);
 	useEffect(() => {
 		const values = (common.data ?? [])
@@ -60,7 +74,9 @@ export function WorkspaceSharedBindsSync() {
 				const own = (personal.data ?? []).find(
 					(b) => b.sourceBindId === base.id && !b.archived,
 				);
-				const local = matchLocalBind(base, locals);
+				const local = locals.find(
+					(b) => b.id === links[base.id] && !b.archived,
+				);
 				return {
 					...resolveBranch(base, own ?? local, branches.data).bind,
 					id: local?.id ?? base.id,
@@ -68,7 +84,11 @@ export function WorkspaceSharedBindsSync() {
 				};
 			});
 		useKnowledgeStore.setState({ remoteBinds: values });
-	}, [user?.id, common.data, personal.data, branches.data, locals]);
+	}, [user?.id, common.data, personal.data, branches.data, locals, links]);
+	useEffect(() => {
+		if (user?.id && common.data)
+			useBindLinksStore.getState().remember(user.id, links);
+	}, [user?.id, common.data, links]);
 	useEffect(
 		() => () => {
 			useKnowledgeStore.setState({ remoteBinds: [] });
@@ -83,7 +103,7 @@ export function WorkspaceSharedTree({
 }: {
 	onNavigate?: () => void;
 }) {
-	const { common, personal, branches } = useWorkspaceSharedBinds();
+	const { common, personal } = useWorkspaceSharedBinds();
 	const binds = useKnowledgeStore((s) => s.remoteBinds),
 		language = useKnowledgeStore((s) => s.language),
 		search = useKnowledgeStore((s) => s.search),
@@ -154,13 +174,14 @@ export function resolveBranch(
 }
 
 export function WorkspaceSharedBindViewer({ id }: { id: string }) {
-	const { user, common, personal, branches } = useWorkspaceSharedBinds();
+	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
 	const client = useQueryClient();
 	const { showToast } = useToast();
 	const base = common.data?.find((b) => b.id === id),
 		savedOwn = personal.data?.find((b) => b.sourceBindId === id && !b.archived);
 	const locals = useKnowledgeStore((s) => s.binds);
-	const local = base ? matchLocalBind(base, locals) : undefined;
+	const local = locals.find((b) => b.id === links[id] && !b.archived);
+	const [linkOpen, setLinkOpen] = useState(false);
 	const own = savedOwn ?? local;
 	const [editor, setEditor] = useState<Bind | null>(null),
 		[busy, setBusy] = useState(false),
@@ -171,6 +192,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		[email, setEmail] = useState("");
 	useEffect(() => {
 		setEditor(null);
+		setLinkOpen(false);
 		setShareOpen(false);
 		setError("");
 		setHistoryOpen(false);
@@ -183,14 +205,28 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		enabled: historyOpen,
 	});
 	const choose = async (branch: string) => {
-		await sharedBindsService.branchAction("choose", { sourceId: id, branch });
-		client.setQueryData<BindBranches>(["bind-branches", user?.id], (current) =>
+		const key = ["bind-branches", user?.id];
+		await client.cancelQueries({ queryKey: key });
+		const previous = client.getQueryData<BindBranches>(key)?.choices[id];
+		client.setQueryData<BindBranches>(key, (current) =>
 			current
 				? { ...current, choices: { ...current.choices, [id]: branch } }
 				: current,
 		);
-		await client.invalidateQueries({ queryKey: ["bind-branches", user?.id] });
+		try {
+			await sharedBindsService.branchAction("choose", { sourceId: id, branch });
+		} catch (error) {
+			client.setQueryData<BindBranches>(key, (current) => {
+				if (!current) return current;
+				const choices = { ...current.choices };
+				if (previous === undefined) delete choices[id];
+				else choices[id] = previous;
+				return { ...current, choices };
+			});
+			throw error;
+		}
 	};
+
 	const action = async (fn: () => Promise<unknown>) => {
 		setBusy(true);
 		setError("");
@@ -243,48 +279,55 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-5 sm:p-8">
 			<div className="mx-auto max-w-5xl space-y-5">
 				<div className="flex flex-wrap items-center justify-between gap-3">
-					<div
-						role="group"
-						aria-label="Быстрый выбор версии"
-						className="flex gap-1 rounded-xl border border-border bg-surface p-1"
-					>
-						{[
-							{ id: "main", label: "Общая" },
-							{ id: "mine", label: "Моя" },
-						].map((v) => (
-							<button
-								key={v.id}
-								type="button"
-								disabled={busy}
-								aria-pressed={selected.branch === v.id}
-								onClick={() => void action(() => choose(v.id))}
-								className="rounded-lg px-4 py-2 text-sm text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
-							>
-								{v.label}
-							</button>
-						))}
-					</div>
-					<label className="flex items-center gap-3 text-xs text-muted">
-						Ветка
-						<select
+					<div className="min-w-0 flex-1">
+						<div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted">
+							<span>Версия ответа</span>
+							<span role="status" className="normal-case tracking-normal">
+								{busy ? "· Сохраняем…" : ""}
+							</span>
+						</div>
+						<div
+							role="group"
 							aria-label="Ветка бинда"
-							value={selected.branch}
-							disabled={busy}
-							onChange={(e) => void action(() => choose(e.target.value))}
-							className="max-w-64 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground"
+							className="bind-version-switch"
 						>
-							<option value="main">Основная · для команды</option>
-							<option value="mine">
-								{own ? "Моя версия" : "Моя · наследует основную"}
-							</option>
-							{incoming.map((s) => (
-								<option key={s.id} value={s.id}>
-									От {s.sender}
-								</option>
+							{[
+								{ id: "main", label: "Общая", hint: "Для команды" },
+								{
+									id: "mine",
+									label: "Моя",
+									hint: own ? "Личная версия" : "Из общей",
+								},
+								...incoming.map((s) => ({
+									id: s.id,
+									label: s.sender,
+									hint: "От коллеги",
+								})),
+							].map((v) => (
+								<button
+									key={v.id}
+									aria-label={v.label}
+									type="button"
+									disabled={busy}
+									aria-pressed={selected.branch === v.id}
+									onClick={() => void action(() => choose(v.id))}
+									className="bind-version-option"
+								>
+									<span className="block text-sm font-medium">{v.label}</span>
+									<span className="block text-[10px] text-muted">{v.hint}</span>
+								</button>
 							))}
-						</select>
-					</label>
+						</div>
+					</div>
 					<div className="flex flex-wrap gap-2">
+						<button
+							type="button"
+							disabled={busy}
+							onClick={() => setLinkOpen(true)}
+							className="rounded-xl border border-border px-3 py-2 text-xs"
+						>
+							Связь версий
+						</button>
 						<button
 							type="button"
 							aria-pressed={compare}
@@ -510,8 +553,19 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					</div>
 				)}
 				<BindProposals sourceId={id} />
+				{linkOpen && user && (
+					<BindLinkEditor
+						base={base}
+						locals={locals}
+						links={links}
+						userId={user.id}
+						onClose={() => setLinkOpen(false)}
+					/>
+				)}
 				{editor && user && (
 					<SharedBindEditor
+						draftSourceId={id}
+						draftTargetId={user.id}
 						personal
 						original={editor}
 						onClose={() => setEditor(null)}
