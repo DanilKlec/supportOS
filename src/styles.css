@@ -16,12 +16,12 @@
 }
 
 .dark {
-  --color-background: #0b1120;
-  --color-foreground: #e2e8f0;
-  --color-surface: #111827;
-  --color-surface-elevated: #1e293b;
-  --color-border: #1e293b;
-  --color-muted: #94a3b8;
+  --color-background: #000000;
+  --color-foreground: #f4f4f5;
+  --color-surface: #0d0d0f;
+  --color-surface-elevated: #18181b;
+  --color-border: #27272a;
+  --color-muted: #a1a1aa;
   --color-accent: #3b82f6;
   --color-accent-foreground: #ffffff;
 }
@@ -137,17 +137,37 @@ textarea {
 }
 
 /* Shared shell and sign-in surface. */
-.login-scene { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 100dvh; overflow: hidden; background: #090e1a; color: #f1f5f9; color-scheme: dark; }
-.login-card { background: linear-gradient(145deg, #151e30ee, #101725ee); backdrop-filter: blur(20px); }
-.login-orbit { position: absolute; z-index: -1; pointer-events: none; border-radius: 50%; filter: blur(85px); opacity: .16; }
-.login-orbit-one { width: 560px; height: 560px; background: #2563eb; left: -250px; top: 10%; }
-.login-orbit-two { width: 400px; height: 400px; background: #6366f1; right: -180px; bottom: -180px; }
-.login-input { width: 100%; height: 48px; border: 1px solid #2a3549; border-radius: 12px; background: #0a1120; padding: 0 14px; color: #f1f5f9; outline: none; transition: border-color .15s, box-shadow .15s; }
+.login-scene { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 100dvh; overflow: hidden; background: #000; color: #fafafa; color-scheme: dark; }
+.login-card { position: relative; background: linear-gradient(150deg, #151517ed, #09090bed); backdrop-filter: blur(24px); box-shadow: 0 32px 100px #0009, inset 0 1px 0 #ffffff0d; }
+.login-card::before { content: ''; position: absolute; top: -1px; left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, #ffffff70, transparent); }
+.login-input { width: 100%; height: 52px; border: 1px solid #303034; border-radius: 12px; background: #070708; padding: 0 16px; color: #fafafa; outline: none; transition: border-color .18s, box-shadow .18s; }
 .login-input.pr-12 { padding-right: 48px; }
-.login-input::placeholder { color: #56647c; font-size: 14px; }
-.login-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px #3b82f620; }
+.login-input::placeholder { color: #777780; font-size: 14px; }
+.login-input:focus { border-color: #a1a1aa; box-shadow: 0 0 0 4px #ffffff08; }
 .login-input:disabled { opacity: .5; }
-.app-shell { background: var(--color-background); }
+.app-shell { position: relative; isolation: isolate; background: var(--color-background); }
+.login-submit { background: #f4f4f5; color: #09090b; box-shadow: 0 2px 20px #ffffff10; transition: background .2s, transform .2s, box-shadow .2s; }
+.login-submit:hover:not(:disabled) { background: white; transform: translateY(-1px); box-shadow: 0 5px 28px #ffffff20; }
+.login-headline { background: linear-gradient(135deg, #fff 25%, #a1a1aa 90%); background-clip: text; color: transparent; }
+.login-feature { border: 1px solid #ffffff0d; border-radius: 16px; padding: 16px; background: #ffffff02; }
+.ambient-background { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict; }
+.ambient-glow { position: absolute; width: min(850px, 100vw); aspect-ratio: 1; border-radius: 50%; opacity: .5; animation: ambient-drift 24s ease-in-out infinite alternate; background: radial-gradient(circle, #b8c8e51c 0%, #7e99bf0c 35%, transparent 65%); }
+.ambient-glow-one { left: -20%; top: -35%; }
+.ambient-glow-two { right: -25%; bottom: -55%; animation-delay: -12s; background: radial-gradient(circle, #3b82f618, transparent 65%); }
+.ambient-grid { position: absolute; inset: 0; background-image: linear-gradient(#ffffff04 1px, transparent 1px), linear-gradient(90deg, #ffffff04 1px, transparent 1px); background-size: 72px 72px; mask-image: linear-gradient(145deg, black, transparent 70%); }
+.login-scene .ambient-glow { opacity: 1; width: min(1100px, 130vw); }
+.login-scene .ambient-glow-one { left: -15%; top: -35%; }
+.login-scene .ambient-glow-two { bottom: -70%; right: -25%; }
+.ambient-motion-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; min-width: 36px; padding: 8px; border-radius: 10px; color: var(--color-muted, #a1a1aa); font-size: 12px; transition: background .15s, color .15s; }
+.ambient-motion-button:hover { color: var(--color-foreground, #fafafa); background: #ffffff09; }
+.login-scene .ambient-motion-button { color: #a1a1aa; }
+html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
+.dark .workspace-main > .bg-background { background-color: transparent; }
+.dark .workspace-dock { background: color-mix(in srgb, var(--color-surface) 92%, transparent); backdrop-filter: blur(20px); }
+.dark .tools-popover { box-shadow: 0 20px 60px #0009, inset 0 1px 0 #ffffff06; }
+@keyframes ambient-drift { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(12%, 9%, 0) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .ambient-glow { animation: none !important; } .ambient-motion-button { display: none; } }
+@media (max-width: 767px) { .ambient-grid { background-size: 48px 48px; } .login-card { backdrop-filter: none; } }
 .app-nav-link { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 10px 12px; border-radius: 12px; color: var(--color-muted); font-size: 13px; font-weight: 500; transition: background .15s, color .15s; white-space: nowrap; }
 .app-nav-link:hover { background: var(--color-surface-elevated); color: var(--color-foreground); }
 .app-nav-link[aria-current="page"] { background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 18%, transparent); }
@@ -168,3 +188,9 @@ textarea {
 .registry-status-active { color: #34d399; }
 .registry-status-pending { color: #fbbf24; }
 .registry-status-disabled { color: #fb7185; }
+
+.workspace-drawer { animation: drawer-enter 220ms cubic-bezier(.2,.8,.2,1); }
+.dark .workspace-drawer { background: linear-gradient(160deg, var(--color-surface), var(--color-background)); }
+.drawer-link { min-height: 64px; }
+@keyframes drawer-enter { from { opacity: .6; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .workspace-drawer { animation: none; } }

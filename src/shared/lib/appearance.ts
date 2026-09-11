@@ -33,9 +33,9 @@ export const ACCENT_COLORS = [
 
 export const PALETTE_OPTIONS = [
 	{
-		name: "Slate",
+		name: "Obsidian",
 		value: "slate",
-		description: "Current SupportOS look.",
+		description: "Black canvas and graphite surfaces.",
 	},
 	{
 		name: "Neutral",
@@ -88,12 +88,12 @@ const RADIUS_KEY = "supportos-radius";
 const FONT_SCALE_KEY = "supportos-font-scale";
 
 const DEFAULT_CUSTOM_PALETTE: PaletteColors = {
-	background: "#0b1120",
-	foreground: "#e2e8f0",
-	surface: "#111827",
-	surfaceElevated: "#1e293b",
-	border: "#1e293b",
-	muted: "#94a3b8",
+	background: "#000000",
+	foreground: "#f4f4f5",
+	surface: "#0d0d0f",
+	surfaceElevated: "#18181b",
+	border: "#27272a",
+	muted: "#a1a1aa",
 };
 
 const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -127,12 +127,12 @@ const PALETTES: Record<
 			muted: "#64748b",
 		},
 		dark: {
-			background: "#0b1120",
-			foreground: "#e2e8f0",
-			surface: "#111827",
-			surfaceElevated: "#1e293b",
-			border: "#1e293b",
-			muted: "#94a3b8",
+			background: "#000000",
+			foreground: "#f4f4f5",
+			surface: "#0d0d0f",
+			surfaceElevated: "#18181b",
+			border: "#27272a",
+			muted: "#a1a1aa",
 		},
 	},
 	neutral: {

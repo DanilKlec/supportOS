@@ -1,7 +1,7 @@
 import { can } from "../../../shared/access.js";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppNavigation } from "./AppNavigation";
+import { ToolsMenu } from "./ToolsMenu";
 import { useNavigate } from "@tanstack/react-router";
 import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
 import {
@@ -489,6 +489,7 @@ export function Topbar({
 								<LogIn size={16} />
 							</button>
 						))}
+					<ToolsMenu />
 				</div>
 
 				{mobileSearchOpen && (
@@ -537,7 +538,6 @@ export function Topbar({
 				)}
 			</header>
 
-			<AppNavigation />
 			{newShared && can(authSession?.user.access, "knowledge.write") && (
 				<SharedBindEditor
 					onClose={() => setNewShared(false)}

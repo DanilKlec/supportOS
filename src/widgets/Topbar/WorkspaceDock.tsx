@@ -2,7 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Mail, Gift, Calculator } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { can, routePermission } from "../../../shared/access.js";
-import { ToolsMenu } from "./ToolsMenu";
 const links = [
 	{
 		to: "/project-emails",
@@ -24,8 +23,8 @@ export function WorkspaceDock() {
 		select: (s) => s.location.pathname.replace(/\/+$/, ""),
 	});
 	return (
-		<footer className="relative z-30 shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
-			<div className="mx-auto flex min-h-16 max-w-screen-2xl items-center justify-between gap-2 px-3 sm:px-5">
+		<footer className="workspace-dock relative z-30 shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
+			<div className="mx-auto flex min-h-16 max-w-screen-2xl items-center justify-center gap-2 px-3 sm:px-5">
 				<nav
 					aria-label="Рабочие справочники"
 					className="flex min-w-0 items-center gap-1 sm:gap-2"
@@ -46,9 +45,6 @@ export function WorkspaceDock() {
 							</Link>
 						))}
 				</nav>
-				<div className="shrink-0 border-l border-border pl-2 sm:pl-4">
-					<ToolsMenu placement="up" />
-				</div>
 			</div>
 		</footer>
 	);

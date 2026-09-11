@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { AmbientMotionButton } from "@/components/brand/AmbientBackground";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { can, routePermission } from "../../../shared/access.js";
 import { useAuthStore } from "@/store/auth.store";
@@ -20,7 +22,9 @@ import {
 	Trophy,
 	LayoutGrid,
 	Search,
-	ChevronDown,
+	PanelRight,
+	BookOpen,
+	Users,
 	Calculator,
 	X,
 } from "lucide-react";
@@ -42,6 +46,8 @@ import {
 } from "@/shared/lib/appearance";
 
 type AppRoute =
+	| "/shared-binds"
+	| "/settings/users"
 	| "/"
 	| "/translator"
 	| "/ai/assistant"
@@ -171,11 +177,7 @@ function getFocusableItems(container: HTMLDivElement | null) {
 	);
 }
 
-export function ToolsMenu({
-	placement = "down",
-}: {
-	placement?: "up" | "down";
-}) {
+export function ToolsMenu() {
 	const role = useAuthStore((s) => s.session?.user.access);
 	const navigate = useNavigate();
 	const pathname = useRouterState({
@@ -187,7 +189,6 @@ export function ToolsMenu({
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
-	const [groupIndex, setGroupIndex] = useState(0);
 	const searchRef = useRef<HTMLInputElement>(null);
 	const [themeMode, setThemeMode] = useState(
 		() => getAppearanceSettings().themeMode,
@@ -197,7 +198,6 @@ export function ToolsMenu({
 
 	const closeMenu = useCallback(() => {
 		setOpen(false);
-		buttonRef.current?.focus();
 	}, []);
 
 	const navigateTo = (to: AppRoute) => {
@@ -253,34 +253,73 @@ export function ToolsMenu({
 
 	const groups: ToolGroup[] = [
 		{
-			title: "Инструменты",
-			items: WORK_TOOLS.filter(
-				(item) =>
-					!["/bonus-tools", "/agent-monitor", "/ai/assistant"].includes(
-						item.to,
-					),
+			title: "Рабочее пространство",
+			items: [
+				{
+					type: "route",
+					label: "База знаний",
+					description: "Материалы и личная библиотека",
+					icon: BookOpen,
+					to: "/",
+				},
+				{
+					type: "route",
+					label: "Общие бинды",
+					description: "Базовые ответы и версии сотрудников",
+					icon: Users,
+					to: "/shared-binds",
+				},
+				...WORK_TOOLS.filter((item) =>
+					["/archive", "/health"].includes(item.to),
+				),
+			],
+		},
+		{
+			title: "AI и инструменты",
+			items: WORK_TOOLS.filter((item) =>
+				[
+					"/translator",
+					"/ai/assistant",
+					"/ai/translator",
+					"/sports-betting",
+				].includes(item.to),
 			),
+		},
+		{
+			title: "Команда и контроль",
+			items: [
+				{
+					type: "route",
+					label: "Пользователи и роли",
+					description: "Реестр команды и управление доступами",
+					icon: Users,
+					to: "/settings/users",
+				},
+				...WORK_TOOLS.filter((item) =>
+					["/agent-monitor", "/ai/knowledge"].includes(item.to),
+				),
+			],
 		},
 		{
 			title: "Данные",
 			items: [
 				{
 					type: "action",
-					label: "Импорт JSON",
+					label: "Восстановить локальную копию",
 					description: "Восстановление из файла",
 					icon: Import,
 					action: importJson,
 				},
 				{
 					type: "action",
-					label: "Экспорт JSON",
+					label: "Экспорт локальной копии",
 					description: "Скачать резервную копию",
 					icon: Download,
 					action: exportJson,
 				},
 				{
 					type: "route",
-					label: "Импорт Google Sheets",
+					label: "Таблица в личную базу",
 					description: "Добавить данные из таблицы",
 					icon: FileJson,
 					to: "/import/google-sheets",
@@ -300,7 +339,7 @@ export function ToolsMenu({
 				},
 				{
 					type: "route",
-					label: "Управление",
+					label: "Настройки пространства",
 					description: "Аккаунт, роли и оформление",
 					icon: Settings,
 					to: "/settings",
@@ -324,36 +363,49 @@ export function ToolsMenu({
 	];
 
 	useEffect(() => {
-		if (!open) return undefined;
-
-		const closeOnOutsideClick = (event: PointerEvent) => {
-			const target = event.target as Node;
-
-			if (
-				buttonRef.current?.contains(target) ||
-				menuRef.current?.contains(target)
-			) {
-				return;
-			}
-
-			setOpen(false);
-		};
-		const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+		setOpen(false);
+	}, [pathname]);
+	useEffect(() => {
+		if (!open) return;
+		const root = document.getElementById("app");
+		const previousInert = root?.inert;
+		const overflow = document.body.style.overflow;
+		if (root) root.inert = true;
+		document.body.style.overflow = "hidden";
+		searchRef.current?.focus();
+		const keyboard = (event: globalThis.KeyboardEvent) => {
 			if (event.key === "Escape") {
 				event.preventDefault();
+				event.stopImmediatePropagation();
 				closeMenu();
 			}
+			if (event.key === "Tab") {
+				const nodes = Array.from(
+					menuRef.current?.querySelectorAll<HTMLElement>(
+						"button:not([disabled]), input:not([disabled]), a[href]",
+					) ?? [],
+				);
+				const first = nodes[0],
+					last = nodes[nodes.length - 1];
+				if (
+					event.shiftKey &&
+					(document.activeElement === first ||
+						!menuRef.current?.contains(document.activeElement))
+				) {
+					event.preventDefault();
+					last?.focus();
+				} else if (!event.shiftKey && document.activeElement === last) {
+					event.preventDefault();
+					first?.focus();
+				}
+			}
 		};
-
-		window.addEventListener("pointerdown", closeOnOutsideClick);
-		window.addEventListener("keydown", closeOnEscape);
-		window.setTimeout(() => {
-			searchRef.current?.focus();
-		}, 0);
-
+		window.addEventListener("keydown", keyboard, true);
 		return () => {
-			window.removeEventListener("pointerdown", closeOnOutsideClick);
-			window.removeEventListener("keydown", closeOnEscape);
+			window.removeEventListener("keydown", keyboard, true);
+			if (root) root.inert = previousInert ?? false;
+			document.body.style.overflow = overflow;
+			buttonRef.current?.focus();
 		};
 	}, [open, closeMenu]);
 
@@ -385,50 +437,38 @@ export function ToolsMenu({
 	const visibleGroups = groups
 		.map((group) => ({
 			...group,
-			items: group.items.filter(
-				(item) => item.type !== "route" || can(role, routePermission(item.to)),
-			),
+			items: group.items
+				.filter((item) => {
+					if (item.type === "route") return can(role, routePermission(item.to));
+					if (item.action === importJson) return can(role, "knowledge.write");
+					if (item.action === exportJson) return can(role, "binds.read");
+					return can(role, "work");
+				})
+				.filter((item) =>
+					`${item.label} ${item.description ?? ""} ${group.title}`
+						.toLocaleLowerCase()
+						.includes(query.trim().toLocaleLowerCase()),
+				),
 		}))
 		.filter((group) => group.items.length);
-	const displayed = (
-		query.trim()
-			? visibleGroups.flatMap((g) => g.items)
-			: (visibleGroups[groupIndex]?.items ?? [])
-	).filter((item) =>
-		`${item.label} ${item.description ?? ""}`
-			.toLocaleLowerCase()
-			.includes(query.trim().toLocaleLowerCase()),
-	);
 	return (
-		<div
-			className="relative"
-			onBlur={(event) => {
-				if (
-					event.relatedTarget &&
-					!event.currentTarget.contains(event.relatedTarget as Node)
-				)
-					setOpen(false);
-			}}
-		>
+		<>
 			<button
 				ref={buttonRef}
 				type="button"
-				aria-label="Открыть инструменты"
+				aria-label="Открыть меню пространства"
 				aria-haspopup="dialog"
 				aria-expanded={open}
 				aria-controls={menuId}
 				onClick={() => {
-					setOpen((v) => !v);
 					setQuery("");
+					setOpen(true);
+					setThemeMode(getAppearanceSettings().themeMode);
 				}}
-				className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition ${open ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
+				className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-surface-elevated/50 px-3 text-sm font-medium text-foreground transition hover:bg-surface-elevated"
 			>
-				<LayoutGrid size={18} />
-				<span className="hidden sm:inline">Инструменты</span>
-				<ChevronDown
-					size={13}
-					className={`transition-transform ${open ? "rotate-180" : ""}`}
-				/>
+				<PanelRight size={18} />
+				<span className="hidden sm:inline">Меню</span>
 			</button>
 			<input
 				ref={fileInputRef}
@@ -437,104 +477,130 @@ export function ToolsMenu({
 				onChange={handleImportFile}
 				className="hidden"
 			/>
-			{open && (
-				<div
-					ref={menuRef}
-					id={menuId}
-					role="dialog"
-					aria-label="Инструменты"
-					onKeyDown={handleMenuKeyDown}
-					className={`tools-popover fixed right-3 z-50 flex w-[min(350px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-black/30 sm:absolute sm:right-0 ${placement === "up" ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-[calc(100%+12px)] origin-bottom-right" : "top-[4.5rem] sm:top-[calc(100%+12px)]"}`}
-				>
-					<div className="flex items-center gap-2 border-b border-border px-4 py-3">
-						<Search size={16} className="shrink-0 text-muted" />
-						<input
-							ref={searchRef}
-							aria-label="Найти инструмент"
-							value={query}
-							onChange={(e) => setQuery(e.target.value)}
-							placeholder="Найти инструмент…"
-							className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
-						/>
-						<button
-							type="button"
-							aria-label="Закрыть инструменты"
-							onClick={closeMenu}
-							className="rounded-lg p-1.5 text-muted hover:bg-surface-elevated"
-						>
-							<X size={16} />
-						</button>
-					</div>
-					{!query && (
+			{open &&
+				createPortal(
+					<div className="fixed inset-0 z-[80]">
 						<div
-							className="flex gap-1 px-3 pt-3"
-							aria-label="Группы инструментов"
+							aria-hidden="true"
+							onClick={closeMenu}
+							className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+						/>
+						<div
+							ref={menuRef}
+							id={menuId}
+							role="dialog"
+							aria-modal="true"
+							aria-labelledby="workspace-menu-title"
+							onKeyDown={handleMenuKeyDown}
+							className="workspace-drawer absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col border-l border-border bg-surface text-foreground shadow-2xl"
 						>
-							{visibleGroups.map((group, index) => (
+							<header className="flex items-center gap-3 px-6 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
+								<span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface-elevated">
+									<LayoutGrid size={20} />
+								</span>
+								<div className="flex-1">
+									<p className="text-[10px] uppercase tracking-[.2em] text-muted">
+										SupportOS
+									</p>
+									<h2
+										id="workspace-menu-title"
+										className="mt-1 text-lg font-semibold"
+									>
+										Рабочее пространство
+									</h2>
+								</div>
 								<button
 									type="button"
-									key={group.title}
-									aria-pressed={groupIndex === index}
-									onClick={() => setGroupIndex(index)}
-									className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium ${groupIndex === index ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
+									aria-label="Закрыть меню"
+									onClick={closeMenu}
+									className="flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
-									{group.title}
+									<X size={20} />
 								</button>
-							))}
+							</header>
+							<div className="relative mx-6 mb-4">
+								<Search
+									size={17}
+									className="pointer-events-none absolute left-3 top-3 text-muted"
+								/>
+								<input
+									ref={searchRef}
+									aria-label="Поиск разделов и инструментов"
+									value={query}
+									onChange={(event) => setQuery(event.target.value)}
+									placeholder="Найти раздел или инструмент…"
+									className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-accent"
+								/>
+							</div>
+							<nav
+								aria-label="Разделы и инструменты"
+								className="supportos-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5"
+							>
+								{visibleGroups.map((group) => (
+									<section key={group.title} className="mb-5">
+										<h3 className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted">
+											{group.title}
+										</h3>
+										<div className="space-y-1">
+											{group.items.map((item) => {
+												const Icon = item.icon;
+												const active =
+													item.type === "route" &&
+													(pathname.replace(/\/+$/, "") || "/") === item.to;
+												return (
+													<button
+														key={item.label}
+														type="button"
+														data-tools-item
+														aria-current={active ? "page" : undefined}
+														onClick={() =>
+															item.type === "route"
+																? navigateTo(item.to)
+																: item.action()
+														}
+														className={`drawer-link group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? "bg-accent/10 text-accent ring-1 ring-inset ring-accent/20" : "hover:bg-surface-elevated"}`}
+													>
+														<span
+															className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? "bg-accent/10" : "bg-background text-muted"}`}
+														>
+															<Icon size={18} strokeWidth={1.7} />
+														</span>
+														<span className="min-w-0 flex-1">
+															<span className="block text-sm font-medium">
+																{item.label}
+															</span>
+															<span className="mt-0.5 block text-xs leading-5 text-muted">
+																{item.description}
+															</span>
+														</span>
+														{active ? (
+															<Check size={15} />
+														) : (
+															<ChevronRight
+																size={14}
+																className="text-muted opacity-40 group-hover:opacity-100"
+															/>
+														)}
+													</button>
+												);
+											})}
+										</div>
+									</section>
+								))}
+								{!visibleGroups.length && (
+									<p className="py-12 text-center text-sm text-muted">
+										Ничего не найдено. Попробуйте другое название.
+									</p>
+								)}
+							</nav>
+							<footer className="flex shrink-0 items-center justify-between border-t border-border px-6 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
+								<span className="text-xs text-muted">Esc — закрыть меню</span>
+								<AmbientMotionButton />
+							</footer>
 						</div>
-					)}
-					<div className="supportos-scroll max-h-[min(390px,calc(100dvh-220px))] overflow-y-auto p-2">
-						{displayed.map((item) => {
-							const Icon = item.icon;
-							const active = item.type === "route" && pathname === item.to;
-							return (
-								<button
-									key={item.label}
-									type="button"
-									data-tools-item
-									onClick={() =>
-										item.type === "route" ? navigateTo(item.to) : item.action()
-									}
-									className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-accent/10 text-accent" : "hover:bg-surface-elevated"}`}
-								>
-									<Icon
-										size={18}
-										strokeWidth={1.6}
-										className={
-											active ? "shrink-0 text-accent" : "shrink-0 text-muted"
-										}
-									/>
-									<span className="min-w-0 flex-1">
-										<span className="block text-sm font-medium">
-											{item.label}
-										</span>
-										<span className="mt-0.5 block text-[11px] text-muted">
-											{item.description}
-										</span>
-									</span>
-									{active ? (
-										<Check size={14} />
-									) : (
-										<ChevronRight
-											size={14}
-											className="text-muted opacity-0 group-hover:opacity-100"
-										/>
-									)}
-								</button>
-							);
-						})}
-						{!displayed.length && (
-							<p className="px-4 py-8 text-center text-sm text-muted">
-								Инструмент не найден
-							</p>
-						)}
-					</div>
-					<div className="flex justify-between border-t border-border px-4 py-2.5 text-[10px] text-muted">
-						<span>↑ ↓ выбор · Enter открыть</span>
-						<span>Esc закрыть</span>
-					</div>
-				</div>
-			)}
-		</div>
+					</div>,
+					document.body,
+				)}
+		</>
 	);
 }

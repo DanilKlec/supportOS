@@ -1,4 +1,5 @@
 import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
+import { AmbientBackground } from "@/components/brand/AmbientBackground";
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -53,6 +54,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
 	return (
 		<div className="app-shell flex h-dvh flex-col">
+			<AmbientBackground />
 			{
 				<Topbar
 					showKnowledgeControls={knowledgeRoute}
@@ -85,7 +87,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					</div>
 				)}
 
-				<main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+				<main className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden">
 					{children}
 				</main>
 			</div>
