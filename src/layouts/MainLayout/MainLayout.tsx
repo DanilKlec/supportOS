@@ -1,4 +1,5 @@
 import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
+import { WorkspaceSharedBindsSync } from '@/features/shared-binds/WorkspaceSharedBinds';
 import { AmbientBackground } from "@/components/brand/AmbientBackground";
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -54,6 +55,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
 	return (
 		<div className="app-shell flex h-dvh flex-col">
+			<WorkspaceSharedBindsSync />
 			<AmbientBackground />
 			{
 				<Topbar

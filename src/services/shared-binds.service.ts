@@ -9,6 +9,33 @@ import {
 } from "./cloud-knowledge.service";
 
 const TABLE = "supportos_binds";
+export interface BindBranches {
+	choices: Record<string, string>;
+	incoming: { id: string; sourceId: string; sender: string; bind: Bind }[];
+	outgoing: {
+		id: string;
+		sourceId: string;
+		recipient: string;
+		email: string;
+	}[];
+}
+export interface BindProposal {
+	id: string;
+	source_id: string;
+	author_id: string;
+	author: string;
+	translations: BindTranslation[];
+	tags: string[];
+	created_at: string;
+	status: string;
+}
+export interface BindRevision {
+	id: number;
+	owner_id: string | null;
+	created_at: string;
+	operation: string;
+	snapshot: Bind;
+}
 export const SHARED_CATEGORY = "supportos-shared";
 
 async function api(path: string, body?: unknown) {
@@ -27,9 +54,34 @@ async function api(path: string, body?: unknown) {
 	return data;
 }
 export const sharedBindsService = {
-	async users(
-		search: string,
-	): Promise<{
+	async branches(): Promise<BindBranches> {
+		const data = await api("?action=branches");
+		return {
+			...data,
+			incoming: data.incoming.map((entry: any) => ({
+				...entry,
+				bind: fromBindRow(entry.row),
+			})),
+		};
+	},
+	async branchAction(action: string, payload: Record<string, unknown>) {
+		return api("", { ...payload, action });
+	},
+	async history(sourceId: string): Promise<BindRevision[]> {
+		const data = await api(
+			`?action=history&source_id=${encodeURIComponent(sourceId)}`,
+		);
+		return data.map((entry: any) => ({
+			...entry,
+			snapshot: fromBindRow(entry.snapshot),
+		}));
+	},
+	async proposals(sourceId?: string): Promise<BindProposal[]> {
+		return api(
+			`?action=proposals${sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""}`,
+		);
+	},
+	async users(search: string): Promise<{
 		total: number;
 		users: { id: string; email: string; display_name: string }[];
 	}> {

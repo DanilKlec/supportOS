@@ -34,6 +34,7 @@ export interface KnowledgeSnapshot {
 }
 
 interface KnowledgeState extends KnowledgeSnapshot {
+	remoteBinds: Bind[];
 	tree: KnowledgeTreeNode[];
 
 	setKnowledge: (snapshot: Partial<KnowledgeSnapshot>) => void;
@@ -88,6 +89,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 	folders: [],
 	binds: [],
 	tree: [],
+	remoteBinds: [],
 
 	expandedFolders: [],
 
@@ -114,7 +116,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 		const folders = snapshot.folders ?? state.folders;
 		const binds = snapshot.binds ?? state.binds;
 
-		const bindIds = getBindIds(binds);
+		const bindIds = getBindIds([...binds, ...state.remoteBinds]);
 		const expandableIds = getFolderAndCategoryIds(categories, folders);
 
 		const openedTabs = unique(snapshot.openedTabs ?? state.openedTabs).filter(
@@ -233,7 +235,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 	openBind: (id) => {
 		const state = get();
-		const bind = state.binds.find((b) => b.id === id);
+		const bind = [...state.remoteBinds, ...state.binds].find(
+			(b) => b.id === id,
+		);
 		if (!bind) return;
 
 		const openedTabs = state.openedTabs.includes(id)
@@ -286,7 +290,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 	togglePinnedTab: (id) => {
 		const state = get();
-		const bind = state.binds.find((item) => item.id === id);
+		const bind = [...state.remoteBinds, ...state.binds].find(
+			(item) => item.id === id,
+		);
 
 		if (!bind) return;
 
@@ -350,5 +356,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			),
 		})),
 
-	getBind: (id) => get().binds.find((b) => b.id === id),
+	getBind: (id) =>
+		[...get().remoteBinds, ...get().binds].find((b) => b.id === id),
 }));

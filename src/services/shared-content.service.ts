@@ -9,15 +9,17 @@ export async function contentApi(
 	dataset: string,
 	data?: unknown[],
 	expected?: number,
+	scope: 'shared'|'personal' = 'shared',
+	action: 'save'|'reset' = 'save',
 ): Promise<Publication | null> {
 	const response = await authenticatedFetch(
-		`/api/content?dataset=${dataset}`,
+		`/api/content?dataset=${dataset}&scope=${scope}`,
 		data === undefined
 			? undefined
 			: {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ dataset, data, expected }),
+					body: JSON.stringify({ dataset, data, expected, scope, action }),
 				},
 	);
 	const result = await response.json();

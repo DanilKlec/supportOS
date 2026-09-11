@@ -111,3 +111,46 @@ it("keeps drafts when the server reports a conflict", async () => {
 	await screen.findByRole("alert");
 	expect(screen.getByRole("status").textContent).toContain("draft");
 });
+
+function PersonalScreen() {
+	const [data, setData] = useState<any[]>([]);
+	const p = useSharedPublication("bonuses", data, setData, false);
+	return (
+		<>
+			{p.banner}
+			<output>{JSON.stringify(data)}</output>
+			<button disabled={!p.canEdit} onClick={() => setData([{ id: "mine" }])}>
+				Edit personal
+			</button>
+		</>
+	);
+}
+it("lets Support save only personal bonus data without publishing controls", async () => {
+	auth(["bonuses.read"]);
+	mock.api.mockImplementation(async (_dataset, data, _version, scope) =>
+		data
+			? { data, version: 1, updated_at: "2026-09-11" }
+			: scope === "personal"
+				? null
+				: { data: [{ id: "team" }], version: 7, updated_at: "2026-09-11" },
+	);
+	render(<PersonalScreen />);
+	await waitFor(() =>
+		expect(
+			(screen.getByText("Edit personal") as HTMLButtonElement).disabled,
+		).toBe(false),
+	);
+	expect(screen.getByRole("status").textContent).toContain("team");
+	expect(screen.queryByText("Загрузить общую версию")).toBeNull();
+	expect(screen.queryByText("Сохранить для всех")).toBeNull();
+	fireEvent.click(screen.getByText("Edit personal"));
+	fireEvent.click(screen.getByText("Сохранить для себя"));
+	await waitFor(() =>
+		expect(mock.api).toHaveBeenCalledWith(
+			"bonuses",
+			[{ id: "mine" }],
+			0,
+			"personal",
+		),
+	);
+});

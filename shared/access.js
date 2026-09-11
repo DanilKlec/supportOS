@@ -14,7 +14,8 @@ export function routePermission(path) {
  if(path==='/agent-monitor'||path.startsWith('/agent-monitor/')) return 'monitor.read';
  if(path==='/settings/users'||path.startsWith('/settings/users/')) return 'users.manage';
  if(path==='/import/google-sheets'||path.startsWith('/import/google-sheets/')) return 'knowledge.write';
- if(['/','/binds','/shared-binds','/favorites','/recent'].includes(path))return 'binds.read';
+ if(path==='/shared-binds')return 'knowledge.write';
+ if(['/','/binds','/favorites','/recent'].includes(path))return 'binds.read';
  if(path==='/project-emails')return 'projects.read';
  if(['/bonuses','/bonus-tools'].includes(path))return 'bonuses.read';
  return ['/settings','/login'].includes(path)?'work':'tools';

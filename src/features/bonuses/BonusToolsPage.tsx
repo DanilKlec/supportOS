@@ -263,7 +263,11 @@ const RULE_COLUMNS: Array<{
 	{ key: "note", label: "Note" },
 ];
 
-export function BonusToolsPage() {
+export function BonusToolsPage({
+	management = false,
+}: {
+	management?: boolean;
+} = {}) {
 	const { showToast } = useToast();
 	const query = useBonusStore((state) => state.bonusToolsQuery);
 	const selectedRuleId = useBonusStore(
@@ -303,6 +307,7 @@ export function BonusToolsPage() {
 			setData(rows[0]);
 			if (rows[0]) saveStoredBonusToolsData(rows[0]);
 		},
+		management,
 	);
 	const canEdit = publication.canEdit;
 	const sourceUrl =
@@ -541,6 +546,7 @@ export function BonusToolsPage() {
 
 						<button
 							type="button"
+							style={!management ? { display: "none" } : undefined}
 							onClick={() => void updateFromGoogle(sourceUrl)}
 							disabled={loading || !canEdit}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
@@ -556,6 +562,7 @@ export function BonusToolsPage() {
 						<button
 							type="button"
 							disabled={!canEdit}
+							style={!management ? { display: "none" } : undefined}
 							onClick={() => setSourceOpen((current) => !current)}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
@@ -565,7 +572,7 @@ export function BonusToolsPage() {
 					</div>
 				</div>
 
-				{canEdit && sourceOpen && (
+				{management && canEdit && sourceOpen && (
 					<div className="rounded-xl border border-border bg-surface p-4">
 						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
 							<FileSpreadsheet size={16} />
@@ -588,6 +595,7 @@ export function BonusToolsPage() {
 							/>
 							<button
 								type="button"
+								style={!management ? { display: "none" } : undefined}
 								onClick={() => void updateFromGoogle(sourceUrl)}
 								disabled={loading || !sourceUrl.trim()}
 								className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"

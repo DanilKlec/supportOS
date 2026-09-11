@@ -96,13 +96,22 @@ function toRecord(draft: EmailDraft, existing?: ProjectEmailRecord) {
 	};
 }
 
-export function ProjectEmailsPage() {
+export function ProjectEmailsPage({
+	management = false,
+}: {
+	management?: boolean;
+} = {}) {
 	const { showToast } = useToast();
 	const records = useProjectEmailStore((state) => state.records);
 	const upsertRecords = useProjectEmailStore((state) => state.upsertRecords);
 	const replaceRecords = useProjectEmailStore((state) => state.replaceRecords);
 	const removeRecord = useProjectEmailStore((state) => state.removeRecord);
-	const publication = useSharedPublication("emails", records, replaceRecords);
+	const publication = useSharedPublication(
+		"emails",
+		records,
+		replaceRecords,
+		management,
+	);
 	const canEdit = publication.canEdit;
 	const [query, setQuery] = useState("");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
@@ -289,6 +298,7 @@ export function ProjectEmailsPage() {
 					<div className="flex flex-wrap items-center gap-2">
 						<button
 							type="button"
+							style={!management ? { display: "none" } : undefined}
 							disabled={!canEdit}
 							onClick={openCreate}
 							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
@@ -298,6 +308,7 @@ export function ProjectEmailsPage() {
 						</button>
 						<button
 							type="button"
+							style={!management ? { display: "none" } : undefined}
 							disabled={!canEdit}
 							onClick={() =>
 								setWorkPanel((current) =>
@@ -445,6 +456,7 @@ export function ProjectEmailsPage() {
 										</button>
 										<button
 											type="button"
+											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => editRecord(selectedRecord)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
@@ -454,6 +466,7 @@ export function ProjectEmailsPage() {
 										</button>
 										<button
 											type="button"
+											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => setDeleteId(selectedRecord.id)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"

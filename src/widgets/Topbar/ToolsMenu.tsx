@@ -257,15 +257,15 @@ export function ToolsMenu() {
 			items: [
 				{
 					type: "route",
-					label: "База знаний",
+					label: "Пространство биндов",
 					description: "Материалы и личная библиотека",
 					icon: BookOpen,
 					to: "/",
 				},
 				{
 					type: "route",
-					label: "Общие бинды",
-					description: "Базовые ответы и версии сотрудников",
+					label: "Общая база",
+					description: "Бинды, почты, бонусы и калькуляторы команды",
 					icon: Users,
 					to: "/shared-binds",
 				},

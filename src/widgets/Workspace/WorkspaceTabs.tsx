@@ -37,6 +37,7 @@ function getVisibleUnpinnedTabIds(tabIds: string[], activeTab?: string) {
 export function WorkspaceTabs() {
 	const [overflowOpen, setOverflowOpen] = useState(false);
 	const overflowRef = useRef<HTMLDivElement>(null);
+	useKnowledgeStore((s) => s.remoteBinds);
 	const openedTabs = useKnowledgeStore((s) => s.openedTabs);
 	const pinnedTabs = useKnowledgeStore((s) => s.pinnedTabs);
 	const activeTab = useKnowledgeStore((s) => s.activeTab);
@@ -103,7 +104,7 @@ export function WorkspaceTabs() {
 	if (visibleTabs.length === 0 && overflowTabs.length === 0) {
 		return (
 			<div className="flex h-10 shrink-0 items-center border-b border-border bg-surface px-4 text-sm text-muted">
-				No material opened
+				Пространство биндов
 			</div>
 		);
 	}
@@ -111,9 +112,9 @@ export function WorkspaceTabs() {
 	return (
 		<div
 			ref={overflowRef}
-			className="relative h-10 shrink-0 border-b border-border bg-surface"
+			className="chrome-tabs relative h-12 shrink-0 border-b border-border bg-background"
 		>
-			<div className="supportos-scroll flex h-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden px-2">
+			<div className="supportos-scroll flex h-full min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2">
 				{visibleTabs.map((bind) => {
 					const active = bind.id === activeTab;
 					const pinned = pinnedTabs.includes(bind.id);
@@ -121,9 +122,15 @@ export function WorkspaceTabs() {
 					return (
 						<div
 							key={bind.id}
-							className={`group flex h-8 max-w-[13rem] shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm transition ${
+							onAuxClick={(event) => {
+								if (event.button === 1) {
+									event.preventDefault();
+									removeTab(bind.id);
+								}
+							}}
+							className={`chrome-tab group flex h-10 max-w-[15rem] min-w-32 shrink-0 items-center gap-1.5 rounded-t-xl px-3 text-sm transition ${
 								active
-									? "bg-background text-foreground shadow-[inset_0_0_0_1px_var(--color-border)]"
+									? "bg-surface-elevated text-foreground shadow-[inset_0_1px_0_var(--color-border)]"
 									: pinned
 										? "bg-accent/10 text-foreground hover:bg-accent/15"
 										: "text-muted hover:bg-surface-elevated hover:text-foreground"
@@ -132,7 +139,8 @@ export function WorkspaceTabs() {
 							<button
 								type="button"
 								onClick={() => activateTab(bind.id)}
-								className="flex min-w-0 flex-1 items-center gap-2 focus-visible:outline-none"
+								aria-current={active ? "page" : undefined}
+								className="flex min-w-0 flex-1 items-center gap-2"
 								title={getBindTitle(bind, language)}
 							>
 								{pinned ? (

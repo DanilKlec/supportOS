@@ -31,6 +31,18 @@ it('publishes with current permissions, conflicts, atomic imports and audit',asy
  await expect(save(support,2)).rejects.toThrow('permission denied');
  await pg.exec('reset role');
  expect((await pg.query('select count(*)::int n from supportos_access_audit')).rows[0].n).toBe(3);
+ const mine=async(id,expected,operation='save')=>(await pg.query("select supportos_save_personal_content($1,'bonuses',$2,'[{\"id\":\"mine\"}]',$3) value",[id,expected,operation])).rows[0].value;
+ expect((await mine(support,0)).owner_id).toBe(support);
+ await expect(mine(support,0)).rejects.toThrow('Личная версия изменилась');
+ expect((await mine(admin,0)).owner_id).toBe(admin);
+ expect((await pg.query('select count(*)::int n from supportos_personal_content')).rows[0].n).toBe(2);
+ await expect(pg.query("select supportos_save_personal_content($1,'emails',0,'[]','save')",[support])).rejects.toThrow('Некорректный справочник');
+ await pg.exec('set role authenticated');
+ await expect(mine(support,1)).rejects.toThrow('permission denied');
+ await expect(pg.query('select * from supportos_personal_content')).rejects.toThrow('permission denied');
+ await pg.exec('reset role');
+ await mine(support,1,'reset');
+ expect((await pg.query('select owner_id from supportos_personal_content')).rows).toEqual([{owner_id:admin}]);
  await pg.exec("delete from supportos_role_permissions where role_id='admin' and permission_id='projects.write'");
  await expect(save(admin,2)).rejects.toThrow('Нет права');
  await pg.exec(await readFile(new URL('../../supabase/shared-content.sql',import.meta.url),'utf8'));

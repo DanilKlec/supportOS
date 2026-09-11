@@ -22,12 +22,15 @@ export function useSharedPublication(
 	dataset: "emails" | "bonuses" | "bonus-tools",
 	data: any[],
 	replace: (rows: any[]) => void,
+	management = true,
 ) {
 	const user = useAuthStore((s) => s.session?.user);
-	const writable = can(
-		user?.access,
-		dataset === "emails" ? "projects.write" : "bonuses.write",
-	);
+	const writable = management
+		? can(
+				user?.access,
+				dataset === "emails" ? "projects.write" : "bonuses.write",
+			)
+		: dataset !== "emails" && can(user?.access, "bonuses.read");
 	const [ready, setReady] = useState(false),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState("");
@@ -35,12 +38,20 @@ export function useSharedPublication(
 		[version, setVersion] = useState(0),
 		[stamp, setStamp] = useState("");
 	const current = serialize(data);
-	const draftKey = `${user?.id}:${dataset}`;
+	const draftKey = `${user?.id}:${dataset}:${management ? "shared" : "personal"}`;
 	const initial = useRef(data);
 	const latest = useRef({ current, base, ready, replace });
 	latest.current = { current, base, ready, replace };
 	const generation = useRef(0);
 	const writes = useRef(0);
+	const loadDocument = async () => {
+		if (management || dataset === "emails") return contentApi(dataset);
+		const [shared, personal] = await Promise.all([
+			contentApi(dataset),
+			contentApi(dataset, undefined, undefined, "personal"),
+		]);
+		return personal ?? (shared ? { ...shared, version: 0 } : null);
+	};
 	const apply = (row: Awaited<ReturnType<typeof contentApi>>) => {
 		const values = row?.data ?? [];
 		latest.current.replace(values);
@@ -60,7 +71,7 @@ export function useSharedPublication(
 			fetching = true;
 			const write = writes.current;
 			try {
-				const row = await contentApi(dataset);
+				const row = await loadDocument();
 				if (run !== generation.current || write !== writes.current) return;
 				const state = latest.current;
 				const draft =
@@ -87,7 +98,7 @@ export function useSharedPublication(
 			clearInterval(timer);
 			window.removeEventListener("focus", load);
 		};
-	}, [dataset, user?.id, writable]);
+	}, [dataset, user?.id, writable, management]);
 	const dirty = ready && current !== base;
 	useEffect(() => {
 		if (!ready) return;
@@ -113,7 +124,9 @@ export function useSharedPublication(
 		setBusy(true);
 		setError("");
 		try {
-			const row = await contentApi(dataset, snapshot, version);
+			const row = management
+				? await contentApi(dataset, snapshot, version)
+				: await contentApi(dataset, snapshot, version, "personal");
 			if (run === generation.current && row) {
 				setBase(serialize(row.data));
 				setVersion(row.version);
@@ -136,7 +149,7 @@ export function useSharedPublication(
 		const run = generation.current;
 		setBusy(true);
 		try {
-			const row = await contentApi(dataset);
+			const row = await loadDocument();
 			if (run === generation.current) apply(row);
 		} catch (e) {
 			setError((e as Error).message);
@@ -144,6 +157,92 @@ export function useSharedPublication(
 			setBusy(false);
 		}
 	};
+	const resetPersonal = async () => {
+		if (
+			!writable ||
+			busy ||
+			!window.confirm(
+				"Удалить личные изменения этого справочника и использовать данные команды?",
+			)
+		)
+			return;
+		setBusy(true);
+		const run = generation.current;
+		try {
+			await contentApi(dataset, [], version, "personal", "reset");
+			const row = await loadDocument();
+			if (run === generation.current) apply(row);
+		} catch (e) {
+			if (run === generation.current) setError((e as Error).message);
+		} finally {
+			if (run === generation.current) setBusy(false);
+		}
+	};
+	if (!management)
+		return {
+			ready,
+			canEdit: writable && ready && !busy,
+			banner:
+				!ready || error || dirty || (writable && version > 0) ? (
+					<div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+						<div>
+							{!ready
+								? "Подготавливаем справочник…"
+								: dirty
+									? "Личные изменения не сохранены"
+									: writable && version > 0
+										? "Вы используете свои настройки бонусов"
+										: ""}
+							{error && (
+								<p role="alert" className="text-red-400">
+									{error}
+								</p>
+							)}
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{dirty && (
+								<>
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() => void publish()}
+										className="rounded-lg bg-accent px-3 py-2 text-accent-foreground"
+									>
+										Сохранить для себя
+									</button>
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() => void reload()}
+										className="rounded-lg border border-border px-3 py-2"
+									>
+										Отменить изменения
+									</button>
+								</>
+							)}
+							{writable && version > 0 && !dirty && (
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => void resetPersonal()}
+									className="text-xs text-muted underline"
+								>
+									Сбросить мои изменения
+								</button>
+							)}
+							{error && !dirty && (
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => void reload()}
+								>
+									Повторить
+								</button>
+							)}
+						</div>
+					</div>
+				) : null,
+		};
 	return {
 		ready,
 		canEdit: writable && ready && !busy,

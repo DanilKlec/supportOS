@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SharedBindsPage } from "@/features/shared-binds/SharedBindsPage";
+import { SharedContentHub } from "@/features/shared-binds/SharedContentHub";
 export const Route = createFileRoute("/shared-binds")({
-	component: SharedBindsPage,
+	component: SharedContentHub,
 });

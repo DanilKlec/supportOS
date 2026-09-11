@@ -15,6 +15,17 @@ it('requires email write permission and ignores forged actors',async()=>{
 it('allows readers and returns an unpublished document as null',async()=>{
  mocks.db.mockResolvedValue([]);expect((await run({})).data).toBe(null);expect(mocks.requireUser.mock.calls[0][1]).toEqual({permission:'projects.read'});
 });
+it('isolates personal reads and writes using only the verified account',async()=>{
+ mocks.db.mockResolvedValue([]);
+ await run({url:'/api/content?dataset=bonuses&scope=personal&owner_id=forged'});
+ expect(mocks.db.mock.calls[0][1]).toContain('owner_id=eq.verified');
+ const fetch=vi.fn(async()=>new Response(JSON.stringify({version:1})));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{dataset:'bonuses',data:[],scope:'personal',expected:0,actor:'forged',owner_id:'forged'}})).status).toBe(200);
+ expect(mocks.requireUser.mock.calls.at(-1)[1]).toEqual({permission:'bonuses.read'});
+ expect(JSON.parse(fetch.mock.calls[0][1].body).actor).toBe('verified');
+ expect(fetch.mock.calls[0][0]).toContain('supportos_save_personal_content');
+ expect((await run({method:'POST',body:{dataset:'emails',data:[],scope:'personal',expected:0}})).status).toBe(400);
+});
 it('rejects cross-origin writes, malformed records, revoked rights and conflicts',async()=>{
  expect((await run({method:'POST',headers:{host:'app.test',origin:'https://evil.test'},body:{dataset:'emails'}})).status).toBe(403);
  expect(mocks.requireUser).not.toHaveBeenCalled();

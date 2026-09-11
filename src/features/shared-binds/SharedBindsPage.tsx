@@ -30,9 +30,7 @@ export function SharedBindsPage() {
 	const user = useAuthStore((s) => s.session?.user);
 	const canEdit = can(user?.access, "knowledge.write");
 	const canManage = can(user?.access, "binds.manage");
-	const [mode, setMode] = useState<"personal" | "common" | "manage">(
-		"personal",
-	);
+	const [mode, setMode] = useState<"personal" | "common" | "manage">("common");
 	const [target, setTarget] = useState("");
 	const [userSearch, setUserSearch] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -172,7 +170,6 @@ export function SharedBindsPage() {
 				<div className="mb-5 flex flex-wrap gap-2" aria-label="Варианты биндов">
 					{(
 						[
-							{ id: "personal", label: "Мои ответы" },
 							{ id: "common", label: "Общая база" },
 							...(canManage
 								? [{ id: "manage", label: "Бинды сотрудников" }]

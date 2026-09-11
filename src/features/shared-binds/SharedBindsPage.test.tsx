@@ -11,6 +11,10 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
 const mock = vi.hoisted(() => ({
 	list: vi.fn(),
+	branches: vi.fn(),
+	proposals: vi.fn(),
+	history: vi.fn(),
+	branchAction: vi.fn(),
 	personal: vi.fn(),
 	users: vi.fn(),
 	save: vi.fn(),
@@ -23,7 +27,7 @@ vi.mock("@/services/shared-binds.service", () => ({
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
-import { SharedBindsPage } from "./SharedBindsPage";
+import { WorkspaceSharedBindViewer } from "./WorkspaceSharedBinds";
 const base = {
 	id: "common",
 	slug: "common",
@@ -59,6 +63,10 @@ beforeEach(() => {
 			},
 		},
 	});
+	mock.branches.mockResolvedValue({ choices: {}, incoming: [], outgoing: [] });
+	mock.proposals.mockResolvedValue([]);
+	mock.history.mockResolvedValue([]);
+	mock.branchAction.mockResolvedValue({ ok: true });
 	mock.list.mockResolvedValue([base]);
 	mock.personal.mockResolvedValue([]);
 });
@@ -69,7 +77,7 @@ function show() {
 	});
 	render(
 		<QueryClientProvider client={client}>
-			<SharedBindsPage />
+			<WorkspaceSharedBindViewer id="common" />
 		</QueryClientProvider>,
 	);
 	return client;
@@ -83,7 +91,7 @@ it("Support can save a personal version without changing the common original", a
 	});
 	show();
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Изменить под себя" }),
+		await screen.findByRole("button", { name: "Изменить для себя" }),
 	);
 	fireEvent.change(screen.getByLabelText("Текст ответа"), {
 		target: { value: "Моя формулировка" },
@@ -104,8 +112,10 @@ it("Support can save a personal version without changing the common original", a
 });
 it("Support has no editor for common originals", async () => {
 	show();
-	fireEvent.click(screen.getByRole("button", { name: "Общая база" }));
-	await screen.findAllByRole("heading", { name: "Общий ответ", level: 2 });
+	fireEvent.change(await screen.findByLabelText("Ветка бинда"), {
+		target: { value: "main" },
+	});
+	await screen.findAllByRole("heading", { name: "Общий ответ", level: 1 });
 	expect(
 		screen.queryByRole("button", { name: "Изменить для всех" }),
 	).toBeNull();
@@ -115,7 +125,7 @@ it("a failed save keeps the draft open and shows an error", async () => {
 	mock.savePersonal.mockRejectedValue(new Error("Версия уже изменена"));
 	show();
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Изменить под себя" }),
+		await screen.findByRole("button", { name: "Изменить для себя" }),
 	);
 	fireEvent.change(screen.getByLabelText("Текст ответа"), {
 		target: { value: "Не терять черновик" },
@@ -127,4 +137,13 @@ it("a failed save keeps the draft open and shows an error", async () => {
 	expect(
 		(screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value,
 	).toBe("Не терять черновик");
+});
+
+it("recipient selects a shared branch and can only copy it into their own", async()=>{
+ mock.branches.mockResolvedValue({choices:{common:"grant"},incoming:[{id:"grant",sourceId:"common",sender:"Коллега",bind:{...base,id:"theirs",translations:[{language:"ru",title:"Ответ коллеги",content:"Чужая формулировка"}]}}],outgoing:[]});
+ show();
+ expect(await screen.findByRole("heading",{name:"Ответ коллеги",level:1})).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"Скопировать в мою ветку"}));
+ expect((screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value).toBe("Чужая формулировка");
+ expect(screen.queryByRole("button",{name:"Изменить для всех"})).toBeNull();
 });

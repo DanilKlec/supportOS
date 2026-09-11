@@ -17,9 +17,10 @@ it('groups allowed routes, searches and hides administration from Support',()=>{
  expect(screen.getByRole('dialog')).toBeTruthy();
  expect(screen.queryByText('Пользователи и роли')).toBeNull();
  expect(screen.queryByText('Восстановить локальную копию')).toBeNull();
- expect(screen.getByText('Общие бинды')).toBeTruthy();
+ expect(screen.queryByText('Общая база')).toBeNull();
+ expect(screen.getByText('Пространство биндов')).toBeTruthy();
  fireEvent.change(screen.getByRole('textbox'),{target:{value:'Переводчик'}});
- expect(screen.queryByText('Общие бинды')).toBeNull();
+ expect(screen.queryByText('Пространство биндов')).toBeNull();
  fireEvent.click(screen.getByText('AI-переводчик'));
  expect(mocks.navigate).toHaveBeenCalledWith({to:'/ai/translator'});
  expect(screen.queryByRole('dialog')).toBeNull();

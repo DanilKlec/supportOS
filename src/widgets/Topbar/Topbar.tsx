@@ -228,7 +228,15 @@ export function Topbar({
 	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
-	const binds = useKnowledgeStore((s) => s.binds);
+	const localBinds = useKnowledgeStore((s) => s.binds);
+	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const binds = useMemo(
+		() => [
+			...remoteBinds,
+			...localBinds.filter((b) => !remoteBinds.some((r) => r.id === b.id)),
+		],
+		[localBinds, remoteBinds],
+	);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const shortcutLabel = useMemo(getShortcutLabel, []);
 
@@ -253,7 +261,7 @@ export function Topbar({
 
 	const createBind = useCallback(() => {
 		if (can(authSession?.user.access, "knowledge.write")) setNewShared(true);
-		else void navigate({ to: "/shared-binds" });
+		else void navigate({ to: "/" });
 	}, [authSession?.user.access, navigate]);
 
 	const signOut = async () => {

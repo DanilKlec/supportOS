@@ -18,6 +18,18 @@ export default async function handler(req,res) {
    return send(200,{total:data.total,users:data.users.map(u=>({id:u.id,email:u.email,display_name:u.display_name}))});
   }
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
+  const branchAction=req.method==='GET'?({branches:'list',history:'history',proposals:'proposals'}[url.searchParams.get('action')]):(['share','revoke','choose','propose','accept','reject','withdraw'].includes(body.action)?body.action:null);
+  if(branchAction){
+   const payload=req.method==='GET'?{sourceId:url.searchParams.get('source_id')}:{sourceId:body.sourceId,email:body.email,shareId:body.shareId,proposalId:body.proposalId,branch:body.branch,expected:body.expected};
+   if(JSON.stringify(payload).length>2000)throw fail('Слишком длинный запрос');
+   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/supportos_bind_branch_action`,{
+    method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify({actor:actor.id,operation:branchAction,payload}),signal:AbortSignal.timeout(15000)
+   });
+   const result=await response.json();
+   if(!response.ok)throw fail(['42501','40001','22023'].includes(result.code)?result.message:'Не удалось выполнить действие с веткой',result.code==='42501'?403:result.code==='40001'?409:400);
+   return send(200,result);
+  }
   const target=body.userId??url.searchParams.get('user_id')??actor.id;
   if(typeof target!=='string'||! /^[0-9a-f-]{36}$/i.test(target))throw fail('Некорректный пользователь');
   if(target!==actor.id&&!can(actor.access,'binds.manage'))throw fail('Нет права управления биндами сотрудников',403);

@@ -15,8 +15,8 @@ import { can, routePermission } from "../../../shared/access.js";
 const shortcuts = [
 	{
 		to: "/shared-binds",
-		title: "Ответы команды",
-		description: "Общие бинды и ваши личные версии",
+		title: "Управление общей базой",
+		description: "Публикация биндов, почт и бонусов",
 		icon: Users,
 	},
 	{
@@ -35,12 +35,16 @@ const shortcuts = [
 export function EmptyWorkspace() {
 	const navigate = useNavigate();
 	const user = useAuthStore((s) => s.session?.user);
-	const binds = useKnowledgeStore((s) => s.binds);
+	const localBinds = useKnowledgeStore((s) => s.binds);
+	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const binds = [...remoteBinds, ...localBinds];
 	const recent = useKnowledgeStore((s) => s.recent);
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
-	const latest = recent
+	const latest = (
+		recent.length ? recent : remoteBinds.slice(0, 5).map((b) => b.id)
+	)
 		.map((id) => binds.find((b) => b.id === id && !b.archived))
 		.filter((b) => b !== undefined)
 		.slice(0, 5);
@@ -58,9 +62,7 @@ export function EmptyWorkspace() {
 					Рабочее пространство
 				</div>
 				<h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-					{user?.access?.display_name
-						? `${user.access.display_name}, всё под рукой`
-						: "Хорошая поддержка начинается здесь"}
+					Пространство биндов
 				</h1>
 				<p className="mt-3 max-w-xl text-sm leading-7 text-muted">
 					Найдите готовый ответ, уточните условия или продолжите работу с
@@ -106,7 +108,9 @@ export function EmptyWorkspace() {
 				<section className="mt-9">
 					<div className="mb-4 flex items-center gap-2">
 						<Clock3 size={16} className="text-muted" />
-						<h2 className="text-sm font-semibold">Продолжить работу</h2>
+						<h2 className="text-sm font-semibold">
+							{recent.length ? "Продолжить работу" : "Бинды команды"}
+						</h2>
 					</div>
 					{latest.length ? (
 						<div className="overflow-hidden rounded-2xl border border-border bg-surface/50">

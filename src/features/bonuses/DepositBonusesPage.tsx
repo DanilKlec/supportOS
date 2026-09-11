@@ -471,7 +471,11 @@ function toDraft(bonus: DepositBonus): BonusDraft {
 	};
 }
 
-export function DepositBonusesPage() {
+export function DepositBonusesPage({
+	management = false,
+}: {
+	management?: boolean;
+} = {}) {
 	const { showToast } = useToast();
 	const projects = useBonusStore((state) => state.projects);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
@@ -489,6 +493,7 @@ export function DepositBonusesPage() {
 		"bonuses",
 		projects,
 		replaceProjects,
+		management,
 	);
 	const canEdit = publication.canEdit;
 	const removeProject = useBonusStore((state) => state.removeProject);
@@ -953,6 +958,7 @@ export function DepositBonusesPage() {
 						<button
 							type="button"
 							disabled={!canEdit}
+							style={!management ? { display: "none" } : undefined}
 							onClick={() => setImportOpen((current) => !current)}
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
@@ -996,7 +1002,7 @@ export function DepositBonusesPage() {
 					</div>
 				)}
 
-				{importOpen && (
+				{management && importOpen && (
 					<div className="rounded-xl border border-border bg-surface p-4">
 						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
 							<FileSpreadsheet size={16} />
