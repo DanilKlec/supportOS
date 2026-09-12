@@ -280,3 +280,17 @@ it('recovers a personal draft after remount and removes it after successful save
  render(<SharedBindEditor personal original={base} save={save} onClose={()=>{}} onSaved={()=>{}}/>);
  expect(screen.queryByText('Найден несохранённый черновик')).toBeNull();
 });
+
+it('keeps personal edits on conflict and retries against the explicitly reviewed version',async()=>{
+ const latest={...base,id:'personal',sourceBindId:'common',updatedAt:'2026-09-12T10:00:00Z'};
+ mock.personal.mockResolvedValue([latest]);
+ mock.savePersonal.mockRejectedValueOnce(Object.assign(new Error('Conflict'),{status:409})).mockResolvedValue(latest);
+ show();fireEvent.click(await screen.findByRole('button',{name:'Изменить для себя'}));
+ fireEvent.change(screen.getByLabelText('Текст ответа'),{target:{value:'Мои изменения'}});
+ fireEvent.click(screen.getByRole('button',{name:'Сохранить личную версию'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Продолжить с моими правками'}));
+ expect((screen.getByLabelText('Текст ответа') as HTMLTextAreaElement).value).toBe('Мои изменения');
+ fireEvent.click(screen.getByRole('button',{name:'Сохранить личную версию'}));
+ await waitFor(()=>expect(mock.savePersonal).toHaveBeenCalledTimes(2));
+ expect(mock.savePersonal.mock.calls[1][0].original.updatedAt).toBe(latest.updatedAt);
+});

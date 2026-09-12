@@ -1,5 +1,9 @@
+import { useScrollContext } from "@/shared/hooks/useScrollContext";
+import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { useBonusStore } from "@/store/bonus.store";
 import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
-import { WorkspaceSharedBindsSync } from '@/features/shared-binds/WorkspaceSharedBinds';
+import { WorkspaceSharedBindsSync } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { AmbientBackground } from "@/components/brand/AmbientBackground";
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -16,6 +20,22 @@ export function MainLayout({ children }: { children: ReactNode }) {
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
+	const scrollRoot = useRef<HTMLElement>(null);
+	const actor = useAuthStore((s) => s.session?.user.id);
+	const activeBind = useKnowledgeStore((s) => s.activeTab);
+	const activeProject = useBonusStore((s) => s.activeProjectId);
+	useScrollContext(
+		scrollRoot,
+		JSON.stringify([
+			actor,
+			pathname,
+			pathname === "/"
+				? activeBind
+				: pathname === "/bonuses"
+					? activeProject
+					: "",
+		]),
+	);
 	const previousPathnameRef = useRef(pathname);
 	const knowledgeRoute = [
 		"/",
@@ -89,7 +109,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					</div>
 				)}
 
-				<main className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden">
+				<main
+					ref={scrollRoot}
+					className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden"
+				>
 					{children}
 				</main>
 			</div>

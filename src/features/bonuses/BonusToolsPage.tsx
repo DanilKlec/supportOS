@@ -517,7 +517,7 @@ export function BonusToolsPage({
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-background">
 			{publication.banner}
-			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
+			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">

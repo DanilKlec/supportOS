@@ -121,10 +121,12 @@ export const useBonusStore = create<BonusState>()(
 				});
 			},
 			replaceProjects: (projects) =>
-				set({
+				set((state) => ({
 					projects: sortProjects(projects),
-					activeProjectId: projects[0]?.id,
-				}),
+					activeProjectId: projects.some((p) => p.id === state.activeProjectId)
+						? state.activeProjectId
+						: sortProjects(projects)[0]?.id,
+				})),
 			addProject: (name) => {
 				const trimmedName = name.trim();
 

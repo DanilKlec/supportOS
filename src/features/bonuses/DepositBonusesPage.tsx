@@ -633,13 +633,13 @@ export function DepositBonusesPage({
 
 				setRates(nextRates);
 				if (force) {
-					showToast("Currency rates updated");
+					showToast("Курсы валют обновлены");
 				}
 			} catch (error) {
 				setRatesError(
 					error instanceof Error
 						? error.message
-						: "Unable to load currency rates",
+						: "Не удалось загрузить курсы валют",
 				);
 			} finally {
 				setRatesLoading(false);
@@ -680,9 +680,11 @@ export function DepositBonusesPage({
 			const nextPreview = await depositBonusImportService.preview(sheetUrl);
 
 			setPreview(nextPreview);
-			showToast("Preview loaded");
+			showToast("Предпросмотр готов");
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Import failed");
+			showToast(
+				error instanceof Error ? error.message : "Не удалось загрузить данные",
+			);
 		} finally {
 			setImporting(false);
 		}
@@ -719,7 +721,7 @@ export function DepositBonusesPage({
 		const project = addProject(newProjectName);
 
 		if (!project) {
-			showToast("Project name is required");
+			showToast("Укажите название проекта");
 			return;
 		}
 
@@ -740,8 +742,8 @@ export function DepositBonusesPage({
 		setNewProjectCurrencyGroup("");
 		showToast(
 			newProjectCurrencyGroup
-				? "Project sheet added to currency group"
-				: "Project sheet added",
+				? "Проект добавлен в группу валют"
+				: "Проект добавлен в черновик",
 		);
 	};
 
@@ -750,7 +752,7 @@ export function DepositBonusesPage({
 		if (!activeProject) return;
 
 		renameProject(activeProject.id, renameValue);
-		showToast("Project name saved");
+		showToast("Название изменено. Сохраните справочник.");
 	};
 
 	const updateActiveProjectCurrencyGroup = (tableName: string) => {
@@ -771,8 +773,8 @@ export function DepositBonusesPage({
 
 		showToast(
 			tableName
-				? "Currency group saved for project"
-				: "Automatic currency group enabled",
+				? "Группа валют выбрана"
+				: "Включён автоматический выбор группы валют",
 		);
 	};
 
@@ -791,7 +793,7 @@ export function DepositBonusesPage({
 		setFormError("");
 
 		if (!activeProject) {
-			setFormError("Create a project sheet first");
+			setFormError("Сначала создайте проект");
 			return;
 		}
 
@@ -800,12 +802,12 @@ export function DepositBonusesPage({
 		const content = pickPrimaryDraftContent(bonusDraft, selectedLanguage);
 
 		if (!name) {
-			setFormError("Bonus name is required");
+			setFormError("Укажите название бонуса");
 			return;
 		}
 
 		if (translations.length === 0) {
-			setFormError("Add bonus content for at least one language");
+			setFormError("Заполните условия хотя бы на одном языке");
 			return;
 		}
 
@@ -835,7 +837,7 @@ export function DepositBonusesPage({
 				minDepositAmount: amount,
 				minDepositCurrency: currency,
 			});
-			showToast("Bonus saved");
+			showToast("Правки применены. Сохраните справочник.");
 		} else {
 			addBonus(activeProject.id, {
 				name,
@@ -844,7 +846,7 @@ export function DepositBonusesPage({
 				minDepositAmount: amount,
 				minDepositCurrency: currency,
 			});
-			showToast("Bonus added");
+			showToast("Бонус добавлен в черновик справочника");
 		}
 
 		resetBonusForm();
@@ -867,7 +869,7 @@ export function DepositBonusesPage({
 			}),
 		);
 
-		showToast(copied ? "Bonus bind copied" : "Copy failed");
+		showToast(copied ? "Условия бонуса скопированы" : "Не удалось скопировать");
 	};
 
 	const copyPackage = async (project: BonusProject) => {
@@ -881,7 +883,7 @@ export function DepositBonusesPage({
 			}),
 		);
 
-		showToast(copied ? "Package bind copied" : "Copy failed");
+		showToast(copied ? "Пакет условий скопирован" : "Не удалось скопировать");
 	};
 
 	const confirmDeleteProject = () => {
@@ -890,7 +892,7 @@ export function DepositBonusesPage({
 
 		removeProject(deleteProjectTarget.id);
 		setDeleteProjectId(undefined);
-		showToast("Project sheet deleted");
+		showToast("Проект удалён из черновика");
 	};
 
 	const confirmDeleteBonus = () => {
@@ -899,7 +901,7 @@ export function DepositBonusesPage({
 
 		removeBonus(activeProject.id, deleteBonusTarget.id);
 		setDeleteBonusId(undefined);
-		showToast("Bonus deleted");
+		showToast("Бонус удалён из черновика");
 	};
 
 	if (!publication.ready) return publication.banner;
@@ -912,7 +914,7 @@ export function DepositBonusesPage({
 				))}
 			</datalist>
 
-			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
+			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">
@@ -978,7 +980,7 @@ export function DepositBonusesPage({
 							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
-							Import
+							Импорт
 						</button>
 
 						{activeProject && (
@@ -1148,7 +1150,7 @@ export function DepositBonusesPage({
 												setNewProjectName(event.target.value)
 											}
 											className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder="Project name"
+											placeholder="Название проекта"
 										/>
 										<button
 											type="submit"
@@ -1164,7 +1166,7 @@ export function DepositBonusesPage({
 											setNewProjectCurrencyGroup(event.target.value)
 										}
 										className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-										aria-label="Currency group for new project"
+										aria-label="Группа валют нового проекта"
 									>
 										<option value="">Auto currency group</option>
 										{currencyGroupOptions.map((group) => (
@@ -1186,7 +1188,7 @@ export function DepositBonusesPage({
 								value={query}
 								onChange={(event) => setQuery(event.target.value)}
 								className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-								placeholder="Search sheets or bonuses..."
+								placeholder="Поиск проектов или бонусов…"
 							/>
 						</div>
 
@@ -1266,7 +1268,7 @@ export function DepositBonusesPage({
 												className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Pencil size={15} />
-												Save
+												Применить
 											</button>
 										</div>
 										<div className="mt-3 grid max-w-xl gap-1">
@@ -1274,7 +1276,7 @@ export function DepositBonusesPage({
 												htmlFor="active-project-currency-group"
 												className="text-xs font-medium text-muted"
 											>
-												Currency group
+												Группа валют
 											</label>
 											<select
 												id="active-project-currency-group"
@@ -1284,7 +1286,7 @@ export function DepositBonusesPage({
 												}
 												className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											>
-												<option value="">Auto detect by project name</option>
+												<option value="">Определять по названию проекта</option>
 												{currencyGroupOptions.map((group) => (
 													<option key={group.name} value={group.name}>
 														{formatCurrencyGroupLabel(
@@ -1297,7 +1299,7 @@ export function DepositBonusesPage({
 											<div className="text-xs text-muted">
 												{activeCurrencyContext
 													? `${activeCurrencyContext.source === "manual" ? "Manual" : "Auto"} uses ${activeCurrencyContext.table.name}.`
-													: "No currency table matched yet. Load Bonus Tools or choose a group manually."}
+													: "Таблица валют не найдена. Выберите группу вручную или настройте общую базу."}
 											</div>
 										</div>
 									</div>
@@ -1308,8 +1310,8 @@ export function DepositBonusesPage({
 											disabled={!canEdit}
 											onClick={() => setDeleteProjectId(activeProject.id)}
 											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
-											title="Delete project sheet"
-											aria-label="Delete project sheet"
+											title="Удалить проект"
+											aria-label="Удалить проект"
 										>
 											<Trash2 size={16} />
 										</button>
@@ -1328,7 +1330,7 @@ export function DepositBonusesPage({
 													}))
 												}
 												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-												placeholder="Bonus name"
+												placeholder="Название бонуса"
 											/>
 											<input
 												value={bonusDraft.minDepositAmount}
@@ -1339,7 +1341,7 @@ export function DepositBonusesPage({
 													}))
 												}
 												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-												placeholder="Min dep."
+												placeholder="Мин. депозит"
 											/>
 											<input
 												value={bonusDraft.minDepositCurrency}
@@ -1386,7 +1388,7 @@ export function DepositBonusesPage({
 													className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 												>
 													<X size={15} />
-													Cancel
+													Отмена
 												</button>
 											)}
 											<button
@@ -1394,7 +1396,9 @@ export function DepositBonusesPage({
 												className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 											>
 												<Plus size={16} />
-												{editingBonusId ? "Save Bonus" : "Add Bonus"}
+												{editingBonusId
+													? "Применить изменения"
+													: "Добавить бонус"}
 											</button>
 										</div>
 									</fieldset>
@@ -1481,15 +1485,15 @@ export function DepositBonusesPage({
 																className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 															>
 																<Copy size={15} />
-																Copy
+																Копировать
 															</button>
 															<button
 																type="button"
 																disabled={!canEdit}
 																onClick={() => editBonus(bonus)}
 																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-																title="Edit bonus"
-																aria-label="Edit bonus"
+																title="Редактировать бонус"
+																aria-label="Редактировать бонус"
 															>
 																<Pencil size={15} />
 															</button>
@@ -1498,8 +1502,8 @@ export function DepositBonusesPage({
 																disabled={!canEdit}
 																onClick={() => setDeleteBonusId(bonus.id)}
 																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
-																title="Delete bonus"
-																aria-label="Delete bonus"
+																title="Удалить бонус"
+																aria-label="Удалить бонус"
 															>
 																<Trash2 size={15} />
 															</button>
@@ -1510,8 +1514,8 @@ export function DepositBonusesPage({
 									) : (
 										<div className="px-4 py-12 text-center text-sm text-muted">
 											{searchTokens.length > 0
-												? "No bonuses match this search"
-												: "This project sheet has no bonuses yet"}
+												? "По запросу ничего не найдено"
+												: "В проекте пока нет бонусов"}
 										</div>
 									)}
 								</div>
@@ -1527,7 +1531,7 @@ export function DepositBonusesPage({
 
 			<ConfirmDialog
 				open={Boolean(deleteProjectTarget)}
-				title="Delete project sheet?"
+				title="Удалить проект?"
 				description={
 					deleteProjectTarget
 						? `${deleteProjectTarget.name} and its bonuses will be removed.`
@@ -1539,7 +1543,7 @@ export function DepositBonusesPage({
 
 			<ConfirmDialog
 				open={Boolean(deleteBonusTarget)}
-				title="Delete bonus?"
+				title="Удалить бонус?"
 				description={
 					deleteBonusTarget
 						? `${deleteBonusTarget.name} will be removed from this project.`
@@ -1603,14 +1607,14 @@ function ConfirmDialog({
 						onClick={onCancel}
 						className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
-						Cancel
+						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
 						className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
 					>
-						Delete
+						Удалить
 					</button>
 				</div>
 			</div>

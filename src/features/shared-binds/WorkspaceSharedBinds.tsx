@@ -1,3 +1,4 @@
+import { MoreActions } from "@/components/MoreActions";
 import { reconcileBindLinks } from "./bind-links";
 import { BindLinkEditor } from "./BindLinkEditor";
 import { useBindLinksStore, EMPTY_BIND_LINKS } from "@/store/bind-links.store";
@@ -320,30 +321,90 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						</div>
 					</div>
 					<div className="flex flex-wrap gap-2">
-						<button
-							type="button"
-							disabled={busy}
-							onClick={() => setLinkOpen(true)}
-							className="rounded-xl border border-border px-3 py-2 text-xs"
-						>
-							Связь версий
-						</button>
-						<button
-							type="button"
-							aria-pressed={compare}
-							onClick={() => setCompare((v) => !v)}
-							className="rounded-xl border border-border px-3 py-2 text-xs"
-						>
-							Сравнить
-						</button>
-						<button
-							type="button"
-							aria-expanded={historyOpen}
-							onClick={() => setHistoryOpen((v) => !v)}
-							className="rounded-xl border border-border px-3 py-2 text-xs"
-						>
-							История
-						</button>
+						<MoreActions>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() => setLinkOpen(true)}
+								className="rounded-xl border border-border px-3 py-2 text-xs"
+							>
+								Связь версий
+							</button>
+							<button
+								type="button"
+								aria-pressed={compare}
+								onClick={() => setCompare((v) => !v)}
+								className="rounded-xl border border-border px-3 py-2 text-xs"
+							>
+								Сравнить
+							</button>
+							<button
+								type="button"
+								aria-expanded={historyOpen}
+								onClick={() => setHistoryOpen((v) => !v)}
+								className="rounded-xl border border-border px-3 py-2 text-xs"
+							>
+								История
+							</button>
+							{savedOwn && (
+								<div className="flex flex-wrap gap-2">
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() =>
+											void action(async () => {
+												await sharedBindsService.branchAction("propose", {
+													sourceId: id,
+													expected: base.updatedAt,
+												});
+												await client.invalidateQueries({
+													queryKey: ["bind-proposals"],
+												});
+												showToast("Предложение отправлено на проверку");
+											})
+										}
+										className="rounded-xl border border-border px-3 py-2 text-xs"
+									>
+										Предложить мою версию команде
+									</button>
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Удалить свою ветку этого бинда? Доступ коллег к ней тоже будет отозван.",
+												)
+											)
+												void action(async () => {
+													if (savedOwn)
+														await sharedBindsService.resetPersonal(
+															base,
+															savedOwn,
+															user!.id,
+														);
+													await choose("main");
+													await Promise.all([
+														client.invalidateQueries({
+															queryKey: ["personal-binds"],
+														}),
+														client.invalidateQueries({
+															queryKey: ["bind-branches"],
+														}),
+														client.invalidateQueries({
+															queryKey: ["bind-history"],
+														}),
+													]);
+												});
+										}}
+										className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted"
+									>
+										<RotateCcw size={13} />
+										Сбросить мою ветку
+									</button>
+								</div>
+							)}
+						</MoreActions>
 						<button
 							type="button"
 							disabled={busy}
@@ -498,61 +559,15 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						))}
 					</section>
 				)}
-				{savedOwn && (
-					<div className="flex flex-wrap gap-2">
-						<button
-							type="button"
-							disabled={busy}
-							onClick={() =>
-								void action(async () => {
-									await sharedBindsService.branchAction("propose", {
-										sourceId: id,
-										expected: base.updatedAt,
-									});
-									await client.invalidateQueries({
-										queryKey: ["bind-proposals"],
-									});
-									showToast("Предложение отправлено на проверку");
-								})
-							}
-							className="rounded-xl border border-border px-3 py-2 text-xs"
-						>
-							Предложить мою версию команде
-						</button>
-						<button
-							type="button"
-							disabled={busy}
-							onClick={() => {
-								if (
-									window.confirm(
-										"Удалить свою ветку этого бинда? Доступ коллег к ней тоже будет отозван.",
-									)
-								)
-									void action(async () => {
-										if (savedOwn)
-											await sharedBindsService.resetPersonal(
-												base,
-												savedOwn,
-												user!.id,
-											);
-										await choose("main");
-										await Promise.all([
-											client.invalidateQueries({
-												queryKey: ["personal-binds"],
-											}),
-											client.invalidateQueries({ queryKey: ["bind-branches"] }),
-											client.invalidateQueries({ queryKey: ["bind-history"] }),
-										]);
-									});
-							}}
-							className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted"
-						>
-							<RotateCcw size={13} />
-							Сбросить мою ветку
-						</button>
+
+				<details className="rounded-xl border border-border p-3">
+					<summary className="cursor-pointer text-xs text-muted">
+						Предложения команды
+					</summary>
+					<div className="mt-3">
+						<BindProposals sourceId={id} />
 					</div>
-				)}
-				<BindProposals sourceId={id} />
+				</details>
 				{linkOpen && user && (
 					<BindLinkEditor
 						base={base}
@@ -569,10 +584,11 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						personal
 						original={editor}
 						onClose={() => setEditor(null)}
-						save={(draft) =>
+						save={(draft, latest) =>
 							sharedBindsService.savePersonal({
 								source: base,
-								original: savedOwn,
+								original:
+									latest === undefined ? savedOwn : (latest ?? undefined),
 								userId: user.id,
 								...draft,
 							})

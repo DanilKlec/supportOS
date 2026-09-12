@@ -179,6 +179,9 @@ function getFocusableItems(container: HTMLDivElement | null) {
 
 export function ToolsMenu() {
 	const role = useAuthStore((s) => s.session?.user.access);
+	const actor = useAuthStore((s) => s.session?.user.id);
+	const scrollPositions = useRef<Record<string, number>>({});
+	const scrollRef = useRef<HTMLElement>(null);
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
@@ -195,6 +198,12 @@ export function ToolsMenu() {
 	);
 	const resolvedTheme = resolveThemeMode(themeMode);
 	const menuId = "supportos-tools-menu";
+	useEffect(() => {
+		if (open && scrollRef.current)
+			scrollRef.current.scrollTop = query
+				? 0
+				: (scrollPositions.current[actor ?? "guest"] ?? 0);
+	}, [open, query, actor]);
 
 	const closeMenu = useCallback(() => {
 		setOpen(false);
@@ -262,20 +271,14 @@ export function ToolsMenu() {
 					icon: BookOpen,
 					to: "/",
 				},
-				{
-					type: "route",
-					label: "Общая база",
-					description: "Бинды, почты, бонусы и калькуляторы команды",
-					icon: Users,
-					to: "/shared-binds",
-				},
+
 				...WORK_TOOLS.filter((item) =>
 					["/archive", "/health"].includes(item.to),
 				),
 			],
 		},
 		{
-			title: "AI и инструменты",
+			title: "Рабочие инструменты",
 			items: WORK_TOOLS.filter((item) =>
 				[
 					"/translator",
@@ -286,8 +289,15 @@ export function ToolsMenu() {
 			),
 		},
 		{
-			title: "Команда и контроль",
+			title: "Управление командой",
 			items: [
+				{
+					type: "route",
+					label: "Общая база",
+					description: "Бинды, почты, бонусы и калькуляторы команды",
+					icon: Users,
+					to: "/shared-binds",
+				},
 				{
 					type: "route",
 					label: "Пользователи и роли",
@@ -301,7 +311,7 @@ export function ToolsMenu() {
 			],
 		},
 		{
-			title: "Данные",
+			title: "Резервные копии и импорт",
 			items: [
 				{
 					type: "action",
@@ -534,10 +544,19 @@ export function ToolsMenu() {
 							</div>
 							<nav
 								aria-label="Разделы и инструменты"
+								ref={scrollRef}
+								onScroll={(e) => {
+									if (!query)
+										scrollPositions.current[actor ?? "guest"] =
+											e.currentTarget.scrollTop;
+								}}
 								className="supportos-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5"
 							>
 								{visibleGroups.map((group) => (
-									<section key={group.title} className="mb-5">
+									<section
+										key={group.title}
+										className="mb-4 rounded-2xl border border-border/70 bg-background/30 p-1"
+									>
 										<h3 className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted">
 											{group.title}
 										</h3>
@@ -558,7 +577,7 @@ export function ToolsMenu() {
 																? navigateTo(item.to)
 																: item.action()
 														}
-														className={`drawer-link group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? "bg-accent/10 text-accent ring-1 ring-inset ring-accent/20" : "hover:bg-surface-elevated"}`}
+														className={`drawer-link group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? "bg-surface-elevated text-foreground ring-1 ring-inset ring-border" : "hover:bg-surface-elevated"}`}
 													>
 														<span
 															className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? "bg-accent/10" : "bg-background text-muted"}`}
@@ -574,7 +593,10 @@ export function ToolsMenu() {
 															</span>
 														</span>
 														{active ? (
-															<Check size={15} />
+															<span className="flex items-center gap-1 text-[10px] text-muted">
+																<Check size={13} />
+																Здесь
+															</span>
 														) : (
 															<ChevronRight
 																size={14}

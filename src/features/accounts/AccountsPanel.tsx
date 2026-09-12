@@ -1,3 +1,4 @@
+import { AdminOverview } from "./AdminOverview";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
@@ -155,6 +156,7 @@ export function AccountsPanel({
 				aria-label="Управление доступами"
 			>
 				{[
+					...(usersAllowed ? [["overview", "Обзор"]] : []),
 					["users", "Пользователи"],
 					["roles", "Роли и разрешения"],
 					["audit", "Журнал изменений"],
@@ -188,6 +190,19 @@ export function AccountsPanel({
 				</p>
 			)}
 			{notice && <p role="status">{notice}</p>}
+			{tab === "overview" && usersAllowed && (
+				<AdminOverview
+					key={revision}
+					onAudit={() => setTab("audit")}
+					onUser={(u) => {
+						setTab("users");
+						setUserEdit(u);
+						setSearch(u.email);
+						setQuery(u.email);
+						setPage(1);
+					}}
+				/>
+			)}
 			{tab === "users" && usersAllowed && (
 				<>
 					<form

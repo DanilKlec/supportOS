@@ -17,6 +17,10 @@ export default async function handler(req,res) {
    const data=await db(env,'rpc/supportos_rbac_list_users',{search_text:search,page_number:1});
    return send(200,{total:data.total,users:data.users.map(u=>({id:u.id,email:u.email,display_name:u.display_name}))});
   }
+  if(req.method==='GET'&&url.searchParams.get('action')==='proposal-results') {
+   const rows=await db(env,`supportos_bind_proposals?select=id,source_id,status,resolved_at,translations&author_id=eq.${actor.id}&status=in.(accepted,rejected)&order=resolved_at.desc&limit=50`);
+   return send(200,rows.map(row=>({id:row.id,sourceId:row.source_id,status:row.status,resolvedAt:row.resolved_at,title:row.translations?.[0]?.title??'Предложение'})));
+  }
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
   const branchAction=req.method==='GET'?({branches:'list',history:'history',proposals:'proposals'}[url.searchParams.get('action')]):(['share','revoke','choose','propose','accept','reject','withdraw'].includes(body.action)?body.action:null);
   if(branchAction){

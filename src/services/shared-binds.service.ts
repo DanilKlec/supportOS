@@ -50,10 +50,23 @@ async function api(path: string, body?: unknown) {
 			: undefined,
 	);
 	const data = await response.json();
-	if (!response.ok) throw new Error(data.error ?? "Ошибка сохранения биндов");
+	if (!response.ok)
+		throw Object.assign(new Error(data.error ?? "Ошибка сохранения биндов"), {
+			status: response.status,
+		});
 	return data;
 }
+export interface ProposalResult {
+	id: string;
+	sourceId: string;
+	status: "accepted" | "rejected";
+	resolvedAt: string;
+	title: string;
+}
 export const sharedBindsService = {
+	async proposalResults(): Promise<ProposalResult[]> {
+		return api("?action=proposal-results");
+	},
 	async branches(): Promise<BindBranches> {
 		const data = await api("?action=branches");
 		return {
@@ -202,8 +215,9 @@ export const sharedBindsService = {
 				},
 			);
 			if (!saved.length)
-				throw new Error(
-					"Бинд уже изменён другим сотрудником или доступ отозван. Скопируйте свой текст, закройте редактор и обновите список.",
+				throw Object.assign(
+					new Error("Бинд изменён другим сотрудником или доступ отозван."),
+					{ status: 409 },
 				);
 		} else {
 			saved = await supabaseService.insert<BindRow>(

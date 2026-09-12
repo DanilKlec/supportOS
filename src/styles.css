@@ -175,3 +175,16 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
 .bind-version-option[aria-pressed="true"] { background:var(--color-surface-elevated); border-color:#52525b; color:var(--color-foreground); box-shadow:0 2px 6px #0002,inset 0 1px 0 #ffffff08; }
 .bind-version-option:disabled { cursor:wait; }
 @media (prefers-reduced-motion:reduce) { .bind-version-option { transition:none; } }
+
+.supportos-page-scroll { --page-content-width:80rem; padding-inline:max(1rem,calc((100% - var(--page-content-width)) / 2 + 1rem)); scrollbar-gutter:stable; }
+.supportos-page-scroll-narrow { --page-content-width:72rem; }
+.supportos-page-scroll > * { flex-shrink:0; }
+@media (min-width:640px) { .supportos-page-scroll { padding-inline:max(1.5rem,calc((100% - var(--page-content-width)) / 2 + 1.5rem)); } }
+@supports selector(::-webkit-scrollbar) {
+ * { scrollbar-width:auto; scrollbar-color:auto; }
+ *::-webkit-scrollbar { width:8px; height:8px; }
+ *::-webkit-scrollbar-track { background:#111113; }
+ *::-webkit-scrollbar-thumb { background:#52525b; border:2px solid #111113; border-radius:999px; background-clip:padding-box; }
+ *::-webkit-scrollbar-thumb:hover { background:#71717a; }
+ .scrollbar-none { scrollbar-width:none; }
+}

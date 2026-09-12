@@ -416,7 +416,7 @@ export function TranslatorPage() {
 		<div className="flex h-full flex-col overflow-hidden bg-background">
 			<form
 				onSubmit={translate}
-				className="supportos-scroll mx-auto flex h-full w-full max-w-6xl flex-1 flex-col gap-4 overflow-auto p-4 sm:p-6"
+				className="supportos-page-scroll supportos-page-scroll-narrow flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6"
 			>
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div>

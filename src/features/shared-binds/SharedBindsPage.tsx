@@ -474,10 +474,13 @@ export function SharedBindsPage() {
 						onClose={() => setEditor(null)}
 						save={
 							editor.userId && editor.source
-								? (draft) =>
+								? (draft, latest) =>
 										sharedBindsService.savePersonal({
 											source: editor.source!,
-											original: editor.original,
+											original:
+												latest === undefined
+													? editor.original
+													: (latest ?? undefined),
 											userId: editor.userId!,
 											...draft,
 										})
@@ -522,10 +525,13 @@ export function SharedBindEditor({
 	personal?: boolean;
 	draftSourceId?: string;
 	draftTargetId?: string;
-	save?: (draft: {
-		translations: BindTranslation[];
-		tags: string[];
-	}) => Promise<Bind>;
+	save?: (
+		draft: {
+			translations: BindTranslation[];
+			tags: string[];
+		},
+		latest?: Bind | null,
+	) => Promise<Bind>;
 }) {
 	const actor = useAuthStore((s) => s.session?.user.id) ?? "anonymous";
 	const key = draftKey(
@@ -534,6 +540,36 @@ export function SharedBindEditor({
 		draftSourceId ?? original?.sourceBindId ?? original?.id ?? "new",
 		personal,
 	);
+	const [retryBase, setRetryBase] = useState<Bind>();
+	const [conflict, setConflict] = useState<Bind | null>(null);
+	const [conflictLoading, setConflictLoading] = useState(false);
+	const loadConflict = async () => {
+		setConflictLoading(true);
+		try {
+			const rows = personal
+				? await sharedBindsService.personal(draftTargetId ?? actor)
+				: await sharedBindsService.list();
+			const latest = rows.find((b) =>
+				personal
+					? b.sourceBindId ===
+						(draftSourceId ?? original?.sourceBindId ?? original?.id)
+					: b.id === original?.id,
+			);
+			if (!latest || latest.archived) {
+				setError(
+					"Версия удалена или недоступна. Ваш черновик сохранён; автоматическая перезапись запрещена.",
+				);
+				return;
+			}
+			setConflict(latest);
+		} catch (e) {
+			setError(
+				"Не удалось загрузить актуальную версию: " + (e as Error).message,
+			);
+		} finally {
+			setConflictLoading(false);
+		}
+	};
 	const [recovery, setRecovery] = useState(() => readDraft(key));
 	const [draftStatus, setDraftStatus] = useState("");
 	const [baseVersion, setBaseVersion] = useState<string | null>(
@@ -637,7 +673,7 @@ export function SharedBindEditor({
 				onChange={() => setReviewed(false)}
 				onSubmit={async (e) => {
 					e.preventDefault();
-					if (saving || recovery) return;
+					if (saving || recovery || conflict || conflictLoading) return;
 					if (!personal && !reviewed) {
 						setReviewed(true);
 						return;
@@ -647,8 +683,11 @@ export function SharedBindEditor({
 					try {
 						const draft = { translations, tags: tags.split(",") };
 						const saved = await (save
-							? save(draft)
-							: sharedBindsService.save({ original, ...draft }));
+							? save(draft, retryBase)
+							: sharedBindsService.save({
+									original: retryBase ?? original,
+									...draft,
+								}));
 						dirty.current = false;
 						try {
 							removeDraft(key);
@@ -660,12 +699,50 @@ export function SharedBindEditor({
 						onSaved(saved);
 					} catch (e) {
 						setError(e instanceof Error ? e.message : "Не удалось сохранить");
+						if ((e as { status?: number }).status === 409) {
+							setReviewed(false);
+							await loadConflict();
+						}
 					} finally {
 						setSaving(false);
 					}
 				}}
 				className="space-y-5"
 			>
+				{conflict && (
+					<section className="rounded-xl border border-amber-400/30 p-4">
+						<h3 className="font-semibold">Ответ изменён другим сотрудником</h3>
+						<p className="my-3 text-xs text-muted">
+							Слева — актуальная версия, справа — ваши правки. Ваш текст
+							остаётся в редакторе. Продолжение не публикует его автоматически.
+						</p>
+						<BindDiff
+							before={{
+								translations: conflict.translations,
+								tags: conflict.tags,
+							}}
+							after={reviewDraft}
+						/>
+						<button
+							type="button"
+							onClick={() => {
+								setRetryBase(conflict);
+								setBaseVersion(conflict.updatedAt);
+								setConflict(null);
+								setError("");
+								setReviewed(false);
+							}}
+							className="mt-3 rounded-lg border border-border px-3 py-2 text-sm"
+						>
+							Продолжить с моими правками
+						</button>
+					</section>
+				)}
+				{conflictLoading && (
+					<p role="status" className="text-xs text-muted">
+						Загружаем актуальную версию для сравнения…
+					</p>
+				)}
 				{recovery && (
 					<section className="rounded-xl border border-border bg-surface-elevated p-4">
 						<h3 className="text-sm font-semibold">
@@ -740,7 +817,7 @@ export function SharedBindEditor({
 					</p>
 				)}
 				<fieldset
-					disabled={saving || !!recovery}
+					disabled={saving || !!recovery || !!conflict || conflictLoading}
 					className="space-y-4 disabled:opacity-60"
 				>
 					<label className="block text-sm font-medium">
@@ -808,7 +885,7 @@ export function SharedBindEditor({
 						<BindDiff
 							before={
 								original
-									? { translations: original.translations, tags: original.tags }
+									? { translations: (retryBase??original).translations, tags: (retryBase??original).tags }
 									: undefined
 							}
 							after={reviewDraft}
@@ -829,7 +906,7 @@ export function SharedBindEditor({
 					</button>
 					<button
 						type="submit"
-						disabled={saving || !!recovery}
+						disabled={saving || !!recovery || !!conflict || conflictLoading}
 						className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
 					>
 						<Check size={17} />

@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Bell } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore } from "@/store";
 import { sharedBindsService } from "@/services/shared-binds.service";
@@ -48,6 +48,13 @@ export function Inbox() {
 	const { user, common, branches } = useWorkspaceSharedBinds();
 	const navigate = useNavigate();
 	const client = useQueryClient();
+	const results = useQuery({
+		queryKey: ["proposal-results", user?.id],
+		queryFn: () => sharedBindsService.proposalResults(),
+		enabled: can(user?.access, "binds.read"),
+		staleTime: 30000,
+		refetchInterval: 30000,
+	});
 	const profile = useInbox((s) => (user ? s.profiles[user.id] : undefined));
 	const [open, setOpen] = useState(false),
 		[filter, setFilter] = useState("unread"),
@@ -63,13 +70,27 @@ export function Inbox() {
 				);
 	}, [user?.id, common.data, profile]);
 	if (!user || !can(user.access, "binds.read")) return null;
-	const items = profile
+	const updates = profile
 		? inboxItems(
 				common.data ?? [],
 				branches.data?.incoming ?? [],
 				profile.baseline,
 			)
 		: [];
+	const items: InboxItem[] = [
+		...updates,
+		...(results.data ?? []).map((r) => ({
+			key: "proposal:" + r.id + ":" + r.status,
+			sourceId: r.sourceId,
+			branch: r.status === "accepted" ? "main" : "mine",
+			title: r.title,
+			description:
+				r.status === "accepted"
+					? "Ваше предложение принято и опубликовано"
+					: "Ваше предложение отклонено",
+			stamp: r.resolvedAt,
+		})),
+	].sort((a, b) => b.stamp.localeCompare(a.stamp));
 	const unread = items.filter((i) => !profile?.read.includes(i.key));
 	const visible = filter === "unread" ? unread : items;
 	const show = async (item: InboxItem) => {
@@ -149,14 +170,18 @@ export function Inbox() {
 							Прочитать всё
 						</button>
 					</div>
-					{(error || common.error || branches.error) && (
+					{(error || common.error || branches.error || results.error) && (
 						<p role="alert" className="mb-3 text-sm text-red-400">
-							{error || common.error?.message || branches.error?.message}
+							{error ||
+								common.error?.message ||
+								branches.error?.message ||
+								results.error?.message}
 							<button
 								className="ml-2 underline"
 								onClick={() => {
 									void common.refetch();
 									void branches.refetch();
+									void results.refetch();
 								}}
 							>
 								Обновить

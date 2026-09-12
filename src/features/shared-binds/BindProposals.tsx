@@ -27,6 +27,7 @@ export function BindProposals({ sourceId }: { sourceId?: string }) {
 			await sharedBindsService.branchAction(action, { proposalId: id });
 			await Promise.all([
 				client.invalidateQueries({ queryKey: ["bind-proposals"] }),
+				client.invalidateQueries({ queryKey: ["proposal-results"] }),
 				client.invalidateQueries({ queryKey: ["shared-binds"] }),
 				client.invalidateQueries({ queryKey: ["bind-history"] }),
 			]);
