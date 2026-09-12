@@ -18,11 +18,11 @@ it('groups allowed routes, searches and hides administration from Support',()=>{
  expect(screen.queryByText('Пользователи и роли')).toBeNull();
  expect(screen.queryByText('Восстановить локальную копию')).toBeNull();
  expect(screen.queryByText('Общая база')).toBeNull();
- expect(screen.getByText('Пространство биндов')).toBeTruthy();
- fireEvent.change(screen.getByRole('textbox'),{target:{value:'Переводчик'}});
- expect(screen.queryByText('Пространство биндов')).toBeNull();
- fireEvent.click(screen.getByText('AI-переводчик'));
- expect(mocks.navigate).toHaveBeenCalledWith({to:'/ai/translator'});
+ expect(screen.getByText('Бинды')).toBeTruthy();
+ fireEvent.change(screen.getByRole('textbox'),{target:{value:'Спортивные'}});
+ expect(screen.queryByText('Бинды')).toBeNull();
+ fireEvent.click(screen.getByText('Спортивные ставки'));
+ expect(mocks.navigate).toHaveBeenCalledWith({to:'/sports-betting',hash:''});
  expect(screen.queryByRole('dialog')).toBeNull();
 });
 it('traps keyboard focus, closes with Escape and restores the page',()=>{

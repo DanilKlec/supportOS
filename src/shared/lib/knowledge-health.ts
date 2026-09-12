@@ -52,6 +52,11 @@ export function getKnowledgeHealthReport({
 	const archivedBinds = binds.filter((bind) => bind.archived);
 	const contentGroups = new Map<string, Bind[]>();
 	const issues: KnowledgeHealthIssue[] = [];
+	for (const bind of activeBinds) {
+		if (Date.parse(bind.updatedAt) < Date.now() - 90 * 86400000) {
+			issues.push({ id: `stale-${bind.id}`, title: "Материал давно не обновлялся", description: `${getBindTitle(bind)}: более 90 дней без изменений. Проверьте актуальность.`, severity: "info", bindId: bind.id });
+		}
+	}
 
 	for (const bind of activeBinds) {
 		const key = getContentKey(bind);

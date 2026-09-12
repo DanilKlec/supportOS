@@ -1,8 +1,2 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/ai/assistant")({
-	component: lazyRouteComponent(
-		() => import("@/features/ai/AnswerAssistantPage"),
-		"AnswerAssistantPage",
-	),
-});
+import {createFileRoute,redirect} from "@tanstack/react-router";
+export const Route=createFileRoute("/ai/assistant")({beforeLoad:()=>{throw redirect({to:"/",hash:"composer-answer",replace:true});}});

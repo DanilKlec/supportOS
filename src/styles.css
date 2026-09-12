@@ -188,3 +188,20 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
  *::-webkit-scrollbar-thumb:hover { background:#71717a; }
  .scrollbar-none { scrollbar-width:none; }
 }
+
+.space-tab { display:inline-flex; align-items:center; flex-shrink:0; min-height:40px; padding:8px 12px; border-radius:10px; font-size:13px; }
+.space-tab:hover { background:var(--color-surface-elevated); }
+.space-tab[aria-current="page"], .space-tab[aria-pressed="true"] { background:color-mix(in srgb,var(--color-accent) 12%,transparent); color:var(--color-accent); }
+
+.composer-panel form[data-settings-only="true"] { display:block; }
+.composer-panel section[hidden] { display:none; }
+
+@media(max-width:639px){
+.accounts-registry table {min-width:0;display:block;}
+.accounts-registry thead {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+.accounts-registry tbody,.accounts-registry tr {display:block;width:100%;}
+.accounts-registry tr {padding:12px 0;}
+.accounts-registry td {display:flex;align-items:flex-start;gap:12px;padding:8px 12px;overflow-wrap:anywhere;}
+.accounts-registry td[data-label]::before {content:attr(data-label);min-width:64px;font-size:11px;opacity:.65;}
+.accounts-registry td > * {min-width:0;}
+}

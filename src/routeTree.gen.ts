@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslatorRouteImport } from './routes/translator'
+import { Route as TeamRouteImport } from './routes/team'
 import { Route as SportsBettingRouteImport } from './routes/sports-betting'
 import { Route as SharedBindsRouteImport } from './routes/shared-binds'
 import { Route as RecentRouteImport } from './routes/recent'
@@ -18,6 +19,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LivechatRouteImport } from './routes/livechat'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as ContentRouteImport } from './routes/content'
 import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
@@ -36,6 +38,11 @@ import { Route as AiAssistantRouteImport } from './routes/ai/assistant'
 const TranslatorRoute = TranslatorRouteImport.update({
   id: '/translator',
   path: '/translator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamRoute = TeamRouteImport.update({
+  id: '/team',
+  path: '/team',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SportsBettingRoute = SportsBettingRouteImport.update({
@@ -76,6 +83,11 @@ const HealthRoute = HealthRouteImport.update({
 const FavoritesRoute = FavoritesRouteImport.update({
   id: '/favorites',
   path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContentRoute = ContentRouteImport.update({
+  id: '/content',
+  path: '/content',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BonusesRoute = BonusesRouteImport.update({
@@ -156,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
@@ -164,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -181,6 +195,7 @@ export interface FileRoutesByTo {
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
@@ -189,6 +204,7 @@ export interface FileRoutesByTo {
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -207,6 +223,7 @@ export interface FileRoutesById {
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
@@ -215,6 +232,7 @@ export interface FileRoutesById {
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -234,6 +252,7 @@ export interface FileRouteTypes {
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
@@ -242,6 +261,7 @@ export interface FileRouteTypes {
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -259,6 +279,7 @@ export interface FileRouteTypes {
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
@@ -267,6 +288,7 @@ export interface FileRouteTypes {
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -284,6 +306,7 @@ export interface FileRouteTypes {
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
@@ -292,6 +315,7 @@ export interface FileRouteTypes {
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -310,6 +334,7 @@ export interface RootRouteChildren {
   BindsRoute: typeof BindsRoute
   BonusToolsRoute: typeof BonusToolsRoute
   BonusesRoute: typeof BonusesRoute
+  ContentRoute: typeof ContentRoute
   FavoritesRoute: typeof FavoritesRoute
   HealthRoute: typeof HealthRoute
   LivechatRoute: typeof LivechatRoute
@@ -318,6 +343,7 @@ export interface RootRouteChildren {
   RecentRoute: typeof RecentRoute
   SharedBindsRoute: typeof SharedBindsRoute
   SportsBettingRoute: typeof SportsBettingRoute
+  TeamRoute: typeof TeamRoute
   TranslatorRoute: typeof TranslatorRoute
   AiAssistantRoute: typeof AiAssistantRoute
   AiKnowledgeRoute: typeof AiKnowledgeRoute
@@ -336,6 +362,13 @@ declare module '@tanstack/react-router' {
       path: '/translator'
       fullPath: '/translator'
       preLoaderRoute: typeof TranslatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/team': {
+      id: '/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof TeamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sports-betting': {
@@ -392,6 +425,13 @@ declare module '@tanstack/react-router' {
       path: '/favorites'
       fullPath: '/favorites'
       preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/content': {
+      id: '/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof ContentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bonuses': {
@@ -502,6 +542,7 @@ const rootRouteChildren: RootRouteChildren = {
   BindsRoute: BindsRoute,
   BonusToolsRoute: BonusToolsRoute,
   BonusesRoute: BonusesRoute,
+  ContentRoute: ContentRoute,
   FavoritesRoute: FavoritesRoute,
   HealthRoute: HealthRoute,
   LivechatRoute: LivechatRoute,
@@ -510,6 +551,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecentRoute: RecentRoute,
   SharedBindsRoute: SharedBindsRoute,
   SportsBettingRoute: SportsBettingRoute,
+  TeamRoute: TeamRoute,
   TranslatorRoute: TranslatorRoute,
   AiAssistantRoute: AiAssistantRoute,
   AiKnowledgeRoute: AiKnowledgeRoute,

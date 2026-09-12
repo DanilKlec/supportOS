@@ -9,7 +9,6 @@ import {
 	MoreHorizontal,
 	Pin,
 	Search,
-	Sparkles,
 	Star,
 	Trash2,
 } from "lucide-react";
@@ -147,26 +146,6 @@ function getCopyWarnings(issues: CheckIssue[]) {
 	return issues.filter(
 		(issue) => issue.severity === "error" || importantWarnings.has(issue.id),
 	);
-}
-
-function buildBindComposerContext({
-	title,
-	language,
-	baseMaterial,
-}: {
-	title: string;
-	language: string;
-	baseMaterial: string;
-}) {
-	return [
-		`Current bind title: ${title}`,
-		`Reply language: ${language}`,
-		"Task: adapt the current bind into a complete ready-to-send customer support reply for the described situation.",
-		"Do not answer the agent note directly. Use the note as instructions for how to adapt the bind.",
-		"Make the reply fuller than the base if needed: include empathy, regret for inconvenience, clear explanation, next step, and a polite closing.",
-		"Do not invent facts, statuses, deadlines, checks, approvals, payments, or promises that are not present in the bind or case note.",
-		`Current bind text:\n${baseMaterial}`,
-	].join("\n\n");
 }
 
 const MAP_FALLBACK_CURRENCIES = ["EUR", "USD", "CAD", "AUD", "BRL", "TRY"];
@@ -374,11 +353,7 @@ export function BindViewer() {
 	const copyTimerRef = useRef<number | undefined>(undefined);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [copied, setCopied] = useState(false);
-	const [composerBrief, setComposerBrief] = useState("");
-	const [composerAnswer, setComposerAnswer] = useState("");
-	const [composerLoading, setComposerLoading] = useState(false);
-	const [composerIssues, setComposerIssues] = useState<CheckIssue[]>([]);
-	const [composerMeta, setComposerMeta] = useState("");
+
 	const [mapBonusBlock, setMapBonusBlock] = useState("");
 	const [mapCurrency, setMapCurrency] = useState("EUR");
 	const [mapTableName, setMapTableName] = useState("");
@@ -485,67 +460,6 @@ export function BindViewer() {
 			showToast(`Copy check: ${copyWarnings[0]?.title}`);
 		}
 		showToast(ok ? "Copied to clipboard" : "Copy failed");
-	};
-
-	const generateComposerAnswer = async () => {
-		if (!bind || !translation || !composerBrief.trim()) return;
-
-		setComposerLoading(true);
-		setComposerIssues([]);
-		setComposerMeta("");
-
-		try {
-			const assistantData = answerAssistantService.load();
-			const composerTone =
-				assistantData.settings.tone === "concise"
-					? "friendly"
-					: assistantData.settings.tone;
-			const result = await answerAssistantService.generateReadyAnswer({
-				customerMessage: composerBrief,
-				context: buildBindComposerContext({
-					title,
-					language: translation.language,
-					baseMaterial: displayContent,
-				}),
-				referenceAnswer: displayContent,
-				responseStyle: "expanded-bind",
-				settings: {
-					...assistantData.settings,
-					tone: composerTone,
-					language: translation.language,
-				},
-				glossary: assistantData.glossary,
-				memory: assistantData.memory,
-			});
-
-			setComposerAnswer(result.answer);
-			setComposerIssues(result.issues);
-			setComposerMeta(
-				`${result.language.toUpperCase()} / ${
-			result.mode === "openai"
-				? "OpenAI"
-				: result.mode === "gemini"
-					? "Gemini"
-					: "Free mode"
-				}`,
-			);
-			showToast("AI answer ready");
-		} catch (error) {
-			showToast(error instanceof Error ? error.message : "AI answer failed");
-		} finally {
-			setComposerLoading(false);
-		}
-	};
-
-	const copyComposerAnswer = async () => {
-		if (!composerAnswer.trim()) return;
-
-		const ok = await copyToClipboard(composerAnswer);
-
-		if (ok && bind) {
-			addRecent(bind.id);
-		}
-		showToast(ok ? "AI answer copied" : "Copy failed");
 	};
 
 	const copyContent = () => copyTranslation(translation);
@@ -1060,92 +974,6 @@ export function BindViewer() {
 								No content in this translation
 							</div>
 						)}
-					</section>
-
-					<section className="mt-4 rounded-xl border border-border bg-surface">
-						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-							<div className="min-w-0">
-								<div className="flex items-center gap-2 text-sm font-semibold">
-									<Sparkles size={16} />
-									AI composer
-								</div>
-								<div className="mt-1 text-xs text-muted">
-									Build a fuller support reply from this bind and your case
-									notes.
-								</div>
-							</div>
-							{composerMeta && (
-								<div className="rounded-lg bg-background px-2.5 py-1 text-xs text-muted">
-									{composerMeta}
-								</div>
-							)}
-						</div>
-
-						<div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-							<div className="flex flex-col gap-3">
-								<textarea
-									value={composerBrief}
-									onChange={(event) => setComposerBrief(event.target.value)}
-									className="supportos-scroll min-h-32 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									placeholder="Example: adapt this bind for a player who is upset because the withdrawal is still pending. Add empathy and explain what they should do next..."
-								/>
-								<button
-									type="button"
-									onClick={() => void generateComposerAnswer()}
-									disabled={composerLoading || !composerBrief.trim()}
-									className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-								>
-									{composerLoading ? (
-										<Sparkles size={16} className="animate-pulse" />
-									) : (
-										<Sparkles size={16} />
-									)}
-									Generate full answer
-								</button>
-							</div>
-
-							<div className="flex min-h-44 flex-col rounded-lg bg-background">
-								<div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-									<div className="text-xs font-semibold uppercase text-muted">
-										Ready reply
-									</div>
-									<button
-										type="button"
-										onClick={() => void copyComposerAnswer()}
-										disabled={!composerAnswer.trim()}
-										className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
-									>
-										<Copy size={14} />
-										Copy
-									</button>
-								</div>
-								<textarea
-									value={composerAnswer}
-									onChange={(event) => setComposerAnswer(event.target.value)}
-									className="supportos-scroll min-h-32 flex-1 resize-y bg-transparent px-3 py-3 text-sm leading-6 outline-none"
-									placeholder="Generated answer will appear here."
-								/>
-								{composerIssues.length > 0 && composerAnswer && (
-									<div className="grid gap-2 border-t border-border p-3">
-										{composerIssues.map((issue) => (
-											<div
-												key={issue.id}
-												className={`rounded-lg border px-3 py-2 text-xs ${
-													issue.severity === "error"
-														? "border-red-500/30 bg-red-500/10"
-														: issue.severity === "warning"
-															? "border-amber-500/30 bg-amber-500/10"
-															: "border-emerald-500/30 bg-emerald-500/10"
-												}`}
-											>
-												<div className="font-semibold">{issue.title}</div>
-												<div className="mt-0.5 text-muted">{issue.detail}</div>
-											</div>
-										))}
-									</div>
-								)}
-							</div>
-						</div>
 					</section>
 
 					<details className="mt-4 rounded-xl border border-border bg-surface">

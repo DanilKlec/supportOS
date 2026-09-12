@@ -3,17 +3,18 @@ import { ArrowLeft, Mail, Gift, Calculator } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { can, routePermission } from "../../../shared/access.js";
 const links = [
+	{ to: "/", label: "Бинды", short: "Бинды", icon: ArrowLeft },
 	{
 		to: "/project-emails",
-		label: "Почты проектов",
-		short: "Почты",
+		label: "Email",
+		short: "Email",
 		icon: Mail,
 	},
 	{ to: "/bonuses", label: "Бонусы", short: "Бонусы", icon: Gift },
 	{
 		to: "/bonus-tools",
-		label: "Калькуляторы бонусов",
-		short: "Расчёты",
+		label: "Калькулятор",
+		short: "Калькулятор",
 		icon: Calculator,
 	},
 ] as const;
@@ -24,19 +25,7 @@ export function WorkspaceDock() {
 	});
 	return (
 		<footer className="workspace-dock relative z-30 shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
-			<div className="mx-auto flex min-h-16 max-w-screen-2xl items-center justify-between gap-2 px-3 sm:px-5">
-				{pathname !== "" && pathname !== "/" ? (
-					<Link
-						to="/"
-						className="flex shrink-0 items-center gap-2 rounded-xl px-2 py-3 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
-						aria-label="Вернуться в бинды"
-					>
-						<ArrowLeft size={16} />
-						<span className="hidden sm:inline">В бинды</span>
-					</Link>
-				) : (
-					<span className="hidden sm:block" />
-				)}
+			<div className="mx-auto flex min-h-16 max-w-screen-2xl items-center justify-center gap-2 px-3 sm:px-5">
 				<nav
 					aria-label="Рабочие справочники"
 					className="flex min-w-0 items-center gap-1 sm:gap-2"

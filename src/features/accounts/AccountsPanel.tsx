@@ -156,7 +156,7 @@ export function AccountsPanel({
 				aria-label="Управление доступами"
 			>
 				{[
-					...(usersAllowed ? [["overview", "Обзор"]] : []),
+					...(!standalone && usersAllowed ? [["overview", "Обзор"]] : []),
 					["users", "Пользователи"],
 					["roles", "Роли и разрешения"],
 					["audit", "Журнал изменений"],
@@ -301,7 +301,7 @@ export function AccountsPanel({
 										key={u.id}
 										className="border-t border-border/60 transition hover:bg-surface-elevated/40"
 									>
-										<td className="py-3">
+										<td data-label="Сотрудник" className="py-3">
 											<div className="flex items-center gap-3">
 												<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-sm font-semibold uppercase text-accent">
 													{(u.display_name || u.email).slice(0, 2)}
@@ -319,7 +319,7 @@ export function AccountsPanel({
 												</div>
 											</div>
 										</td>
-										<td>
+										<td data-label="Роли">
 											<div className="flex max-w-xs flex-wrap gap-1.5">
 												{u.roles.length ? (
 													u.roles.map((id) => (
@@ -335,7 +335,7 @@ export function AccountsPanel({
 												)}
 											</div>
 										</td>
-										<td>
+										<td data-label="Статус">
 											<span
 												className={`registry-status registry-status-${u.status}`}
 											>
@@ -348,7 +348,7 @@ export function AccountsPanel({
 												}
 											</span>
 										</td>
-										<td>
+										<td data-label="Действия">
 											<button
 												className={control}
 												disabled={

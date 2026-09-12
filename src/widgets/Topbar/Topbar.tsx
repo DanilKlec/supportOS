@@ -1,3 +1,4 @@
+import { spaces, type SpaceItem } from "@/features/spaces/navigation";
 import { Inbox } from "@/features/shared-binds/Inbox";
 import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
 import { catalogResults, type CatalogResult } from "./search-catalog";
@@ -6,7 +7,7 @@ import { contentApi } from "@/services/shared-content.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useBonusStore } from "@/store/bonus.store";
-import { can } from "../../../shared/access.js";
+import { can, routePermission } from "../../../shared/access.js";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
 import { useQueryClient } from "@tanstack/react-query";
 import { ToolsMenu } from "./ToolsMenu";
@@ -300,6 +301,38 @@ export function Topbar({
 			).slice(0, 9)
 		: [];
 
+	const sectionResults = spaces
+		.flatMap((g) =>
+			(g.items as readonly SpaceItem[]).map((i) => ({ ...i, group: g.title })),
+		)
+		.filter(
+			(i) =>
+				can(access, i.permission ?? routePermission(i.to)) &&
+				searchValue.trim() &&
+				(i.label + " " + i.group)
+					.toLowerCase()
+					.includes(searchValue.trim().toLowerCase()),
+		);
+	const sectionSearch = (
+		<>
+			{sectionResults.map((i) => (
+				<button
+					type="button"
+					key={i.to + (i.hash ?? "")}
+					className="flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated"
+					onMouseDown={(e) => e.preventDefault()}
+					onClick={() => {
+						void navigate({ to: i.to, hash: i.hash ?? "" });
+						setSearchFocused(false);
+						setMobileSearchOpen(false);
+					}}
+				>
+					{i.label}
+					<span className="text-xs text-muted">{i.group}</span>
+				</button>
+			))}
+		</>
+	);
 	const searchFilters = (
 		<div className="border-b border-border p-2">
 			<div className="flex gap-1">
@@ -617,6 +650,7 @@ export function Topbar({
 						{searchFocused && (
 							<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
 								{searchFilters}
+								{sectionSearch}
 								<SearchResults
 									results={searchResults}
 									query={searchValue}
@@ -706,6 +740,7 @@ export function Topbar({
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 							{searchFilters}
+							{sectionSearch}
 							<SearchResults
 								results={searchResults}
 								query={searchValue}

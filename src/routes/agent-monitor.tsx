@@ -14,7 +14,7 @@ import { supabaseService } from "@/services/supabase.service";
 import { useAuthStore } from "@/store/auth.store";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import {
 	Activity,
 	Download,
@@ -94,6 +94,8 @@ const stamp = (at: string | number | null) =>
 			}).format(new Date(at))
 		: "—";
 function AgentMonitor() {
+	const scheduleMode =
+		useRouterState({ select: (s) => s.location.hash }) === "schedule";
 	const canManage = useAuthStore((s) =>
 		can(s.session?.user.access, "monitor.write"),
 	);
@@ -351,7 +353,7 @@ function AgentMonitor() {
 					</section>
 				) : (
 					<>
-						{canManage && (
+						{scheduleMode && canManage && (
 							<ScheduleUpload
 								agents={data.agents}
 								onSave={async (payload) => {
@@ -509,7 +511,7 @@ function AgentMonitor() {
 									: ""}
 							</p>
 						)}
-						{manage && canManage && (
+						{(scheduleMode || manage) && (
 							<section className="rounded-xl border border-border bg-surface p-4">
 								<h2 className="font-semibold">Расписание на {day}</h2>
 								<p className="mt-1 text-xs text-muted">
@@ -517,7 +519,7 @@ function AgentMonitor() {
 									LiveChat не изменяется.
 								</p>
 								<div className="mt-3 max-h-80 overflow-auto">
-									{online
+									{data.agents
 										.filter((agent) => matchesAgent(agent, search))
 										.map((agent) => (
 											<div
@@ -535,7 +537,7 @@ function AgentMonitor() {
 														<label className="text-sm" key={s.id}>
 															<input
 																type="checkbox"
-																disabled={busy}
+																disabled={busy || !canManage}
 																checked={data.assignments.some(
 																	(a) =>
 																		a.agent_id === agent.id && a.shift === s.id,
@@ -557,208 +559,225 @@ function AgentMonitor() {
 								</div>
 							</section>
 						)}
-						<section className="rounded-xl border border-border bg-surface p-4">
-							<h2 className="font-semibold">
-								Аналитика выбранной смены · {filtered.length} агентов
-							</h2>
-							<div className="mt-3 grid gap-4 sm:grid-cols-2">
-								<div>
-									<p className="text-sm text-muted">Приём включён, суммарно</p>
-									<p className="mt-1 text-2xl font-semibold text-emerald-500">
-										{duration(totals.reduce((sum, row) => sum + row.on, 0))}
-									</p>
-								</div>
-								<div>
-									<p className="text-sm text-muted">Приём выключен, суммарно</p>
-									<p className="mt-1 text-2xl font-semibold text-amber-500">
-										{duration(totals.reduce((sum, row) => sum + row.off, 0))}
-									</p>
-								</div>
-							</div>
-							<p className="mt-3 text-xs text-muted">
-								Состав списка:{" "}
-								{rosterScope === "current"
-									? "сейчас на смене по графику"
-									: rosterScope === "selected"
-										? "назначены на выбранную смену"
-										: "все онлайн"}
-								. Приём включён или выключен. Не в сети и без свежего статуса
-								скрыты. Длительности — за выбранную смену.
-							</p>
-						</section>
-						<section className="overflow-auto rounded-xl border border-border bg-surface">
-							<table className="w-full text-left text-sm">
-								<thead className="border-b border-border text-muted">
-									<tr>
-										{[
-											"Агент / сейчас",
-											"Последнее изменение",
-											"Приём включён",
-											"Выключен",
-											"Не в сети",
-											"Нет данных",
-											"Назначен",
-										].map((label) => (
-											<th className="p-4 font-medium" key={label}>
-												{label}
-											</th>
-										))}
-									</tr>
-								</thead>
-								<tbody>
-									{totals.map((row) => (
-										<tr key={row.agent.id} className="border-b border-border">
-											<td className="p-4">
-												<div className="font-semibold">{row.agent.name}</div>
-												<div className="mt-1 text-xs text-muted">
-													{agentEmail(row.agent) || `ID: ${row.agent.id}`}
-												</div>
-												<div
-													className={`mt-1 text-xs ${colors[currentStatus(row.agent, now)]}`}
-												>
-													{labels[currentStatus(row.agent, now)]}
-												</div>
-												<div className="mt-1 text-xs text-muted">
-													Проверен: {stamp(row.agent.observed_at)}
-												</div>
-											</td>
-											<td className="p-4 whitespace-nowrap">
-												{stamp(row.agent.changed_at)}
-												<span className="block text-xs text-muted">
-													Статус наблюдается{" "}
-													{row.agent.changed_at
-														? duration(
-																Math.max(
-																	0,
-																	now - Date.parse(row.agent.changed_at),
-																),
-															)
-														: "—"}
-												</span>
-											</td>
-											{(["on", "off", "offline", "unknown"] as const).map(
-												(status) => (
-													<td className="p-4" key={status}>
-														{duration(row[status])}
-													</td>
-												),
-											)}
-											<td className="p-4">
-												{data.assignments.some(
-													(a) =>
-														a.agent_id === row.agent.id && a.shift === shift,
-												)
-													? "Да"
-													: "Нет"}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-							{!filtered.length && (
-								<p className="p-8 text-center text-muted">
-									Нет агентов по выбранным фильтрам. Проверьте график и
-									подключение LiveChat.
-								</p>
-							)}
-						</section>
-						<section className="rounded-xl border border-border bg-surface p-4">
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<h2 className="font-semibold">
-									Журнал приёма чатов · {history.length}
-								</h2>
-								<div className="flex flex-wrap gap-2">
-									<select
-										aria-label="Агент в журнале"
-										className={control}
-										value={selectedAgent}
-										onChange={(e) => setSelectedAgent(e.target.value)}
-									>
-										<option value="all">Все агенты в списке</option>
-										{filtered.map((agent) => (
-											<option key={agent.id} value={agent.id}>
-												{agent.name} · {agent.id}
-											</option>
-										))}
-									</select>
-									<select
-										aria-label="События журнала"
-										className={control}
-										value={eventFilter}
-										onChange={(e) => setEventFilter(e.target.value)}
-									>
-										<option value="all">Все события</option>
-										<option value="off">Только выключения</option>
-										<option value="on">Только включения</option>
-									</select>
-								</div>
-							</div>
-							{data.historyLimited && !historyEnded && (
-								<button
-									className={`${control} mt-2`}
-									type="button"
-									disabled={busy}
-									onClick={() => void loadOlder()}
-								>
-									Загрузить более ранние события
-								</button>
-							)}
-							<p className="mt-1 text-xs text-muted">
-								Время — момент получения webhook или обнаружения статуса
-								опросом. LiveChat не сообщает здесь автора и причину
-								переключения. Показаны события агентов выбранного состава
-								списка. Первое доступное наблюдение не считается переключением.
-								Повторные подтверждения одинакового статуса скрыты.
-							</p>
-							<div className="mt-4 max-h-96 divide-y divide-border overflow-auto">
-								{history.map((event) => (
-									<div
-										key={event.id}
-										className="flex flex-wrap justify-between gap-2 py-3 text-sm"
-									>
+						{!scheduleMode && (
+							<>
+								<section className="rounded-xl border border-border bg-surface p-4">
+									<h2 className="font-semibold">
+										Аналитика выбранной смены · {filtered.length} агентов
+									</h2>
+									<div className="mt-3 grid gap-4 sm:grid-cols-2">
 										<div>
-											{data.agents.find((a) => a.id === event.agent_id)?.name ??
-												event.agent_id}{" "}
-											·{" "}
-											<span className={colors[event.status]}>
-												{event.action}
-											</span>
-											<p className="mt-1 text-xs text-muted">
-												{event.previous
-													? `${labels[event.previous]} → ${labels[event.status]}`
-													: labels[event.status]}{" "}
-												· {event.agent_id}
-												<br />
-												{event.source === "webhook"
-													? "Webhook LiveChat"
-													: "Обнаружено опросом LiveChat"}
+											<p className="text-sm text-muted">
+												Приём включён, суммарно
+											</p>
+											<p className="mt-1 text-2xl font-semibold text-emerald-500">
+												{duration(totals.reduce((sum, row) => sum + row.on, 0))}
 											</p>
 										</div>
-										<time>{stamp(event.at)}</time>
+										<div>
+											<p className="text-sm text-muted">
+												Приём выключен, суммарно
+											</p>
+											<p className="mt-1 text-2xl font-semibold text-amber-500">
+												{duration(
+													totals.reduce((sum, row) => sum + row.off, 0),
+												)}
+											</p>
+										</div>
 									</div>
-								))}
-								{!history.length && (
-									<p className="py-6 text-sm text-muted">
-										Изменений за выбранный интервал нет.
+									<p className="mt-3 text-xs text-muted">
+										Состав списка:{" "}
+										{rosterScope === "current"
+											? "сейчас на смене по графику"
+											: rosterScope === "selected"
+												? "назначены на выбранную смену"
+												: "все онлайн"}
+										. Приём включён или выключен. Не в сети и без свежего
+										статуса скрыты. Длительности — за выбранную смену.
 									</p>
-								)}
-							</div>
-						</section>
-						<details className="rounded-xl border border-border bg-surface p-4">
-							<summary className="cursor-pointer text-sm font-semibold">
-								История назначений · {data.audit.length}
-							</summary>
-							{data.audit.map((item) => (
-								<p key={item.id} className="mt-3 text-xs text-muted">
-									{stamp(item.at)} ·{" "}
-									{data.agents.find((a) => a.id === item.agent_id)?.name ??
-										item.agent_id}{" "}
-									· {shifts.find((s) => s.id === item.shift)?.label} ·{" "}
-									{item.operation === "assigned" ? "Назначен" : "Снят"} ·{" "}
-									{item.actor}
-								</p>
-							))}
-						</details>
+								</section>
+								<section className="overflow-auto rounded-xl border border-border bg-surface">
+									<table className="w-full text-left text-sm">
+										<thead className="border-b border-border text-muted">
+											<tr>
+												{[
+													"Агент / сейчас",
+													"Последнее изменение",
+													"Приём включён",
+													"Выключен",
+													"Не в сети",
+													"Нет данных",
+													"Назначен",
+												].map((label) => (
+													<th className="p-4 font-medium" key={label}>
+														{label}
+													</th>
+												))}
+											</tr>
+										</thead>
+										<tbody>
+											{totals.map((row) => (
+												<tr
+													key={row.agent.id}
+													className="border-b border-border"
+												>
+													<td className="p-4">
+														<div className="font-semibold">
+															{row.agent.name}
+														</div>
+														<div className="mt-1 text-xs text-muted">
+															{agentEmail(row.agent) || `ID: ${row.agent.id}`}
+														</div>
+														<div
+															className={`mt-1 text-xs ${colors[currentStatus(row.agent, now)]}`}
+														>
+															{labels[currentStatus(row.agent, now)]}
+														</div>
+														<div className="mt-1 text-xs text-muted">
+															Проверен: {stamp(row.agent.observed_at)}
+														</div>
+													</td>
+													<td className="p-4 whitespace-nowrap">
+														{stamp(row.agent.changed_at)}
+														<span className="block text-xs text-muted">
+															Статус наблюдается{" "}
+															{row.agent.changed_at
+																? duration(
+																		Math.max(
+																			0,
+																			now - Date.parse(row.agent.changed_at),
+																		),
+																	)
+																: "—"}
+														</span>
+													</td>
+													{(["on", "off", "offline", "unknown"] as const).map(
+														(status) => (
+															<td className="p-4" key={status}>
+																{duration(row[status])}
+															</td>
+														),
+													)}
+													<td className="p-4">
+														{data.assignments.some(
+															(a) =>
+																a.agent_id === row.agent.id &&
+																a.shift === shift,
+														)
+															? "Да"
+															: "Нет"}
+													</td>
+												</tr>
+											))}
+										</tbody>
+									</table>
+									{!filtered.length && (
+										<p className="p-8 text-center text-muted">
+											Нет агентов по выбранным фильтрам. Проверьте график и
+											подключение LiveChat.
+										</p>
+									)}
+								</section>
+								<section className="rounded-xl border border-border bg-surface p-4">
+									<div className="flex flex-wrap items-center justify-between gap-3">
+										<h2 className="font-semibold">
+											Журнал приёма чатов · {history.length}
+										</h2>
+										<div className="flex flex-wrap gap-2">
+											<select
+												aria-label="Агент в журнале"
+												className={control}
+												value={selectedAgent}
+												onChange={(e) => setSelectedAgent(e.target.value)}
+											>
+												<option value="all">Все агенты в списке</option>
+												{filtered.map((agent) => (
+													<option key={agent.id} value={agent.id}>
+														{agent.name} · {agent.id}
+													</option>
+												))}
+											</select>
+											<select
+												aria-label="События журнала"
+												className={control}
+												value={eventFilter}
+												onChange={(e) => setEventFilter(e.target.value)}
+											>
+												<option value="all">Все события</option>
+												<option value="off">Только выключения</option>
+												<option value="on">Только включения</option>
+											</select>
+										</div>
+									</div>
+									{data.historyLimited && !historyEnded && (
+										<button
+											className={`${control} mt-2`}
+											type="button"
+											disabled={busy}
+											onClick={() => void loadOlder()}
+										>
+											Загрузить более ранние события
+										</button>
+									)}
+									<p className="mt-1 text-xs text-muted">
+										Время — момент получения webhook или обнаружения статуса
+										опросом. LiveChat не сообщает здесь автора и причину
+										переключения. Показаны события агентов выбранного состава
+										списка. Первое доступное наблюдение не считается
+										переключением. Повторные подтверждения одинакового статуса
+										скрыты.
+									</p>
+									<div className="mt-4 max-h-96 divide-y divide-border overflow-auto">
+										{history.map((event) => (
+											<div
+												key={event.id}
+												className="flex flex-wrap justify-between gap-2 py-3 text-sm"
+											>
+												<div>
+													{data.agents.find((a) => a.id === event.agent_id)
+														?.name ?? event.agent_id}{" "}
+													·{" "}
+													<span className={colors[event.status]}>
+														{event.action}
+													</span>
+													<p className="mt-1 text-xs text-muted">
+														{event.previous
+															? `${labels[event.previous]} → ${labels[event.status]}`
+															: labels[event.status]}{" "}
+														· {event.agent_id}
+														<br />
+														{event.source === "webhook"
+															? "Webhook LiveChat"
+															: "Обнаружено опросом LiveChat"}
+													</p>
+												</div>
+												<time>{stamp(event.at)}</time>
+											</div>
+										))}
+										{!history.length && (
+											<p className="py-6 text-sm text-muted">
+												Изменений за выбранный интервал нет.
+											</p>
+										)}
+									</div>
+								</section>
+								<details className="rounded-xl border border-border bg-surface p-4">
+									<summary className="cursor-pointer text-sm font-semibold">
+										История назначений · {data.audit.length}
+									</summary>
+									{data.audit.map((item) => (
+										<p key={item.id} className="mt-3 text-xs text-muted">
+											{stamp(item.at)} ·{" "}
+											{data.agents.find((a) => a.id === item.agent_id)?.name ??
+												item.agent_id}{" "}
+											· {shifts.find((s) => s.id === item.shift)?.label} ·{" "}
+											{item.operation === "assigned" ? "Назначен" : "Снят"} ·{" "}
+											{item.actor}
+										</p>
+									))}
+								</details>
+							</>
+						)}
 					</>
 				)}
 			</div>

@@ -1,3 +1,4 @@
+import { useViewState } from "@/shared/hooks/useViewState";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	Archive,
@@ -127,8 +128,16 @@ export function Sidebar({
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const selectFolder = useKnowledgeStore((s) => s.selectFolder);
-	const [treeSearch, setTreeSearch] = useState("");
-	const [selectedTag, setSelectedTag] = useState("");
+	const [treeSearch, setTreeSearch] = useViewState(
+		"knowledge-tree",
+		"search",
+		"",
+	);
+	const [selectedTag, setSelectedTag] = useViewState(
+		"knowledge-tree",
+		"tag",
+		"",
+	);
 	const [selectedBindIds, setSelectedBindIds] = useState<string[]>([]);
 	const [bulkTag, setBulkTag] = useState("");
 	const [bulkTagOpen, setBulkTagOpen] = useState(false);
@@ -350,6 +359,25 @@ export function Sidebar({
 				)}
 
 			<div className="flex min-h-0 flex-1 flex-col">
+				<nav aria-label="Библиотека" className="flex gap-1 p-2">
+					{[
+						["/", "Все"],
+						["/favorites", "Избранное"],
+						["/recent", "Недавние"],
+					].map(([to, label]) => (
+						<button
+							key={to}
+							type="button"
+							className="space-tab !px-2 !text-xs"
+							onClick={() => {
+								void navigate({ to });
+								onNavigate?.();
+							}}
+						>
+							{label}
+						</button>
+					))}
+				</nav>
 				<div className="shrink-0 border-b border-border/80 px-3 py-3">
 					<div className="mb-3 flex items-center justify-between px-2">
 						<div className="text-xs font-semibold uppercase text-muted">

@@ -70,7 +70,11 @@ function getModeLabel(mode: "openai" | "gemini" | "free") {
 	return "Бесплатный режим";
 }
 
-export function AnswerAssistantPage() {
+export function AnswerAssistantPage({
+	settingsOnly = false,
+}: {
+	settingsOnly?: boolean;
+} = {}) {
 	const { showToast } = useToast();
 	const [data, setData] = useState(() => answerAssistantService.load());
 	const [customerMessage, setCustomerMessage] = useState("");
@@ -181,7 +185,9 @@ export function AnswerAssistantPage() {
 			setAIOnline(true);
 			setAIModel(status.model);
 			setAIProvider(status.provider);
-			showToast(`${status.provider === "openai" ? "OpenAI" : "Gemini"} настроен`);
+			showToast(
+				`${status.provider === "openai" ? "OpenAI" : "Gemini"} настроен`,
+			);
 		} catch (error) {
 			setAIOnline(false);
 			setAIModel("");
@@ -253,10 +259,14 @@ export function AnswerAssistantPage() {
 				</header>
 
 				<form
+					data-settings-only={settingsOnly}
 					onSubmit={generate}
 					className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
 				>
-					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+					<section
+						hidden={settingsOnly}
+						className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface"
+					>
 						<div className="border-b border-border px-4 py-3">
 							<div className="text-sm font-semibold">Краткое описание</div>
 							<div className="mt-1 text-xs text-muted">
@@ -367,7 +377,10 @@ export function AnswerAssistantPage() {
 						</div>
 					</section>
 
-					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+					<section
+						hidden={settingsOnly}
+						className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface"
+					>
 						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
 							<div className="min-w-0">
 								<div className="text-sm font-semibold">Готовый ответ</div>
@@ -487,12 +500,12 @@ export function AnswerAssistantPage() {
 												})
 											}
 											className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-											settings.aiEnabled
+												settings.aiEnabled
 													? "border-accent bg-accent/10 text-accent"
 													: "border-border text-muted"
 											}`}
 										>
-										{settings.aiEnabled ? "Включён" : "Выключен"}
+											{settings.aiEnabled ? "Включён" : "Выключен"}
 										</button>
 									</div>
 
@@ -504,13 +517,13 @@ export function AnswerAssistantPage() {
 									</div>
 									<button
 										type="button"
-									onClick={() => void checkAI()}
-									disabled={aiChecking}
+										onClick={() => void checkAI()}
+										disabled={aiChecking}
 										className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
 									>
-									{aiChecking ? (
+										{aiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
-									) : aiOnline ? (
+										) : aiOnline ? (
 											<Wifi size={15} />
 										) : (
 											<WifiOff size={15} />

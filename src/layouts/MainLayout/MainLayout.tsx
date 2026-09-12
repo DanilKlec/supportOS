@@ -1,3 +1,5 @@
+import { SupportComposer } from "@/features/spaces/SupportComposer";
+import { SpaceFrame } from "@/features/spaces/SpaceFrame";
 import { useScrollContext } from "@/shared/hooks/useScrollContext";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
@@ -8,9 +10,8 @@ import { AmbientBackground } from "@/components/brand/AmbientBackground";
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
 import { useWorkspaceStore } from "@/store";
-import { CommandPalette } from "@/widgets/CommandPalette/CommandPalette";
+
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
 
@@ -37,14 +38,9 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		]),
 	);
 	const previousPathnameRef = useRef(pathname);
-	const knowledgeRoute = [
-		"/",
-		"/binds",
-		"/favorites",
-		"/recent",
-		"/archive",
-		"/health",
-	].includes(pathname.replace(/\/+$/, "") || "/");
+	const knowledgeRoute = ["/", "/binds", "/favorites", "/recent"].includes(
+		pathname.replace(/\/+$/, "") || "/",
+	);
 
 	useEffect(() => {
 		if (!mobileSidebarOpen) return undefined;
@@ -84,7 +80,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				/>
 			}
 
-			<div className="flex min-h-0 flex-1 overflow-hidden">
+			<div className="relative flex min-h-0 flex-1 overflow-hidden">
 				{knowledgeRoute && layout.showSidebar && (
 					<div className="hidden min-h-0 md:block">
 						<Sidebar />
@@ -113,13 +109,12 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					ref={scrollRoot}
 					className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden"
 				>
-					{children}
+					<SpaceFrame>{children}</SpaceFrame>
 				</main>
+				<SupportComposer />
 			</div>
 
 			<WorkspaceDock />
-			{layout.showTranslatorWidget && <TranslatorWidget />}
-			<CommandPalette />
 		</div>
 	);
 }

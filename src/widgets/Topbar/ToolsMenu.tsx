@@ -1,31 +1,22 @@
+import { spaces, type SpaceItem } from "@/features/spaces/navigation";
 import { createPortal } from "react-dom";
 import { AmbientMotionButton } from "@/components/brand/AmbientBackground";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { can, routePermission } from "../../../shared/access.js";
 import { useAuthStore } from "@/store/auth.store";
 import {
-	Archive,
-	Bot,
-	BrainCircuit,
 	Check,
 	ChevronRight,
 	Download,
-	FileJson,
-	HeartPulse,
 	type LucideIcon,
 	Import,
-	Languages,
 	Moon,
 	Settings,
-	Sparkles,
-	Sun,
-	Trophy,
 	LayoutGrid,
 	Search,
 	PanelRight,
 	BookOpen,
 	Users,
-	Calculator,
 	X,
 } from "lucide-react";
 import {
@@ -46,6 +37,10 @@ import {
 } from "@/shared/lib/appearance";
 
 type AppRoute =
+	| "/content"
+	| "/team"
+	| "/project-emails"
+	| "/bonuses"
 	| "/shared-binds"
 	| "/settings/users"
 	| "/"
@@ -69,6 +64,8 @@ interface RouteToolItem {
 	description?: string;
 	icon: LucideIcon;
 	to: AppRoute;
+	hash?: string;
+	permission?: string;
 }
 
 interface ActionToolItem {
@@ -87,72 +84,6 @@ interface ToolGroup {
 	title: string;
 	items: ToolItem[];
 }
-
-const WORK_TOOLS: RouteToolItem[] = [
-	{
-		type: "route",
-		label: "Калькуляторы бонусов",
-		description: "Расчёты и условия",
-		icon: Calculator,
-		to: "/bonus-tools",
-	},
-	{
-		type: "route",
-		label: "Контроль агентов",
-		description: "Приём чатов и история смен",
-		icon: HeartPulse,
-		to: "/agent-monitor",
-	},
-	{
-		type: "route",
-		label: "Переводчик",
-		description: "Перевод рабочих текстов",
-		icon: Languages,
-		to: "/translator",
-	},
-	{
-		type: "route",
-		label: "AI-помощник",
-		description: "Подготовка и проверка ответов",
-		icon: Bot,
-		to: "/ai/assistant",
-	},
-	{
-		type: "route",
-		label: "AI-переводчик",
-		description: "Перевод с учётом контекста",
-		icon: Sparkles,
-		to: "/ai/translator",
-	},
-	{
-		type: "route",
-		label: "Обучение AI",
-		description: "Общие инструкции для помощника",
-		icon: BrainCircuit,
-		to: "/ai/knowledge",
-	},
-	{
-		type: "route",
-		label: "Спортивные ставки",
-		description: "Коэффициенты и события",
-		icon: Trophy,
-		to: "/sports-betting",
-	},
-	{
-		type: "route",
-		label: "Качество базы",
-		description: "Проверка полноты и дубликатов",
-		icon: HeartPulse,
-		to: "/health",
-	},
-	{
-		type: "route",
-		label: "Архив",
-		description: "Архивные материалы",
-		icon: Archive,
-		to: "/archive",
-	},
-];
 
 function downloadJson(payload: string) {
 	const blob = new Blob([payload], { type: "application/json" });
@@ -183,6 +114,7 @@ export function ToolsMenu() {
 	const scrollPositions = useRef<Record<string, number>>({});
 	const scrollRef = useRef<HTMLElement>(null);
 	const navigate = useNavigate();
+	const hash = useRouterState({ select: (s) => s.location.hash });
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
@@ -209,9 +141,9 @@ export function ToolsMenu() {
 		setOpen(false);
 	}, []);
 
-	const navigateTo = (to: AppRoute) => {
+	const navigateTo = (to: AppRoute, hash?: string) => {
 		setOpen(false);
-		void navigate({ to });
+		void navigate({ to, hash: hash ?? "" });
 	};
 
 	const exportJson = () => {
@@ -260,117 +192,60 @@ export function ToolsMenu() {
 		setOpen(false);
 	};
 
-	const groups: ToolGroup[] = [
-		{
-			title: "Рабочее пространство",
-			items: [
-				{
-					type: "route",
-					label: "Пространство биндов",
-					description: "Материалы и личная библиотека",
-					icon: BookOpen,
-					to: "/",
-				},
-
-				...WORK_TOOLS.filter((item) =>
-					["/archive", "/health"].includes(item.to),
-				),
-			],
-		},
-		{
-			title: "Рабочие инструменты",
-			items: WORK_TOOLS.filter((item) =>
-				[
-					"/translator",
-					"/ai/assistant",
-					"/ai/translator",
-					"/sports-betting",
-				].includes(item.to),
-			),
-		},
-		{
-			title: "Управление командой",
-			items: [
-				{
-					type: "route",
-					label: "Общая база",
-					description: "Бинды, почты, бонусы и калькуляторы команды",
-					icon: Users,
-					to: "/shared-binds",
-				},
-				{
-					type: "route",
-					label: "Пользователи и роли",
-					description: "Реестр команды и управление доступами",
-					icon: Users,
-					to: "/settings/users",
-				},
-				...WORK_TOOLS.filter((item) =>
-					["/agent-monitor", "/ai/knowledge"].includes(item.to),
-				),
-			],
-		},
-		{
-			title: "Резервные копии и импорт",
-			items: [
-				{
-					type: "action",
-					label: "Восстановить локальную копию",
-					description: "Восстановление из файла",
-					icon: Import,
-					action: importJson,
-				},
-				{
-					type: "action",
-					label: "Экспорт локальной копии",
-					description: "Скачать резервную копию",
-					icon: Download,
-					action: exportJson,
-				},
-				{
-					type: "route",
-					label: "Таблица в личную базу",
-					description: "Добавить данные из таблицы",
-					icon: FileJson,
-					to: "/import/google-sheets",
-				},
-			],
-		},
-		{
-			title: "Настройки",
-			items: [
-				{
-					type: "action",
-					label: resolvedTheme === "dark" ? "Светлая тема" : "Тёмная тема",
-					description: "Оформление рабочего пространства",
-					icon: resolvedTheme === "dark" ? Sun : Moon,
-					action: toggleTheme,
-					active: true,
-				},
-				{
-					type: "route",
-					label: "Настройки пространства",
-					description: "Аккаунт, роли и оформление",
-					icon: Settings,
-					to: "/settings",
-				},
-				{
-					type: "route",
-					label: "Настройки перевода",
-					description: "Подключение провайдера",
-					icon: Languages,
-					to: "/settings/translator",
-				},
-				{
-					type: "route",
-					label: "Настройки AI",
-					description: "Провайдер и модель",
-					icon: BrainCircuit,
-					to: "/settings/ai",
-				},
-			],
-		},
-	];
+	const groups: ToolGroup[] = spaces.map((space) => ({
+		title: space.title,
+		items: (space.items as readonly SpaceItem[]).map((item) => ({
+			type: "route" as const,
+			...item,
+			to: item.to as AppRoute,
+			icon:
+				space.title === "Команда"
+					? Users
+					: space.title === "Настройки"
+						? Settings
+						: BookOpen,
+		})),
+	}));
+	groups.push({
+		title: "Быстрые действия",
+		items: [
+			{
+				type: "action",
+				label: "Восстановить локальную копию",
+				icon: Import,
+				action: importJson,
+			},
+			{
+				type: "action",
+				label: "Экспорт локальной копии",
+				icon: Download,
+				action: exportJson,
+			},
+			{
+				type: "action",
+				label: resolvedTheme === "dark" ? "Светлая тема" : "Тёмная тема",
+				icon: Moon,
+				action: toggleTheme,
+			},
+		],
+	});
+	const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+		try {
+			return JSON.parse(
+				sessionStorage.getItem("supportos-menu-groups") ?? "{}",
+			);
+		} catch {
+			return {};
+		}
+	});
+	const toggleGroup = (title: string) =>
+		setCollapsed((current) => {
+			const next = { ...current, [title]: !current[title] };
+			try {
+				sessionStorage.setItem("supportos-menu-groups", JSON.stringify(next));
+			} catch {}
+			return next;
+		});
 
 	useEffect(() => {
 		setOpen(false);
@@ -449,7 +324,8 @@ export function ToolsMenu() {
 			...group,
 			items: group.items
 				.filter((item) => {
-					if (item.type === "route") return can(role, routePermission(item.to));
+					if (item.type === "route")
+						return can(role, item.permission ?? routePermission(item.to));
 					if (item.action === importJson) return can(role, "knowledge.write");
 					if (item.action === exportJson) return can(role, "binds.read");
 					return can(role, "work");
@@ -553,19 +429,27 @@ export function ToolsMenu() {
 								className="supportos-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5"
 							>
 								{visibleGroups.map((group) => (
-									<section
-										key={group.title}
-										className="mb-4 rounded-2xl border border-border/70 bg-background/30 p-1"
-									>
+									<section key={group.title} className="mb-3 p-1">
 										<h3 className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted">
-											{group.title}
+											<button
+												type="button"
+												className="w-full py-2 text-left"
+												aria-expanded={!!query || !collapsed[group.title]}
+												onClick={() => toggleGroup(group.title)}
+											>
+												{group.title}
+											</button>
 										</h3>
-										<div className="space-y-1">
+										<div
+											className="space-y-1"
+											hidden={!query && collapsed[group.title]}
+										>
 											{group.items.map((item) => {
 												const Icon = item.icon;
 												const active =
 													item.type === "route" &&
-													(pathname.replace(/\/+$/, "") || "/") === item.to;
+													(pathname.replace(/\/+$/, "") || "/") === item.to &&
+													hash === (item.hash ?? "");
 												return (
 													<button
 														key={item.label}
@@ -574,7 +458,7 @@ export function ToolsMenu() {
 														aria-current={active ? "page" : undefined}
 														onClick={() =>
 															item.type === "route"
-																? navigateTo(item.to)
+																? navigateTo(item.to, item.hash)
 																: item.action()
 														}
 														className={`drawer-link group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? "bg-surface-elevated text-foreground ring-1 ring-inset ring-border" : "hover:bg-surface-elevated"}`}
