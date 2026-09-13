@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { agentEmail, isOnline, matchesAgent, statusEvents } from "./analytics";
 import type { LiveAgent, Observation } from "./live-model";
+
 const at = Date.parse("2026-09-09T12:00:00Z");
 const agent: LiveAgent = {
 	id: "someone@example.com",

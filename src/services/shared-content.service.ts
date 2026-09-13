@@ -9,8 +9,8 @@ export async function contentApi(
 	dataset: string,
 	data?: unknown[],
 	expected?: number,
-	scope: 'shared'|'personal' = 'shared',
-	action: 'save'|'reset' = 'save',
+	scope: "shared" | "personal" = "shared",
+	action: "save" | "reset" = "save",
 ): Promise<Publication | null> {
 	const response = await authenticatedFetch(
 		`/api/content?dataset=${dataset}&scope=${scope}`,

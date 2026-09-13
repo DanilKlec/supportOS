@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+
 const mock = vi.hoisted(() => ({
 	getSession: vi.fn(),
 	select: vi.fn(),
@@ -6,7 +7,9 @@ const mock = vi.hoisted(() => ({
 	updateWhere: vi.fn(),
 }));
 vi.mock("./supabase.service", () => ({ supabaseService: mock }));
+
 import { sharedBindsService } from "./shared-binds.service";
+
 const draft = {
 	translations: [
 		{ language: "ru", title: "Title", content: "Text", updatedAt: "" },
@@ -47,7 +50,7 @@ it("detects a concurrent shared edit instead of silently overwriting it", async 
 				updatedAt: "2026-09-10T10:00:00Z",
 			} as never,
 		}),
-	).rejects.toThrow("уже изменён");
+	).rejects.toThrow("Бинд изменён другим сотрудником или доступ отозван");
 	expect(mock.updateWhere.mock.calls[0][1]).toMatchObject({
 		updated_at: "eq.2026-09-10T10:00:00Z",
 		owner_id: "is.null",

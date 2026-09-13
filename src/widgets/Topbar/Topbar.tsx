@@ -1,16 +1,4 @@
-import { spaces, type SpaceItem } from "@/features/spaces/navigation";
-import { Inbox } from "@/features/shared-binds/Inbox";
-import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
-import { catalogResults, type CatalogResult } from "./search-catalog";
-import { useQuery } from "@tanstack/react-query";
-import { contentApi } from "@/services/shared-content.service";
-import { BaseModal } from "@/shared/modals/BaseModal";
-import { copyToClipboard } from "@/shared/lib/clipboard";
-import { useBonusStore } from "@/store/bonus.store";
-import { can, routePermission } from "../../../shared/access.js";
-import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
-import { useQueryClient } from "@tanstack/react-query";
-import { ToolsMenu } from "./ToolsMenu";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
 import {
@@ -21,17 +9,28 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
+import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
+import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
+import { Inbox } from "@/features/shared-binds/Inbox";
+import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
+import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
+import { contentApi } from "@/services/shared-content.service";
 import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
+import { copyToClipboard } from "@/shared/lib/clipboard";
 import { isKeyboardCode } from "@/shared/lib/keyboard";
+import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
+import { useBonusStore } from "@/store/bonus.store";
+import { can, routePermission } from "../../../shared/access.js";
+import { type CatalogResult, catalogResults } from "./search-catalog";
+import { ToolsMenu } from "./ToolsMenu";
 
 interface TopbarProps {
 	onOpenMobileSidebar?: () => void;
@@ -270,7 +269,6 @@ export function Topbar({
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
-	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const localBinds = useKnowledgeStore((s) => s.binds);
@@ -309,23 +307,25 @@ export function Topbar({
 			(i) =>
 				can(access, i.permission ?? routePermission(i.to)) &&
 				searchValue.trim() &&
-				(i.label + " " + i.group)
+				(i.label + " " + i.group + " " + i.to + " " + (i.hash ?? ""))
 					.toLowerCase()
 					.includes(searchValue.trim().toLowerCase()),
 		);
+	const resultCount = sectionResults.length + searchResults.length;
+	const openSection = (item: SpaceItem) => {
+		void navigate({ to: item.to, hash: item.hash ?? "" });
+		setSearchFocused(false);
+		setMobileSearchOpen(false);
+	};
 	const sectionSearch = (
 		<>
-			{sectionResults.map((i) => (
+			{sectionResults.map((i, index) => (
 				<button
 					type="button"
 					key={i.to + (i.hash ?? "")}
-					className="flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated"
+					className={`flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated ${index === activeResultIndex ? "bg-accent/10" : ""}`}
 					onMouseDown={(e) => e.preventDefault()}
-					onClick={() => {
-						void navigate({ to: i.to, hash: i.hash ?? "" });
-						setSearchFocused(false);
-						setMobileSearchOpen(false);
-					}}
+					onClick={() => openSection(i)}
 				>
 					{i.label}
 					<span className="text-xs text-muted">{i.group}</span>
@@ -335,6 +335,7 @@ export function Topbar({
 	);
 	const searchFilters = (
 		<div className="border-b border-border p-2">
+			<KnowledgeGapButton />
 			<div className="flex gap-1">
 				{[
 					{ id: "all", label: "Всё" },
@@ -365,9 +366,9 @@ export function Topbar({
 			</div>
 			{((can(access, "projects.read") && emails.isFetching) ||
 				(can(access, "bonuses.read") && bonuses.isFetching)) && (
-				<p role="status" className="p-2 text-xs text-muted">
+				<output className="p-2 text-xs text-muted">
 					Обновляем справочники…
-				</p>
+				</output>
 			)}
 			{((can(access, "projects.read") && emails.error) ||
 				(can(access, "bonuses.read") && bonuses.error)) && (
@@ -389,19 +390,10 @@ export function Topbar({
 		</div>
 	);
 	const openSearchResult = (bind: CatalogResult) => {
-		if (bind.resultKind) setPreview(bind);
-		else {
-			openBind(bind.id);
-			void navigate({ to: "/" });
-		}
+		setPreview(bind);
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
-
-	const createBind = useCallback(() => {
-		if (can(authSession?.user.access, "knowledge.write")) setNewShared(true);
-		else void navigate({ to: "/" });
-	}, [authSession?.user.access, navigate]);
 
 	const signOut = async () => {
 		try {
@@ -442,22 +434,23 @@ export function Topbar({
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
 			setActiveResultIndex((index) =>
-				searchResults.length === 0 ? 0 : (index + 1) % searchResults.length,
+				resultCount === 0 ? 0 : (index + 1) % resultCount,
 			);
 		}
 
 		if (event.key === "ArrowUp") {
 			event.preventDefault();
 			setActiveResultIndex((index) =>
-				searchResults.length === 0
-					? 0
-					: (index - 1 + searchResults.length) % searchResults.length,
+				resultCount === 0 ? 0 : (index - 1 + resultCount) % resultCount,
 			);
 		}
 
-		if (event.key === "Enter" && searchResults[activeResultIndex]) {
+		if (event.key === "Enter" && resultCount) {
 			event.preventDefault();
-			openSearchResult(searchResults[activeResultIndex]);
+			const section = sectionResults[activeResultIndex];
+			const result = searchResults[activeResultIndex - sectionResults.length];
+			if (section) openSection(section);
+			else if (result) openSearchResult(result);
 		}
 
 		if (event.key === "Escape") {
@@ -471,51 +464,22 @@ export function Topbar({
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
-			if (!event.ctrlKey && !event.metaKey) return;
-
 			if (
-				isKeyboardCode(event, "KeyK") ||
-				isKeyboardCode(event, "KeyF") ||
-				isKeyboardCode(event, "KeyP")
-			) {
+				(!event.ctrlKey && !event.metaKey) ||
+				event.shiftKey ||
+				event.altKey ||
+				event.defaultPrevented ||
+				document.querySelector('[aria-modal="true"]')
+			)
+				return;
+			if (isKeyboardCode(event, "KeyK")) {
 				event.preventDefault();
 				openGlobalSearch();
 			}
-
-			if (isKeyboardCode(event, "KeyN")) {
-				event.preventDefault();
-				createBind();
-			}
-
-			if (isKeyboardCode(event, "KeyD") && activeTab) {
-				event.preventDefault();
-				const favorite = knowledgeService.toggleFavorite(activeTab);
-
-				showToast(favorite ? "Added to favorites" : "Removed from favorites");
-			}
-
-			if (isKeyboardCode(event, "KeyS")) {
-				event.preventDefault();
-
-				const detail = { handled: false };
-
-				window.dispatchEvent(
-					new CustomEvent("supportos:save-active-bind", {
-						detail,
-					}),
-				);
-
-				if (!detail.handled) {
-					knowledgeService.saveKnowledge();
-					showToast("Saved");
-				}
-			}
 		};
-
 		window.addEventListener("keydown", handler);
-
 		return () => window.removeEventListener("keydown", handler);
-	}, [activeTab, createBind, openGlobalSearch, showToast]);
+	}, [openGlobalSearch]);
 
 	useEffect(() => {
 		if (!mobileSearchOpen) return undefined;
@@ -543,7 +507,9 @@ export function Topbar({
 						<p className="mb-3 text-xs text-muted">
 							{preview.resultKind === "email"
 								? "Почта проекта"
-								: "Сохранённые условия бонуса"}
+								: preview.resultKind === "bonus"
+									? "Сохранённые условия бонуса"
+									: "Предпросмотр материала"}
 						</p>
 						{preview.freshness && <BonusFreshness bonus={preview.freshness} />}
 						<p className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border p-4 text-sm leading-6">
@@ -575,6 +541,7 @@ export function Topbar({
 							<button
 								type="button"
 								onClick={() => {
+									if (!preview.resultKind) openBind(preview.id);
 									if (preview.resultKind === "bonus") {
 										useBonusStore
 											.getState()
@@ -585,7 +552,9 @@ export function Topbar({
 										to:
 											preview.resultKind === "email"
 												? "/project-emails"
-												: "/bonuses",
+												: preview.resultKind === "bonus"
+													? "/bonuses"
+													: "/",
 									});
 									setPreview(null);
 								}}
@@ -657,8 +626,10 @@ export function Topbar({
 									language={language}
 									categories={categories}
 									folders={folders}
-									activeIndex={activeResultIndex}
-									onActiveIndexChange={setActiveResultIndex}
+									activeIndex={activeResultIndex - sectionResults.length}
+									onActiveIndexChange={(index) =>
+										setActiveResultIndex(index + sectionResults.length)
+									}
 									onOpen={openSearchResult}
 								/>
 							</div>
@@ -747,8 +718,10 @@ export function Topbar({
 								language={language}
 								categories={categories}
 								folders={folders}
-								activeIndex={activeResultIndex}
-								onActiveIndexChange={setActiveResultIndex}
+								activeIndex={activeResultIndex - sectionResults.length}
+								onActiveIndexChange={(index) =>
+									setActiveResultIndex(index + sectionResults.length)
+								}
 								onOpen={openSearchResult}
 							/>
 						</div>

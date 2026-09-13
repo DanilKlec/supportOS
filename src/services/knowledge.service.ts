@@ -1,5 +1,4 @@
 import type { Bind, BindHistoryEntry, BindTranslation } from "@/entities/bind";
-import {can} from '../../shared/access.js';
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import {
 	mockBinds,
@@ -10,6 +9,7 @@ import { cloudKnowledgeService } from "@/services/cloud-knowledge.service";
 import { localKnowledgeStorageService } from "@/services/local-knowledge-storage.service";
 import { supabaseService } from "@/services/supabase.service";
 import { type KnowledgeSnapshot, useKnowledgeStore } from "@/store";
+import { can } from "../../shared/access.js";
 
 export interface KnowledgeDatabase
 	extends Partial<
@@ -1611,8 +1611,8 @@ class KnowledgeService {
 	private getDefaultOwnerId() {
 		const session = supabaseService.getSession();
 
-		if (can(session?.user.access,'knowledge.write')) return null;
-		if(!session) throw new Error('Войдите с личным аккаунтом');
+		if (can(session?.user.access, "knowledge.write")) return null;
+		if (!session) throw new Error("Войдите с личным аккаунтом");
 
 		return session.user.id;
 	}
@@ -1620,7 +1620,11 @@ class KnowledgeService {
 	private shouldCreatePersonalOverride(bind: Bind) {
 		const session = supabaseService.getSession();
 
-		return Boolean(session) && !can(session?.user.access,'knowledge.write') && bind.ownerId === null;
+		return (
+			Boolean(session) &&
+			!can(session?.user.access, "knowledge.write") &&
+			bind.ownerId === null
+		);
 	}
 
 	private createPersonalBindOverride(

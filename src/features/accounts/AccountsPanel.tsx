@@ -1,9 +1,10 @@
-import { AdminOverview } from "./AdminOverview";
-import { BaseModal } from "@/shared/modals/BaseModal";
-import { useEffect, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
+import type { MonitorData } from "@/features/agent-monitor/live-model";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { BaseModal } from "@/shared/modals/BaseModal";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
+import { AdminOverview } from "./AdminOverview";
 export type ManagedRole = {
 	id: string;
 	name: string;
@@ -37,6 +38,24 @@ type Audit = {
 };
 const control =
 	"rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-40";
+const permissionGroup = (id: string) => {
+	if (
+		id.startsWith("ai.") ||
+		id === "tools" ||
+		id === "translator.use" ||
+		id === "composer.use"
+	)
+		return "AI";
+	if (id === "knowledge.write" || id === "binds.manage") return "QC";
+	if (id.startsWith("monitor.")) return "Team";
+	if (
+		/^(users|roles|settings)\./.test(id) ||
+		id === "technical" ||
+		id === "work"
+	)
+		return "Administration";
+	return "Knowledge";
+};
 export async function accessApi(
 	action: string,
 	body?: unknown,
@@ -59,32 +78,47 @@ export async function accessApi(
 }
 export function AccountsPanel({
 	standalone = false,
+	initialTab,
+	initialUser,
+	embedded = false,
 }: {
 	standalone?: boolean;
+	initialTab?: "users" | "roles" | "audit";
+	initialUser?: User;
+	embedded?: boolean;
 }) {
 	const identity = useAuthStore((s) => s.session?.user);
 	const access = identity?.access;
 	const usersAllowed = can(access, "users.manage");
 	const rolesAllowed = can(access, "roles.manage");
 	const owner = access?.roles.some((r) => r.id === "creator") ?? false;
-	const [tab, setTab] = useState(usersAllowed ? "users" : "roles");
+	const [tab, setTab] = useState<string>(
+		initialTab ?? (usersAllowed ? "users" : "roles"),
+	);
 	const [roles, setRoles] = useState<ManagedRole[]>([]);
 	const [permissions, setPermissions] = useState<Permission[]>([]);
 	const [users, setUsers] = useState<User[]>([]);
 	const [total, setTotal] = useState(0);
 	const [page, setPage] = useState(1);
-	const [search, setSearch] = useState("");
-	const [query, setQuery] = useState("");
+	const [search, setSearch] = useState(initialUser?.email ?? "");
+	const [query, setQuery] = useState(initialUser?.email ?? "");
 	const [revision, setRevision] = useState(0);
 	const [audit, setAudit] = useState<Audit[]>([]);
 	const [moreAudit, setMoreAudit] = useState(false);
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
-	const [userEdit, setUserEdit] = useState<User | null>(null);
+	const [userEdit, setUserEdit] = useState<User | null>(initialUser ?? null);
 	const [roleEdit, setRoleEdit] = useState<ManagedRole | null>(null);
 	const [create, setCreate] = useState(false);
+	const [confirmation, setConfirmation] = useState<{
+		body: unknown;
+		diff: string[];
+	} | null>(null);
+	const [statusFilter, setStatusFilter] = useState(initialUser ? "" : "active");
+	const [roleFilter, setRoleFilter] = useState("");
 	const refresh = () => setRevision((r) => r + 1);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: revision explicitly refreshes the server snapshot after mutations.
 	useEffect(() => {
 		const abort = new AbortController();
 		setBusy(true);
@@ -99,7 +133,12 @@ export function AccountsPanel({
 					const data = await accessApi(
 						"users",
 						undefined,
-						{ page: String(page), search: query },
+						{
+							page: String(page),
+							search: query,
+							status: embedded ? statusFilter : "",
+							role: embedded ? roleFilter : "",
+						},
 						abort.signal,
 					);
 					if (abort.signal.aborted) return;
@@ -120,14 +159,63 @@ export function AccountsPanel({
 			}
 		})();
 		return () => abort.abort();
-	}, [tab, page, query, revision, usersAllowed]);
+	}, [
+		tab,
+		page,
+		query,
+		revision,
+		usersAllowed,
+		embedded,
+		statusFilter,
+		roleFilter,
+	]);
 	const assignable = roles.filter(
 		(r) =>
 			owner ||
 			(r.id !== "creator" &&
 				r.permissions.every((p) => access?.permissions.includes(p))),
 	);
-	const mutate = async (body: unknown) => {
+	const mutate = async (body: unknown, confirmed = false) => {
+		const change = body as {
+			action: string;
+			payload?: { permissions?: string[]; roles?: string[]; status?: string };
+		};
+		if (
+			!confirmed &&
+			["user.update", "role.save", "role.delete"].includes(change.action)
+		) {
+			const previous =
+				change.action === "user.update"
+					? roles
+							.filter((r) => userEdit?.roles.includes(r.id))
+							.flatMap((r) => r.permissions)
+					: (roleEdit?.permissions ?? []);
+			const next =
+				change.action === "user.update"
+					? roles
+							.filter((r) => change.payload?.roles?.includes(r.id))
+							.flatMap((r) => r.permissions)
+					: (change.payload?.permissions ?? []);
+			const label = (key: string) =>
+				permissions.find((p) => p.id === key)?.name ?? key;
+			const diff = [...new Set(next.filter((p) => !previous.includes(p)))]
+				.map((p) => `+ ${label(p)}`)
+				.concat(
+					[...new Set(previous.filter((p) => !next.includes(p)))].map(
+						(p) => `− ${label(p)}`,
+					),
+				);
+			if (
+				change.action === "user.update" &&
+				change.payload?.status !== userEdit?.status
+			)
+				diff.push(`Доступ: ${userEdit?.status} → ${change.payload?.status}`);
+			if (change.action === "role.delete") diff.push("Удалить роль");
+			if (diff.length) {
+				setConfirmation({ body, diff });
+				return;
+			}
+		}
 		setBusy(true);
 		setError("");
 		setNotice("");
@@ -147,6 +235,153 @@ export function AccountsPanel({
 	const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 	return (
 		<section className="accounts-registry space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+			{confirmation && (
+				<BaseModal
+					title="Подтвердить изменения прав"
+					onClose={() => setConfirmation(null)}
+				>
+					<ul className="space-y-2">
+						{confirmation.diff.map((line) => (
+							<li key={line}>{line}</li>
+						))}
+					</ul>
+					<div className="mt-4 flex gap-2">
+						<button
+							type="button"
+							className={control}
+							onClick={() => {
+								const body = confirmation.body;
+								setConfirmation(null);
+								void mutate(body, true);
+							}}
+						>
+							Подтвердить изменения
+						</button>
+						<button
+							type="button"
+							className={control}
+							onClick={() => setConfirmation(null)}
+						>
+							Отмена
+						</button>
+					</div>
+				</BaseModal>
+			)}
+			{embedded && tab === "users" && usersAllowed && (
+				<div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+					<div className="space-y-2">
+						<form
+							onSubmit={(e) => {
+								e.preventDefault();
+								setQuery(search);
+								setPage(1);
+							}}
+						>
+							<input
+								aria-label="Поиск сотрудников"
+								className={`${control} w-full`}
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+							/>
+							<button type="submit" className={control}>
+								Найти
+							</button>
+						</form>
+						<select
+							aria-label="Статус сотрудников"
+							className={control}
+							value={statusFilter}
+							onChange={(e) => {
+								setStatusFilter(e.target.value);
+								setPage(1);
+							}}
+						>
+							<option value="">Все статусы</option>
+							<option value="active">Активные</option>
+							<option value="pending">Ожидают доступа</option>
+							<option value="disabled">Отключены</option>
+						</select>
+						<select
+							aria-label="Роль сотрудников"
+							className={control}
+							value={roleFilter}
+							onChange={(e) => {
+								setRoleFilter(e.target.value);
+								setPage(1);
+							}}
+						>
+							<option value="">Все роли</option>
+							{roles.map((r) => (
+								<option key={r.id} value={r.id}>
+									{r.name}
+								</option>
+							))}
+						</select>
+						<p className="text-xs text-muted">Найдено: {total}</p>
+						{users
+							.filter(
+								(u) =>
+									(!statusFilter || u.status === statusFilter) &&
+									(!roleFilter || u.roles.includes(roleFilter)),
+							)
+							.map((u) => (
+								<button
+									type="button"
+									key={u.id}
+									className={`${control} block w-full text-left`}
+									onClick={() => setUserEdit(u)}
+								>
+									{u.display_name || u.email}
+									<small className="block">
+										{u.roles.map(roleName).join(", ")}
+									</small>
+								</button>
+							))}
+						<div className="flex gap-2">
+							<button
+								type="button"
+								disabled={page === 1 || busy}
+								className={control}
+								onClick={() => setPage(page - 1)}
+							>
+								Назад
+							</button>
+							<button
+								type="button"
+								disabled={page * 50 >= total || busy}
+								className={control}
+								onClick={() => setPage(page + 1)}
+							>
+								Далее
+							</button>
+						</div>
+					</div>
+					<div>
+						{userEdit ? (
+							<UserDetails key={userEdit.id} user={userEdit}>
+								<EditUser
+									key={`${userEdit.id}-${userEdit.version}`}
+									user={userEdit}
+									roles={assignable}
+									permissions={permissions}
+									busy={
+										busy ||
+										userEdit.id === identity?.id ||
+										(!owner &&
+											userEdit.roles.some(
+												(id) => !assignable.some((r) => r.id === id),
+											))
+									}
+									onSave={mutate}
+									onCancel={() => setUserEdit(null)}
+								/>
+							</UserDetails>
+						) : (
+							<p>Выберите сотрудника для просмотра профиля и доступа.</p>
+						)}
+					</div>
+				</div>
+			)}
 			{!standalone && (
 				<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
 			)}
@@ -154,6 +389,7 @@ export function AccountsPanel({
 				className="flex flex-wrap gap-2"
 				role="tablist"
 				aria-label="Управление доступами"
+				style={embedded ? { display: "none" } : undefined}
 			>
 				{[
 					...(!standalone && usersAllowed ? [["overview", "Обзор"]] : []),
@@ -164,6 +400,7 @@ export function AccountsPanel({
 					.filter(([id]) => id !== "users" || usersAllowed)
 					.map(([id, label]) => (
 						<button
+							type="button"
 							key={id}
 							role="tab"
 							aria-selected={tab === id}
@@ -179,17 +416,22 @@ export function AccountsPanel({
 							{label}
 						</button>
 					))}
-				<button className={control} disabled={busy} onClick={refresh}>
+				<button
+					type="button"
+					className={control}
+					disabled={busy}
+					onClick={refresh}
+				>
 					Обновить
 				</button>
 			</div>
-			{busy && <p role="status">Загрузка…</p>}
-			{error && !create && !userEdit && (
+			{busy && <output>Загрузка…</output>}
+			{error && !create && (!userEdit || embedded) && (
 				<p role="alert" className="text-red-400">
 					{error}
 				</p>
 			)}
-			{notice && <p role="status">{notice}</p>}
+			{notice && <output>{notice}</output>}
 			{tab === "overview" && usersAllowed && (
 				<AdminOverview
 					key={revision}
@@ -203,7 +445,7 @@ export function AccountsPanel({
 					}}
 				/>
 			)}
-			{tab === "users" && usersAllowed && (
+			{tab === "users" && usersAllowed && !embedded && (
 				<>
 					<form
 						className="flex flex-wrap gap-2"
@@ -222,7 +464,7 @@ export function AccountsPanel({
 							maxLength={120}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
-						<button className={control} disabled={busy}>
+						<button type="submit" className={control} disabled={busy}>
 							Найти
 						</button>
 						<button
@@ -350,6 +592,7 @@ export function AccountsPanel({
 										</td>
 										<td data-label="Действия">
 											<button
+												type="button"
 												className={control}
 												disabled={
 													busy ||
@@ -384,6 +627,7 @@ export function AccountsPanel({
 					</div>
 					<div className="flex items-center gap-3">
 						<button
+							type="button"
 							className={control}
 							disabled={busy || page === 1}
 							onClick={() => setPage((p) => p - 1)}
@@ -392,6 +636,7 @@ export function AccountsPanel({
 						</button>
 						<span>Страница {page}</span>
 						<button
+							type="button"
 							className={control}
 							disabled={busy || page * 50 >= total}
 							onClick={() => setPage((p) => p + 1)}
@@ -403,6 +648,75 @@ export function AccountsPanel({
 			)}
 			{tab === "roles" && (
 				<>
+					{embedded && (
+						<div className="overflow-auto border border-border rounded-lg">
+							<table className="w-full text-sm text-left">
+								<caption className="p-2 text-left font-semibold">
+									Матрица разрешений
+								</caption>
+								<thead>
+									<tr>
+										<th className="p-2">Разрешение</th>
+										{roles.map((r) => (
+											<th key={r.id} className="p-2">
+												<button
+													type="button"
+													className={control}
+													disabled={
+														!rolesAllowed ||
+														busy ||
+														r.id === "creator" ||
+														access?.roles.some((own) => own.id === r.id) ||
+														(!owner &&
+															r.permissions.some(
+																(p) => !access?.permissions.includes(p),
+															))
+													}
+													onClick={() => setRoleEdit(r)}
+												>
+													{r.name}
+												</button>
+											</th>
+										))}
+									</tr>
+								</thead>
+								<tbody>
+									{["Knowledge", "AI", "Team", "QC", "Administration"].map(
+										(group) => (
+											<Fragment key={group}>
+												{permissions
+													.filter((p) => permissionGroup(p.id) === group)
+													.map((p, index) => (
+														<tr key={p.id} className="border-t border-border">
+															<th className="p-2 font-normal">
+																{index === 0 && (
+																	<span className="block text-xs font-semibold text-muted">
+																		{group}
+																	</span>
+																)}
+																{p.name}
+																<small className="block text-muted">
+																	{p.id}
+																</small>
+															</th>
+															{roles.map((r) => (
+																<td
+																	key={r.id}
+																	className="p-2"
+																	aria-label={`${r.name}: ${p.name}`}
+																>
+																	{r.permissions.includes(p.id) ? "✓" : "—"}
+																</td>
+															))}
+														</tr>
+													))}
+											</Fragment>
+										),
+									)}
+								</tbody>
+							</table>
+						</div>
+					)}
 					<p className="text-sm text-muted">
 						Разрешения действуют для всех сотрудников с этой ролью. Собственную
 						роль и роль Creator менять нельзя. Технические права закреплены за
@@ -410,6 +724,7 @@ export function AccountsPanel({
 					</p>
 					{rolesAllowed && (
 						<button
+							type="button"
 							className={control}
 							disabled={busy}
 							onClick={() =>
@@ -440,7 +755,7 @@ export function AccountsPanel({
 							onCancel={() => setRoleEdit(null)}
 						/>
 					)}
-					<div className="grid gap-3 md:grid-cols-2">
+					<div className="grid gap-3 md:grid-cols-2" hidden={embedded}>
 						{roles.map((r) => (
 							<div
 								key={r.id}
@@ -462,6 +777,7 @@ export function AccountsPanel({
 								</ul>
 								{rolesAllowed && (
 									<button
+										type="button"
 										className={control}
 										disabled={
 											busy ||
@@ -524,6 +840,7 @@ export function AccountsPanel({
 					))}
 					{moreAudit && (
 						<button
+							type="button"
 							className={control}
 							disabled={busy}
 							onClick={async () => {
@@ -547,6 +864,109 @@ export function AccountsPanel({
 				</>
 			)}
 		</section>
+	);
+}
+function UserDetails({ user, children }: { user: User; children: ReactNode }) {
+	const access = useAuthStore((s) => s.session?.user.access);
+	const [tab, setTab] = useState("profile"),
+		[rows, setRows] = useState<Audit[]>([]),
+		[monitor, setMonitor] = useState<MonitorData>(),
+		[error, setError] = useState(""),
+		[loading, setLoading] = useState(false);
+	useEffect(() => {
+		if (tab === "profile") return;
+		const abort = new AbortController();
+		setLoading(true);
+		setError("");
+		void (async () => {
+			try {
+				if (tab === "activity") {
+					const result = await accessApi(
+						"audit",
+						undefined,
+						{ target: user.id },
+						abort.signal,
+					);
+					if (!abort.signal.aborted) setRows(result.rows);
+				} else if (can(access, "monitor.read")) {
+					const response = await authenticatedFetch(
+						"/api/agent-monitor?action=data&day=" +
+							new Date(Date.now() - 6 * 3600000).toISOString().slice(0, 10),
+						{ signal: abort.signal },
+					);
+					if (!response.ok) throw new Error("Не удалось загрузить мониторинг");
+					const data = await response.json();
+					if (!abort.signal.aborted) setMonitor(data);
+				}
+			} catch (e) {
+				if (!abort.signal.aborted) setError((e as Error).message);
+			} finally {
+				if (!abort.signal.aborted) setLoading(false);
+			}
+		})();
+		return () => abort.abort();
+	}, [tab, user.id, access]);
+	const agent = monitor?.agents.find(
+		(a) => a.id.toLowerCase() === user.email.toLowerCase(),
+	);
+	return (
+		<div className="space-y-3">
+			<div
+				className="flex flex-wrap gap-2"
+				role="tablist"
+				aria-label="Карточка сотрудника"
+			>
+				{[
+					["profile", "Профиль, роли и доступ"],
+					["activity", "Активность"],
+					...(can(access, "monitor.read") ? [["monitor", "Мониторинг"]] : []),
+				].map(([id, label]) => (
+					<button
+						type="button"
+						role="tab"
+						aria-selected={tab === id}
+						key={id}
+						className={control}
+						onClick={() => setTab(id)}
+					>
+						{label}
+					</button>
+				))}
+			</div>
+			<div hidden={tab !== "profile"}>{children}</div>
+			{loading && <p>Загрузка…</p>}
+			{error && <p role="alert">{error}</p>}
+			{tab === "activity" && !loading && (
+				<div>
+					{!rows.length && <p>Изменений доступа пока нет.</p>}
+					{rows.map((row) => (
+						<p key={row.id} className="border-b border-border py-2 text-sm">
+							{new Date(row.created_at).toLocaleString("ru")} ·{" "}
+							{row.actor_label} · {row.action}
+						</p>
+					))}
+				</div>
+			)}
+			{tab === "monitor" && !loading && (
+				<div>
+					{agent ? (
+						<>
+							<p>
+								{agent.name}: {agent.status}
+							</p>
+							<p className="text-sm text-muted">
+								Последнее наблюдение:{" "}
+								{agent.observed_at
+									? new Date(agent.observed_at).toLocaleString("ru")
+									: "нет данных"}
+							</p>
+						</>
+					) : (
+						<p>В мониторинге нет агента с почтой {user.email}.</p>
+					)}
+				</div>
+			)}
+		</div>
 	);
 }
 function RolesChoice({
@@ -680,7 +1100,11 @@ function CreateUser({
 				Передайте пароль сотруднику лично. Письмо не отправляется. Сотрудник
 				сможет изменить пароль в настройках.
 			</p>
-			<button className={control} disabled={busy || !selected.length}>
+			<button
+				type="submit"
+				className={control}
+				disabled={busy || !selected.length}
+			>
 				Создать аккаунт
 			</button>{" "}
 			<button
@@ -772,6 +1196,7 @@ function EditUser({
 				.
 			</p>
 			<button
+				type="submit"
 				className={control}
 				disabled={busy || (status === "active" && !selected.length)}
 			>
@@ -862,8 +1287,9 @@ function EditRole({
 				</legend>
 				{Object.entries(
 					permissions.reduce<Record<string, Permission[]>>((groups, p) => {
-						const key = p.id.split(".")[0];
-						(groups[key] ??= []).push(p);
+						const key = permissionGroup(p.id);
+						groups[key] ??= [];
+						groups[key].push(p);
 						return groups;
 					}, {}),
 				).map(([group, items]) => (
@@ -916,7 +1342,7 @@ function EditRole({
 					</section>
 				))}
 			</fieldset>
-			<button className={control} disabled={busy}>
+			<button type="submit" className={control} disabled={busy}>
 				Сохранить роль
 			</button>{" "}
 			<button

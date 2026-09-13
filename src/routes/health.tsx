@@ -11,7 +11,7 @@ import {
 	Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import { QualitySignals } from "@/features/productivity/KnowledgeSignals";
 import { getBindTitle } from "@/shared/lib/bind-search";
 import {
 	getKnowledgeHealthReport,
@@ -37,7 +37,7 @@ function getSeverityIcon(issue: KnowledgeHealthIssue) {
 	return <CheckCircle2 size={16} />;
 }
 
-function HealthPage() {
+export function HealthPage() {
 	const navigate = useNavigate();
 	const [query, setQuery] = useState("");
 	const [severity, setSeverity] = useState<
@@ -88,6 +88,7 @@ function HealthPage() {
 	return (
 		<div className="h-full overflow-auto bg-background">
 			<div className="mx-auto w-full max-w-6xl p-6">
+				<QualitySignals />
 				<header className="mb-6 flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted">

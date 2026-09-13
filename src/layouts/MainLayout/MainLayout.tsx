@@ -1,19 +1,19 @@
-import { SupportComposer } from "@/features/spaces/SupportComposer";
-import { SpaceFrame } from "@/features/spaces/SpaceFrame";
-import { useScrollContext } from "@/shared/hooks/useScrollContext";
-import { useKnowledgeStore } from "@/store";
-import { useAuthStore } from "@/store/auth.store";
-import { useBonusStore } from "@/store/bonus.store";
-import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
-import { WorkspaceSharedBindsSync } from "@/features/shared-binds/WorkspaceSharedBinds";
-import { AmbientBackground } from "@/components/brand/AmbientBackground";
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-
-import { useWorkspaceStore } from "@/store";
-
+import { AmbientBackground } from "@/components/brand/AmbientBackground";
+import { PersonalLibrary } from "@/features/productivity/PersonalLibrary";
+import { SelectionActions } from "@/features/productivity/SelectionActions";
+import { WorkspaceContinuity } from "@/features/productivity/WorkspaceContinuity";
+import { WorkspaceSharedBindsSync } from "@/features/shared-binds/WorkspaceSharedBinds";
+import { SpaceFrame } from "@/features/spaces/SpaceFrame";
+import { SupportComposer } from "@/features/spaces/SupportComposer";
+import { useScrollContext } from "@/shared/hooks/useScrollContext";
+import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { useBonusStore } from "@/store/bonus.store";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
+import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
 
 export function MainLayout({ children }: { children: ReactNode }) {
 	const layout = useWorkspaceStore((state) => state.layout);
@@ -71,6 +71,9 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
 	return (
 		<div className="app-shell flex h-dvh flex-col">
+			<WorkspaceContinuity key={actor} />
+			<PersonalLibrary key={`library-${actor}`} />
+			<SelectionActions key={`selection-${actor}`} />
 			<WorkspaceSharedBindsSync />
 			<AmbientBackground />
 			{
@@ -111,7 +114,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				>
 					<SpaceFrame>{children}</SpaceFrame>
 				</main>
-				<SupportComposer />
+				<SupportComposer key={actor} />
 			</div>
 
 			<WorkspaceDock />

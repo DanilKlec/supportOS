@@ -7,10 +7,14 @@ export function normalizeRole(value) {
 export function can(access, permission) {
  return access?.status==='active' && Array.isArray(access.permissions) && access.permissions.includes(permission);
 }
+export function canTrain(access) { return ['ai.train','ai.rules','ai.playground','ai.tests','ai.publish'].some(permission=>can(access,permission)); }
+export function canAdmin(access) { return canTrain(access)||['users.manage','roles.manage','knowledge.write','technical'].some(permission=>can(access,permission)); }
 export function routePermission(path) {
  path=path.replace(/\/+$/,'')||'/';
+ if(path==='/admin')return 'work';
  if(['/settings/ai','/settings/translator'].includes(path)) return 'technical';
  if(path==='/ai/knowledge') return 'ai.train';
+ if(path==='/translator'||path==='/ai/translator')return 'translator.use';
  if(path==='/agent-monitor'||path.startsWith('/agent-monitor/')) return 'monitor.read';
  if(path==='/settings/users'||path.startsWith('/settings/users/')) return 'users.manage';
  if(path==='/import/google-sheets'||path.startsWith('/import/google-sheets/')) return 'knowledge.write';

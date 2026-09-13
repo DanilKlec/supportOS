@@ -1,7 +1,7 @@
-import { useAuthStore } from "@/store/auth.store";
 import { defaultLocalDataService } from "@/services/default-local-data.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
+import { useAuthStore } from "@/store/auth.store";
 
 let authInitialized = false;
 let knowledgeInitialized = false;

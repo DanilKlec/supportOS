@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import {
 	cleanup,
+	fireEvent,
 	render,
 	screen,
-	fireEvent,
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useAuthStore } from "@/store/auth.store";
 import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+
 const mocks = vi.hoisted(() => ({
 	location: { pathname: "/", hash: "" },
 	navigate: vi.fn(),
@@ -36,14 +37,24 @@ vi.mock("@/services/answer-assistant.service", () => ({
 vi.mock("@/services/translator.service", () => ({
 	translatorService: { translate: mocks.translate },
 }));
+
 import { SupportComposer } from "./SupportComposer";
+
 beforeEach(() => {
 	mocks.location = { pathname: "/", hash: "" };
 	useAuthStore.setState({
 		session: {
 			user: {
 				id: "u",
-				access: { status: "active", permissions: ["tools", "binds.read"] },
+				access: {
+					status: "active",
+					permissions: [
+						"tools",
+						"composer.use",
+						"translator.use",
+						"binds.read",
+					],
+				},
 			},
 		} as any,
 	});
@@ -81,6 +92,9 @@ it("uses existing generation and translation services", async () => {
 	await waitFor(() => expect(mocks.generate).toHaveBeenCalled());
 	await screen.findByDisplayValue("Готовый ответ");
 	fireEvent.click(screen.getByRole("button", { name: "Перевод" }));
+	fireEvent.change(screen.getByLabelText("Язык ответа"), {
+		target: { value: "en" },
+	});
 	fireEvent.click(screen.getByRole("button", { name: "Перевести" }));
 	await waitFor(() =>
 		expect(mocks.translate).toHaveBeenCalledWith({

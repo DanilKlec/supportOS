@@ -1,10 +1,10 @@
-import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { sharedBindsService } from "@/services/shared-binds.service";
+import { getBindTitle } from "@/shared/lib/bind-search";
+import { getKnowledgeHealthReport } from "@/shared/lib/knowledge-health";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
-import { sharedBindsService } from "@/services/shared-binds.service";
-import { getKnowledgeHealthReport } from "@/shared/lib/knowledge-health";
-import { getBindTitle } from "@/shared/lib/bind-search";
 import { can } from "../../../shared/access.js";
 export function ContentOverview() {
 	const { binds, categories, folders, language, openBind } =
@@ -40,6 +40,16 @@ export function ContentOverview() {
 			rows: active.filter((b) => !(b.copyCount ?? 0)).slice(0, 8),
 		},
 		{ title: "Не обновлялись более 90 дней", rows: stale.slice(0, 8) },
+		{
+			title: "Не копировались более 90 дней",
+			rows: active
+				.filter(
+					(b) =>
+						b.lastCopiedAt &&
+						Date.parse(b.lastCopiedAt) < Date.now() - 90 * 86400000,
+				)
+				.slice(0, 8),
+		},
 	];
 	return (
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 md:p-6">
@@ -82,6 +92,7 @@ export function ContentOverview() {
 						<p role="alert">
 							Не удалось загрузить предложения.{" "}
 							<button
+								type="button"
 								onClick={() => void proposals.refetch()}
 								className="underline"
 							>
@@ -108,6 +119,7 @@ export function ContentOverview() {
 						) : (
 							list.rows.map((b) => (
 								<button
+									type="button"
 									key={b.id}
 									onClick={() => {
 										openBind(b.id);
@@ -124,8 +136,8 @@ export function ContentOverview() {
 				))}
 			</div>
 			<p className="mt-6 text-xs text-muted">
-				История поисков без результатов и время последнего использования пока не
-				собираются. Счётчики копирования относятся к этой библиотеке.
+				Сообщения «Не нашёл нужный ответ» доступны в разделе качества. Счётчики
+				копирования относятся к этой библиотеке.
 			</p>
 		</div>
 	);

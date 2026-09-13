@@ -454,10 +454,7 @@ export function TreeNode({
 						}
 					: undefined;
 			})
-			.filter(
-				(item): item is { id: string; categoryId: string; folderId?: string } =>
-					Boolean(item),
-			);
+			.filter((item): item is NonNullable<typeof item> => item !== undefined);
 		const movedLocations: typeof previousLocations = [];
 
 		try {

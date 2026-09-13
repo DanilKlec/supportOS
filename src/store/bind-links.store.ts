@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-	setBindLink,
 	type BindLinks,
+	setBindLink,
 } from "@/features/shared-binds/bind-links";
+
 interface State {
 	accounts: Record<string, BindLinks>;
 	remember: (user: string, links: BindLinks) => void;

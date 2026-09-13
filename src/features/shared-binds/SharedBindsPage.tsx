@@ -1,6 +1,3 @@
-import { draftKey, readDraft, writeDraft, removeDraft } from "./bind-drafts";
-import { BindDiff } from "./BindDiff";
-import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	BookOpen,
@@ -10,21 +7,24 @@ import {
 	Pencil,
 	Plus,
 	RefreshCw,
+	RotateCcw,
 	Search,
 	Users,
-	RotateCcw,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Bind, BindTranslation } from "@/entities/bind";
-import { useAuthStore } from "@/store/auth.store";
-import { CommonBindImport } from "./CommonBindImport";
-import { can } from "../../../shared/access.js";
-import { sharedBindsService } from "@/services/shared-binds.service";
-import { copyToClipboard } from "@/shared/lib/clipboard";
-import { useToast } from "@/shared/hooks/useToast";
-import { BaseModal } from "@/shared/modals/BaseModal";
 import { languages } from "@/entities/language";
+import { sharedBindsService } from "@/services/shared-binds.service";
+import { useToast } from "@/shared/hooks/useToast";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { BaseModal } from "@/shared/modals/BaseModal";
+import { useAuthStore } from "@/store/auth.store";
+import { can } from "../../../shared/access.js";
+import { BindDiff } from "./BindDiff";
+import { draftKey, readDraft, removeDraft, writeDraft } from "./bind-drafts";
+import { CommonBindImport } from "./CommonBindImport";
 
 const inputClass =
 	"w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
@@ -169,7 +169,10 @@ export function SharedBindsPage() {
 						)}
 					</div>
 				</div>
-				<div className="mb-5 flex flex-wrap gap-2" aria-label="Варианты биндов">
+				<fieldset
+					className="mb-5 flex flex-wrap gap-2"
+					aria-label="Варианты биндов"
+				>
 					{(
 						[
 							{ id: "common", label: "Общая база" },
@@ -191,7 +194,7 @@ export function SharedBindsPage() {
 							{item.label}
 						</button>
 					))}
-				</div>
+				</fieldset>
 				{mode === "common" && canEdit && <CommonBindImport />}
 				{mode === "manage" && canManage && (
 					<div className="mb-5 space-y-3 rounded-2xl border border-border bg-surface p-4">
@@ -291,12 +294,9 @@ export function SharedBindsPage() {
 					</p>
 				) : query.isPending ||
 					(mode !== "common" && personalQuery.isPending) ? (
-					<div
-						role="status"
-						className="rounded-2xl border border-border bg-surface p-12 text-center text-muted"
-					>
+					<output className="rounded-2xl border border-border bg-surface p-12 text-center text-muted">
 						Загружаем общую базу…
-					</div>
+					</output>
 				) : items.length === 0 ? (
 					<div className="rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-16 text-center">
 						<Users size={32} className="mx-auto mb-4 text-accent" />
@@ -315,7 +315,7 @@ export function SharedBindsPage() {
 					</div>
 				) : (
 					<div className="grid gap-5 lg:grid-cols-[minmax(240px,350px)_minmax(0,1fr)]">
-						<div className="space-y-2" aria-label="Список общих биндов">
+						<fieldset className="space-y-2" aria-label="Список общих биндов">
 							{items.map((item) => {
 								const t =
 									item.translations.find((t) => t.language === language) ??
@@ -348,7 +348,7 @@ export function SharedBindsPage() {
 									</button>
 								);
 							})}
-						</div>
+						</fieldset>
 						{bind && (
 							<article className="min-w-0 self-start overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-0">
 								<div className="flex flex-wrap items-start justify-between gap-4 border-b border-border p-5 sm:p-6">
@@ -739,9 +739,9 @@ export function SharedBindEditor({
 					</section>
 				)}
 				{conflictLoading && (
-					<p role="status" className="text-xs text-muted">
+					<output className="text-xs text-muted">
 						Загружаем актуальную версию для сравнения…
-					</p>
+					</output>
 				)}
 				{recovery && (
 					<section className="rounded-xl border border-border bg-surface-elevated p-4">
@@ -792,9 +792,7 @@ export function SharedBindEditor({
 					</section>
 				)}
 				{draftStatus && (
-					<p role="status" className="text-xs text-muted">
-						{draftStatus}
-					</p>
+					<output className="text-xs text-muted">{draftStatus}</output>
 				)}
 				{dirty.current && baseVersion !== (original?.updatedAt ?? null) && (
 					<p className="text-xs text-amber-400">
@@ -885,7 +883,10 @@ export function SharedBindEditor({
 						<BindDiff
 							before={
 								original
-									? { translations: (retryBase??original).translations, tags: (retryBase??original).tags }
+									? {
+											translations: (retryBase ?? original).translations,
+											tags: (retryBase ?? original).tags,
+										}
 									: undefined
 							}
 							after={reviewDraft}

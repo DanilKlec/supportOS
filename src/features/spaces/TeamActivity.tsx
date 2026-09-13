@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { accessApi } from "@/features/accounts/AccountsPanel";
-import { sharedBindsService } from "@/services/shared-binds.service";
+import { workDay } from "@/features/agent-monitor/live-model";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { sharedBindsService } from "@/services/shared-binds.service";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
-import { workDay } from "@/features/agent-monitor/live-model";
 export function TeamActivity() {
 	const user = useAuthStore((s) => s.session?.user);
 	const [filter, setFilter] = useState("all");
@@ -64,6 +64,7 @@ export function TeamActivity() {
 					["monitor", "Мониторинг"],
 				].map(([id, label]) => (
 					<button
+						type="button"
 						className="space-tab"
 						key={id}
 						aria-pressed={filter === id}
@@ -82,6 +83,7 @@ export function TeamActivity() {
 						<p role="alert">
 							Не удалось загрузить события.{" "}
 							<button
+								type="button"
 								className="underline"
 								onClick={() => void s.query.refetch()}
 							>

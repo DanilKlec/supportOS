@@ -1,9 +1,5 @@
+import { mockBinds } from "./binds";
 import { mockCategories } from "./categories";
 import { mockFolders } from "./folders";
-import { mockBinds } from "./binds";
 
-export {
-  mockCategories,
-  mockFolders,
-  mockBinds,
-};
+export { mockCategories, mockFolders, mockBinds };

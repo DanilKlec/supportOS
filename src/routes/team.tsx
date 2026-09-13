@@ -1,7 +1,7 @@
 import {
 	createFileRoute,
-	useRouterState,
 	useNavigate,
+	useRouterState,
 } from "@tanstack/react-router";
 import { AdminOverview } from "@/features/accounts/AdminOverview";
 import { TeamActivity } from "@/features/spaces/TeamActivity";

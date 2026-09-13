@@ -28,3 +28,17 @@ it('blocks Creator assignment before creating an Auth account',async()=>{
 it('rejects cross-origin writes before authentication or database access',async()=>{
  const res=response();await handler({...req({}),headers:{origin:'https://evil.test',host:'app.test'}},res);expect(res.statusCode).toBe(403);expect(mock.requireUser).not.toHaveBeenCalled();
 });
+it('serves an active recipient directory through accounts without granting account management',async()=>{
+ mock.requireUser.mockResolvedValue({id:'verified',access:{status:'active',roles:[],permissions:['binds.read']}});
+ mock.db.mockResolvedValue([{id:'other',display_name:'Ivan',email:'ivan@example.com'}]);
+ const res=response();await handler({...req(),method:'GET',url:'/api/accounts?action=users&purpose=share'},res);
+ expect(res.statusCode).toBe(200);expect(res.body.users).toHaveLength(1);
+ const path=mock.db.mock.calls[0][1];expect(path).toContain('status=eq.active');expect(path).toContain('id=neq.verified');expect(path).toContain('select=id,display_name,email');expect(path).not.toContain('&or=');
+ const denied=response();await handler({...req(),method:'GET',url:'/api/accounts?action=users'},denied);expect(denied.statusCode).toBe(403);
+});
+it('searches names and email with paging and hides the recipient directory from pending accounts',async()=>{
+ mock.requireUser.mockResolvedValue({id:'verified',access:{status:'active',roles:[],permissions:['binds.read']}});mock.db.mockResolvedValue(Array.from({length:51},(_,id)=>({id})));
+ const res=response();await handler({...req(),method:'GET',url:'/api/accounts?action=users&purpose=share&page=2&search=Ivan'},res);
+ expect(res.body.users).toHaveLength(50);expect(res.body.hasMore).toBe(true);expect(mock.db.mock.calls[0][1]).toContain('offset=50');expect(mock.db.mock.calls[0][1]).toContain('display_name.ilike.');expect(mock.db.mock.calls[0][1]).toContain('email.ilike.');
+ mock.requireUser.mockResolvedValue({id:'pending',access:{status:'pending',roles:[],permissions:[]}});const denied=response();await handler({...req(),method:'GET',url:'/api/accounts?action=users&purpose=share'},denied);expect(denied.statusCode).toBe(403);
+});

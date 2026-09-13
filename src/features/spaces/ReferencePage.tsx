@@ -1,9 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { BonusToolsPage } from "@/features/bonuses/BonusToolsPage";
+import { DepositBonusesPage } from "@/features/bonuses/DepositBonusesPage";
+import { ProjectEmailsPage } from "@/features/project-emails/ProjectEmailsPage";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
-import { ProjectEmailsPage } from "@/features/project-emails/ProjectEmailsPage";
-import { DepositBonusesPage } from "@/features/bonuses/DepositBonusesPage";
-import { BonusToolsPage } from "@/features/bonuses/BonusToolsPage";
 export function ReferencePage() {
 	const { pathname, hash } = useRouterState({ select: (s) => s.location });
 	const access = useAuthStore((s) => s.session?.user.access);

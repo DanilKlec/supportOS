@@ -54,7 +54,13 @@ export function getKnowledgeHealthReport({
 	const issues: KnowledgeHealthIssue[] = [];
 	for (const bind of activeBinds) {
 		if (Date.parse(bind.updatedAt) < Date.now() - 90 * 86400000) {
-			issues.push({ id: `stale-${bind.id}`, title: "Материал давно не обновлялся", description: `${getBindTitle(bind)}: более 90 дней без изменений. Проверьте актуальность.`, severity: "info", bindId: bind.id });
+			issues.push({
+				id: `stale-${bind.id}`,
+				title: "Материал давно не обновлялся",
+				description: `${getBindTitle(bind)}: более 90 дней без изменений. Проверьте актуальность.`,
+				severity: "info",
+				bindId: bind.id,
+			});
 		}
 	}
 

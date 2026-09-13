@@ -1,3 +1,3 @@
-import type { Folder } from "./types"
+import type { Folder } from "./types";
 
-export const mockFolders: Folder[] = []
+export const mockFolders: Folder[] = [];

@@ -1,12 +1,11 @@
-import { BindDiff } from "./BindDiff";
-import { bindChange } from "./bind-diff";
-import type { Bind } from "@/entities/bind";
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import type { Bind, BindTranslation } from "@/entities/bind";
 import { googleSheetsService } from "@/services/google-sheets.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { contentApi } from "@/services/shared-content.service";
-import type { BindTranslation } from "@/entities/bind";
+import { BindDiff } from "./BindDiff";
+import { bindChange } from "./bind-diff";
 
 export function CommonBindImport() {
 	const client = useQueryClient();
@@ -207,21 +206,13 @@ export function CommonBindImport() {
 					Предпросмотр таблицы
 				</button>
 			</div>
-			{busy && (
-				<p role="status" className="mt-3 text-muted">
-					Обработка…
-				</p>
-			)}
+			{busy && <output className="mt-3 text-muted">Обработка…</output>}
 			{error && (
 				<p role="alert" className="mt-3 text-red-400">
 					{error}
 				</p>
 			)}
-			{message && (
-				<p role="status" className="mt-3 text-emerald-400">
-					{message}
-				</p>
-			)}
+			{message && <output className="mt-3 text-emerald-400">{message}</output>}
 			{!!rows.length && (
 				<div className="mt-4">
 					<p className="mb-2 text-sm">

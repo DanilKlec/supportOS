@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, Mail, Gift, Calculator } from "lucide-react";
+import { ArrowLeft, Calculator, Gift, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { can, routePermission } from "../../../shared/access.js";
+
 const links = [
 	{ to: "/", label: "Бинды", short: "Бинды", icon: ArrowLeft },
 	{

@@ -1,15 +1,16 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Bell } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore } from "@/store";
-import { sharedBindsService } from "@/services/shared-binds.service";
 import { can } from "../../../shared/access.js";
+import { type InboxItem, inboxItems } from "./inbox-items";
 import { useWorkspaceSharedBinds } from "./WorkspaceSharedBinds";
-import { inboxItems, type InboxItem } from "./inbox-items";
+
 type Profile = { baseline: Record<string, string>; read: string[] };
 const useInbox = create<{
 	profiles: Record<string, Profile>;
@@ -68,7 +69,7 @@ export function Inbox() {
 					user.id,
 					Object.fromEntries(common.data.map((b) => [b.id, b.updatedAt])),
 				);
-	}, [user?.id, common.data, profile]);
+	}, [user, common.data, profile]);
 	if (!user || !can(user.access, "binds.read")) return null;
 	const updates = profile
 		? inboxItems(
@@ -177,6 +178,7 @@ export function Inbox() {
 								branches.error?.message ||
 								results.error?.message}
 							<button
+								type="button"
 								className="ml-2 underline"
 								onClick={() => {
 									void common.refetch();

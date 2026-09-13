@@ -1,3 +1,4 @@
+import type { Permission } from "../../../shared/access.js";
 export const spaces = [
 	{
 		title: "Рабочее пространство",
@@ -52,7 +53,7 @@ export type SpaceItem = {
 	label: string;
 	to: string;
 	hash?: string;
-	permission?: string;
+	permission?: Permission;
 };
 export function spaceFor(path: string) {
 	if (path === "/bonus-tools") return spaces[1];

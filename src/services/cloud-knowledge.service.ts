@@ -1,11 +1,12 @@
 import type { Bind } from "@/entities/bind";
-import {can} from '../../shared/access.js';
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import type { KnowledgeDatabase } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
+import { can } from "../../shared/access.js";
 
 const QUEUE_KEY = "supportos:cloud-sync-queue:v1";
-const queueKey=()=>`${QUEUE_KEY}:${supabaseService.getSession()?.user.id ?? 'signed-out'}`;
+const queueKey = () =>
+	`${QUEUE_KEY}:${supabaseService.getSession()?.user.id ?? "signed-out"}`;
 const CATEGORIES_TABLE = "supportos_categories";
 const FOLDERS_TABLE = "supportos_folders";
 const BINDS_TABLE = "supportos_binds";
@@ -83,8 +84,8 @@ function currentOwnerId(entityOwnerId?: string | null) {
 
 	const session = supabaseService.getSession();
 
-	if (can(session?.user.access,'knowledge.write')) return null;
-	if(!session) throw new Error('Войдите с личным аккаунтом');
+	if (can(session?.user.access, "knowledge.write")) return null;
+	if (!session) throw new Error("Войдите с личным аккаунтом");
 
 	return session.user.id;
 }
@@ -198,7 +199,7 @@ function mergeBinds(rows: BindRow[]) {
 	return binds.filter((bind) => bind.ownerId || !hiddenGlobalIds.has(bind.id));
 }
 
-function readQueue(key=queueKey()) {
+function readQueue(key = queueKey()) {
 	if (!isBrowser()) return [];
 
 	try {
@@ -210,7 +211,7 @@ function readQueue(key=queueKey()) {
 	}
 }
 
-function writeQueue(queue: CloudOperation[],key=queueKey()) {
+function writeQueue(queue: CloudOperation[], key = queueKey()) {
 	if (!isBrowser()) return;
 
 	localStorage.setItem(key, JSON.stringify(queue));
@@ -219,7 +220,9 @@ function writeQueue(queue: CloudOperation[],key=queueKey()) {
 class CloudKnowledgeService {
 	canUseCloud() {
 		return (
-			import.meta.env.VITE_SUPPORTOS_CLOUD_SYNC === "true" && supabaseService.isConfigured() && Boolean(supabaseService.getSession())
+			import.meta.env.VITE_SUPPORTOS_CLOUD_SYNC === "true" &&
+			supabaseService.isConfigured() &&
+			Boolean(supabaseService.getSession())
 		);
 	}
 
@@ -355,13 +358,16 @@ class CloudKnowledgeService {
 
 	async flushQueue() {
 		if (!this.canUseCloud()) return;
-		const key=queueKey();
+		const key = queueKey();
 
 		const queue = readQueue();
 		const remaining: CloudOperation[] = [];
 
 		for (const operation of queue) {
-			if(queueKey()!==key){remaining.push(operation);continue;}
+			if (queueKey() !== key) {
+				remaining.push(operation);
+				continue;
+			}
 			try {
 				await this.execute(operation);
 			} catch {
@@ -369,17 +375,17 @@ class CloudKnowledgeService {
 			}
 		}
 
-		writeQueue(remaining,key);
+		writeQueue(remaining, key);
 	}
 
 	private async runOrQueue(operation: CloudOperation) {
 		if (!this.canUseCloud()) return;
-		const key=queueKey();
+		const key = queueKey();
 
 		try {
 			await this.execute(operation);
 		} catch {
-			writeQueue([...readQueue(key), operation],key);
+			writeQueue([...readQueue(key), operation], key);
 		}
 	}
 

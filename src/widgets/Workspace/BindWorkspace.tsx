@@ -1,8 +1,8 @@
+import { WorkspaceSharedBindViewer } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { BindViewer } from "./BindViewer";
 import { EmptyWorkspace } from "./EmptyWorkspace";
 import { WorkspaceTabs } from "./WorkspaceTabs";
-import { WorkspaceSharedBindViewer } from "@/features/shared-binds/WorkspaceSharedBinds";
 
 export function BindWorkspace() {
 	const activeTab = useKnowledgeStore((s) => s.activeTab);

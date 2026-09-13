@@ -118,7 +118,6 @@ export function parseSchedule(
 		}
 		preview.push({ name, email, shifts: count });
 	}
-	if (!people.length)
-		issues.push("Не найдены сотрудники с пометкой (sup).");
+	if (!people.length) issues.push("Не найдены сотрудники с пометкой (sup).");
 	return { payload: { month, people, records }, issues, preview };
 }

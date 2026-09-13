@@ -1,12 +1,12 @@
-import { authenticatedFetch } from "./authenticated-fetch";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import { can } from "../../shared/access.js";
-import { supabaseService } from "./supabase.service";
+import { authenticatedFetch } from "./authenticated-fetch";
 import {
+	type BindRow,
 	fromBindRow,
 	toBindRow,
-	type BindRow,
 } from "./cloud-knowledge.service";
+import { supabaseService } from "./supabase.service";
 
 const TABLE = "supportos_binds";
 export interface BindBranches {

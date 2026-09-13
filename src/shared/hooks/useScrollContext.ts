@@ -1,8 +1,29 @@
-import { useLayoutEffect, type RefObject } from "react";
+import { type RefObject, useLayoutEffect } from "react";
+import { useAuthStore } from "@/store/auth.store";
+
 const positions = new Map<
 	string,
 	Record<string, { top: number; left: number }>
 >();
+const storageKey = "supportos:scroll-session:v1";
+try {
+	for (const [key, value] of JSON.parse(
+		sessionStorage.getItem(storageKey) ?? "[]",
+	))
+		positions.set(key, value);
+} catch {
+	/* Missing or unavailable session storage. */
+}
+useAuthStore.subscribe((state, previous) => {
+	if (previous.session && previous.session.user.id !== state.session?.user.id) {
+		positions.clear();
+		try {
+			sessionStorage.removeItem(storageKey);
+		} catch {
+			/* Storage disabled. */
+		}
+	}
+});
 export function useScrollContext(
 	root: RefObject<HTMLElement | null>,
 	key: string,
@@ -13,6 +34,14 @@ export function useScrollContext(
 		const saved = positions.get(key) ?? {};
 		let restoring = true;
 		let frame = 0;
+		let saveTimer: ReturnType<typeof setTimeout> | undefined;
+		const persist = () => {
+			try {
+				sessionStorage.setItem(storageKey, JSON.stringify([...positions]));
+			} catch {
+				/* Keep in-memory positions. */
+			}
+		};
 		const address = (node: HTMLElement) => {
 			const path: number[] = [];
 			let current: Element | null = node;
@@ -43,6 +72,8 @@ export function useScrollContext(
 			};
 			positions.set(key, saved);
 			if (positions.size > 80) positions.delete(positions.keys().next().value!);
+			clearTimeout(saveTimer);
+			saveTimer = setTimeout(persist, 200);
 		};
 		const stop = () => {
 			restoring = false;
@@ -62,6 +93,8 @@ export function useScrollContext(
 		host.addEventListener("pointerdown", stop);
 		host.addEventListener("keydown", stop);
 		return () => {
+			clearTimeout(saveTimer);
+			persist();
 			clearTimeout(timer);
 			cancelAnimationFrame(frame);
 			observer.disconnect();

@@ -8,11 +8,14 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
+
 const mock = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/services/authenticated-fetch", () => ({
 	authenticatedFetch: mock.fetch,
 }));
+
 import { AccountsPanel } from "./AccountsPanel";
+
 const catalog = {
 	roles: [
 		{
@@ -98,6 +101,12 @@ it("assigns multiple roles with the profile version and shows success only after
 	fireEvent.click(screen.getByRole("button", { name: "Изменить" }));
 	fireEvent.click(screen.getByRole("checkbox", { name: "QC" }));
 	fireEvent.click(screen.getByRole("button", { name: "Сохранить доступ" }));
+	expect(
+		mock.fetch.mock.calls.some(([, init]) => init?.method === "POST"),
+	).toBe(false);
+	fireEvent.click(
+		screen.getByRole("button", { name: "Подтвердить изменения" }),
+	);
 	await screen.findByText("Изменения сохранены");
 	const request = mock.fetch.mock.calls.find(
 		([, init]) => init?.method === "POST",
@@ -137,6 +146,10 @@ it("creates a custom role from permission checkboxes", async () => {
 		screen.getByRole("checkbox", { name: "Просмотр мониторинга" }),
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Сохранить роль" }));
+	expect(screen.getByText("+ Просмотр мониторинга")).toBeTruthy();
+	fireEvent.click(
+		screen.getByRole("button", { name: "Подтвердить изменения" }),
+	);
 	await screen.findByText("Изменения сохранены");
 	const request = mock.fetch.mock.calls.find(
 		([, init]) => init?.method === "POST",

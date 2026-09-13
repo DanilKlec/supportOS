@@ -3,8 +3,8 @@ import {
 	ArrowUpRight,
 	BookOpen,
 	Clock3,
-	Mail,
 	Gift,
+	Mail,
 	Search,
 	Users,
 } from "lucide-react";

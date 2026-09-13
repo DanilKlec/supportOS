@@ -1,9 +1,9 @@
-import { BindDiff } from "./BindDiff";
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuthStore } from "@/store/auth.store";
+import { useState } from "react";
 import { sharedBindsService } from "@/services/shared-binds.service";
+import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
+import { BindDiff } from "./BindDiff";
 
 export function BindProposals({
 	sourceId,

@@ -1,4 +1,5 @@
-import { changedText, type BindContent } from "./bind-diff";
+import { type BindContent, changedText } from "./bind-diff";
+
 function TextChange({
 	before = "",
 	after = "",

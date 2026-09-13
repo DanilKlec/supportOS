@@ -1,3 +1,3 @@
-import type { Bind } from "./types"
+import type { Bind } from "./types";
 
-export const mockBinds: Bind[] = []
+export const mockBinds: Bind[] = [];

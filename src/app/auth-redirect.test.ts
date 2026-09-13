@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { safeAuthRedirect } from "./auth-redirect";
+
 it("preserves an internal deep link", () => {
 	expect(safeAuthRedirect("/agent-monitor?day=2026-09-08#history")).toBe(
 		"/agent-monitor?day=2026-09-08#history",

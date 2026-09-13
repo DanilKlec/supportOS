@@ -1,8 +1,8 @@
-import { authorize } from "./server/_auth.js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { authorize } from "./server/_auth.js";
 import { agentMonitorPlugin } from "./server/agent-monitor/_vite.js";
 import { loadSportsBettingLive } from "./server/sports-betting/_live.js";
 

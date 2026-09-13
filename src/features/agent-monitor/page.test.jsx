@@ -8,6 +8,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+
 const auth = vi.hoisted(() => ({
 	getAccessToken: vi.fn(async () => "user-token"),
 	signOut: vi.fn(async () => {}),
@@ -15,9 +16,11 @@ const auth = vi.hoisted(() => ({
 vi.mock("@/services/supabase.service", () => ({ supabaseService: auth }));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options) => ({ options }),
- useRouterState: ({select}) => select({location:{hash:""}}),
+	useRouterState: ({ select }) => select({ location: { hash: "" } }),
 }));
+
 import { Route } from "../../routes/agent-monitor";
+
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();

@@ -1,9 +1,4 @@
-import { useRouterState } from "@tanstack/react-router";
-import { IntegrationsPanel } from "@/features/spaces/IntegrationsPanel";
-import { createFileRoute, Link } from "@tanstack/react-router";
-
-import { PasswordPanel } from "@/features/accounts/PasswordPanel";
-import { can } from "../../../shared/access.js";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import {
 	Check,
 	Cloud,
@@ -27,7 +22,6 @@ import {
 	Zap,
 } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
-
 import { GoogleSheetsImportPanel } from "@/components/import/GoogleSheetsImportPanel";
 import { PWAInstallButton } from "@/components/pwa/PWAInstallButton";
 import { languages } from "@/entities/language";
@@ -36,6 +30,8 @@ import type {
 	WorkspaceLayoutSettings,
 	WorkspaceSidebarWidth,
 } from "@/entities/workspace";
+import { PasswordPanel } from "@/features/accounts/PasswordPanel";
+import { IntegrationsPanel } from "@/features/spaces/IntegrationsPanel";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 import { supportOSExportService } from "@/services/supportos-export.service";
@@ -60,8 +56,8 @@ import {
 	useKnowledgeStore,
 	useWorkspaceStore,
 } from "@/store";
-
 import { useAuthStore } from "@/store/auth.store";
+import { can } from "../../../shared/access.js";
 
 export const Route = createFileRoute("/settings/")({
 	component: SettingsPage,

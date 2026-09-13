@@ -2027,7 +2027,7 @@ function getDeletedItemsSnapshot(
 			binds: binds.filter(
 				(bind) =>
 					bind.categoryId === id ||
-					(Boolean(bind.folderId) && categoryFolderIds.has(bind.folderId)),
+					(bind.folderId !== undefined && categoryFolderIds.has(bind.folderId)),
 			),
 		};
 	}
@@ -2038,7 +2038,7 @@ function getDeletedItemsSnapshot(
 		return {
 			folders: folders.filter((folder) => folderIds.has(folder.id)),
 			binds: binds.filter(
-				(bind) => Boolean(bind.folderId) && folderIds.has(bind.folderId),
+				(bind) => bind.folderId !== undefined && folderIds.has(bind.folderId),
 			),
 		};
 	}

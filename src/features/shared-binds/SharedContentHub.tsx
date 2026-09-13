@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
-import { SharedBindsPage } from "./SharedBindsPage";
 import { ProposalWorkflow } from "@/features/spaces/ProposalWorkflow";
+import { SharedBindsPage } from "./SharedBindsPage";
 export function SharedContentHub() {
 	const hash = useRouterState({ select: (s) => s.location.hash });
 	return hash === "proposals" ? (

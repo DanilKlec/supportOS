@@ -1,24 +1,25 @@
-import { MoreActions } from "@/components/MoreActions";
-import { reconcileBindLinks } from "./bind-links";
-import { BindLinkEditor } from "./BindLinkEditor";
-import { useBindLinksStore, EMPTY_BIND_LINKS } from "@/store/bind-links.store";
-import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText, Copy, Pencil, RotateCcw } from "lucide-react";
+import { Copy, FileText, Pencil, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useAuthStore } from "@/store/auth.store";
-import { useKnowledgeStore } from "@/store";
-import { sharedBindsService } from "@/services/shared-binds.service";
-import { BaseModal } from "@/shared/modals/BaseModal";
-import { BindProposals } from "./BindProposals";
+import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
 import type { BindBranches } from "@/services/shared-binds.service";
-import { SharedBindEditor } from "./SharedBindsPage";
-import { copyToClipboard } from "@/shared/lib/clipboard";
+import { sharedBindsService } from "@/services/shared-binds.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { BaseModal } from "@/shared/modals/BaseModal";
+import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
 import { can } from "../../../shared/access.js";
+import { BindLinkEditor } from "./BindLinkEditor";
+import { BindProposals } from "./BindProposals";
+import { reconcileBindLinks } from "./bind-links";
+import { SharedBindEditor } from "./SharedBindsPage";
+import { ShareRecipientPicker } from "./ShareRecipientPicker";
 
 export function useWorkspaceSharedBinds() {
 	const user = useAuthStore((s) => s.session?.user);
@@ -85,7 +86,7 @@ export function WorkspaceSharedBindsSync() {
 				};
 			});
 		useKnowledgeStore.setState({ remoteBinds: values });
-	}, [user?.id, common.data, personal.data, branches.data, locals, links]);
+	}, [common.data, personal.data, branches.data, locals, links]);
 	useEffect(() => {
 		if (user?.id && common.data)
 			useBindLinksStore.getState().remember(user.id, links);
@@ -187,10 +188,12 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 	const [editor, setEditor] = useState<Bind | null>(null),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState("");
+	const [declineId, setDeclineId] = useState<string>();
 	const [compare, setCompare] = useState(false),
 		[historyOpen, setHistoryOpen] = useState(false),
 		[shareOpen, setShareOpen] = useState(false),
 		[email, setEmail] = useState("");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: changing the selected bind resets its transient dialogs.
 	useEffect(() => {
 		setEditor(null);
 		setLinkOpen(false);
@@ -248,6 +251,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					{(common.error ?? personal.error ?? branches.error)?.message}
 				</p>
 				<button
+					type="button"
 					onClick={() => {
 						void common.refetch();
 						void personal.refetch();
@@ -283,15 +287,11 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					<div className="min-w-0 flex-1">
 						<div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted">
 							<span>Версия ответа</span>
-							<span role="status" className="normal-case tracking-normal">
+							<output className="normal-case tracking-normal">
 								{busy ? "· Сохраняем…" : ""}
-							</span>
+							</output>
 						</div>
-						<div
-							role="group"
-							aria-label="Ветка бинда"
-							className="bind-version-switch"
-						>
+						<fieldset aria-label="Ветка бинда" className="bind-version-switch">
 							{[
 								{ id: "main", label: "Общая", hint: "Для команды" },
 								{
@@ -318,10 +318,20 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									<span className="block text-[10px] text-muted">{v.hint}</span>
 								</button>
 							))}
-						</div>
+						</fieldset>
 					</div>
 					<div className="flex flex-wrap gap-2">
 						<MoreActions>
+							{incoming.some((share) => share.id === selected.branch) && (
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => setDeclineId(selected.branch)}
+									className="min-h-10 px-3 text-left text-sm text-red-400"
+								>
+									Отказаться от версии
+								</button>
+							)}
 							<button
 								type="button"
 								disabled={busy}
@@ -605,6 +615,62 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						}}
 					/>
 				)}
+				{declineId && (
+					<BaseModal
+						title="Отказаться от версии?"
+						closeDisabled={busy}
+						onClose={() => setDeclineId(undefined)}
+					>
+						<p className="mb-4 text-sm">
+							После отказа вы вернётесь к своей или общей версии бинда.
+						</p>
+						{error && <p role="alert">{error}</p>}
+						<div className="flex gap-3">
+							<button
+								type="button"
+								disabled={busy}
+								className="min-h-10 rounded-lg border border-border px-3"
+								onClick={() =>
+									void action(async () => {
+										await sharedBindsService.branchAction("decline", {
+											shareId: declineId,
+										});
+										client.setQueryData<BindBranches>(
+											["bind-branches", user?.id],
+											(current) => {
+												if (!current) return current;
+												const choices = { ...current.choices };
+												if (choices[id] === declineId) delete choices[id];
+												return {
+													...current,
+													choices,
+													incoming: current.incoming.filter(
+														(share) => share.id !== declineId,
+													),
+												};
+											},
+										);
+										await client.invalidateQueries({
+											queryKey: ["bind-branches"],
+										});
+										setDeclineId(undefined);
+										showToast("Вы отказались от полученной версии");
+									})
+								}
+							>
+								Отказаться
+							</button>
+							<button
+								type="button"
+								disabled={busy}
+								className="min-h-10 px-3"
+								onClick={() => setDeclineId(undefined)}
+							>
+								Отмена
+							</button>
+						</div>
+					</BaseModal>
+				)}
 				{shareOpen && (
 					<BaseModal
 						title="Поделиться моей веткой"
@@ -645,19 +711,22 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							}}
 							className="flex flex-wrap gap-2"
 						>
-							<input
-								type="email"
-								required
-								aria-label="Почта сотрудника"
-								placeholder="colleague@company.com"
+							<ShareRecipientPicker
 								value={email}
-								onChange={(e) => setEmail(e.target.value)}
+								onChange={setEmail}
+								sharedEmails={outgoing.map((share) => share.email)}
 								disabled={busy}
-								className="min-w-48 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
 							/>
 							<button
 								type="submit"
-								disabled={busy}
+								disabled={
+									busy ||
+									!email ||
+									outgoing.some(
+										(share) =>
+											share.email.toLowerCase() === email.toLowerCase(),
+									)
+								}
 								className="rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
 							>
 								Предоставить доступ
@@ -698,7 +767,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									}
 									className="text-xs text-red-400"
 								>
-									Отозвать
+									Отозвать доступ
 								</button>
 							</div>
 						))}

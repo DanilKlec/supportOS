@@ -327,10 +327,7 @@ async function inflateRawBytes(compressed: Uint8Array) {
 		throw new Error("XLSX decompression is not supported in this browser");
 	}
 
-	const compressedBuffer = compressed.buffer.slice(
-		compressed.byteOffset,
-		compressed.byteOffset + compressed.byteLength,
-	);
+	const compressedBuffer = new Uint8Array(compressed).buffer;
 	const stream = new Blob([compressedBuffer])
 		.stream()
 		.pipeThrough(new DecompressionStream("deflate-raw"));

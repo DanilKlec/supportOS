@@ -23,16 +23,27 @@ export default async function handler(req,res) {
   if(req.method==='GET'&&action==='me')return send(200,{id:actor.id,access:actor.access});
   const env=config();
   if(req.method==='GET') {
+   if(action==='users'&&url.searchParams.get('purpose')==='share') {
+    if(!can(actor.access,'binds.read'))throw fail('Нет доступа к биндам',403);
+    const page=Number(url.searchParams.get('page')??1);if(!Number.isInteger(page)||page<1||page>10000)throw fail('Некорректная страница');
+    const search=(url.searchParams.get('search')??'').trim().slice(0,120).replace(/[^\p{L}\p{N}@._ -]/gu,'');
+    const pattern=encodeURIComponent(`"*${search.replace(/[_]/g,'\\_')}*"`);
+    const rows=await db(env,`supportos_users?select=id,display_name,email&status=eq.active&id=neq.${actor.id}&order=display_name.asc,id.asc&limit=51&offset=${(page-1)*50}${search?`&or=(display_name.ilike.${pattern},email.ilike.${pattern})`:''}`);
+    return send(200,{users:rows.slice(0,50),hasMore:rows.length>50});
+   }
    if(!can(actor.access,'users.manage')&&!can(actor.access,'roles.manage'))throw fail('Недостаточно прав',403);
    if(action==='catalog')return send(200,await catalog(env));
-   if(action==='audit'){
+    if(action==='audit'){
+     const target=url.searchParams.get('target');if(target&&!/^[a-zA-Z0-9_-]{1,100}$/.test(target))throw fail('Некорректный сотрудник');
     const before=url.searchParams.get('before');if(before&&!/^\d{1,18}$/.test(before))throw fail('Некорректный курсор');
-    const rows=await db(env,`supportos_access_audit?select=*&order=id.desc&limit=50${can(actor.access,'binds.manage')?'':'&action=not.like.bind.*'}${before?`&id=lt.${before}`:''}`);
+     const rows=await db(env,`supportos_access_audit?select=*&order=id.desc&limit=50${can(actor.access,'binds.manage')?'':'&action=not.like.bind.*'}${before?`&id=lt.${before}`:''}${target?`&target_id=eq.${target}`:''}`);
     return send(200,{rows,hasMore:rows.length===50});
    }
    if(action!=='users'||!can(actor.access,'users.manage'))throw fail('Недостаточно прав',403);
    const page=Number(url.searchParams.get('page')??1);if(!Number.isInteger(page)||page<1||page>10000)throw fail('Некорректная страница');
-   return send(200,await db(env,'rpc/supportos_rbac_list_users',{search_text:(url.searchParams.get('search')??'').slice(0,120),page_number:page}));
+    const status=url.searchParams.get('status')??'',role=url.searchParams.get('role')??'';
+    if(!['','active','pending','disabled'].includes(status)||role&&!/^[a-z][a-z0-9_]{1,39}$/.test(role))throw fail('Некорректный фильтр');
+    return send(200,await db(env,'rpc/supportos_rbac_list_users',{search_text:(url.searchParams.get('search')??'').slice(0,120),page_number:page,status_filter:status,role_filter:role}));
   }
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
   if(body.action==='create'){

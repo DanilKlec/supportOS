@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from "react";
+
 import {
 	cleanup,
 	fireEvent,
@@ -7,11 +7,15 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
+
 const mock = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("@/services/shared-content.service", () => ({ contentApi: mock.api }));
+
 import { useSharedPublication } from "./SharedPublication";
+
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
@@ -24,6 +28,7 @@ function Screen() {
 			{p.banner}
 			<output>{JSON.stringify(data)}</output>
 			<button
+				type="button"
 				disabled={!p.canEdit}
 				onClick={() => setData([{ id: "draft", name: "New" }])}
 			>
@@ -119,7 +124,11 @@ function PersonalScreen() {
 		<>
 			{p.banner}
 			<output>{JSON.stringify(data)}</output>
-			<button disabled={!p.canEdit} onClick={() => setData([{ id: "mine" }])}>
+			<button
+				type="button"
+				disabled={!p.canEdit}
+				onClick={() => setData([{ id: "mine" }])}
+			>
 				Edit personal
 			</button>
 		</>

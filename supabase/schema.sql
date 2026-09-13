@@ -556,6 +556,14 @@ begin
    'outgoing',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'sourceId',s.source_id,'recipient',coalesce(nullif(u.display_name,''),u.email),'email',u.email)) from public.supportos_bind_shares s join public.supportos_users u on u.id=s.recipient_id where s.owner_id=actor),'[]')
   );
  end if;
+ if operation='decline' then
+  select * into share_row from public.supportos_bind_shares where id=(payload->>'shareId')::uuid and recipient_id=actor for update;
+  if not found then raise exception using errcode='42501',message='Нет доступа к этой полученной версии'; end if;
+  -- Removing just this relation preserves the author and every other recipient.
+  delete from public.supportos_bind_choices where user_id=actor and source_id=share_row.source_id and branch=share_row.id::text;
+  delete from public.supportos_bind_shares where id=share_row.id and recipient_id=actor;
+  return jsonb_build_object('ok',true);
+ end if;
  if operation='revoke' then
   select * into share_row from public.supportos_bind_shares where id=(payload->>'shareId')::uuid and owner_id=actor for update;
   if not found then raise exception using errcode='42501',message='Нет доступа к этой отправленной версии'; end if;

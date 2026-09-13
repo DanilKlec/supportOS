@@ -1,5 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslatorStore } from "@/store/translator.store";
@@ -35,7 +35,9 @@ export function IntegrationsPanel() {
 							{ai.data?.provider}
 						</p>
 						{ai.error && (
-							<button onClick={() => void ai.refetch()}>Повторить</button>
+							<button type="button" onClick={() => void ai.refetch()}>
+								Повторить
+							</button>
 						)}
 						<Link className="space-tab" to="/settings/ai">
 							Настроить AI →

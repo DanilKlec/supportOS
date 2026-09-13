@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { UsersRound, ShieldCheck } from "lucide-react";
+import { ShieldCheck, UsersRound } from "lucide-react";
 import { AccountsPanel } from "@/features/accounts/AccountsPanel";
 export const Route = createFileRoute("/settings/users")({
 	component: UsersPage,

@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
+import { type AuthSession, useAuthStore } from "@/store/auth.store";
 import { normalizeRole } from "../../shared/access.js";
-import { useAuthStore, type AuthSession } from "@/store/auth.store";
 import { supabase } from "./supabase-client";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -39,7 +39,8 @@ class SupabaseService {
 		return next;
 	}
 	initialize() {
-		return (this.initialized ??= this.initializeOnce());
+		this.initialized ??= this.initializeOnce();
+		return this.initialized;
 	}
 	private async initializeOnce() {
 		useAuthStore.setState({ configured: this.isConfigured(), loading: true });
@@ -196,14 +197,24 @@ class SupabaseService {
 			body: JSON.stringify(rows),
 		});
 	}
-	async updateWhere<T>(table: string, query: Record<string, string>, patch: Record<string, unknown>) {
+	async updateWhere<T>(
+		table: string,
+		query: Record<string, string>,
+		patch: Record<string, unknown>,
+	) {
 		const params = new URLSearchParams(query);
 		return this.rest<T[]>(`/${table}?${params}`, {
-			method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch),
+			method: "PATCH",
+			headers: { Prefer: "return=representation" },
+			body: JSON.stringify(patch),
 		});
 	}
 	async insert<T>(table: string, row: Record<string, unknown>) {
-		return this.rest<T[]>(`/${table}`, {method:"POST", headers:{Prefer:"return=representation"}, body:JSON.stringify(row)});
+		return this.rest<T[]>(`/${table}`, {
+			method: "POST",
+			headers: { Prefer: "return=representation" },
+			body: JSON.stringify(row),
+		});
 	}
 	async rpc<T>(name: string, body?: Record<string, unknown>) {
 		return this.rest<T>(`/rpc/${name}`, {

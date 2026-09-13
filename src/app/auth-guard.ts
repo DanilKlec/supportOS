@@ -1,8 +1,8 @@
 import { redirect } from "@tanstack/react-router";
-import { can, routePermission } from "../../shared/access.js";
-import { bootstrapAuth } from "./bootstrap";
-import { safeAuthRedirect } from "./auth-redirect";
 import { useAuthStore } from "@/store/auth.store";
+import { can, canAdmin, routePermission } from "../../shared/access.js";
+import { safeAuthRedirect } from "./auth-redirect";
+import { bootstrapAuth } from "./bootstrap";
 
 export async function requireAppAuth({
 	location,
@@ -11,6 +11,12 @@ export async function requireAppAuth({
 }) {
 	await bootstrapAuth();
 	const session = useAuthStore.getState().session;
+	if (
+		session &&
+		location.pathname.replace(/\/+$/, "") === "/admin" &&
+		!canAdmin(session.user.access)
+	)
+		throw redirect({ to: "/settings", replace: true });
 	if (
 		session &&
 		location.pathname.replace(/\/+$/, "") !== "/login" &&

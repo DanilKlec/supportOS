@@ -1,4 +1,5 @@
 import {requireUser} from '../_auth.js';
+import {safeKnowledgeTopic} from '../../shared/knowledge-gap.js';
 import {can} from '../../shared/access.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -22,7 +23,26 @@ export default async function handler(req,res) {
    return send(200,rows.map(row=>({id:row.id,sourceId:row.source_id,status:row.status,resolvedAt:row.resolved_at,title:row.translations?.[0]?.title??'Предложение'})));
   }
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
-  const branchAction=req.method==='GET'?({branches:'list',history:'history',proposals:'proposals'}[url.searchParams.get('action')]):(['share','revoke','choose','propose','accept','reject','withdraw'].includes(body.action)?body.action:null);
+  if(req.method==='GET'&&url.searchParams.get('action')==='quality-signals') {
+   if(!can(actor.access,'knowledge.write'))throw fail('Нет доступа к качеству',403);
+   const [feedback,gaps]=await Promise.all([db(env,'supportos_bind_feedback?select=bind_id,kind,updated_at&order=updated_at.desc&limit=100'),db(env,'supportos_knowledge_gaps?select=id,topic,project_id,created_at&order=created_at.desc&limit=100')]);
+   return send(200,{feedback,gaps});
+  }
+  if(req.method==='GET'&&url.searchParams.get('action')==='my-feedback')return send(200,await db(env,`supportos_bind_feedback?select=bind_id,kind&user_id=eq.${actor.id}&limit=1000`));
+  if(req.method==='POST'&&['feedback','gap'].includes(body.action)) {
+   let payload;
+   if(body.action==='gap') {
+    const topic=safeKnowledgeTopic(body.topic);
+    if(!topic)throw fail('Укажите короткую общую тему без персональных данных, номеров, ссылок и реквизитов');
+    if(body.projectId!=null&&(typeof body.projectId!=='string'||! /^[a-z0-9_-]{1,100}$/i.test(body.projectId)))throw fail('Некорректный проект');
+    payload={topic,projectId:body.projectId??null};
+   } else {
+    if(typeof body.bindId!=='string'||body.bindId.length>200||!['helpful','outdated'].includes(body.kind))throw fail('Некорректная отметка');
+    payload={bindId:body.bindId,kind:body.kind};
+   }
+   return send(200,await db(env,'rpc/supportos_knowledge_signal',{actor:actor.id,operation:body.action,payload}));
+  }
+  const branchAction=req.method==='GET'?({branches:'list',history:'history',proposals:'proposals'}[url.searchParams.get('action')]):(['share','revoke','decline','choose','propose','accept','reject','withdraw'].includes(body.action)?body.action:null);
   if(branchAction){
    const payload=req.method==='GET'?{sourceId:url.searchParams.get('source_id')}:{sourceId:body.sourceId,email:body.email,shareId:body.shareId,proposalId:body.proposalId,branch:body.branch,expected:body.expected};
    if(JSON.stringify(payload).length>2000)throw fail('Слишком длинный запрос');

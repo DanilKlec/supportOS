@@ -1,18 +1,3 @@
-import { ScheduleUpload } from "@/features/agent-monitor/ScheduleUpload";
-import { can } from "../../shared/access.js";
-import {
-	matchesRoster,
-	type RosterScope,
-} from "@/features/agent-monitor/schedule";
-import {
-	agentEmail,
-	isOnline,
-	matchesAgent,
-	statusEvents,
-} from "@/features/agent-monitor/analytics";
-import { supabaseService } from "@/services/supabase.service";
-import { useAuthStore } from "@/store/auth.store";
-import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import {
@@ -24,6 +9,12 @@ import {
 	Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+	agentEmail,
+	isOnline,
+	matchesAgent,
+	statusEvents,
+} from "@/features/agent-monitor/analytics";
 import {
 	csvCell,
 	currentShift,
@@ -41,6 +32,15 @@ import {
 	shifts,
 	zone,
 } from "@/features/agent-monitor/model";
+import { ScheduleUpload } from "@/features/agent-monitor/ScheduleUpload";
+import {
+	matchesRoster,
+	type RosterScope,
+} from "@/features/agent-monitor/schedule";
+import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { supabaseService } from "@/services/supabase.service";
+import { useAuthStore } from "@/store/auth.store";
+import { can } from "../../shared/access.js";
 
 export const Route = createFileRoute("/agent-monitor")({
 	component: AgentMonitor,

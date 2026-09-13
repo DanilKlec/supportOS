@@ -1,2 +1,7 @@
-import {createFileRoute,lazyRouteComponent} from "@tanstack/react-router";
-export const Route=createFileRoute("/bonus-tools")({component:lazyRouteComponent(()=>import("@/features/spaces/ReferencePage"),"ReferencePage")});
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+export const Route = createFileRoute("/bonus-tools")({
+	component: lazyRouteComponent(
+		() => import("@/features/spaces/ReferencePage"),
+		"ReferencePage",
+	),
+});

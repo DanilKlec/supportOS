@@ -46,6 +46,8 @@ export interface StoredAssistantData {
 }
 
 export interface GenerateAnswerRequest {
+	purpose?: "composer";
+	project?: string;
 	customerMessage: string;
 	context: string;
 	referenceAnswer?: string;
@@ -502,6 +504,8 @@ async function generateWithAI(request: GenerateAnswerRequest) {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
+			project: request.project,
+			purpose: request.purpose,
 			customerMessage: request.customerMessage,
 			context: request.context,
 			referenceAnswer: request.referenceAnswer ?? "",
@@ -514,9 +518,7 @@ async function generateWithAI(request: GenerateAnswerRequest) {
 			memory: memoryMatches,
 		}),
 	});
-	const data = (await response
-		.json()
-		.catch(() => ({}))) as AIGenerateResponse;
+	const data = (await response.json().catch(() => ({}))) as AIGenerateResponse;
 
 	if (!response.ok || data.error) {
 		if (response.status === 429) {
@@ -672,7 +674,9 @@ class AnswerAssistantService {
 		};
 
 		if (!response.ok) {
-			throw new Error(data.error || `AI provider returned HTTP ${response.status}`);
+			throw new Error(
+				data.error || `AI provider returned HTTP ${response.status}`,
+			);
 		}
 
 		if (!data.configured) {

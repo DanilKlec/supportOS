@@ -4,7 +4,7 @@ export function safeAuthRedirect(value: unknown): string {
 		typeof value !== "string" ||
 		!value.startsWith("/") ||
 		value.startsWith("//") ||
-		/[\\\x00-\x20]/.test(value)
+		Array.from(value).some((char) => char === "\\" || char.charCodeAt(0) <= 32)
 	)
 		return "/";
 	try {

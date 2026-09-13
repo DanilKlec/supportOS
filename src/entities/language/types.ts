@@ -1,9 +1,9 @@
 export interface Language {
-  code: string
+	code: string;
 
-  name: string
+	name: string;
 
-  flag: string
+	flag: string;
 
-  enabled: boolean
+	enabled: boolean;
 }

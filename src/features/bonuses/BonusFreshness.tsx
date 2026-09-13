@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { bonusStatus, localDate, type Freshness } from "./bonus-freshness";
+import { bonusStatus, type Freshness, localDate } from "./bonus-freshness";
 export function BonusFreshness({
 	bonus,
 	canEdit = false,

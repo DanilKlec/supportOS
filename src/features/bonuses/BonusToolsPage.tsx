@@ -1,4 +1,3 @@
-import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	Copy,
 	FileSpreadsheet,
@@ -18,6 +17,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { useSharedPublication } from "@/components/SharedPublication";
 
 import {
 	type BonusRule,

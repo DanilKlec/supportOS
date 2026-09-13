@@ -57,10 +57,14 @@ export function PasswordPanel() {
 				onChange={(e) => setRepeat(e.target.value)}
 				disabled={busy}
 			/>
-			<button className="rounded border border-border p-2" disabled={busy}>
+			<button
+				type="submit"
+				className="rounded border border-border p-2"
+				disabled={busy}
+			>
 				Изменить пароль
 			</button>
-			{message && <p role="status">{message}</p>}
+			{message && <output>{message}</output>}
 		</form>
 	);
 }

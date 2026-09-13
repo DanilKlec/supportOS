@@ -25,6 +25,25 @@ it('isolates shared branches, revokes access and protects publication and histor
  expect((await action(b,'list')).incoming).toHaveLength(0);
  expect((await action(b,'list')).choices.common).toBeUndefined();
  await expect(action(b,'choose',{sourceId,branch:share.id})).rejects.toThrow('Ветка недоступна');
+ const again=await action(a,'share',{sourceId,email:`${b}@example.com`});
+ expect((await action(a,'share',{sourceId,email:`${b}@example.com`})).id).toBe(again.id);
+ const otherRecipient=await action(a,'share',{sourceId,email:`${admin}@example.com`});
+ await expect(action(a,'decline',{shareId:again.id})).rejects.toThrow('Нет доступа');
+ await expect(action(admin,'decline',{shareId:again.id})).rejects.toThrow('Нет доступа');
+ await action(b,'choose',{sourceId,branch:again.id});
+ await action(b,'decline',{shareId:again.id});
+ expect((await action(b,'list')).incoming).toHaveLength(0);
+ expect((await action(b,'list')).choices.common).toBeUndefined();
+ expect((await action(admin,'list')).incoming.map(s=>s.id)).toContain(otherRecipient.id);
+ expect((await pg.query("select id from supportos_binds where id='common' or owner_id=$1",[a])).rows).toHaveLength(2);
+ // With several incoming versions, declining one must retain the others and the recipient's own copy.
+ for(const actor of [admin,b])await pg.query("select supportos_personal_bind_change($1,$1,'common','save',$2)",[actor,JSON.stringify({translations:[{language:'ru',title:'Own',content:'Own text'}],tags:[],expected:null})]);
+ const fromAdmin=await action(admin,'share',{sourceId,email:`${b}@example.com`});
+ const fromA=await action(a,'share',{sourceId,email:`${b}@example.com`});
+ await action(b,'choose',{sourceId,branch:fromA.id});await action(b,'decline',{shareId:fromA.id});
+ expect((await action(b,'list')).incoming.map(s=>s.id)).toEqual([fromAdmin.id]);
+ expect((await action(b,'list')).choices.common).toBeUndefined();
+ expect((await pg.query('select id from supportos_binds where owner_id=$1',[b])).rows).toHaveLength(1);
  const expected=(await pg.query("select updated_at::text t from supportos_binds where id='common'")).rows[0].t;
  const proposal=await action(a,'propose',{sourceId,expected});
  expect(await action(b,'proposals')).toEqual([]);

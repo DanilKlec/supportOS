@@ -205,3 +205,8 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
 .accounts-registry td[data-label]::before {content:attr(data-label);min-width:64px;font-size:11px;opacity:.65;}
 .accounts-registry td > * {min-width:0;}
 }
+@media (min-width: 1024px) {
+ .composer-panel { width: var(--composer-width, 420px); max-width: 55vw; }
+ [data-density="compact"] .workspace-main { font-size: 0.875rem; }
+ [data-density="compact"] .space-tab { padding-block: 0.4rem; }
+}

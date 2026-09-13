@@ -25,6 +25,7 @@ import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
 import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as AgentMonitorRouteImport } from './routes/agent-monitor'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsUsersRouteImport } from './routes/settings/users'
@@ -115,6 +116,11 @@ const AgentMonitorRoute = AgentMonitorRouteImport.update({
   path: '/agent-monitor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -163,6 +169,7 @@ const AiAssistantRoute = AiAssistantRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
@@ -218,6 +226,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/agent-monitor'
     | '/archive'
     | '/binds'
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/agent-monitor'
     | '/archive'
     | '/binds'
@@ -301,6 +312,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/agent-monitor'
     | '/archive'
     | '/binds'
@@ -329,6 +341,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AgentMonitorRoute: typeof AgentMonitorRoute
   ArchiveRoute: typeof ArchiveRoute
   BindsRoute: typeof BindsRoute
@@ -469,6 +482,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentMonitorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -537,6 +557,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AgentMonitorRoute: AgentMonitorRoute,
   ArchiveRoute: ArchiveRoute,
   BindsRoute: BindsRoute,

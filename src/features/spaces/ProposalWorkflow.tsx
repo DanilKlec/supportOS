@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { BindProposals } from "@/features/shared-binds/BindProposals";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -23,6 +23,7 @@ export function ProposalWorkflow() {
 					["mine", "Мои"],
 				].map(([id, label]) => (
 					<button
+						type="button"
 						key={id}
 						className="space-tab"
 						aria-pressed={mode === id}
@@ -44,7 +45,9 @@ export function ProposalWorkflow() {
 					) : results.error ? (
 						<p role="alert">
 							Не удалось загрузить результаты.{" "}
-							<button onClick={() => void results.refetch()}>Повторить</button>
+							<button type="button" onClick={() => void results.refetch()}>
+								Повторить
+							</button>
 						</p>
 					) : results.data?.filter((r) => r.status === mode).length ? (
 						<ul>

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
 	fireEvent,
@@ -6,10 +8,11 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
+
 const mock = vi.hoisted(() => ({
+	accounts: vi.fn(),
 	list: vi.fn(),
 	branches: vi.fn(),
 	proposals: vi.fn(),
@@ -21,16 +24,21 @@ const mock = vi.hoisted(() => ({
 	savePersonal: vi.fn(),
 	resetPersonal: vi.fn(),
 }));
+vi.mock("@/services/authenticated-fetch", () => ({
+	authenticatedFetch: mock.accounts,
+}));
 vi.mock("@/services/shared-binds.service", () => ({
 	sharedBindsService: mock,
 }));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
+
 import {
-	WorkspaceSharedBindViewer,
 	matchLocalBind,
+	WorkspaceSharedBindViewer,
 } from "./WorkspaceSharedBinds";
+
 const base = {
 	id: "common",
 	favorite: false,
@@ -52,7 +60,7 @@ const base = {
 };
 beforeEach(() => {
 	vi.resetAllMocks();
- localStorage.clear();
+	localStorage.clear();
 	useAuthStore.setState({
 		session: {
 			accessToken: "test",
@@ -73,6 +81,10 @@ beforeEach(() => {
 	mock.branches.mockResolvedValue({ choices: {}, incoming: [], outgoing: [] });
 	mock.proposals.mockResolvedValue([]);
 	mock.history.mockResolvedValue([]);
+	mock.accounts.mockResolvedValue({
+		ok: true,
+		json: async () => ({ users: [], hasMore: false }),
+	});
 	mock.branchAction.mockResolvedValue({ ok: true });
 	mock.list.mockResolvedValue([base]);
 	mock.personal.mockResolvedValue([]);
@@ -200,7 +212,7 @@ it("offers sharing before a personal branch exists", async () => {
 	show();
 	fireEvent.click(await screen.findByRole("button", { name: "Поделиться" }));
 	expect(
-		screen.getByRole("textbox", { name: "Почта сотрудника" }),
+		screen.getByRole("textbox", { name: "Поиск по имени или email" }),
 	).toBeTruthy();
 });
 
@@ -264,33 +276,152 @@ it("requires reviewing the exact common draft before publishing", async () => {
 	);
 });
 
-it('recovers a personal draft after remount and removes it after successful save',async()=>{
- const {SharedBindEditor}=await import('./SharedBindsPage');
- const save=vi.fn().mockResolvedValue(base);
- const first=render(<SharedBindEditor personal original={base} save={save} onClose={()=>{}} onSaved={()=>{}}/>);
- fireEvent.change(screen.getByLabelText('Текст ответа'),{target:{value:'Не терять этот текст'}});
- await screen.findByText('Черновик сохранён в этом браузере');
- first.unmount();
- const second=render(<SharedBindEditor personal original={base} save={save} onClose={()=>{}} onSaved={()=>{}}/>);
- fireEvent.click(screen.getByRole('button',{name:'Восстановить черновик'}));
- expect((screen.getByLabelText('Текст ответа') as HTMLTextAreaElement).value).toBe('Не терять этот текст');
- fireEvent.click(screen.getByRole('button',{name:'Сохранить личную версию'}));
- await waitFor(()=>expect(save).toHaveBeenCalled());
- second.unmount();
- render(<SharedBindEditor personal original={base} save={save} onClose={()=>{}} onSaved={()=>{}}/>);
- expect(screen.queryByText('Найден несохранённый черновик')).toBeNull();
+it("recovers a personal draft after remount and removes it after successful save", async () => {
+	const { SharedBindEditor } = await import("./SharedBindsPage");
+	const save = vi.fn().mockResolvedValue(base);
+	const first = render(
+		<SharedBindEditor
+			personal
+			original={base}
+			save={save}
+			onClose={() => {}}
+			onSaved={() => {}}
+		/>,
+	);
+	fireEvent.change(screen.getByLabelText("Текст ответа"), {
+		target: { value: "Не терять этот текст" },
+	});
+	await screen.findByText("Черновик сохранён в этом браузере");
+	first.unmount();
+	const second = render(
+		<SharedBindEditor
+			personal
+			original={base}
+			save={save}
+			onClose={() => {}}
+			onSaved={() => {}}
+		/>,
+	);
+	fireEvent.click(
+		screen.getByRole("button", { name: "Восстановить черновик" }),
+	);
+	expect(
+		(screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value,
+	).toBe("Не терять этот текст");
+	fireEvent.click(
+		screen.getByRole("button", { name: "Сохранить личную версию" }),
+	);
+	await waitFor(() => expect(save).toHaveBeenCalled());
+	second.unmount();
+	render(
+		<SharedBindEditor
+			personal
+			original={base}
+			save={save}
+			onClose={() => {}}
+			onSaved={() => {}}
+		/>,
+	);
+	expect(screen.queryByText("Найден несохранённый черновик")).toBeNull();
 });
 
-it('keeps personal edits on conflict and retries against the explicitly reviewed version',async()=>{
- const latest={...base,id:'personal',sourceBindId:'common',updatedAt:'2026-09-12T10:00:00Z'};
- mock.personal.mockResolvedValue([latest]);
- mock.savePersonal.mockRejectedValueOnce(Object.assign(new Error('Conflict'),{status:409})).mockResolvedValue(latest);
- show();fireEvent.click(await screen.findByRole('button',{name:'Изменить для себя'}));
- fireEvent.change(screen.getByLabelText('Текст ответа'),{target:{value:'Мои изменения'}});
- fireEvent.click(screen.getByRole('button',{name:'Сохранить личную версию'}));
- fireEvent.click(await screen.findByRole('button',{name:'Продолжить с моими правками'}));
- expect((screen.getByLabelText('Текст ответа') as HTMLTextAreaElement).value).toBe('Мои изменения');
- fireEvent.click(screen.getByRole('button',{name:'Сохранить личную версию'}));
- await waitFor(()=>expect(mock.savePersonal).toHaveBeenCalledTimes(2));
- expect(mock.savePersonal.mock.calls[1][0].original.updatedAt).toBe(latest.updatedAt);
+it("keeps personal edits on conflict and retries against the explicitly reviewed version", async () => {
+	const latest = {
+		...base,
+		id: "personal",
+		sourceBindId: "common",
+		updatedAt: "2026-09-12T10:00:00Z",
+	};
+	mock.personal.mockResolvedValue([latest]);
+	mock.savePersonal
+		.mockRejectedValueOnce(
+			Object.assign(new Error("Conflict"), { status: 409 }),
+		)
+		.mockResolvedValue(latest);
+	show();
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Изменить для себя" }),
+	);
+	fireEvent.change(screen.getByLabelText("Текст ответа"), {
+		target: { value: "Мои изменения" },
+	});
+	fireEvent.click(
+		screen.getByRole("button", { name: "Сохранить личную версию" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Продолжить с моими правками" }),
+	);
+	expect(
+		(screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value,
+	).toBe("Мои изменения");
+	fireEvent.click(
+		screen.getByRole("button", { name: "Сохранить личную версию" }),
+	);
+	await waitFor(() => expect(mock.savePersonal).toHaveBeenCalledTimes(2));
+	expect(mock.savePersonal.mock.calls[1][0].original.updatedAt).toBe(
+		latest.updatedAt,
+	);
+});
+it.each([
+	false,
+	true,
+])("declines only the selected received version and restores own=%s", async (hasOwn) => {
+	const own = {
+		...base,
+		id: "own",
+		ownerId: "support",
+		sourceBindId: "common",
+		translations: [
+			{ language: "ru", title: "Личный fallback", content: "Мой текст" },
+		],
+	};
+	mock.personal.mockResolvedValue(hasOwn ? [own] : []);
+	const incoming = {
+		id: "received",
+		sourceId: "common",
+		sender: "Автор",
+		bind: {
+			...base,
+			id: "authors",
+			translations: [
+				{
+					language: "ru",
+					title: "Полученная версия",
+					content: "Авторский текст",
+				},
+			],
+		},
+	};
+	mock.branches.mockResolvedValue({
+		choices: { common: "received" },
+		incoming: [incoming],
+		outgoing: [],
+	});
+	mock.branchAction.mockImplementation(async (action) => {
+		if (action === "decline")
+			mock.branches.mockResolvedValue({
+				choices: {},
+				incoming: [],
+				outgoing: [],
+			});
+		return { ok: true };
+	});
+	show();
+	await screen.findByRole("heading", { name: "Полученная версия", level: 1 });
+	const menu = screen.getByText("Ещё ···").closest("details");
+	if (menu) menu.open = true;
+	fireEvent.click(screen.getByRole("button", { name: "Отказаться от версии" }));
+	expect(
+		screen.getByRole("dialog", { name: "Отказаться от версии?" }),
+	).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Отказаться" }));
+	await screen.findByRole("heading", {
+		name: hasOwn ? "Личный fallback" : "Общий ответ",
+		level: 1,
+	});
+	expect(mock.branchAction).toHaveBeenCalledWith("decline", {
+		shareId: "received",
+	});
+	expect(mock.save).not.toHaveBeenCalled();
+	expect(mock.resetPersonal).not.toHaveBeenCalled();
 });

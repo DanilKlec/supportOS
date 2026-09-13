@@ -1,31 +1,27 @@
 import { create } from "zustand";
 
 interface SettingsState {
-  theme: "dark" | "light";
+	theme: "dark" | "light";
 
-  compactMode: boolean;
+	compactMode: boolean;
 
-  toggleTheme: () => void;
+	toggleTheme: () => void;
 
-  toggleCompact: () => void;
+	toggleCompact: () => void;
 }
 
-export const useSettingsStore =
-  create<SettingsState>((set) => ({
-    theme: "dark",
+export const useSettingsStore = create<SettingsState>((set) => ({
+	theme: "dark",
 
-    compactMode: false,
+	compactMode: false,
 
-    toggleTheme: () =>
-      set((state) => ({
-        theme:
-          state.theme === "dark"
-            ? "light"
-            : "dark",
-      })),
+	toggleTheme: () =>
+		set((state) => ({
+			theme: state.theme === "dark" ? "light" : "dark",
+		})),
 
-    toggleCompact: () =>
-      set((state) => ({
-        compactMode: !state.compactMode,
-      })),
-  }));
+	toggleCompact: () =>
+		set((state) => ({
+			compactMode: !state.compactMode,
+		})),
+}));

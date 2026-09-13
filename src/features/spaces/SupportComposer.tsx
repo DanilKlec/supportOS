@@ -1,18 +1,22 @@
-import { searchBinds, getBindTitle } from "@/shared/lib/bind-search";
-import { useState, useEffect, useRef } from "react";
-import { useRouterState, useNavigate } from "@tanstack/react-router";
-import { useKnowledgeStore, useWorkspaceStore } from "@/store";
-import { useBonusStore } from "@/store/bonus.store";
-import { useAuthStore } from "@/store/auth.store";
-import { can } from "../../../shared/access.js";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { AIFeedback } from "@/features/admin/AIFeedback";
+import { AnswerAssistantPage } from "@/features/ai/AnswerAssistantPage";
+import { usePreference } from "@/features/productivity/preferences";
 import {
 	answerAssistantService,
 	type CheckIssue,
 } from "@/services/answer-assistant.service";
 import { translatorService } from "@/services/translator.service";
-import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useToast } from "@/shared/hooks/useToast";
-import { AnswerAssistantPage } from "@/features/ai/AnswerAssistantPage";
+import { useViewState } from "@/shared/hooks/useViewState";
+import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { useBonusStore } from "@/store/bonus.store";
+import { can } from "../../../shared/access.js";
+
 const modes = [
 	["answer", "Ответ"],
 	["translate", "Перевод"],
@@ -26,19 +30,64 @@ export function SupportComposer() {
 	const navigate = useNavigate();
 	const showLauncher = useWorkspaceStore((s) => s.layout.showTranslatorWidget);
 	const access = useAuthStore((s) => s.session?.user.access);
-	const [expanded, setExpanded] = useState(false);
-	const [mode, setMode] = useState("answer");
-	const [input, setInput] = useState("");
-	const [output, setOutput] = useState("");
-	const [language, setLanguage] = useState("en");
-	const [fromLanguage, setFromLanguage] = useState("auto");
-	const [liveTranslate, setLiveTranslate] = useState(false);
+	const projectId = useBonusStore((s) => s.activeProjectId);
+	const projects = useBonusStore((s) => s.projects);
+	const preferredMaterialLanguage = useKnowledgeStore((s) => s.language);
+	const [tone, setTone] = usePreference<
+		import("@/services/answer-assistant.service").AnswerTone
+	>(`composer-tone:${projectId ?? "all"}`, "neutral");
+	const [expanded, setExpanded] = useViewState("composer", "expanded", false);
+	const [mode, setMode] = usePreference("composer-mode", "answer");
+	const [input, setInput] = useViewState("composer", "input", "");
+	const [output, setOutput] = useViewState("composer", "output", "");
+	const [language, setLanguage] = usePreference(
+		`composer-language:${projectId ?? "all"}`,
+		preferredMaterialLanguage as string,
+	);
+	const [fromLanguage, setFromLanguage] = usePreference(
+		"composer-source-language",
+		"auto",
+	);
+	const [liveTranslate, setLiveTranslate] = useViewState(
+		"composer",
+		"live",
+		false,
+	);
 	const liveSignature = useRef("");
+	const requestVersion = useRef(0);
+	useEffect(
+		() => () => {
+			requestVersion.current++;
+		},
+		[],
+	);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [issues, setIssues] = useState<CheckIssue[]>([]);
 	const [checked, setChecked] = useState(false);
 	const [advanced, setAdvanced] = useState(false);
+	useEffect(() => {
+		const select = (event: Event) => {
+			const detail = (event as CustomEvent<{ text: string; mode: string }>)
+				.detail;
+			if (
+				!can(access, "composer.use") ||
+				!detail ||
+				typeof detail.text !== "string" ||
+				detail.text.length > 5000 ||
+				!["translate", "rewrite", "check"].includes(detail.mode)
+			)
+				return;
+			setInput(detail.text);
+			setOutput("");
+			setMode(detail.mode);
+			setExpanded(true);
+			void navigate({ to: "/", hash: `composer-${detail.mode}` });
+		};
+		window.addEventListener("supportos:compose-selection", select);
+		return () =>
+			window.removeEventListener("supportos:compose-selection", select);
+	}, [access, setInput, setOutput, setMode, setExpanded, navigate]);
 	const {
 		binds,
 		remoteBinds,
@@ -48,21 +97,32 @@ export function SupportComposer() {
 	const project = useBonusStore((s) =>
 		s.projects.find((p) => p.id === s.activeProjectId),
 	);
-	const bind = [...binds, ...remoteBinds].find((b) => b.id === activeTab);
+	const [sourceId, setSourceId] = useViewState<string | undefined>(
+		"composer",
+		"source",
+		undefined,
+	);
+	const bind = [...binds, ...remoteBinds].find(
+		(b) => b.id === (sourceId ?? activeTab),
+	);
 	const translation =
 		bind?.translations.find((t) => t.language === bindLanguage) ??
 		bind?.translations[0];
 	const { showToast } = useToast();
 	useEffect(() => {
 		const close = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
+			if (
+				e.key === "Escape" &&
+				!e.defaultPrevented &&
+				!document.querySelector('[aria-modal="true"]')
+			) {
 				setExpanded(false);
 				if (hash.startsWith("composer")) void navigate({ to: "/", hash: "" });
 			}
 		};
 		window.addEventListener("keydown", close);
 		return () => window.removeEventListener("keydown", close);
-	}, [hash, navigate]);
+	}, [hash, navigate, setExpanded]);
 	const requested = hash.startsWith("composer");
 	const open = expanded || requested;
 	const activeMode = requested ? hash.split("-")[1] || mode : mode;
@@ -81,7 +141,23 @@ export function SupportComposer() {
 	]
 		.filter(Boolean)
 		.join("\n\n");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: all case inputs invalidate in-flight responses and checks.
+	useEffect(() => {
+		requestVersion.current++;
+		setBusy(false);
+		setChecked(false);
+	}, [
+		input,
+		language,
+		fromLanguage,
+		activeMode,
+		sourceId,
+		activeTab,
+		projectId,
+		tone,
+	]);
 	async function run() {
+		const version = ++requestVersion.current;
 		setBusy(true);
 		setError("");
 		setIssues([]);
@@ -89,11 +165,14 @@ export function SupportComposer() {
 		try {
 			const data = answerAssistantService.load();
 			if (activeMode === "translate") {
+				if (!can(access, "translator.use"))
+					throw new Error("Нет доступа к переводчику");
 				const result = await translatorService.translate({
 					text: input,
 					fromLanguage,
 					toLanguage: language,
 				});
+				if (version !== requestVersion.current) return;
 				setOutput(result.text);
 			} else if (activeMode === "check") {
 				setChecked(true);
@@ -107,6 +186,8 @@ export function SupportComposer() {
 				);
 			} else {
 				const result = await answerAssistantService.generateReadyAnswer({
+					project: projectId,
+					purpose: "composer",
 					customerMessage:
 						activeMode === "rewrite"
 							? "Перепиши исходный ответ яснее, сохраняя факты и ограничения."
@@ -117,6 +198,7 @@ export function SupportComposer() {
 					responseStyle: activeMode === "rewrite" ? "expanded-bind" : undefined,
 					settings: {
 						...data.settings,
+						tone,
 						language,
 						aiEnabled:
 							activeMode === "rewrite" ? true : data.settings.aiEnabled,
@@ -124,16 +206,19 @@ export function SupportComposer() {
 					glossary: data.glossary,
 					memory: data.memory,
 				});
+				if (version !== requestVersion.current) return;
 				setOutput(result.answer);
 				setIssues(result.issues);
 				if (result.warning) setError(result.warning);
 			}
 		} catch (e) {
+			if (version !== requestVersion.current) return;
 			setError(e instanceof Error ? e.message : "Не удалось подготовить ответ");
 		} finally {
-			setBusy(false);
+			if (version === requestVersion.current) setBusy(false);
 		}
 	}
+	const runLive = useEffectEvent(run);
 	useEffect(() => {
 		if (
 			!liveTranslate ||
@@ -146,11 +231,11 @@ export function SupportComposer() {
 		if (signature === liveSignature.current) return;
 		const timer = setTimeout(() => {
 			liveSignature.current = signature;
-			void run();
+			void runLive();
 		}, 500);
 		return () => clearTimeout(timer);
 	}, [liveTranslate, input, language, fromLanguage, activeMode, pathname]);
-	if (pathname !== "/" || !can(access, "tools")) return null;
+	if (pathname !== "/" || !can(access, "composer.use")) return null;
 	return (
 		<>
 			{showLauncher && (
@@ -164,12 +249,41 @@ export function SupportComposer() {
 			)}
 			{open && (
 				<aside
+					onKeyDown={(event) => {
+						if (
+							(event.ctrlKey || event.metaKey) &&
+							event.key === "Enter" &&
+							!busy &&
+							input.trim()
+						) {
+							event.preventDefault();
+							void run();
+						}
+					}}
 					aria-label="Support Composer"
 					className="composer-panel absolute inset-0 z-30 flex min-h-0 flex-col border-l border-border bg-surface shadow-xl lg:relative lg:inset-auto lg:w-[420px] lg:shrink-0"
 				>
 					<header className="flex items-center justify-between p-3">
 						<h2 className="font-semibold">Support Composer</h2>
 						<button
+							type="button"
+							className="min-h-10 px-3 text-sm"
+							onClick={() => {
+								requestVersion.current++;
+								setInput("");
+								setSourceId("");
+								setOutput("");
+								setIssues([]);
+								setError("");
+								setChecked(false);
+								setBusy(false);
+								setLiveTranslate(false);
+							}}
+						>
+							Новый кейс
+						</button>
+						<button
+							type="button"
 							className="min-h-10 px-3"
 							aria-label="Закрыть Composer"
 							onClick={() => {
@@ -183,7 +297,9 @@ export function SupportComposer() {
 					<nav className="flex overflow-auto px-2" aria-label="Режим Composer">
 						{modes.map(([id, label]) => (
 							<button
+								type="button"
 								key={id}
+								disabled={id === "translate" && !can(access, "translator.use")}
 								className="space-tab"
 								aria-pressed={activeMode === id}
 								onClick={() => {
@@ -197,12 +313,52 @@ export function SupportComposer() {
 						))}
 					</nav>
 					<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 space-y-3">
+						<label className="block text-sm">
+							Проект
+							<select
+								className="ml-2 max-w-full rounded border border-border bg-background p-2"
+								value={projectId ?? ""}
+								onChange={(e) =>
+									useBonusStore
+										.getState()
+										.setActiveProject(e.target.value || undefined)
+								}
+							>
+								<option value="">Все проекты</option>
+								{projects.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="block text-sm">
+							Тон
+							<select
+								className="ml-2 rounded border border-border bg-background p-2"
+								value={tone}
+								onChange={(e) => setTone(e.target.value as typeof tone)}
+							>
+								<option value="neutral">Нейтральный</option>
+								<option value="friendly">Дружелюбный</option>
+								<option value="formal">Формальный</option>
+								<option value="concise">Краткий</option>
+							</select>
+						</label>
 						<p className="text-xs text-muted">
 							{project?.name ?? "Проект не выбран"} ·{" "}
 							{translation?.title ?? "Материал не выбран"}
 						</p>
 						{activeMode === "sources" ? (
 							<div>
+								<button
+									type="button"
+									disabled={!activeTab}
+									className="min-h-10 px-3 text-sm"
+									onClick={() => setSourceId(activeTab)}
+								>
+									Использовать открытый материал
+								</button>
 								<p className="whitespace-pre-wrap text-sm">
 									{translation
 										? context
@@ -214,11 +370,13 @@ export function SupportComposer() {
 								{suggestions.length ? (
 									suggestions.map((b) => (
 										<button
+											type="button"
 											key={b.id}
 											className="block w-full border-b border-border py-3 text-left text-sm"
-											onClick={() =>
-												useKnowledgeStore.getState().openBind(b.id)
-											}
+											onClick={() => {
+												setSourceId(b.id);
+												useKnowledgeStore.getState().openBind(b.id);
+											}}
 										>
 											{getBindTitle(b, bindLanguage)}
 										</button>
@@ -289,6 +447,7 @@ export function SupportComposer() {
 											Автоперевод
 										</label>
 										<button
+											type="button"
 											className="space-tab"
 											disabled={!output}
 											onClick={() => {
@@ -305,6 +464,7 @@ export function SupportComposer() {
 									</div>
 								)}
 								<button
+									type="button"
 									disabled={
 										busy ||
 										!(input.trim() || (activeMode === "check" && output.trim()))
@@ -336,6 +496,7 @@ export function SupportComposer() {
 									/>
 								</label>
 								<button
+									type="button"
 									disabled={!output.trim()}
 									className="space-tab"
 									onClick={async () =>
@@ -349,10 +510,18 @@ export function SupportComposer() {
 									Копировать
 								</button>
 								{checked && !issues.length && (
-									<p role="status" className="text-sm text-muted">
+									<output className="text-sm text-muted">
 										Проверка завершена: известных проблем не обнаружено.
-									</p>
+									</output>
 								)}
+								{output && (
+									<AIFeedback
+										key={`${output}:${projectId}`}
+										project={projectId}
+										language={language}
+									/>
+								)}
+
 								{issues.map((i) => (
 									<div
 										className="border-l-2 border-accent pl-3 text-sm"
@@ -363,6 +532,7 @@ export function SupportComposer() {
 									</div>
 								))}
 								<button
+									type="button"
 									className="text-xs underline"
 									onClick={() => setAdvanced(!advanced)}
 									aria-expanded={advanced}

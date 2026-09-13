@@ -1,5 +1,3 @@
-import { useViewState } from "@/shared/hooks/useViewState";
-import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	CheckCircle2,
 	Copy,
@@ -14,7 +12,7 @@ import {
 	X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-
+import { useSharedPublication } from "@/components/SharedPublication";
 import type { ProjectEmailRecord } from "@/entities/project-email";
 import {
 	type ProjectEmailImportMode,
@@ -22,7 +20,9 @@ import {
 	projectEmailImportService,
 } from "@/services/project-email-import.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { useViewState } from "@/shared/hooks/useViewState";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { useBonusStore } from "@/store/bonus.store";
 import { useProjectEmailStore } from "@/store/project-email.store";
 
 interface EmailDraft {
@@ -114,6 +114,20 @@ export function ProjectEmailsPage({
 		management,
 	);
 	const canEdit = publication.canEdit;
+	const workspaceProject = useBonusStore(
+		(s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? "",
+	);
+	const [projectFilter, setProjectFilter] = useViewState(
+		`emails:${management}`,
+		"project-filter",
+		management ? "all" : "context",
+	);
+	const projectName =
+		projectFilter === "context"
+			? workspaceProject
+			: projectFilter === "all"
+				? ""
+				: projectFilter;
 	const [query, setQuery] = useViewState(`emails:${management}`, "query", "");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 	const [editingId, setEditingId] = useState<string>();
@@ -134,26 +148,28 @@ export function ProjectEmailsPage({
 	const filteredRecords = useMemo(() => {
 		const value = query.trim().toLowerCase();
 
-		if (!value) return records;
-
-		return records.filter((record) =>
-			[
-				record.projectName,
-				record.supportEmail,
-				record.kycEmail,
-				record.vipEmail,
-			]
-				.join(" ")
-				.toLowerCase()
-				.includes(value),
-		);
-	}, [records, query]);
+		return records
+			.filter(
+				(record) =>
+					!projectName ||
+					record.projectName.toLowerCase() === projectName.toLowerCase(),
+			)
+			.filter((record) =>
+				[
+					record.projectName,
+					record.supportEmail,
+					record.kycEmail,
+					record.vipEmail,
+				]
+					.join(" ")
+					.toLowerCase()
+					.includes(value),
+			);
+	}, [records, query, projectName]);
 
 	const selectedRecord =
 		filteredRecords.find((record) => record.id === selectedId) ??
-		records.find((record) => record.id === selectedId) ??
-		filteredRecords[0] ??
-		records[0];
+		filteredRecords[0];
 	const deleteTarget = records.find((record) => record.id === deleteId);
 
 	const resetForm = () => {
@@ -294,6 +310,33 @@ export function ProjectEmailsPage({
 	return (
 		<div className="supportos-page-scroll min-h-0 flex-1 overflow-y-auto bg-background">
 			{publication.banner}
+			<label className="flex flex-wrap items-center gap-2 px-3 pt-3 text-sm">
+				Проект
+				<select
+					className="min-h-10 rounded-lg border border-border bg-background px-3"
+					value={projectFilter}
+					onChange={(e) => {
+						setProjectFilter(e.target.value);
+						setSelectedId(undefined);
+					}}
+				>
+					<option value="context">
+						Рабочий проект
+						{workspaceProject ? `: ${workspaceProject}` : ": все проекты"}
+					</option>
+					<option value="all">Все проекты</option>
+					{records.map((record) => (
+						<option key={record.id} value={record.projectName}>
+							{record.projectName}
+						</option>
+					))}
+				</select>
+				{query && (
+					<button type="button" onClick={() => setQuery("")}>
+						Сбросить поиск
+					</button>
+				)}
+			</label>
 			<div className="grid min-h-full w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6">
 				<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">

@@ -23,7 +23,7 @@ export async function requireUser(request, { supervisor = false, permission = 'w
 export async function authorize(request, response) {
  if (request.method === 'OPTIONS') return true;
  response.setHeader('Cache-Control', 'private, no-store');
- try { const path=new URL(request.url??'/','http://localhost').pathname; await requireUser(request,{permission:/^\/api\/(ai|translator|sports-betting)(\/|$)/.test(path)?'tools':'work'}); return true; }
+ try { const path=new URL(request.url??'/','http://localhost').pathname; await requireUser(request,{permission:/^\/api\/translator(\/|$)/.test(path)?'translator.use':/^\/api\/sports-betting(\/|$)/.test(path)?'tools':'work'}); return true; }
  catch (error) {
   response.statusCode = error.status ?? 503;
   response.setHeader('Content-Type', 'application/json; charset=utf-8');

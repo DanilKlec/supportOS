@@ -1,4 +1,3 @@
-import { useViewState } from "@/shared/hooks/useViewState";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	Archive,
@@ -15,17 +14,17 @@ import {
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
+import { usePreference } from "@/features/productivity/preferences";
+import { WorkspaceSharedTree } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { useViewState } from "@/shared/hooks/useViewState";
 import { scoreTextSearch } from "@/shared/lib/bind-search";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
-
 import { Tree } from "./Tree";
-import { WorkspaceSharedTree } from "@/features/shared-binds/WorkspaceSharedBinds";
 
 function getBindTitle(bind: Bind, language: string) {
 	return (
@@ -116,6 +115,7 @@ export function Sidebar({
 	onNavigate,
 }: SidebarProps) {
 	const navigate = useNavigate();
+	const [sidebarPixels] = usePreference("sidebar-pixels", 300);
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
@@ -320,6 +320,11 @@ export function Sidebar({
 
 	return (
 		<aside
+			style={
+				mobile
+					? undefined
+					: { width: Math.min(480, Math.max(240, sidebarPixels)) }
+			}
 			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface/40 pb-[env(safe-area-inset-bottom)]`}
 		>
 			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">

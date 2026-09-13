@@ -1,5 +1,3 @@
-import { BonusFreshness } from "./BonusFreshness";
-import { useSharedPublication } from "@/components/SharedPublication";
 import {
 	CheckCircle2,
 	Copy,
@@ -20,7 +18,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
-
+import { useSharedPublication } from "@/components/SharedPublication";
 import type {
 	BonusProject,
 	DepositBonus,
@@ -40,6 +38,7 @@ import {
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useBonusStore } from "@/store/bonus.store";
+import { BonusFreshness } from "./BonusFreshness";
 
 interface BonusDraft {
 	name: string;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
 const fixture = vi.hoisted(() => ({
 	auth: {
 		getSession: vi.fn(),
@@ -22,7 +23,23 @@ const session = {
 	},
 };
 beforeEach(async () => {
-	vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({access:{status:'active',roles:[{id:'support',name:'Support'}],permissions:['work','binds.read'],version:1,display_name:''}}))));
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "active",
+							roles: [{ id: "support", name: "Support" }],
+							permissions: ["work", "binds.read"],
+							version: 1,
+							display_name: "",
+						},
+					}),
+				),
+		),
+	);
 	vi.resetModules();
 	vi.resetAllMocks();
 	fixture.auth.onAuthStateChange.mockImplementation((callback) => {
@@ -38,14 +55,49 @@ beforeEach(async () => {
 	store = (await import("@/store/auth.store")).useAuthStore;
 });
 afterEach(() => vi.unstubAllGlobals());
-it('does not restore permissions from an older concurrent access response',async()=>{
- await service.initialize();
- let resolveOld;const oldResponse=new Promise(resolve=>{resolveOld=resolve;});
- vi.stubGlobal('fetch',vi.fn().mockReturnValueOnce(oldResponse).mockResolvedValueOnce(new Response(JSON.stringify({access:{status:'disabled',roles:[],permissions:[],version:2,display_name:''}}))));
- const old=service.refreshIdentity();await service.refreshIdentity();
- resolveOld(new Response(JSON.stringify({access:{status:'active',roles:[],permissions:['technical'],version:1,display_name:''}})));await old;
- expect(service.getSession().user.access.status).toBe('disabled');
- expect(service.getSession().user.access.permissions).toEqual([]);
+it("does not restore permissions from an older concurrent access response", async () => {
+	await service.initialize();
+	let resolveOld;
+	const oldResponse = new Promise((resolve) => {
+		resolveOld = resolve;
+	});
+	vi.stubGlobal(
+		"fetch",
+		vi
+			.fn()
+			.mockReturnValueOnce(oldResponse)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "disabled",
+							roles: [],
+							permissions: [],
+							version: 2,
+							display_name: "",
+						},
+					}),
+				),
+			),
+	);
+	const old = service.refreshIdentity();
+	await service.refreshIdentity();
+	resolveOld(
+		new Response(
+			JSON.stringify({
+				access: {
+					status: "active",
+					roles: [],
+					permissions: ["technical"],
+					version: 1,
+					display_name: "",
+				},
+			}),
+		),
+	);
+	await old;
+	expect(service.getSession().user.access.status).toBe("disabled");
+	expect(service.getSession().user.access.permissions).toEqual([]);
 });
 it("verifies restored identity, initializes once and receives refresh/signout events", async () => {
 	await Promise.all([service.initialize(), service.initialize()]);

@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useAuthStore } from "@/store/auth.store";
+import { BindProposals } from "@/features/shared-binds/BindProposals";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";
+import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
-import { BindProposals } from "@/features/shared-binds/BindProposals";
 export interface OverviewUser {
 	id: string;
 	email: string;
@@ -71,7 +71,7 @@ export function AdminOverview({
 	});
 	const monitor = useQuery({
 		queryKey: ["admin-overview-monitor", user?.id],
- refetchInterval:30000,
+		refetchInterval: 30000,
 		enabled: can(access, "monitor.read"),
 		queryFn: ({ signal }) =>
 			get(

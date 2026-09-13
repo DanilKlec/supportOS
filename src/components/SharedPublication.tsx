@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { contentApi } from "@/services/shared-content.service";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../shared/access.js";
@@ -44,15 +44,15 @@ export function useSharedPublication(
 	latest.current = { current, base, ready, replace };
 	const generation = useRef(0);
 	const writes = useRef(0);
-	const loadDocument = async () => {
+	const loadDocument = useCallback(async () => {
 		if (management || dataset === "emails") return contentApi(dataset);
 		const [shared, personal] = await Promise.all([
 			contentApi(dataset),
 			contentApi(dataset, undefined, undefined, "personal"),
 		]);
 		return personal ?? (shared ? { ...shared, version: 0 } : null);
-	};
-	const apply = (row: Awaited<ReturnType<typeof contentApi>>) => {
+	}, [management, dataset]);
+	const apply = useCallback((row: Awaited<ReturnType<typeof contentApi>>) => {
 		const values = row?.data ?? [];
 		latest.current.replace(values);
 		setBase(serialize(values));
@@ -60,7 +60,7 @@ export function useSharedPublication(
 		setStamp(row?.updated_at ?? "");
 		setReady(true);
 		setError("");
-	};
+	}, []);
 	useEffect(() => {
 		const run = ++generation.current;
 		setReady(false);
@@ -98,7 +98,7 @@ export function useSharedPublication(
 			clearInterval(timer);
 			window.removeEventListener("focus", load);
 		};
-	}, [dataset, user?.id, writable, management]);
+	}, [draftKey, writable, loadDocument, apply]);
 	const dirty = ready && current !== base;
 	useEffect(() => {
 		if (!ready) return;

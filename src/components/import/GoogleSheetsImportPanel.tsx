@@ -1,7 +1,5 @@
 import { FileSpreadsheet, Loader2, UploadCloud } from "lucide-react";
-import {can} from '../../../shared/access.js';
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-
 import {
 	googleSheetsService,
 	type SheetImportMode,
@@ -10,6 +8,7 @@ import {
 import { useToast } from "@/shared/hooks/useToast";
 import { useAuthStore } from "@/store/auth.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
+import { can } from "../../../shared/access.js";
 
 type PreviewStatus = "new" | "update" | "unchanged" | "conflict" | "error";
 
@@ -39,7 +38,7 @@ export function GoogleSheetsImportPanel({
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
 
-	const isAdmin = can(session?.user.access,'knowledge.write');
+	const isAdmin = can(session?.user.access, "knowledge.write");
 	const availableFolders = useMemo(
 		() => folders.filter((folder) => folder.categoryId === categoryId),
 		[categoryId, folders],

@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { can, routePermission } from "../../../shared/access.js";
-import { spaceFor, type SpaceItem } from "./navigation";
+import { type SpaceItem, spaceFor } from "./navigation";
 export function SpaceFrame({ children }: { children: ReactNode }) {
 	const { pathname, hash } = useRouterState({ select: (s) => s.location });
 	const access = useAuthStore((s) => s.session?.user.access);

@@ -1,13 +1,16 @@
-import { afterEach, expect, it, vi } from "vitest";
 import {
 	createMemoryHistory,
 	createRootRoute,
 	createRoute,
 	createRouter,
 } from "@tanstack/react-router";
+import { afterEach, expect, it, vi } from "vitest";
+
 vi.mock("./bootstrap", () => ({ bootstrapAuth: vi.fn(async () => {}) }));
-import { requireAppAuth } from "./auth-guard";
+
 import { useAuthStore } from "@/store/auth.store";
+import { requireAppAuth } from "./auth-guard";
+
 afterEach(() => useAuthStore.setState({ session: undefined }));
 it("blocks protected loaders on direct links and preserves return path", async () => {
 	const loader = vi.fn();
@@ -38,7 +41,18 @@ it("permits a signed-in route and the public login", async () => {
 	useAuthStore.setState({
 		session: {
 			accessToken: "token",
-			user: { id: "u", email: "test@example.test", role: "support",access:{status:'active',permissions:['work','binds.read'],roles:[{id:'support',name:'Support'}],version:1,display_name:''} },
+			user: {
+				id: "u",
+				email: "test@example.test",
+				role: "support",
+				access: {
+					status: "active",
+					permissions: ["work", "binds.read"],
+					roles: [{ id: "support", name: "Support" }],
+					version: 1,
+					display_name: "",
+				},
+			},
 		},
 	});
 	await expect(
@@ -46,4 +60,7 @@ it("permits a signed-in route and the public login", async () => {
 			location: { pathname: "/binds", href: "/binds" },
 		}),
 	).resolves.toBeUndefined();
+	await expect(
+		requireAppAuth({ location: { pathname: "/admin", href: "/admin" } }),
+	).rejects.toMatchObject({ options: { to: "/settings" } });
 });

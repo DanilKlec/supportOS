@@ -1,3 +1,3 @@
-import type { Category } from "./types"
+import type { Category } from "./types";
 
-export const mockCategories: Category[] = []
+export const mockCategories: Category[] = [];

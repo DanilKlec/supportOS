@@ -1,6 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
-import { can, routePermission } from "../../shared/access.js";
 import { supabaseService } from "@/services/supabase.service";
+import { can, routePermission } from "../../shared/access.js";
 import "#/styles.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { ToastContainer } from "#/components/ui/Toast";
 import { MainLayout } from "#/layouts/MainLayout/MainLayout";
 import { ToastProvider } from "#/shared/hooks/useToast";
 import { ModalRoot } from "#/shared/modals/ModalRoot";
+import { safeAuthRedirect } from "@/app/auth-redirect";
 import { bootstrapApp, bootstrapAuth } from "@/app/bootstrap";
 import { cleanupDevelopmentCaches } from "@/app/dev-cleanup";
 import { isLightweightRoute } from "@/app/route-mode";
@@ -25,7 +26,6 @@ import {
 	onSystemThemeChange,
 } from "@/shared/lib/appearance";
 import { useAuthStore } from "@/store/auth.store";
-import { safeAuthRedirect } from "@/app/auth-redirect";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -130,10 +130,16 @@ function RootComponent() {
 						{!loading && session && (
 							<>
 								<p>Нет доступа к этому разделу. Обратитесь к администратору.</p>
-								<button onClick={() => void navigate({ to: "/settings" })}>
+								<button
+									type="button"
+									onClick={() => void navigate({ to: "/settings" })}
+								>
 									Мой аккаунт
 								</button>
-								<button onClick={() => void supabaseService.signOut()}>
+								<button
+									type="button"
+									onClick={() => void supabaseService.signOut()}
+								>
 									Выйти
 								</button>
 							</>

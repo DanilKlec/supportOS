@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useId } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 interface BaseModalProps {
@@ -16,6 +16,7 @@ const widths = {
 	lg: "max-w-2xl",
 	xl: "max-w-4xl",
 };
+const modalStack: string[] = [];
 
 export function BaseModal({
 	title,
@@ -25,21 +26,53 @@ export function BaseModal({
 	size = "md",
 }: BaseModalProps) {
 	const titleId = useId();
+	const dialog = useRef<HTMLElement>(null);
+	const close = useRef({ onClose, closeDisabled });
+	close.current = { onClose, closeDisabled };
 
 	useEffect(() => {
-		if (closeDisabled) return undefined;
-
 		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
+			if (modalStack.at(-1) !== titleId) return;
+			if (event.key === "Escape" && !close.current.closeDisabled) {
 				event.preventDefault();
-				onClose();
+				event.stopImmediatePropagation();
+				close.current.onClose();
+			}
+			if (event.key === "Tab") {
+				const nodes = Array.from(
+					dialog.current?.querySelectorAll<HTMLElement>(
+						'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+					) ?? [],
+				).filter((node) => node.getClientRects().length > 0);
+				const first = nodes[0];
+				const last = nodes.at(-1);
+				if (!first) {
+					event.preventDefault();
+					dialog.current?.focus();
+				} else if (
+					event.shiftKey &&
+					(document.activeElement === first ||
+						document.activeElement === dialog.current)
+				) {
+					event.preventDefault();
+					last?.focus();
+				} else if (!event.shiftKey && document.activeElement === last) {
+					event.preventDefault();
+					first.focus();
+				}
 			}
 		};
-
-		window.addEventListener("keydown", handleEscape);
-
-		return () => window.removeEventListener("keydown", handleEscape);
-	}, [closeDisabled, onClose]);
+		const previous = document.activeElement;
+		modalStack.push(titleId);
+		dialog.current?.focus();
+		window.addEventListener("keydown", handleEscape, true);
+		return () => {
+			modalStack.splice(modalStack.indexOf(titleId), 1);
+			window.removeEventListener("keydown", handleEscape, true);
+			if (previous instanceof HTMLElement && previous.isConnected)
+				previous.focus();
+		};
+	}, [titleId]);
 
 	useEffect(() => {
 		const previousOverflow = document.body.style.overflow;
@@ -72,6 +105,8 @@ export function BaseModal({
 			/>
 
 			<section
+				ref={dialog}
+				tabIndex={-1}
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={titleId}

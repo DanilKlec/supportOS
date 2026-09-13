@@ -39,16 +39,14 @@ export function BindLinkEditor({
 			<label className="block text-xs text-muted">
 				Найти личный бинд
 				<input
-					autoFocus
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
 					className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
 					placeholder="Название или slug"
 				/>
 			</label>
-			<div
+			<fieldset
 				className="my-4 max-h-56 space-y-2 overflow-auto"
-				role="group"
 				aria-label="Личный бинд"
 			>
 				{locals
@@ -79,7 +77,7 @@ export function BindLinkEditor({
 							</button>
 						);
 					})}
-			</div>
+			</fieldset>
 			{chosen && (
 				<div className="mb-4 grid gap-3 sm:grid-cols-2">
 					{[

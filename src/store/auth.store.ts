@@ -9,7 +9,7 @@ export interface AuthUser {
 	id: string;
 	email: string;
 	role: AuthRole;
-	access?: import('../../shared/access.js').Access;
+	access?: import("../../shared/access.js").Access;
 }
 
 export interface AuthSession {

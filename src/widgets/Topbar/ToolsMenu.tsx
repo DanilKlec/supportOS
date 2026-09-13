@@ -1,21 +1,16 @@
-import { spaces, type SpaceItem } from "@/features/spaces/navigation";
-import { createPortal } from "react-dom";
-import { AmbientMotionButton } from "@/components/brand/AmbientBackground";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { can, routePermission } from "../../../shared/access.js";
-import { useAuthStore } from "@/store/auth.store";
 import {
+	BookOpen,
 	Check,
 	ChevronRight,
 	Download,
-	type LucideIcon,
 	Import,
-	Moon,
-	Settings,
 	LayoutGrid,
-	Search,
+	type LucideIcon,
+	Moon,
 	PanelRight,
-	BookOpen,
+	Search,
+	Settings,
 	Users,
 	X,
 } from "lucide-react";
@@ -27,7 +22,9 @@ import {
 	useRef,
 	useState,
 } from "react";
-
+import { createPortal } from "react-dom";
+import { AmbientMotionButton } from "@/components/brand/AmbientBackground";
+import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { supportOSExportService } from "@/services/supportos-export.service";
 import { useToast } from "@/shared/hooks/useToast";
 import {
@@ -35,8 +32,12 @@ import {
 	resolveThemeMode,
 	saveAppearanceSettings,
 } from "@/shared/lib/appearance";
+import { useAuthStore } from "@/store/auth.store";
+import type { Permission } from "../../../shared/access.js";
+import { can, canAdmin, routePermission } from "../../../shared/access.js";
 
 type AppRoute =
+	| "/admin"
 	| "/content"
 	| "/team"
 	| "/project-emails"
@@ -65,7 +66,7 @@ interface RouteToolItem {
 	icon: LucideIcon;
 	to: AppRoute;
 	hash?: string;
-	permission?: string;
+	permission?: Permission;
 }
 
 interface ActionToolItem {
@@ -207,8 +208,50 @@ export function ToolsMenu() {
 		})),
 	}));
 	groups.push({
+		title: "Администрирование",
+		items: canAdmin(role)
+			? [{ type: "route", label: "Admin Panel", icon: Settings, to: "/admin" }]
+			: [],
+	});
+	groups.push({
 		title: "Быстрые действия",
 		items: [
+			{
+				type: "action",
+				label: "Рабочий вид",
+				icon: PanelRight,
+				action: () => {
+					setOpen(false);
+					window.setTimeout(
+						() => window.dispatchEvent(new Event("supportos:workspace-view")),
+						0,
+					);
+				},
+			},
+			{
+				type: "action",
+				label: "Рабочая подборка",
+				icon: BookOpen,
+				action: () => {
+					setOpen(false);
+					window.setTimeout(
+						() => window.dispatchEvent(new Event("supportos:library")),
+						0,
+					);
+				},
+			},
+			{
+				type: "action",
+				label: "Горячие клавиши",
+				icon: Search,
+				action: () => {
+					setOpen(false);
+					window.setTimeout(
+						() => window.dispatchEvent(new Event("supportos:shortcuts")),
+						0,
+					);
+				},
+			},
 			{
 				type: "action",
 				label: "Восстановить локальную копию",
@@ -247,6 +290,7 @@ export function ToolsMenu() {
 			return next;
 		});
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: navigation closes the menu.
 	useEffect(() => {
 		setOpen(false);
 	}, [pathname]);

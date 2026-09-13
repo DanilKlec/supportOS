@@ -1,8 +1,3 @@
-import {
-	AmbientBackground,
-	AmbientMotionButton,
-} from "@/components/brand/AmbientBackground";
-import { useAuthStore } from "@/store/auth.store";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRight,
@@ -14,10 +9,15 @@ import {
 	LoaderCircle,
 	ShieldCheck,
 } from "lucide-react";
-import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { type FormEvent, useEffect, useState } from "react";
 import { safeAuthRedirect } from "@/app/auth-redirect";
+import {
+	AmbientBackground,
+	AmbientMotionButton,
+} from "@/components/brand/AmbientBackground";
+import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { supabaseService } from "@/services/supabase.service";
+import { useAuthStore } from "@/store/auth.store";
 
 export const Route = createFileRoute("/login")({
 	validateSearch: (search: Record<string, unknown>) => ({

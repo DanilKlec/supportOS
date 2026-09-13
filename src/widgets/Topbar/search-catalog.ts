@@ -1,7 +1,7 @@
-import type { Freshness } from "@/features/bonuses/bonus-freshness";
 import type { Bind } from "@/entities/bind";
 import type { BonusProject } from "@/entities/bonus";
 import type { ProjectEmailRecord } from "@/entities/project-email";
+import type { Freshness } from "@/features/bonuses/bonus-freshness";
 export interface CatalogResult extends Bind {
 	freshness?: Freshness;
 	resultKind?: "email" | "bonus";

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import {
 	parseSchedule,
-	sheetMonth,
-	type SheetRows,
 	type ScheduleImport,
+	type SheetRows,
+	sheetMonth,
 } from "./import-schedule";
+
 const control =
 	"rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-40";
 export function ScheduleUpload({
@@ -116,8 +117,8 @@ export function ScheduleUpload({
 					}}
 					className={control}
 				/>
-				{busy && <p role="status">Обработка графика…</p>}
-				{message && <p role="status">{message}</p>}
+				{busy && <output>Обработка графика…</output>}
+				{message && <output>{message}</output>}
 				{selected && (
 					<>
 						<p className="text-sm">{filename}</p>
@@ -167,8 +168,8 @@ export function ScheduleUpload({
 								<div role="alert">
 									<p>Исправьте ошибки в Excel и выберите файл повторно:</p>
 									<ul className="max-h-48 overflow-auto">
-										{result.issues.map((issue, i) => (
-											<li key={`${i}-${issue}`}>{issue}</li>
+										{Array.from(new Set(result.issues)).map((issue) => (
+											<li key={issue}>{issue}</li>
 										))}
 									</ul>
 								</div>
