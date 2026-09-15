@@ -1,44 +1,65 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ActionMenuPortal } from "./ActionMenuPortal";
 export function MoreActions({ children }: { children: ReactNode }) {
-	const ref = useRef<HTMLDetailsElement>(null);
+	const ref = useRef<HTMLDetailsElement>(null),
+		[open, setOpen] = useState(false);
+	const close = () => {
+		if (ref.current) ref.current.open = false;
+		setOpen(false);
+	};
 	useEffect(() => {
 		const outside = (e: PointerEvent) => {
-			if (!ref.current?.contains(e.target as Node) && ref.current)
-				ref.current.open = false;
+			if (
+				e.target instanceof Element &&
+				e.target.closest("[data-workspace-actions]")
+			)
+				return;
+			if (!ref.current?.contains(e.target as Node)) {
+				if (ref.current) ref.current.open = false;
+				setOpen(false);
+			}
 		};
 		const handleEscape = (e: KeyboardEvent) => {
 			if (e.key === "Escape" && ref.current?.open) {
-				e.stopPropagation();
 				ref.current.open = false;
+				setOpen(false);
 				ref.current.querySelector("summary")?.focus();
 			}
 		};
 		document.addEventListener("pointerdown", outside);
-		const host = ref.current;
-		const selected = (event: MouseEvent) => {
-			if (
-				event.target instanceof Element &&
-				event.target.closest("button:not(:disabled)") &&
-				host
-			)
-				host.open = false;
-		};
-		host?.addEventListener("click", selected);
 		document.addEventListener("keydown", handleEscape);
 		return () => {
 			document.removeEventListener("pointerdown", outside);
 			document.removeEventListener("keydown", handleEscape);
-			host?.removeEventListener("click", selected);
 		};
 	}, []);
 	return (
-		<details ref={ref} className="relative">
-			<summary className="cursor-pointer list-none rounded-xl border border-border px-3 py-2 text-xs">
+		<details
+			ref={ref}
+			className="relative shrink-0"
+			onToggle={(e) => setOpen(e.currentTarget.open)}
+			onKeyDown={(e) => {
+				if (e.key === "Escape") {
+					close();
+					ref.current?.querySelector("summary")?.focus();
+				}
+			}}
+			onClick={(e) => {
+				if (
+					e.target instanceof Element &&
+					e.target.closest("button:not(:disabled)")
+				)
+					close();
+			}}
+		>
+			<summary
+				aria-label="Действия бинда"
+				aria-haspopup="menu"
+				className="flex min-h-10 min-w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-border px-3 py-2 text-xs"
+			>
 				Ещё ···
 			</summary>
-			<div className="absolute right-0 top-full z-20 mt-2 flex w-64 flex-col gap-1 rounded-xl border border-border bg-surface p-2 shadow-xl">
-				{children}
-			</div>
+			{open && <ActionMenuPortal anchor={ref}>{children}</ActionMenuPortal>}
 		</details>
 	);
 }

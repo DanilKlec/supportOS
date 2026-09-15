@@ -212,7 +212,7 @@ export function Sidebar({
 		setSelectedBindIds([]);
 		showToast(`${archived.length} bind(s) archived`, {
 			action: {
-				label: "Undo",
+				label: "Отменить",
 				onClick: () => {
 					knowledgeService.updateManyBinds(ids, { archived: false });
 					showToast("Archive undone");
@@ -460,13 +460,13 @@ export function Sidebar({
 									<span className="font-semibold text-foreground">
 										{selectedBindIds.length}
 									</span>{" "}
-									selected - drag or use actions
+									выбрано — перетащите или выберите действие
 								</span>
 								<button
 									type="button"
 									onClick={() => setSelectedBindIds([])}
 									className="rounded-lg p-1 text-foreground hover:bg-accent/15"
-									title="Clear selection"
+									title="Снять выделение"
 								>
 									<X size={13} />
 								</button>
@@ -475,12 +475,19 @@ export function Sidebar({
 							<div className="flex flex-wrap gap-1">
 								<button
 									type="button"
+									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground"
+									onClick={() =>
+										modalManager.open("moveBind", { bindIds: selectedBindIds })
+									}
+								>
+									Переместить выбранные
+								</button>
+								<button
+									type="button"
 									onClick={setSelectedFavorite}
 									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
 									title={
-										allSelectedFavorite
-											? "Remove from favorites"
-											: "Add to favorites"
+										allSelectedFavorite ? "Убрать из избранного" : "В избранное"
 									}
 								>
 									<Star
@@ -492,7 +499,11 @@ export function Sidebar({
 									type="button"
 									onClick={setSelectedPinned}
 									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title={allSelectedPinned ? "Unpin selected" : "Pin selected"}
+									title={
+										allSelectedPinned
+											? "Открепить выбранные"
+											: "Закрепить выбранные"
+									}
 								>
 									<Pin
 										size={14}
@@ -503,7 +514,7 @@ export function Sidebar({
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
 									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title="Add tag"
+									title="Добавить тег"
 								>
 									<Tag size={14} />
 								</button>
@@ -511,7 +522,7 @@ export function Sidebar({
 									type="button"
 									onClick={exportSelected}
 									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title="Export selected"
+									title="Экспортировать выбранные"
 								>
 									<Download size={14} />
 								</button>
@@ -519,7 +530,7 @@ export function Sidebar({
 									type="button"
 									onClick={archiveSelected}
 									className="rounded-lg border border-red-500/30 bg-background p-1.5 text-red-300 hover:bg-red-500/10"
-									title="Archive selected"
+									title="Архивировать выбранные"
 								>
 									<Archive size={14} />
 								</button>

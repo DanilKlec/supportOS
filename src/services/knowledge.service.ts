@@ -534,6 +534,7 @@ class KnowledgeService {
 
 		store.setBinds([...store.binds, bind]);
 		store.openBind(bind.id);
+		this.revealLocation(bind.categoryId, bind.folderId);
 		this.saveKnowledge();
 		cloudKnowledgeService.saveBind(bind);
 
@@ -809,11 +810,30 @@ class KnowledgeService {
 			return existing;
 		}
 
-		return this.updateBind(id, {
+		const moved = this.updateBind(id, {
 			categoryId,
 			folderId: targetFolderId || null,
 			order: getNextBindOrder(store.binds, categoryId, targetFolderId),
 		});
+		if (store.selectedBind === id)
+			useKnowledgeStore.getState().openBind(moved.id);
+		this.revealLocation(categoryId, targetFolderId);
+		return moved;
+	}
+
+	revealLocation(categoryId: string, folderId?: string) {
+		const state = useKnowledgeStore.getState(),
+			expanded = new Set(state.expandedFolders),
+			seen = new Set<string>();
+		expanded.add(categoryId);
+		let folder = state.folders.find((f) => f.id === folderId);
+		while (folder && !seen.has(folder.id)) {
+			seen.add(folder.id);
+			expanded.add(folder.id);
+			const parent = folder.parentId;
+			folder = state.folders.find((f) => f.id === parent);
+		}
+		useKnowledgeStore.setState({ expandedFolders: [...expanded] });
 	}
 
 	restoreDeletedItems({
@@ -1222,6 +1242,13 @@ class KnowledgeService {
 		});
 		this.saveKnowledge();
 		cloudKnowledgeService.deleteCategory(id);
+		if (
+			!useKnowledgeStore.getState().selectedBind &&
+			store.selectedCategory === id
+		)
+			useKnowledgeStore
+				.getState()
+				.selectCategory(useKnowledgeStore.getState().categories[0]?.id);
 	}
 
 	createFolder(input: CreateFolderInput) {
@@ -1261,6 +1288,7 @@ class KnowledgeService {
 
 		this.saveKnowledge();
 		cloudKnowledgeService.saveFolder(folder);
+		this.revealLocation(folder.categoryId, folder.id);
 
 		return folder;
 	}
@@ -1335,6 +1363,8 @@ class KnowledgeService {
 		if (!folder) {
 			throw new Error("Folder not found");
 		}
+		if (!this.canManageStructure(folder.ownerId))
+			throw new Error("Нет права перемещать общую папку");
 
 		const targetParentId = destination.parentId ?? "";
 		const targetParent = targetParentId
@@ -1352,6 +1382,20 @@ class KnowledgeService {
 		}
 
 		const movedFolderIds = this.collectFolderIds(id, store.folders);
+		if (
+			store.folders.some(
+				(f) => movedFolderIds.has(f.id) && !this.canManageStructure(f.ownerId),
+			) ||
+			store.binds.some(
+				(b) =>
+					b.folderId &&
+					movedFolderIds.has(b.folderId) &&
+					!this.canManageStructure(b.ownerId),
+			)
+		)
+			throw new Error(
+				"Папка содержит общие материалы: перемещайте их через личные версии",
+			);
 
 		if (targetParentId && movedFolderIds.has(targetParentId)) {
 			throw new Error("Folder cannot be moved into itself");
@@ -1432,6 +1476,7 @@ class KnowledgeService {
 			folders: changedFolders,
 			binds: changedBinds,
 		});
+		this.revealLocation(categoryId, id);
 
 		return {
 			folders: changedFolders,
@@ -1441,6 +1486,7 @@ class KnowledgeService {
 
 	deleteFolder(id: string) {
 		const store = useKnowledgeStore.getState();
+		const previous = store.folders.find((folder) => folder.id === id);
 		const folderIds = this.collectFolderIds(id, store.folders);
 
 		store.setKnowledge({
@@ -1451,6 +1497,14 @@ class KnowledgeService {
 		});
 		this.saveKnowledge();
 		cloudKnowledgeService.deleteFolder(id);
+		if (
+			!useKnowledgeStore.getState().selectedBind &&
+			folderIds.has(store.selectedFolder ?? "")
+		) {
+			if (previous?.parentId)
+				useKnowledgeStore.getState().selectFolder(previous.parentId);
+			else useKnowledgeStore.getState().selectCategory(previous?.categoryId);
+		}
 	}
 
 	toggleFavorite(id: string) {
@@ -1608,6 +1662,16 @@ class KnowledgeService {
 		}, 500);
 	}
 
+	canManageStructure(ownerId?: string | null) {
+		const session = supabaseService.getSession();
+		return Boolean(
+			session &&
+				(ownerId === undefined ||
+					ownerId === session.user.id ||
+					(ownerId === null && can(session.user.access, "knowledge.write"))),
+		);
+	}
+
 	private getDefaultOwnerId() {
 		const session = supabaseService.getSession();
 
@@ -1700,7 +1764,7 @@ class KnowledgeService {
 		};
 	}
 
-	private collectFolderIds(
+	collectFolderIds(
 		id: string,
 		folders: KnowledgeFolder[],
 		result = new Set<string>(),

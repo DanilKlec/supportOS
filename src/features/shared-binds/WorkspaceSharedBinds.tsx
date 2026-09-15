@@ -635,6 +635,9 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 										await sharedBindsService.branchAction("decline", {
 											shareId: declineId,
 										});
+										await client.cancelQueries({
+											queryKey: ["bind-branches", user?.id],
+										});
 										client.setQueryData<BindBranches>(
 											["bind-branches", user?.id],
 											(current) => {
@@ -650,11 +653,11 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 												};
 											},
 										);
+										setDeclineId(undefined);
+										showToast("Вы отказались от полученной версии");
 										await client.invalidateQueries({
 											queryKey: ["bind-branches"],
 										});
-										setDeclineId(undefined);
-										showToast("Вы отказались от полученной версии");
 									})
 								}
 							>
@@ -673,7 +676,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 				)}
 				{shareOpen && (
 					<BaseModal
-						title="Поделиться моей веткой"
+						title="Поделиться версией"
 						closeDisabled={busy}
 						onClose={() => setShareOpen(false)}
 					>
@@ -685,6 +688,15 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						<form
 							onSubmit={(e) => {
 								e.preventDefault();
+								if (
+									busy ||
+									!email ||
+									outgoing.some(
+										(share) =>
+											share.email.toLowerCase() === email.toLowerCase(),
+									)
+								)
+									return;
 								void action(async () => {
 									if (!savedOwn) {
 										await sharedBindsService.savePersonal({

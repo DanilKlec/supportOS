@@ -74,7 +74,7 @@ function unique(ids: string[]) {
 }
 
 function getBindIds(binds: Bind[]) {
-	return new Set(binds.map((b) => b.id));
+	return new Set(binds.filter((b) => !b.archived).map((b) => b.id));
 }
 
 function getFolderAndCategoryIds(
@@ -143,12 +143,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			: undefined;
 		const requestedSelectedFolder =
 			snapshot.selectedFolder ?? state.selectedFolder;
-		const selectedFolder =
-			selectedBindEntity?.folderId ??
-			(requestedSelectedFolder &&
-			folders.some((folder) => folder.id === requestedSelectedFolder)
+		const selectedFolder = selectedBindEntity
+			? selectedBindEntity.folderId
+			: requestedSelectedFolder &&
+					folders.some((folder) => folder.id === requestedSelectedFolder)
 				? requestedSelectedFolder
-				: undefined);
+				: undefined;
 		const selectedFolderEntity = selectedFolder
 			? folders.find((folder) => folder.id === selectedFolder)
 			: undefined;

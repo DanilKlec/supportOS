@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { MoreActions } from "./MoreActions";
 
-it("closes on Escape, outside click and action selection", () => {
+it("closes on Escape, outside click and action selection", async () => {
 	render(
 		<MoreActions>
 			<button type="button">История</button>
@@ -20,7 +20,7 @@ it("closes on Escape, outside click and action selection", () => {
 	fireEvent.pointerDown(document.body);
 	expect(details.open).toBe(false);
 	details.open = true;
-	fireEvent.click(screen.getByText("История"));
+	fireEvent.click(await screen.findByText("История"));
 	expect(details.open).toBe(false);
 	cleanup();
 });

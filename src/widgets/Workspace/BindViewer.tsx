@@ -15,7 +15,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
+import { ActionMenuPortal } from "@/components/ActionMenuPortal";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
@@ -510,12 +510,12 @@ export function BindViewer() {
 
 		const duplicate = knowledgeService.duplicateBind(bind.id);
 
-		showToast("Material duplicated", {
+		showToast("Бинд дублирован", {
 			action: {
-				label: "Undo",
+				label: "Отменить",
 				onClick: () => {
 					knowledgeService.deleteBind(duplicate.id);
-					showToast("Duplicate removed");
+					showToast("Дубликат удалён");
 				},
 			},
 			duration: 6000,
@@ -589,6 +589,11 @@ export function BindViewer() {
 		if (!actionsOpen) return undefined;
 
 		const closeOnOutsideClick = (event: PointerEvent) => {
+			if (
+				event.target instanceof Element &&
+				event.target.closest("[data-workspace-actions]")
+			)
+				return;
 			if (actionsRef.current?.contains(event.target as Node)) return;
 
 			setActionsOpen(false);
@@ -693,7 +698,9 @@ export function BindViewer() {
 						aria-label="Breadcrumbs"
 						className="mb-4 flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted"
 					>
-						<span className="truncate">{category?.name ?? "No category"}</span>
+						<span className="truncate">
+							{category?.name ?? "Без категории"}
+						</span>
 						{folderPath && (
 							<>
 								<span>/</span>
@@ -705,7 +712,7 @@ export function BindViewer() {
 					<div className="flex min-w-0 flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
 						<div className="min-w-0 flex-1">
 							<div className="flex min-w-0 items-start gap-3">
-								<h1 className="min-w-0 text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">
+								<h1 className="min-w-0 break-words text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">
 									{title}
 								</h1>
 								{bind.pinned && (
@@ -730,8 +737,8 @@ export function BindViewer() {
 							)}
 						</div>
 
-						<div className="flex shrink-0 flex-wrap items-center gap-2">
-							<div className="hidden rounded-xl bg-surface p-1 sm:flex">
+						<div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+							<div className="hidden min-w-0 max-w-full flex-wrap rounded-xl bg-surface p-1 sm:flex">
 								{languageCodes.map((code) => {
 									const exists = bind.translations.some(
 										(item) => item.language === code,
@@ -798,10 +805,10 @@ export function BindViewer() {
 								{copied ? "Copied" : "Copy"}
 							</button>
 
-							<div ref={actionsRef} className="relative">
+							<div ref={actionsRef} className="relative shrink-0">
 								<button
 									type="button"
-									aria-label="Material actions"
+									aria-label="Действия бинда"
 									aria-haspopup="menu"
 									aria-expanded={actionsOpen}
 									onClick={() => setActionsOpen((value) => !value)}
@@ -811,18 +818,28 @@ export function BindViewer() {
 								</button>
 
 								{actionsOpen && (
-									<div
-										role="menu"
-										className="absolute right-0 top-11 z-30 w-60 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-2xl"
-									>
+									<ActionMenuPortal anchor={actionsRef}>
+										<ViewerMenuItem
+											icon={<Files size={15} />}
+											label="Переместить"
+											onClick={() =>
+												runAction(() =>
+													modalManager.open("moveBind", {
+														bindId: bind.id,
+														categoryId: bind.categoryId,
+														folderId: bind.folderId,
+													}),
+												)
+											}
+										/>
 										<ViewerMenuItem
 											icon={<Copy size={15} />}
-											label="Copy title"
+											label="Копировать заголовок"
 											onClick={() => runAction(() => void copyTitle())}
 										/>
 										<ViewerMenuItem
 											icon={<Edit3 size={15} />}
-											label="Edit"
+											label="Редактировать"
 											onClick={() => runAction(editBind)}
 										/>
 										<ViewerMenuItem
@@ -833,9 +850,7 @@ export function BindViewer() {
 												/>
 											}
 											label={
-												bind.favorite
-													? "Remove from favorites"
-													: "Add to favorites"
+												bind.favorite ? "Убрать из избранного" : "В избранное"
 											}
 											onClick={() => runAction(toggleFavorite)}
 										/>
@@ -846,32 +861,32 @@ export function BindViewer() {
 													fill={bind.pinned ? "currentColor" : "none"}
 												/>
 											}
-											label={bind.pinned ? "Unpin" : "Pin in folder"}
+											label={bind.pinned ? "Открепить" : "Закрепить"}
 											onClick={() => runAction(togglePinned)}
 										/>
 										<ViewerMenuItem
 											icon={<Files size={15} />}
-											label="Duplicate"
+											label="Дублировать"
 											onClick={() => runAction(duplicateBind)}
 										/>
 										<ViewerMenuItem
 											icon={<History size={15} />}
-											label="History"
+											label="История"
 											onClick={() => runAction(showHistory)}
 										/>
 										<ViewerMenuItem
 											icon={<Search size={15} />}
-											label="Find duplicates"
+											label="Найти дубликаты"
 											onClick={() => runAction(findDuplicates)}
 										/>
 										<div className="my-1 border-t border-border" />
 										<ViewerMenuItem
 											icon={<Trash2 size={15} />}
-											label="Delete"
+											label="Архивировать"
 											danger
 											onClick={() => runAction(deleteBind)}
 										/>
-									</div>
+									</ActionMenuPortal>
 								)}
 							</div>
 						</div>

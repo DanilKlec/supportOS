@@ -27,6 +27,7 @@ import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useProjectEmailStore } from "@/store";
 
 import { BaseModal } from "./BaseModal";
+import { FolderDestination } from "./FolderDestination";
 import type {
 	ActiveModal,
 	KnowledgeObjectType,
@@ -147,7 +148,7 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 		const trimmedName = name.trim();
 
 		if (!trimmedName) {
-			nextErrors.name = "Name is required";
+			nextErrors.name = "Укажите название";
 		}
 
 		if (Object.keys(nextErrors).length > 0) {
@@ -163,7 +164,7 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 				icon: optional(icon),
 				color: optional(color),
 			});
-			showToast("Category created");
+			showToast("Категория создана");
 			void navigate({ to: "/" });
 			onClose();
 		} catch (error) {
@@ -174,11 +175,11 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 	};
 
 	return (
-		<BaseModal title="Create category" onClose={onClose} closeDisabled={saving}>
+		<BaseModal title="Новая категория" onClose={onClose} closeDisabled={saving}>
 			<form onSubmit={submit} className="space-y-4">
 				<FormError message={errors.form} />
 
-				<Field label="Name" error={errors.name}>
+				<Field label="Название" error={errors.name}>
 					<input
 						value={name}
 						onChange={(event) => setName(event.target.value)}
@@ -187,7 +188,7 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 					/>
 				</Field>
 
-				<Field label="Icon" hint="Optional">
+				<Field label="Значок" hint="Необязательно">
 					<input
 						value={icon}
 						onChange={(event) => setIcon(event.target.value)}
@@ -199,7 +200,11 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 
 				<ColorField value={color} onChange={setColor} disabled={saving} />
 
-				<ModalActions submitLabel="Create" saving={saving} onCancel={onClose} />
+				<ModalActions
+					submitLabel="Создать"
+					saving={saving}
+					onCancel={onClose}
+				/>
 			</form>
 		</BaseModal>
 	);
@@ -248,11 +253,11 @@ function CreateFolderModal({
 		const trimmedName = name.trim();
 
 		if (!trimmedName) {
-			nextErrors.name = "Name is required";
+			nextErrors.name = "Укажите название";
 		}
 
 		if (!categoryId) {
-			nextErrors.categoryId = "Category is required";
+			nextErrors.categoryId = "Выберите категорию";
 		}
 
 		if (Object.keys(nextErrors).length > 0) {
@@ -270,7 +275,7 @@ function CreateFolderModal({
 				icon: optional(icon),
 				color: optional(color),
 			});
-			showToast("Folder created");
+			showToast("Папка создана");
 			void navigate({ to: "/" });
 			onClose();
 		} catch (error) {
@@ -281,11 +286,11 @@ function CreateFolderModal({
 	};
 
 	return (
-		<BaseModal title="Create folder" onClose={onClose} closeDisabled={saving}>
+		<BaseModal title="Новая папка" onClose={onClose} closeDisabled={saving}>
 			<form onSubmit={submit} className="space-y-4">
 				<FormError message={errors.form} />
 
-				<Field label="Name" error={errors.name}>
+				<Field label="Название" error={errors.name}>
 					<input
 						value={name}
 						onChange={(event) => setName(event.target.value)}
@@ -294,7 +299,7 @@ function CreateFolderModal({
 					/>
 				</Field>
 
-				<Field label="Category" error={errors.categoryId}>
+				<Field label="Категория" error={errors.categoryId}>
 					<select
 						value={categoryId}
 						onChange={(event) => setCategoryId(event.target.value)}
@@ -302,7 +307,7 @@ function CreateFolderModal({
 						className={inputClass}
 					>
 						{categories.length === 0 ? (
-							<option value="">No categories</option>
+							<option value="">Нет категорий</option>
 						) : (
 							categories.map((category) => (
 								<option key={category.id} value={category.id}>
@@ -313,14 +318,14 @@ function CreateFolderModal({
 					</select>
 				</Field>
 
-				<Field label="Parent folder" hint="Optional">
+				<Field label="Родительская папка" hint="Необязательно">
 					<select
 						value={parentId}
 						onChange={(event) => setParentId(event.target.value)}
 						disabled={saving || !categoryId}
 						className={inputClass}
 					>
-						<option value="">No parent</option>
+						<option value="">Корень категории</option>
 						{availableParents.map((folder) => (
 							<option key={folder.id} value={folder.id}>
 								{getFolderPath(folder, folders)}
@@ -329,19 +334,23 @@ function CreateFolderModal({
 					</select>
 				</Field>
 
-				<Field label="Icon" hint="Optional">
+				<Field label="Значок" hint="Необязательно">
 					<input
 						value={icon}
 						onChange={(event) => setIcon(event.target.value)}
 						disabled={saving}
 						className={inputClass}
-						placeholder="Folder"
+						placeholder="Папка"
 					/>
 				</Field>
 
 				<ColorField value={color} onChange={setColor} disabled={saving} />
 
-				<ModalActions submitLabel="Create" saving={saving} onCancel={onClose} />
+				<ModalActions
+					submitLabel="Создать"
+					saving={saving}
+					onCancel={onClose}
+				/>
 			</form>
 		</BaseModal>
 	);
@@ -376,14 +385,14 @@ function RenameModal({
 		event.preventDefault();
 
 		if (!payload.type || !payload.id || !target) {
-			setErrors({ form: "Object was not found" });
+			setErrors({ form: "Объект не найден" });
 			return;
 		}
 
 		const trimmedName = name.trim();
 
 		if (!trimmedName) {
-			setErrors({ name: "Name is required" });
+			setErrors({ name: "Укажите название" });
 			return;
 		}
 
@@ -412,7 +421,7 @@ function RenameModal({
 				});
 			}
 
-			showToast("Renamed");
+			showToast("Название изменено");
 			onClose();
 		} catch (error) {
 			setErrors({ form: getErrorMessage(error) });
@@ -422,11 +431,11 @@ function RenameModal({
 	};
 
 	return (
-		<BaseModal title="Rename" onClose={onClose} closeDisabled={saving}>
+		<BaseModal title="Переименовать" onClose={onClose} closeDisabled={saving}>
 			<form onSubmit={submit} className="space-y-4">
 				<FormError message={errors.form} />
 
-				<Field label="Name" error={errors.name}>
+				<Field label="Название" error={errors.name}>
 					<input
 						value={name}
 						onChange={(event) => setName(event.target.value)}
@@ -437,7 +446,11 @@ function RenameModal({
 
 				<ColorField value={color} onChange={setColor} disabled={saving} />
 
-				<ModalActions submitLabel="Save" saving={saving} onCancel={onClose} />
+				<ModalActions
+					submitLabel="Сохранить"
+					saving={saving}
+					onCancel={onClose}
+				/>
 			</form>
 		</BaseModal>
 	);
@@ -477,7 +490,7 @@ function DeleteModal({
 		event.preventDefault();
 
 		if (!payload.type || !payload.id || !target) {
-			setErrors({ form: "Object was not found" });
+			setErrors({ form: "Объект не найден" });
 			return;
 		}
 
@@ -498,20 +511,20 @@ function DeleteModal({
 				knowledgeService.archiveBind(payload.id);
 			}
 
-			showToast(payload.type === "bind" ? "Archived" : "Deleted", {
+			showToast(payload.type === "bind" ? "Архивировано" : "Удалено", {
 				action: {
-					label: "Undo",
+					label: "Отменить",
 					onClick: () => {
 						if (payload.type === "bind") {
 							knowledgeService.updateBind(payload.id as string, {
 								archived: false,
 							});
-							showToast("Restored");
+							showToast("Восстановлено");
 							return;
 						}
 
 						knowledgeService.restoreDeletedItems(deletedItems);
-						showToast("Restored");
+						showToast("Восстановлено");
 					},
 				},
 				duration: 6000,
@@ -526,7 +539,7 @@ function DeleteModal({
 
 	return (
 		<BaseModal
-			title="Delete"
+			title="Удалить"
 			onClose={onClose}
 			closeDisabled={saving}
 			size="sm"
@@ -535,15 +548,15 @@ function DeleteModal({
 				<FormError message={errors.form} />
 
 				<div className="space-y-2">
-					<p className="text-sm font-medium">Are you sure?</p>
+					<p className="text-sm font-medium">Подтвердите действие</p>
 					<p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">
-						{target?.name ?? payload.name ?? "Unknown object"}
+						{target?.name ?? payload.name ?? "Неизвестный объект"}
 					</p>
 					<DeletePreview snapshot={deletePreview} type={payload.type} />
 				</div>
 
 				<ModalActions
-					submitLabel={payload.type === "bind" ? "Archive" : "Delete"}
+					submitLabel={payload.type === "bind" ? "Архивировать" : "Удалить"}
 					saving={saving}
 					onCancel={onClose}
 					danger
@@ -560,147 +573,112 @@ function MoveBindModal({
 	payload: ModalPayload;
 	onClose: () => void;
 }) {
-	const navigate = useNavigate();
-	const { showToast } = useToast();
-	const categories = useKnowledgeStore((state) => state.categories);
-	const folders = useKnowledgeStore((state) => state.folders);
-	const binds = useKnowledgeStore((state) => state.binds);
-	const language = useKnowledgeStore((state) => state.language);
-	const expandedFolders = useKnowledgeStore((state) => state.expandedFolders);
-	const toggleFolder = useKnowledgeStore((state) => state.toggleFolder);
-	const openBind = useKnowledgeStore((state) => state.openBind);
-	const targetFolder = folders.find((folder) => folder.id === payload.folderId);
-	const targetCategoryId =
-		payload.categoryId ?? targetFolder?.categoryId ?? categories[0]?.id ?? "";
-	const targetFolderId = payload.folderId ?? "";
-	const targetCategory = categories.find(
-		(category) => category.id === targetCategoryId,
+	const navigate = useNavigate(),
+		{ showToast } = useToast();
+	const categories = useKnowledgeStore((s) => s.categories),
+		folders = useKnowledgeStore((s) => s.folders),
+		binds = useKnowledgeStore((s) => s.binds),
+		language = useKnowledgeStore((s) => s.language);
+	const fixedIds = payload.bindIds ?? (payload.bindId ? [payload.bindId] : []);
+	const sourceFolder = folders.find((f) => f.id === payload.moveFolderId);
+	const [destination, setDestination] = useState(
+		JSON.stringify([
+			payload.categoryId ?? sourceFolder?.categoryId ?? categories[0]?.id ?? "",
+			payload.folderId ?? "",
+		]),
 	);
-	const targetName = targetFolder
-		? `${targetCategory?.name ?? "Category"} / ${getFolderPath(
-				targetFolder,
-				folders,
-			)}`
-		: (targetCategory?.name ?? "Unknown destination");
-	const availableBinds = useMemo(
-		() =>
-			binds
-				.filter(
-					(bind) =>
-						!bind.archived &&
-						!(
-							bind.categoryId === targetCategoryId &&
-							(bind.folderId ?? "") === targetFolderId
-						),
-				)
-				.sort((a, b) =>
-					getBindTitle(a, language).localeCompare(getBindTitle(b, language)),
-				),
-		[binds, language, targetCategoryId, targetFolderId],
+	const [bindId, setBindId] = useState(
+		binds.find((b) => !b.archived)?.id ?? "",
 	);
-	const [bindId, setBindId] = useState(availableBinds[0]?.id ?? "");
-	const [errors, setErrors] = useState<FieldErrors>({});
-	const [saving, setSaving] = useState(false);
-
-	useEffect(() => {
-		if (!availableBinds.some((bind) => bind.id === bindId)) {
-			setBindId(availableBinds[0]?.id ?? "");
-		}
-	}, [availableBinds, bindId]);
-
+	const [error, setError] = useState("");
+	const excluded = sourceFolder
+		? Array.from(knowledgeService.collectFolderIds(sourceFolder.id, folders))
+		: [];
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
-
-		if (!targetCategoryId || !targetCategory) {
-			setErrors({ form: "Destination was not found" });
-			return;
-		}
-
-		if (!bindId) {
-			setErrors({ bindId: "Bind is required" });
-			return;
-		}
-
-		setSaving(true);
-
 		try {
-			const previousBind = binds.find((bind) => bind.id === bindId);
-			const movedBind = knowledgeService.moveBind(bindId, {
-				categoryId: targetCategoryId,
-				folderId: targetFolderId || undefined,
-			});
-
-			for (const id of [targetCategoryId, targetFolderId]) {
-				if (id && !expandedFolders.includes(id)) {
-					toggleFolder(id);
+			const [categoryId, folderId] = JSON.parse(destination) as [
+				string,
+				string,
+			];
+			if (!categories.some((c) => c.id === categoryId))
+				throw new Error("Выберите категорию");
+			if (payload.moveFolderId) {
+				knowledgeService.moveFolderTo(payload.moveFolderId, {
+					categoryId,
+					parentId: folderId || undefined,
+				});
+			} else {
+				const ids = fixedIds.length ? fixedIds : [bindId];
+				if (
+					!ids.length ||
+					ids.some((id) => !binds.some((b) => b.id === id && !b.archived))
+				)
+					throw new Error("Выберите доступный бинд");
+				const selected = useKnowledgeStore.getState().selectedBind;
+				let keep = selected;
+				for (const id of ids) {
+					const moved = knowledgeService.moveBind(id, {
+						categoryId,
+						folderId: folderId || undefined,
+					});
+					if (id === selected || ids.length === 1) keep = moved.id;
 				}
+				if (keep) useKnowledgeStore.getState().openBind(keep);
 			}
-
-			openBind(movedBind.id);
-			showToast("Bind moved", {
-				action: previousBind
-					? {
-							label: "Undo",
-							onClick: () => {
-								knowledgeService.moveBind(movedBind.id, {
-									categoryId: previousBind.categoryId,
-									folderId: previousBind.folderId,
-								});
-								showToast("Move undone");
-							},
-						}
-					: undefined,
-				duration: 6000,
-			});
+			knowledgeService.revealLocation(categoryId, folderId);
+			showToast("Перемещение выполнено");
 			void navigate({ to: "/" });
 			onClose();
-		} catch (error) {
-			setErrors({ form: getErrorMessage(error) });
-		} finally {
-			setSaving(false);
+		} catch (e) {
+			setError(getErrorMessage(e));
 		}
 	};
-
 	return (
 		<BaseModal
-			title="Add existing bind"
+			title={
+				payload.moveFolderId
+					? "Переместить папку"
+					: fixedIds.length
+						? "Переместить бинд" + (fixedIds.length > 1 ? "ы" : "")
+						: "Добавить существующий бинд"
+			}
 			onClose={onClose}
-			closeDisabled={saving}
-			size="md"
 		>
 			<form onSubmit={submit} className="space-y-4">
-				<FormError message={errors.form} />
-
-				<div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">
-					{targetName}
-				</div>
-
-				<Field label="Bind" error={errors.bindId}>
-					<select
-						value={bindId}
-						onChange={(event) => setBindId(event.target.value)}
-						disabled={saving || availableBinds.length === 0}
-						className={inputClass}
-					>
-						{availableBinds.length === 0 ? (
-							<option value="">No binds to move</option>
-						) : (
-							availableBinds.map((bind) => (
-								<option key={bind.id} value={bind.id}>
-									{getBindTitle(bind, language)} -{" "}
-									{getBindLocation(bind, categories, folders)}
-								</option>
-							))
-						)}
-					</select>
-				</Field>
-
-				<ModalActions submitLabel="Move" saving={saving} onCancel={onClose} />
+				<FormError message={error} />
+				{!fixedIds.length && !payload.moveFolderId && (
+					<Field label="Бинд">
+						<select
+							className={inputClass}
+							value={bindId}
+							onChange={(e) => setBindId(e.target.value)}
+						>
+							{binds
+								.filter((b) => !b.archived)
+								.map((b) => (
+									<option key={b.id} value={b.id}>
+										{getBindTitle(b, language)} ·{" "}
+										{getBindLocation(b, categories, folders)}
+									</option>
+								))}
+						</select>
+					</Field>
+				)}
+				<FolderDestination
+					value={destination}
+					onChange={setDestination}
+					excluded={excluded}
+				/>
+				<ModalActions
+					submitLabel="Переместить"
+					saving={false}
+					onCancel={onClose}
+				/>
 			</form>
 		</BaseModal>
 	);
 }
-
 function isEmailVariable(variable: string) {
 	return variable.trim().toLowerCase() === "email";
 }
@@ -988,7 +966,7 @@ function BindHistoryModal({
 
 	if (!bind) {
 		return (
-			<BaseModal title="History" onClose={onClose}>
+			<BaseModal title="История" onClose={onClose}>
 				<p className="text-sm text-muted">Bind was not found</p>
 			</BaseModal>
 		);
@@ -996,15 +974,15 @@ function BindHistoryModal({
 
 	const restore = (historyId: string) => {
 		knowledgeService.restoreBindHistory(bind.id, historyId);
-		showToast("Version restored");
+		showToast("Версия восстановлена");
 		onClose();
 	};
 
 	return (
-		<BaseModal title="History" onClose={onClose} size="lg">
+		<BaseModal title="История" onClose={onClose} size="lg">
 			<div className="space-y-3">
 				{history.length === 0 ? (
-					<p className="text-sm text-muted">No previous versions yet</p>
+					<p className="text-sm text-muted">Предыдущих версий пока нет</p>
 				) : (
 					history.map((entry) => {
 						const translation =
@@ -1037,7 +1015,7 @@ function BindHistoryModal({
 								</div>
 
 								<p className="mt-3 line-clamp-3 text-sm leading-6 text-muted">
-									{translation?.content ?? "No content"}
+									{translation?.content ?? "Нет содержания"}
 								</p>
 							</div>
 						);
@@ -1061,7 +1039,7 @@ function DeletePreview({
 	if (type === "bind") {
 		return (
 			<p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-				The bind will be archived and can be restored later.
+				Бинд будет архивирован. Его можно восстановить из архива.
 			</p>
 		);
 	}
@@ -1070,8 +1048,7 @@ function DeletePreview({
 
 	return (
 		<div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-			This will remove {folderCount} folder{folderCount === 1 ? "" : "s"} and{" "}
-			{bindCount} bind{bindCount === 1 ? "" : "s"}.
+			Будет удалено папок: {folderCount}, биндов: {bindCount}.
 		</div>
 	);
 }
@@ -1102,10 +1079,10 @@ function FindDuplicatesModal({
 	};
 
 	return (
-		<BaseModal title="Duplicate check" onClose={onClose} size="lg">
+		<BaseModal title="Найти дубликаты" onClose={onClose} size="lg">
 			<div className="space-y-3">
 				{duplicates.length === 0 ? (
-					<p className="text-sm text-muted">No obvious duplicates found</p>
+					<p className="text-sm text-muted">Дубликаты не найдены</p>
 				) : (
 					duplicates.map((bind) => (
 						<button
@@ -1241,9 +1218,9 @@ function BindFormModal({
 
 	if (mode === "edit" && !bind) {
 		return (
-			<BaseModal title="Edit bind" onClose={requestClose} size="lg">
+			<BaseModal title="Редактировать бинд" onClose={requestClose} size="lg">
 				<div className="space-y-4">
-					<FormError message="Bind was not found" />
+					<FormError message="Бинд не найден" />
 					<div className="flex justify-end">
 						<button
 							type="button"
@@ -1282,7 +1259,7 @@ function BindFormModal({
 		if (
 			translationDrafts.some((translation) => translation.language === code)
 		) {
-			setAddLanguageError("Language already exists");
+			setAddLanguageError("Язык уже добавлен");
 			return;
 		}
 
@@ -1310,14 +1287,18 @@ function BindFormModal({
 		event.preventDefault();
 
 		const nextErrors: FieldErrors = {};
-		const trimmedSlug = slug.trim();
+		const trimmedSlug =
+			slug.trim() ||
+			(mode === "create"
+				? (translationDrafts.find((t) => t.title.trim())?.title.trim() ?? "")
+				: "");
 
 		if (!trimmedSlug) {
-			nextErrors.slug = "Slug is required";
+			nextErrors.slug = "Укажите заголовок или идентификатор";
 		}
 
 		if (!categoryId) {
-			nextErrors.categoryId = "Category is required";
+			nextErrors.categoryId = "Выберите категорию";
 		}
 
 		const prepared = prepareTranslations(translationDrafts, mode === "edit");
@@ -1346,7 +1327,7 @@ function BindFormModal({
 					content: prepared.translations[0]?.content ?? "",
 					language: prepared.translations[0]?.language,
 				});
-				showToast("Bind created");
+				showToast("Бинд создан");
 				void navigate({ to: "/" });
 			} else if (bind) {
 				knowledgeService.updateBind(bind.id, {
@@ -1357,7 +1338,7 @@ function BindFormModal({
 					tags: splitTags(tags),
 					translations: prepared.translations,
 				});
-				showToast("Bind saved");
+				showToast("Бинд сохранён");
 			}
 
 			onClose();
@@ -1370,7 +1351,7 @@ function BindFormModal({
 
 	return (
 		<BaseModal
-			title={mode === "create" ? "Create bind" : "Edit bind"}
+			title={mode === "create" ? "Новый бинд" : "Редактировать бинд"}
 			onClose={requestClose}
 			closeDisabled={saving}
 			size="xl"
@@ -1426,7 +1407,7 @@ function BindFormModal({
 								className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								<Plus size={15} />
-								Add Language
+								Добавить язык
 							</button>
 						</div>
 					</div>
@@ -1443,7 +1424,7 @@ function BindFormModal({
 								{mode === "edit" && translationDrafts.length > 1 && (
 									<button
 										type="button"
-										title="Delete language"
+										title="Удалить язык"
 										onClick={() => removeLanguage(activeDraft.language)}
 										disabled={saving}
 										className="rounded-md p-1.5 text-muted hover:bg-surface-elevated hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1455,7 +1436,7 @@ function BindFormModal({
 
 							<div className="space-y-4">
 								<Field
-									label="Title"
+									label="Заголовок"
 									error={errors[`title.${activeDraft.language}`]}
 								>
 									<input
@@ -1471,7 +1452,7 @@ function BindFormModal({
 								</Field>
 
 								<Field
-									label="Content"
+									label="Содержание"
 									error={errors[`content.${activeDraft.language}`]}
 								>
 									<textarea
@@ -1510,7 +1491,7 @@ function BindFormModal({
 								/>
 							</Field>
 
-							<Field label="Category" error={errors.categoryId}>
+							<Field label="Категория" error={errors.categoryId}>
 								<select
 									value={categoryId}
 									onChange={(event) => setCategoryId(event.target.value)}
@@ -1518,7 +1499,7 @@ function BindFormModal({
 									className={inputClass}
 								>
 									{categories.length === 0 ? (
-										<option value="">No categories</option>
+										<option value="">Нет категорий</option>
 									) : (
 										categories.map((category) => (
 											<option key={category.id} value={category.id}>
@@ -1529,14 +1510,14 @@ function BindFormModal({
 								</select>
 							</Field>
 
-							<Field label="Folder" hint="Optional">
+							<Field label="Папка" hint="Необязательно">
 								<select
 									value={folderId}
 									onChange={(event) => setFolderId(event.target.value)}
 									disabled={saving || !categoryId}
 									className={inputClass}
 								>
-									<option value="">No folder</option>
+									<option value="">Корень категории</option>
 									{availableFolders.map((folder) => (
 										<option key={folder.id} value={folder.id}>
 											{getFolderPath(folder, folders)}
@@ -1548,7 +1529,7 @@ function BindFormModal({
 
 						<ColorField value={color} onChange={setColor} disabled={saving} />
 
-						<Field label="Tags" hint="Comma separated">
+						<Field label="Теги" hint="Через запятую">
 							<input
 								value={tags}
 								onChange={(event) => setTags(event.target.value)}
@@ -1578,7 +1559,7 @@ function BindFormModal({
 				</details>
 
 				<ModalActions
-					submitLabel={mode === "create" ? "Create" : "Save"}
+					submitLabel={mode === "create" ? "Создать" : "Сохранить"}
 					saving={saving}
 					onCancel={requestClose}
 				/>
@@ -1588,12 +1569,12 @@ function BindFormModal({
 						<div
 							role="alertdialog"
 							aria-modal="true"
-							aria-label="Discard changes"
+							aria-label="Отменить изменения"
 							className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl"
 						>
-							<div className="text-base font-semibold">Discard changes?</div>
+							<div className="text-base font-semibold">Отменить изменения?</div>
 							<p className="mt-2 text-sm leading-6 text-muted">
-								Your unsaved edits in this material will be lost.
+								Несохранённые изменения будут потеряны.
 							</p>
 							<div className="mt-5 flex justify-end gap-2">
 								<button
@@ -1601,7 +1582,7 @@ function BindFormModal({
 									onClick={() => setCloseConfirmationOpen(false)}
 									className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
-									Keep editing
+									Продолжить редактирование
 								</button>
 								<button
 									type="button"
@@ -1631,14 +1612,14 @@ function Field({
 	children: ReactNode;
 }) {
 	return (
-		<div className="block space-y-1.5">
-			<div className="flex items-center gap-2 text-sm font-medium">
+		<fieldset aria-label={label} className="min-w-0 space-y-1.5">
+			<legend className="flex items-center gap-2 text-sm font-medium">
 				{label}
 				{hint && <span className="text-xs font-normal text-muted">{hint}</span>}
-			</div>
+			</legend>
 			{children}
 			<ErrorText message={error} />
-		</div>
+		</fieldset>
 	);
 }
 
@@ -1652,7 +1633,7 @@ function ColorField({
 	disabled: boolean;
 }) {
 	return (
-		<Field label="Color" hint="Optional">
+		<Field label="Цвет" hint="Необязательно">
 			<div className="flex flex-wrap items-center gap-2">
 				{COLOR_SWATCHES.map((color) => (
 					<button
@@ -1699,7 +1680,7 @@ function ModalActions({
 				disabled={saving}
 				className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 			>
-				Cancel
+				Отмена
 			</button>
 
 			<button
@@ -1711,7 +1692,7 @@ function ModalActions({
 						: "bg-accent hover:bg-accent/90"
 				}`}
 			>
-				{saving ? "Saving..." : submitLabel}
+				{saving ? "Сохранение…" : submitLabel}
 			</button>
 		</div>
 	);
@@ -1877,10 +1858,10 @@ function getBindLocation(
 		: undefined;
 
 	if (folder) {
-		return `${category?.name ?? "Category"} / ${getFolderPath(folder, folders)}`;
+		return `${category?.name ?? "Категория"} / ${getFolderPath(folder, folders)}`;
 	}
 
-	return category?.name ?? "No category";
+	return category?.name ?? "Без категории";
 }
 
 function prepareTranslations(
@@ -1902,19 +1883,19 @@ function prepareTranslations(
 		}
 
 		if (!isValidLanguageCode(language)) {
-			errors[`language.${draft.language}`] = "Language code is invalid";
+			errors[`language.${draft.language}`] = "Некорректный код языка";
 		}
 
 		if (seen.has(language)) {
-			errors[`language.${draft.language}`] = "Language is duplicated";
+			errors[`language.${draft.language}`] = "Язык повторяется";
 		}
 
 		if (!title) {
-			errors[`title.${draft.language}`] = "Title is required";
+			errors[`title.${draft.language}`] = "Укажите заголовок";
 		}
 
 		if (!content) {
-			errors[`content.${draft.language}`] = "Content is required";
+			errors[`content.${draft.language}`] = "Введите содержание";
 		}
 
 		seen.add(language);
@@ -1930,7 +1911,8 @@ function prepareTranslations(
 	}
 
 	if (translations.length === 0 && Object.keys(errors).length === 0) {
-		errors.translations = "Add at least one language with title and content";
+		errors.translations =
+			"Добавьте заголовок и содержание хотя бы на одном языке";
 	}
 
 	return { translations, errors };

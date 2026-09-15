@@ -78,4 +78,48 @@ it("loads immediately, excludes self, marks shared recipients, searches and page
 	});
 	await waitFor(() => expect(screen.queryByText("Ivan")).toBeNull());
 	expect(fetcher.mock.calls.at(-1)?.[0]).toContain("page=1&search=Maria");
+	fireEvent.change(screen.getByLabelText("Поиск по имени или email"), {
+		target: { value: "" },
+	});
+	await screen.findByText("Ivan");
+});
+
+it("refreshes the active directory when reopened and retries loading errors", async () => {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const picker = (
+		<QueryClientProvider client={client}>
+			<ShareRecipientPicker
+				value=""
+				onChange={vi.fn()}
+				sharedEmails={[]}
+				disabled={false}
+			/>
+		</QueryClientProvider>
+	);
+	fetcher.mockResolvedValue({
+		ok: true,
+		json: async () => ({
+			users: [{ id: "i", display_name: "Ivan", email: "i@example.com" }],
+			hasMore: false,
+		}),
+	});
+	const first = render(picker);
+	await screen.findByText("Ivan");
+	first.unmount();
+	fetcher.mockResolvedValue({
+		ok: false,
+		json: async () => ({ error: "Сеть недоступна" }),
+	});
+	render(picker);
+	await screen.findByRole("alert");
+	expect(fetcher).toHaveBeenCalledTimes(2);
+	fetcher.mockResolvedValue({
+		ok: true,
+		json: async () => ({ users: [], hasMore: false }),
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
+	await screen.findByText("Сотрудники не найдены.");
+	expect(screen.queryByText("Ivan")).toBeNull();
 });

@@ -209,11 +209,66 @@ it("matches stable ids or a unique slug without guessing duplicate titles", () =
 	).toBe("linked");
 });
 it("offers sharing before a personal branch exists", async () => {
+	mock.accounts.mockResolvedValue({
+		ok: true,
+		json: async () => ({
+			users: [
+				{ id: "recipient", display_name: "Ivan", email: "ivan@example.com" },
+			],
+			hasMore: false,
+		}),
+	});
+	mock.branchAction.mockImplementation(async (action) => {
+		if (action === "share")
+			mock.branches.mockResolvedValue({
+				choices: {},
+				incoming: [],
+				outgoing: [
+					{
+						id: "share",
+						sourceId: "common",
+						recipient: "Ivan",
+						email: "ivan@example.com",
+					},
+				],
+			});
+		if (action === "revoke")
+			mock.branches.mockResolvedValue({
+				choices: {},
+				incoming: [],
+				outgoing: [],
+			});
+		return { ok: true };
+	});
 	show();
 	fireEvent.click(await screen.findByRole("button", { name: "Поделиться" }));
 	expect(
 		screen.getByRole("textbox", { name: "Поиск по имени или email" }),
 	).toBeTruthy();
+	fireEvent.click(await screen.findByRole("button", { name: /Ivan/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Предоставить доступ" }));
+	await screen.findByText("Уже имеет доступ");
+	expect(mock.branchAction).toHaveBeenCalledWith("share", {
+		sourceId: "common",
+		email: "ivan@example.com",
+	});
+	fireEvent.click(screen.getByRole("button", { name: /Ivan/ }));
+	const form = screen
+		.getByRole("button", { name: "Предоставить доступ" })
+		.closest("form");
+	if (!form) throw new Error("Share form missing");
+	fireEvent.submit(form);
+	expect(
+		mock.branchAction.mock.calls.filter(([action]) => action === "share"),
+	).toHaveLength(1);
+	fireEvent.click(screen.getByRole("button", { name: "Отозвать доступ" }));
+	await waitFor(() =>
+		expect(screen.queryByText("Уже имеет доступ")).toBeNull(),
+	);
+	expect(
+		(screen.getByRole("button", { name: /Ivan/ }) as HTMLButtonElement)
+			.disabled,
+	).toBe(false);
 });
 
 it("switches immediately while saving and rolls back a failed preference", async () => {
@@ -394,23 +449,23 @@ it.each([
 	};
 	mock.branches.mockResolvedValue({
 		choices: { common: "received" },
-		incoming: [incoming],
+		incoming: [
+			incoming,
+			{ ...incoming, id: "other-received", sender: "Другой автор" },
+		],
 		outgoing: [],
 	});
 	mock.branchAction.mockImplementation(async (action) => {
 		if (action === "decline")
-			mock.branches.mockResolvedValue({
-				choices: {},
-				incoming: [],
-				outgoing: [],
-			});
+			mock.branches.mockImplementation(() => new Promise(() => {}));
 		return { ok: true };
 	});
-	show();
+	const client = show();
 	await screen.findByRole("heading", { name: "Полученная версия", level: 1 });
-	const menu = screen.getByText("Ещё ···").closest("details");
-	if (menu) menu.open = true;
-	fireEvent.click(screen.getByRole("button", { name: "Отказаться от версии" }));
+	fireEvent.click(screen.getByText("Ещё ···"));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Отказаться от версии" }),
+	);
 	expect(
 		screen.getByRole("dialog", { name: "Отказаться от версии?" }),
 	).toBeTruthy();
@@ -424,4 +479,12 @@ it.each([
 	});
 	expect(mock.save).not.toHaveBeenCalled();
 	expect(mock.resetPersonal).not.toHaveBeenCalled();
+	expect(
+		client
+			.getQueryData<{ incoming: { id: string }[] }>([
+				"bind-branches",
+				"support",
+			])
+			?.incoming.map((share) => share.id),
+	).toEqual(["other-received"]);
 });

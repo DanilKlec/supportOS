@@ -40,7 +40,9 @@ export function ShareRecipientPicker({
 			};
 		},
 		staleTime: 30000,
+		refetchOnMount: "always",
 	});
+	const users = accounts.data?.users.filter((account) => account.id !== user);
 	return (
 		<div className="w-full space-y-2">
 			<label className="block text-sm">
@@ -51,7 +53,9 @@ export function ShareRecipientPicker({
 					className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2"
 				/>
 			</label>
-			{accounts.isPending && <p>Загрузка сотрудников…</p>}
+			{accounts.isFetching && (
+				<output className="block">Загрузка сотрудников…</output>
+			)}
 			{accounts.error && (
 				<p role="alert">
 					{accounts.error.message}{" "}
@@ -61,32 +65,30 @@ export function ShareRecipientPicker({
 				</p>
 			)}
 			<div className="max-h-64 overflow-auto">
-				{accounts.data?.users
-					.filter((account) => account.id !== user)
-					.map((account) => {
-						const shared = sharedEmails.some(
-							(email) => email.toLowerCase() === account.email.toLowerCase(),
-						);
-						return (
-							<button
-								type="button"
-								key={account.id}
-								disabled={disabled || shared}
-								aria-pressed={value === account.email}
-								onClick={() => onChange(account.email)}
-								className="block min-h-12 w-full rounded-lg border-b border-border p-3 text-left text-sm aria-pressed:bg-accent/10 disabled:opacity-60"
-							>
-								<span className="block">
-									{account.display_name || account.email}
-								</span>
-								<span className="text-xs text-muted">
-									{shared ? "Уже имеет доступ" : account.email}
-								</span>
-							</button>
-						);
-					})}
+				{users?.map((account) => {
+					const shared = sharedEmails.some(
+						(email) => email.toLowerCase() === account.email.toLowerCase(),
+					);
+					return (
+						<button
+							type="button"
+							key={account.id}
+							disabled={disabled || shared}
+							aria-pressed={value === account.email}
+							onClick={() => onChange(account.email)}
+							className="block min-h-12 w-full rounded-lg border-b border-border p-3 text-left text-sm aria-pressed:bg-accent/10 disabled:opacity-60"
+						>
+							<span className="block">
+								{account.display_name || account.email}
+							</span>
+							<span className="text-xs text-muted">
+								{shared ? "Уже имеет доступ" : account.email}
+							</span>
+						</button>
+					);
+				})}
 			</div>
-			{accounts.data && !accounts.data.users.length && (
+			{users && !users.length && !accounts.isFetching && !accounts.error && (
 				<p className="text-sm text-muted">Сотрудники не найдены.</p>
 			)}
 			<div className="flex gap-3">
