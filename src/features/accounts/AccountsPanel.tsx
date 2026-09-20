@@ -245,7 +245,7 @@ export function AccountsPanel({
 							<li key={line}>{line}</li>
 						))}
 					</ul>
-					<div className="mt-4 flex gap-2">
+					<div className="ui-actions items-center mt-4 flex gap-2">
 						<button
 							type="button"
 							className={`${control} ui-button`}
@@ -271,7 +271,7 @@ export function AccountsPanel({
 				<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
 			)}
 			<div
-				className="flex flex-wrap gap-2"
+				className="ui-actions items-center flex flex-wrap gap-2"
 				role="tablist"
 				aria-label="Управление доступами"
 				style={embedded ? { display: "none" } : undefined}
@@ -582,7 +582,7 @@ export function AccountsPanel({
 							</tbody>
 						</table>
 					</div>
-					<div className="flex items-center gap-3">
+					<div className="ui-actions items-center flex  gap-3">
 						<button
 							type="button"
 							className={`${control} ui-button`}

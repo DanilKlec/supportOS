@@ -138,7 +138,7 @@ function ArchivePage() {
 										</div>
 									</div>
 
-									<div className="flex shrink-0 gap-2">
+									<div className="ui-actions items-center flex shrink-0 gap-2">
 										<button
 											type="button"
 											onClick={() => restoreBind(bind.id)}
@@ -180,7 +180,7 @@ function ArchivePage() {
 								{getBindTitle(pendingDeleteBind, language)}
 							</div>
 						)}
-						<div className="mt-5 flex justify-end gap-2">
+						<div className="ui-actions items-center mt-5 flex justify-end gap-2">
 							<button
 								type="button"
 								onClick={() => setPendingDeleteId(null)}

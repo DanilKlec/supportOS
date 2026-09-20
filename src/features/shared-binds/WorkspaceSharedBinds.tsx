@@ -325,7 +325,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							))}
 						</fieldset>
 					</div>
-					<div className="flex flex-wrap gap-2">
+					<div className="ui-actions items-center flex flex-wrap gap-2">
 						<MoreActions>
 							{local && <LocalBindActions bind={local} />}
 							{incoming.some((share) => share.id === selected.branch) && (
@@ -363,7 +363,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								История
 							</button>
 							{savedOwn && (
-								<div className="flex flex-wrap gap-2">
+								<div className="ui-actions items-center flex flex-wrap gap-2">
 									<button
 										type="button"
 										disabled={busy}
@@ -449,7 +449,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						</p>
 						<h1 className="text-2xl font-semibold">{translation?.title}</h1>
 					</div>
-					<div className="flex flex-wrap gap-2">
+					<div className="ui-actions items-center flex flex-wrap gap-2">
 						<button
 							type="button"
 							disabled={busy}
@@ -631,7 +631,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							После отказа вы вернётесь к своей или общей версии бинда.
 						</p>
 						{error && <p role="alert">{error}</p>}
-						<div className="flex gap-3">
+						<div className="ui-actions items-center flex gap-3">
 							<button
 								type="button"
 								disabled={busy}
@@ -727,7 +727,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									showToast("Доступ к ветке предоставлен");
 								});
 							}}
-							className="flex flex-wrap gap-2"
+							className="ui-actions items-center flex flex-wrap gap-2"
 						>
 							<ShareRecipientPicker
 								value={email}

@@ -472,7 +472,7 @@ export function Sidebar({
 								</button>
 							</div>
 
-							<div className="flex flex-wrap gap-1">
+							<div className="ui-actions items-center flex flex-wrap gap-1">
 								<button
 									type="button"
 									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground"
@@ -537,7 +537,7 @@ export function Sidebar({
 							</div>
 
 							{bulkTagOpen && (
-								<div className="mt-2 flex gap-1">
+								<div className="ui-actions items-center mt-2 flex gap-1">
 									<input
 										value={bulkTag}
 										onChange={(event) => setBulkTag(event.target.value)}

@@ -521,7 +521,7 @@ export function Topbar({
 								)?.content
 							}
 						</p>
-						<div className="mt-4 flex gap-2">
+						<div className="ui-actions items-center mt-4 flex gap-2">
 							<button
 								type="button"
 								onClick={() =>

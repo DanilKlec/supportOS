@@ -103,7 +103,7 @@ export function BindLinkEditor({
 					{error}
 				</p>
 			)}
-			<div className="flex flex-wrap gap-2">
+			<div className="ui-actions items-center flex flex-wrap gap-2">
 				<button
 					type="button"
 					disabled={!chosen}

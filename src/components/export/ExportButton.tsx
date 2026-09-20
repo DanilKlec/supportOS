@@ -32,7 +32,7 @@ export function ExportButton() {
 	};
 
 	return (
-		<div className="flex gap-2">
+		<div className="ui-actions items-center flex gap-2">
 			<button
 				type="button"
 				onClick={exportToCSV}

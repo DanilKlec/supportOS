@@ -737,7 +737,7 @@ export function BindViewer() {
 							)}
 						</div>
 
-						<div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+						<div className="ui-actions items-center flex min-w-0 max-w-full flex-wrap  gap-2">
 							<div className="hidden min-w-0 max-w-full flex-wrap rounded-xl bg-surface p-1 sm:flex">
 								{languageCodes.map((code) => {
 									const exists = bind.translations.some(

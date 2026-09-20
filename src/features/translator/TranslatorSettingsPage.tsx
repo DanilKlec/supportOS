@@ -232,7 +232,7 @@ export function TranslatorSettingsPage({
 						</div>
 					)}
 
-					<div className="flex flex-wrap items-center gap-3">
+					<div className="ui-actions items-center flex flex-wrap  gap-3">
 						<button
 							type="button"
 							onClick={testConnection}

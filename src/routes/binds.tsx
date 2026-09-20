@@ -42,7 +42,7 @@ function BindsPage() {
 		<div className="flex h-full">
 			<main className="flex-1 overflow-auto">
 				<div className="mx-auto max-w-4xl p-6">
-					<div className="mb-6 flex items-center justify-end">
+					<div className="ui-actions items-center mb-6 flex  justify-end">
 						<button
 							type="button"
 							onClick={() => modalManager.open("createBind", { categoryId })}

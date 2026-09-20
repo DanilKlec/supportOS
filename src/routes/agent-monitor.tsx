@@ -309,7 +309,7 @@ function AgentMonitor() {
 						</p>
 					</div>
 					{data && (
-						<div className="flex gap-2">
+						<div className="ui-actions items-center flex gap-2">
 							<button
 								type="button"
 								disabled={busy}
@@ -393,7 +393,7 @@ function AgentMonitor() {
 								</div>
 							))}
 						</div>
-						<div className="flex flex-wrap items-center gap-3">
+						<div className="ui-actions items-end flex flex-wrap  gap-3">
 							<label className="text-sm">
 								Дата начала смены{" "}
 								<input
@@ -443,7 +443,7 @@ function AgentMonitor() {
 							относится к дате начала. В сводке учитывается только прошедшее
 							время; пробелы наблюдения более 90 секунд отмечаются «Нет данных».
 						</p>
-						<div className="flex flex-wrap items-center gap-3">
+						<div className="ui-actions items-end flex flex-wrap  gap-3">
 							<input
 								aria-label="Поиск агента"
 								className={control}

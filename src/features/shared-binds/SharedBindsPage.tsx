@@ -141,7 +141,7 @@ export function SharedBindsPage() {
 							правами на изменения.
 						</p>
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="ui-actions items-center flex  gap-2">
 						<button
 							type="button"
 							aria-label="Обновить общие бинды"
@@ -371,7 +371,7 @@ export function SharedBindsPage() {
 											{new Date(bind.updatedAt).toLocaleString("ru-RU")}
 										</p>
 									</div>
-									<div className="flex flex-wrap gap-2">
+									<div className="ui-actions items-center flex flex-wrap gap-2">
 										{mode === "common" && canEdit && (
 											<button
 												type="button"
@@ -758,7 +758,7 @@ export function SharedBindEditor({
 								публикацией сравните версии.
 							</p>
 						)}
-						<div className="flex gap-2">
+						<div className="ui-actions items-center flex gap-2">
 							<button
 								type="button"
 								onClick={() => {
@@ -896,7 +896,7 @@ export function SharedBindEditor({
 						</p>
 					</section>
 				)}
-				<div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
+				<div className="ui-actions items-center flex flex-wrap justify-end gap-3 border-t border-border pt-4">
 					<button
 						type="button"
 						disabled={saving}

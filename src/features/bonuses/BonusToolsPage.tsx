@@ -533,7 +533,7 @@ export function BonusToolsPage({
 						</div>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<button
 							type="button"
 							disabled={!canEdit}
@@ -932,7 +932,7 @@ export function BonusToolsPage({
 												);
 											})}
 											<td className="whitespace-nowrap px-3 py-2">
-												<div className="flex items-center gap-2">
+												<div className="ui-actions items-center flex  gap-2">
 													<button
 														type="button"
 														disabled={!canEdit}
@@ -1049,7 +1049,7 @@ export function BonusToolsPage({
 							)}
 						</div>
 
-						<div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+						<div className="ui-actions items-center sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
 							<button
 								type="button"
 								onClick={() => setRuleEditorOpen(false)}

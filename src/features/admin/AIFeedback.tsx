@@ -43,7 +43,7 @@ export function AIFeedback({
 		);
 	return (
 		<div className="space-y-2">
-			<div className="flex gap-2">
+			<div className="ui-actions items-center flex gap-2">
 				<button
 					type="button"
 					aria-label="Полезный ответ AI"
@@ -64,7 +64,7 @@ export function AIFeedback({
 				</button>
 			</div>
 			{negative && (
-				<div className="flex flex-wrap gap-2">
+				<div className="ui-actions items-center flex flex-wrap gap-2">
 					<select
 						aria-label="Причина оценки AI"
 						className="rounded border border-border bg-background p-2 text-sm"

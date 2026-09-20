@@ -571,7 +571,7 @@ export function AIControlCenter({
 									Автор: {entry.author} · {entry.updatedAt}
 								</p>
 							)}
-							<div className="flex flex-wrap gap-2">
+							<div className="ui-actions items-center flex flex-wrap gap-2">
 								<button
 									disabled={busy || !query.data || !editable}
 									type="submit"

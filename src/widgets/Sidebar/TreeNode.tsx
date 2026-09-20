@@ -581,7 +581,7 @@ export function TreeNode({
 			>
 				{node.type === "bind" && (
 					<div
-						className="flex shrink-0 items-center"
+						className="items-center flex shrink-0"
 						style={{
 							paddingLeft: 12 + level * 18,
 						}}

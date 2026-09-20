@@ -386,7 +386,7 @@ export function SportsBettingPage() {
 						</p>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
 							Auto update every {formatDurationMs(pollMs)}
 						</div>

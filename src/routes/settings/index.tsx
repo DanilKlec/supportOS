@@ -323,7 +323,7 @@ function SettingsPage() {
 								</p>
 							</div>
 
-							<div className="flex items-center gap-2">
+							<div className="ui-actions items-center flex  gap-2">
 								<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
 									Current: {resolvedTheme}
 								</div>

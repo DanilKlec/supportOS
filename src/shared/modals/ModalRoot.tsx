@@ -1221,7 +1221,7 @@ function BindFormModal({
 			<BaseModal title="Редактировать бинд" onClose={requestClose} size="lg">
 				<div className="space-y-4">
 					<FormError message="Бинд не найден" />
-					<div className="flex justify-end">
+					<div className="ui-actions items-center flex justify-end">
 						<button
 							type="button"
 							onClick={requestClose}
@@ -1385,7 +1385,7 @@ function BindFormModal({
 							))}
 						</div>
 
-						<div className="flex min-w-0 items-start gap-2">
+						<div className="ui-actions items-center flex min-w-0  gap-2">
 							<div className="min-w-28">
 								<input
 									value={newLanguage}
@@ -1576,7 +1576,7 @@ function BindFormModal({
 							<p className="mt-2 text-sm leading-6 text-muted">
 								Несохранённые изменения будут потеряны.
 							</p>
-							<div className="mt-5 flex justify-end gap-2">
+							<div className="ui-actions items-center mt-5 flex justify-end gap-2">
 								<button
 									type="button"
 									onClick={() => setCloseConfirmationOpen(false)}
@@ -1673,7 +1673,7 @@ function ModalActions({
 	danger?: boolean;
 }) {
 	return (
-		<div className="sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:-mx-5 sm:-mb-4 sm:px-5">
+		<div className="ui-actions items-center sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:-mx-5 sm:-mb-4 sm:px-5">
 			<button
 				type="button"
 				onClick={onCancel}

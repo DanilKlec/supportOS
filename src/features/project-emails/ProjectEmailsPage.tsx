@@ -349,7 +349,7 @@ export function ProjectEmailsPage({
 						</h1>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<button
 							type="button"
 							style={!management ? { display: "none" } : undefined}
@@ -496,7 +496,7 @@ export function ProjectEmailsPage({
 										</div>
 									</div>
 
-									<div className="flex flex-wrap items-center gap-2">
+									<div className="ui-actions items-center flex flex-wrap  gap-2">
 										<button
 											type="button"
 											onClick={() =>
@@ -659,7 +659,7 @@ function ProjectEmailEditor({
 				</div>
 			)}
 
-			<div className="mt-4 flex flex-wrap justify-end gap-2">
+			<div className="ui-actions items-center mt-4 flex flex-wrap justify-end gap-2">
 				<button
 					type="button"
 					onClick={onCancel}
@@ -914,7 +914,7 @@ function DeleteConfirmDialog({
 					{title}
 				</h2>
 				<p className="mt-2 text-sm text-muted">{description}</p>
-				<div className="mt-5 flex justify-end gap-2">
+				<div className="ui-actions items-center mt-5 flex justify-end gap-2">
 					<button
 						type="button"
 						onClick={onCancel}

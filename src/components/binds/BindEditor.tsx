@@ -50,7 +50,7 @@ export function BindEditor({ bind }: BindEditorProps) {
 					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
+				<div className="ui-actions items-center flex flex-wrap  gap-2">
 					<button
 						type="button"
 						className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors"

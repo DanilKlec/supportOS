@@ -92,7 +92,7 @@ export function BindCard({ bind }: BindCardProps) {
 			onDragEnd={() => setDragging(false)}
 			className={`rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent/30 ${dragging ? "opacity-50" : ""}`}
 		>
-			<div className="flex items-start gap-3">
+			<div className="ui-actions items-center flex  gap-3">
 				<button
 					type="button"
 					onClick={() => {

@@ -83,7 +83,7 @@ export function PersonalLibrary() {
 			.map((b) => (
 				<div
 					key={b.id}
-					className="flex items-center gap-2 border-b border-border py-2"
+					className="ui-actions items-center flex  gap-2 border-b border-border py-2"
 				>
 					<button
 						type="button"
@@ -173,7 +173,7 @@ export function PersonalLibrary() {
 							</article>
 						))}
 					</div>
-					<div className="my-3 flex flex-wrap gap-2">
+					<div className="ui-actions items-center my-3 flex flex-wrap gap-2">
 						<button
 							type="button"
 							className="min-h-10 rounded-lg border border-border px-3"

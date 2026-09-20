@@ -40,7 +40,7 @@ export function SelectionActions() {
 	if (!selection || !can(access, "binds.read")) return null;
 	return (
 		<div
-			className="fixed z-30 flex max-w-[calc(100vw-16px)] flex-wrap gap-1 rounded-xl border border-border bg-surface p-1 shadow-lg"
+			className="ui-actions items-center fixed z-30 flex max-w-[calc(100vw-16px)] flex-wrap gap-1 rounded-xl border border-border bg-surface p-1 shadow-lg"
 			style={{ left: selection.x, top: selection.y }}
 		>
 			{can(access, "tools") &&

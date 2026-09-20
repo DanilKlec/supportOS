@@ -91,7 +91,7 @@ export function ShareRecipientPicker({
 			{users && !users.length && !accounts.isFetching && !accounts.error && (
 				<p className="text-sm text-muted">Сотрудники не найдены.</p>
 			)}
-			<div className="flex gap-3">
+			<div className="ui-actions items-center flex gap-3">
 				<button
 					type="button"
 					disabled={page === 1 || accounts.isFetching}

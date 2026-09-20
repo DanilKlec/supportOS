@@ -142,7 +142,7 @@ export function Inbox() {
 					closeDisabled={!!busy}
 					size="lg"
 				>
-					<div className="mb-4 flex flex-wrap gap-2">
+					<div className="ui-actions items-center mb-4 flex flex-wrap gap-2">
 						{[
 							{ id: "unread", label: "Непрочитанные" },
 							{ id: "all", label: "Все" },
@@ -201,7 +201,7 @@ export function Inbox() {
 							>
 								<p className="text-xs text-muted">{item.description}</p>
 								<h3 className="my-2 text-sm font-semibold">{item.title}</h3>
-								<div className="flex items-center gap-3">
+								<div className="ui-actions items-center flex  gap-3">
 									<span className="text-xs text-muted">
 										{new Date(item.stamp).toLocaleString("ru")}
 									</span>

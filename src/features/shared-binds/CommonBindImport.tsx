@@ -155,7 +155,7 @@ export function CommonBindImport() {
 				Совпадения по ID или slug обновят общие оригиналы. Личные версии
 				сохраняются. Отсутствующие языки и пустые переводы пропускаются.
 			</p>
-			<div className="flex flex-wrap gap-3">
+			<div className="ui-actions items-end flex flex-wrap gap-3">
 				<label className="rounded-xl border border-border p-3 text-sm">
 					JSON-файл
 					<input

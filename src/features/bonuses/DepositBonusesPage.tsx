@@ -927,7 +927,7 @@ export function DepositBonusesPage({
 						</p>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<div className="flex rounded-md border border-border bg-surface p-1">
 							{BONUS_LANGUAGES.map((language) => (
 								<button
@@ -1254,7 +1254,7 @@ export function DepositBonusesPage({
 										<div className="mb-2 text-xs font-semibold uppercase text-muted">
 											Active sheet
 										</div>
-										<div className="flex max-w-xl gap-2">
+										<div className="ui-actions items-center flex max-w-xl gap-2">
 											<input
 												value={renameValue}
 												onChange={(event) => setRenameValue(event.target.value)}
@@ -1303,7 +1303,7 @@ export function DepositBonusesPage({
 										</div>
 									</div>
 
-									<div className="flex items-center gap-2">
+									<div className="ui-actions items-center flex  gap-2">
 										<button
 											type="button"
 											disabled={!canEdit}
@@ -1379,7 +1379,7 @@ export function DepositBonusesPage({
 											</div>
 										)}
 
-										<div className="flex flex-wrap justify-end gap-2">
+										<div className="ui-actions items-center flex flex-wrap justify-end gap-2">
 											{editingBonusId && (
 												<button
 													type="button"
@@ -1477,7 +1477,7 @@ export function DepositBonusesPage({
 															{content}
 														</div>
 
-														<div className="flex items-start gap-2">
+														<div className="ui-actions items-center flex  gap-2">
 															<button
 																type="button"
 																onClick={() => void copyBonus(bonus)}
@@ -1600,7 +1600,7 @@ function ConfirmDialog({
 					{title}
 				</h2>
 				<p className="mt-2 text-sm text-muted">{description}</p>
-				<div className="mt-5 flex justify-end gap-2">
+				<div className="ui-actions items-center mt-5 flex justify-end gap-2">
 					<button
 						type="button"
 						onClick={onCancel}

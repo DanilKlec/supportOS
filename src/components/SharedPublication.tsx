@@ -265,7 +265,7 @@ export function useSharedPublication(
 						</p>
 					)}
 				</div>
-				<div className="flex flex-wrap gap-2">
+				<div className="ui-actions items-center flex flex-wrap gap-2">
 					{writable && ready && version === 0 && initial.current.length > 0 && (
 						<button
 							type="button"

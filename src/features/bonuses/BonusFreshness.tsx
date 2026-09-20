@@ -87,7 +87,7 @@ export function BonusFreshness({
 							className="mt-1 block w-full rounded-lg border border-border bg-background p-2"
 						/>
 					</label>
-					<div className="flex flex-wrap gap-2">
+					<div className="ui-actions items-center flex flex-wrap gap-2">
 						<button
 							type="submit"
 							className="rounded-lg border border-border p-2"
