@@ -160,3 +160,46 @@ it("creates a custom role from permission checkboxes", async () => {
 		version: 0,
 	});
 });
+it("shows the embedded directory with all statuses, server filters and account creation", async () => {
+	render(<AccountsPanel standalone embedded initialTab="users" />);
+	await screen.findByRole("table", { name: "Реестр пользователей" });
+	await screen.findByText("user@example.com");
+	expect(
+		(screen.getByLabelText("Статус сотрудников") as HTMLSelectElement).value,
+	).toBe("");
+	fireEvent.change(screen.getByLabelText("Статус сотрудников"), {
+		target: { value: "pending" },
+	});
+	await waitFor(() =>
+		expect(
+			mock.fetch.mock.calls.some(([url]) =>
+				String(url).includes("status=pending"),
+			),
+		).toBe(true),
+	);
+	fireEvent.change(screen.getByLabelText("Роль сотрудников"), {
+		target: { value: "qc" },
+	});
+	await waitFor(() =>
+		expect(
+			mock.fetch.mock.calls.some(([url]) => String(url).includes("role=qc")),
+		).toBe(true),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Сбросить" }));
+	await waitFor(() =>
+		expect(
+			(screen.getByLabelText("Статус сотрудников") as HTMLSelectElement).value,
+		).toBe(""),
+	);
+	await waitFor(() =>
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Создать аккаунт",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(false),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Создать аккаунт" }));
+	expect(screen.getByRole("dialog", { name: "Новый сотрудник" })).toBeTruthy();
+});

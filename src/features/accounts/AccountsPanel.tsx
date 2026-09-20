@@ -115,7 +115,7 @@ export function AccountsPanel({
 		body: unknown;
 		diff: string[];
 	} | null>(null);
-	const [statusFilter, setStatusFilter] = useState(initialUser ? "" : "active");
+	const [statusFilter, setStatusFilter] = useState("");
 	const [roleFilter, setRoleFilter] = useState("");
 	const refresh = () => setRevision((r) => r + 1);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: revision explicitly refreshes the server snapshot after mutations.
@@ -136,8 +136,8 @@ export function AccountsPanel({
 						{
 							page: String(page),
 							search: query,
-							status: embedded ? statusFilter : "",
-							role: embedded ? roleFilter : "",
+							status: statusFilter,
+							role: roleFilter,
 						},
 						abort.signal,
 					);
@@ -267,121 +267,6 @@ export function AccountsPanel({
 					</div>
 				</BaseModal>
 			)}
-			{embedded && tab === "users" && usersAllowed && (
-				<div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-					<div className="space-y-2">
-						<form
-							onSubmit={(e) => {
-								e.preventDefault();
-								setQuery(search);
-								setPage(1);
-							}}
-						>
-							<input
-								aria-label="Поиск сотрудников"
-								className={`${control} w-full`}
-								value={search}
-								onChange={(e) => setSearch(e.target.value)}
-							/>
-							<button type="submit" className={`${control} ui-button`}>
-								Найти
-							</button>
-						</form>
-						<select
-							aria-label="Статус сотрудников"
-							className={control}
-							value={statusFilter}
-							onChange={(e) => {
-								setStatusFilter(e.target.value);
-								setPage(1);
-							}}
-						>
-							<option value="">Все статусы</option>
-							<option value="active">Активные</option>
-							<option value="pending">Ожидают доступа</option>
-							<option value="disabled">Отключены</option>
-						</select>
-						<select
-							aria-label="Роль сотрудников"
-							className={control}
-							value={roleFilter}
-							onChange={(e) => {
-								setRoleFilter(e.target.value);
-								setPage(1);
-							}}
-						>
-							<option value="">Все роли</option>
-							{roles.map((r) => (
-								<option key={r.id} value={r.id}>
-									{r.name}
-								</option>
-							))}
-						</select>
-						<p className="text-xs text-muted">Найдено: {total}</p>
-						{users
-							.filter(
-								(u) =>
-									(!statusFilter || u.status === statusFilter) &&
-									(!roleFilter || u.roles.includes(roleFilter)),
-							)
-							.map((u) => (
-								<button
-									type="button"
-									key={u.id}
-									className={`${control} block w-full text-left`}
-									onClick={() => setUserEdit(u)}
-								>
-									{u.display_name || u.email}
-									<small className="block">
-										{u.roles.map(roleName).join(", ")}
-									</small>
-								</button>
-							))}
-						<div className="flex gap-2">
-							<button
-								type="button"
-								disabled={page === 1 || busy}
-								className={`${control} ui-button`}
-								onClick={() => setPage(page - 1)}
-							>
-								Назад
-							</button>
-							<button
-								type="button"
-								disabled={page * 50 >= total || busy}
-								className={`${control} ui-button`}
-								onClick={() => setPage(page + 1)}
-							>
-								Далее
-							</button>
-						</div>
-					</div>
-					<div>
-						{userEdit ? (
-							<UserDetails key={userEdit.id} user={userEdit}>
-								<EditUser
-									key={`${userEdit.id}-${userEdit.version}`}
-									user={userEdit}
-									roles={assignable}
-									permissions={permissions}
-									busy={
-										busy ||
-										userEdit.id === identity?.id ||
-										(!owner &&
-											userEdit.roles.some(
-												(id) => !assignable.some((r) => r.id === id),
-											))
-									}
-									onSave={mutate}
-									onCancel={() => setUserEdit(null)}
-								/>
-							</UserDetails>
-						) : (
-							<p>Выберите сотрудника для просмотра профиля и доступа.</p>
-						)}
-					</div>
-				</div>
-			)}
 			{!standalone && (
 				<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
 			)}
@@ -445,10 +330,28 @@ export function AccountsPanel({
 					}}
 				/>
 			)}
-			{tab === "users" && usersAllowed && !embedded && (
+			{tab === "users" && usersAllowed && (
 				<>
+					<header className="user-registry-heading">
+						<div>
+							<p className="section-eyebrow">Команда</p>
+							<h1>Пользователи</h1>
+							<p>Управляйте аккаунтами, ролями и доступом сотрудников.</p>
+						</div>
+						<button
+							type="button"
+							className="ui-button ui-button--primary"
+							disabled={busy}
+							onClick={() => {
+								setCreate(true);
+								setUserEdit(null);
+							}}
+						>
+							Создать аккаунт
+						</button>
+					</header>
 					<form
-						className="flex flex-wrap gap-2"
+						className="user-registry-filters"
 						onSubmit={(e) => {
 							e.preventDefault();
 							setQuery(search);
@@ -471,21 +374,55 @@ export function AccountsPanel({
 						>
 							Найти
 						</button>
-						<button
-							type="button"
-							className={`${control} ui-button`}
-							disabled={busy}
-							onClick={() => {
-								setCreate(true);
-								setUserEdit(null);
+						<select
+							aria-label="Статус сотрудников"
+							className={control}
+							value={statusFilter}
+							onChange={(e) => {
+								setStatusFilter(e.target.value);
+								setPage(1);
 							}}
 						>
-							Создать аккаунт
-						</button>
+							<option value="">Все статусы</option>
+							<option value="active">Активные</option>
+							<option value="pending">Ожидают доступа</option>
+							<option value="disabled">Отключены</option>
+						</select>
+						<select
+							aria-label="Роль сотрудников"
+							className={control}
+							value={roleFilter}
+							onChange={(e) => {
+								setRoleFilter(e.target.value);
+								setPage(1);
+							}}
+						>
+							<option value="">Все роли</option>
+							{roles.map((role) => (
+								<option key={role.id} value={role.id}>
+									{role.name}
+								</option>
+							))}
+						</select>
+						{(query || search || statusFilter || roleFilter) && (
+							<button
+								type="button"
+								className="ui-button ui-button--ghost"
+								onClick={() => {
+									setSearch("");
+									setQuery("");
+									setStatusFilter("");
+									setRoleFilter("");
+									setPage(1);
+								}}
+							>
+								Сбросить
+							</button>
+						)}
 					</form>
 					<p className="text-sm text-muted">
-						Найдено: {total}. У одного сотрудника может быть несколько ролей —
-						их разрешения объединяются.
+						Найдено: {total} · Страница {page} из{" "}
+						{Math.max(1, Math.ceil(total / 50))}
 					</p>
 					{create && (
 						<BaseModal
@@ -511,7 +448,7 @@ export function AccountsPanel({
 					{userEdit && (
 						<BaseModal
 							title="Профиль и доступы сотрудника"
-							size="lg"
+							size="xl"
 							onClose={() => setUserEdit(null)}
 							closeDisabled={busy}
 						>
@@ -520,25 +457,41 @@ export function AccountsPanel({
 									{error}
 								</p>
 							)}
-							<EditUser
-								key={`${userEdit.id}-${userEdit.version}`}
-								user={userEdit}
-								roles={assignable}
-								permissions={permissions}
-								busy={busy}
-								onSave={mutate}
-								onCancel={() => setUserEdit(null)}
-							/>
+							<UserDetails key={userEdit.id} user={userEdit}>
+								<EditUser
+									key={`${userEdit.id}-${userEdit.version}`}
+									user={userEdit}
+									roles={assignable}
+									permissions={permissions}
+									busy={
+										busy ||
+										userEdit.id === identity?.id ||
+										userEdit.roles.includes("creator") ||
+										(!owner &&
+											userEdit.roles.some(
+												(id) => !assignable.some((role) => role.id === id),
+											))
+									}
+									onSave={mutate}
+									onCancel={() => setUserEdit(null)}
+								/>
+							</UserDetails>
 						</BaseModal>
 					)}
-					<div className="overflow-auto rounded-xl border border-border">
-						<table className="w-full min-w-[680px] text-left text-sm">
+					<div
+						className="accounts-registry user-registry-table overflow-auto rounded-xl border border-border"
+						aria-busy={busy}
+					>
+						<table
+							aria-label="Реестр пользователей"
+							className="w-full min-w-[680px] text-left text-sm"
+						>
 							<thead className="bg-background/70 text-xs text-muted">
 								<tr>
-									<th>Сотрудник</th>
-									<th>Роли</th>
-									<th>Статус</th>
-									<th>Действия</th>
+									<th scope="col">Сотрудник</th>
+									<th scope="col">Роли</th>
+									<th scope="col">Статус</th>
+									<th scope="col">Действия</th>
 								</tr>
 							</thead>
 							<tbody>
