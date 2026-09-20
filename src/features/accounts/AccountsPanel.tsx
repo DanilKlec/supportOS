@@ -248,7 +248,7 @@ export function AccountsPanel({
 					<div className="mt-4 flex gap-2">
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							onClick={() => {
 								const body = confirmation.body;
 								setConfirmation(null);
@@ -259,7 +259,7 @@ export function AccountsPanel({
 						</button>
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							onClick={() => setConfirmation(null)}
 						>
 							Отмена
@@ -283,7 +283,7 @@ export function AccountsPanel({
 								value={search}
 								onChange={(e) => setSearch(e.target.value)}
 							/>
-							<button type="submit" className={control}>
+							<button type="submit" className={`${control} ui-button`}>
 								Найти
 							</button>
 						</form>
@@ -341,7 +341,7 @@ export function AccountsPanel({
 							<button
 								type="button"
 								disabled={page === 1 || busy}
-								className={control}
+								className={`${control} ui-button`}
 								onClick={() => setPage(page - 1)}
 							>
 								Назад
@@ -349,7 +349,7 @@ export function AccountsPanel({
 							<button
 								type="button"
 								disabled={page * 50 >= total || busy}
-								className={control}
+								className={`${control} ui-button`}
 								onClick={() => setPage(page + 1)}
 							>
 								Далее
@@ -418,7 +418,7 @@ export function AccountsPanel({
 					))}
 				<button
 					type="button"
-					className={control}
+					className={`${control} ui-button`}
 					disabled={busy}
 					onClick={refresh}
 				>
@@ -464,12 +464,16 @@ export function AccountsPanel({
 							maxLength={120}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
-						<button type="submit" className={control} disabled={busy}>
+						<button
+							type="submit"
+							className={`${control} ui-button`}
+							disabled={busy}
+						>
 							Найти
 						</button>
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							disabled={busy}
 							onClick={() => {
 								setCreate(true);
@@ -593,7 +597,7 @@ export function AccountsPanel({
 										<td data-label="Действия">
 											<button
 												type="button"
-												className={control}
+												className={`${control} ui-button`}
 												disabled={
 													busy ||
 													u.id === identity?.id ||
@@ -628,7 +632,7 @@ export function AccountsPanel({
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							disabled={busy || page === 1}
 							onClick={() => setPage((p) => p - 1)}
 						>
@@ -637,7 +641,7 @@ export function AccountsPanel({
 						<span>Страница {page}</span>
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							disabled={busy || page * 50 >= total}
 							onClick={() => setPage((p) => p + 1)}
 						>
@@ -661,7 +665,7 @@ export function AccountsPanel({
 											<th key={r.id} className="p-2">
 												<button
 													type="button"
-													className={control}
+													className={`${control} ui-button`}
 													disabled={
 														!rolesAllowed ||
 														busy ||
@@ -725,7 +729,7 @@ export function AccountsPanel({
 					{rolesAllowed && (
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							disabled={busy}
 							onClick={() =>
 								setRoleEdit({
@@ -778,7 +782,7 @@ export function AccountsPanel({
 								{rolesAllowed && (
 									<button
 										type="button"
-										className={control}
+										className={`${control} ui-button`}
 										disabled={
 											busy ||
 											r.id === "creator" ||
@@ -841,7 +845,7 @@ export function AccountsPanel({
 					{moreAudit && (
 						<button
 							type="button"
-							className={control}
+							className={`${control} ui-button`}
 							disabled={busy}
 							onClick={async () => {
 								setBusy(true);
@@ -926,7 +930,7 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 						role="tab"
 						aria-selected={tab === id}
 						key={id}
-						className={control}
+						className={`${control} ui-button`}
 						onClick={() => setTab(id)}
 					>
 						{label}
@@ -1102,14 +1106,14 @@ function CreateUser({
 			</p>
 			<button
 				type="submit"
-				className={control}
+				className={`${control} ui-button`}
 				disabled={busy || !selected.length}
 			>
 				Создать аккаунт
 			</button>{" "}
 			<button
 				type="button"
-				className={control}
+				className={`${control} ui-button`}
 				disabled={busy}
 				onClick={onCancel}
 			>
@@ -1197,14 +1201,14 @@ function EditUser({
 			</p>
 			<button
 				type="submit"
-				className={control}
+				className={`${control} ui-button`}
 				disabled={busy || (status === "active" && !selected.length)}
 			>
 				Сохранить доступ
 			</button>{" "}
 			<button
 				type="button"
-				className={control}
+				className={`${control} ui-button`}
 				disabled={busy}
 				onClick={onCancel}
 			>
@@ -1342,12 +1346,12 @@ function EditRole({
 					</section>
 				))}
 			</fieldset>
-			<button type="submit" className={control} disabled={busy}>
+			<button type="submit" className={`${control} ui-button`} disabled={busy}>
 				Сохранить роль
 			</button>{" "}
 			<button
 				type="button"
-				className={control}
+				className={`${control} ui-button`}
 				disabled={busy}
 				onClick={onCancel}
 			>
@@ -1357,7 +1361,7 @@ function EditRole({
 				<>
 					<button
 						type="button"
-						className={control}
+						className={`${control} ui-button`}
 						disabled={busy}
 						onClick={() => setDeleting(true)}
 					>
@@ -1368,7 +1372,7 @@ function EditRole({
 							Удаление возможно только если роль никому не назначена.{" "}
 							<button
 								type="button"
-								className={control}
+								className={`${control} ui-button`}
 								disabled={busy}
 								onClick={() =>
 									void onSave({

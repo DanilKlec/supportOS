@@ -1,14 +1,15 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Calculator, Gift, Mail } from "lucide-react";
+import { BookOpen, Calculator, Gift, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
 
 const links = [
+	{ to: "/", hash: "", label: "Бинды", short: "Бинды", icon: BookOpen },
 	{
 		to: "/project-emails",
 		hash: "",
-		label: "Email",
-		short: "Email",
+		label: "Почты",
+		short: "Почты",
 		icon: Mail,
 	},
 	{ to: "/bonuses", hash: "", label: "Бонусы", short: "Бонусы", icon: Gift },

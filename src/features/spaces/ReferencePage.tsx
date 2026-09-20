@@ -22,26 +22,55 @@ export function ReferencePage() {
 				: BonusToolsPage;
 	return (
 		<>
-			{allowed && (
-				<nav aria-label="Управление справочником" className="flex gap-1 px-4">
+			<header className="reference-toolbar">
+				<div className="reference-toolbar-main">
+					<h1>
+						{pathname === "/project-emails" ? "Почты проектов" : "Бонусы"}
+					</h1>
+					{pathname !== "/project-emails" && (
+						<nav aria-label="Режим бонусов" className="reference-modes">
+							<Link
+								to="/bonuses"
+								hash={management ? "manage" : ""}
+								className="space-tab"
+								aria-current={!calculator ? "page" : undefined}
+							>
+								Справочник
+							</Link>
+							<Link
+								to="/bonuses"
+								hash={management ? "calculator-manage" : "calculator"}
+								className="space-tab"
+								aria-current={calculator ? "page" : undefined}
+							>
+								Калькулятор
+							</Link>
+						</nav>
+					)}
+				</div>
+				{allowed && (
 					<Link
 						to={pathname}
-						hash={calculator ? "calculator" : ""}
-						className="space-tab"
-						aria-current={!management ? "page" : undefined}
+						hash={
+							management
+								? calculator
+									? "calculator"
+									: ""
+								: calculator
+									? "calculator-manage"
+									: "manage"
+						}
+						className="shell-button"
+						aria-label={
+							management
+								? "Завершить управление общей базой"
+								: "Управление общей базой"
+						}
 					>
-						Рабочий справочник
+						{management ? "Готово" : "Управление базой"}
 					</Link>
-					<Link
-						to={pathname}
-						hash={calculator ? "calculator-manage" : "manage"}
-						className="space-tab"
-						aria-current={management ? "page" : undefined}
-					>
-						Управление общей базой
-					</Link>
-				</nav>
-			)}
+				)}
+			</header>{" "}
 			<Page key={pathname + management} management={management} />
 		</>
 	);

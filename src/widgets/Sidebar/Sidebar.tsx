@@ -394,7 +394,7 @@ export function Sidebar({
 							title="Добавить категорию"
 							aria-label="Добавить категорию"
 							onClick={createCategory}
-							className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--ghost ui-button--icon ui-button--small inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
 						</button>

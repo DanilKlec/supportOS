@@ -215,7 +215,7 @@ export function ScheduleUpload({
 							</details>
 							<button
 								type="button"
-								className={control}
+								className={`${control} ui-button`}
 								disabled={busy || result.issues.length > 0}
 								onClick={() => void save()}
 							>
@@ -223,7 +223,7 @@ export function ScheduleUpload({
 							</button>
 							<button
 								type="button"
-								className={control}
+								className={`${control} ui-button`}
 								disabled={busy}
 								onClick={() => {
 									setSheets([]);

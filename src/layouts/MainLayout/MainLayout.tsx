@@ -117,7 +117,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				<SupportComposer key={actor} />
 			</div>
 
-			{knowledgeRoute && <WorkspaceDock />}
+			{(knowledgeRoute ||
+				["/bonuses", "/bonus-tools", "/project-emails"].includes(
+					pathname.replace(/\/+$/, ""),
+				)) && <WorkspaceDock />}
 		</div>
 	);
 }

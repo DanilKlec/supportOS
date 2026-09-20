@@ -107,7 +107,7 @@ export function BindProposals({
 											disabled={!!busy || !base}
 											type="button"
 											onClick={() => void resolve("accept", p.id)}
-											className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
+											className="ui-button ui-button--primary rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
 										>
 											Опубликовать в основной
 										</button>
@@ -115,7 +115,7 @@ export function BindProposals({
 											disabled={!!busy}
 											type="button"
 											onClick={() => void resolve("reject", p.id)}
-											className="rounded-lg border border-border px-3 py-2 text-sm"
+											className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2 text-sm"
 										>
 											Отклонить
 										</button>
@@ -126,7 +126,7 @@ export function BindProposals({
 										disabled={!!busy}
 										type="button"
 										onClick={() => void resolve("withdraw", p.id)}
-										className="rounded-lg border border-border px-3 py-2 text-sm"
+										className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2 text-sm"
 									>
 										Отозвать предложение
 									</button>

@@ -961,7 +961,7 @@ export function DepositBonusesPage({
 							type="button"
 							onClick={() => void loadRates(true)}
 							disabled={ratesLoading}
-							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{ratesLoading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -976,7 +976,7 @@ export function DepositBonusesPage({
 							disabled={!canEdit}
 							style={!management ? { display: "none" } : undefined}
 							onClick={() => setImportOpen((current) => !current)}
-							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
 							Импорт
@@ -986,7 +986,7 @@ export function DepositBonusesPage({
 							<button
 								type="button"
 								onClick={() => void copyPackage(activeProject)}
-								className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+								className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 							>
 								<Copy size={16} />
 								Copy package
@@ -1048,7 +1048,7 @@ export function DepositBonusesPage({
 								type="button"
 								onClick={loadPreview}
 								disabled={importing || !sheetUrl.trim()}
-								className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+								className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								{importing ? (
 									<Loader2 size={16} className="animate-spin" />
@@ -1078,7 +1078,7 @@ export function DepositBonusesPage({
 											preview.projects.length === 0 ||
 											preview.errors.length > 0
 										}
-										className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+										className="ui-button ui-button--primary ui-button--small inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 									>
 										{committing && (
 											<Loader2 size={15} className="animate-spin" />
@@ -1153,7 +1153,7 @@ export function DepositBonusesPage({
 										/>
 										<button
 											type="submit"
-											className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
+											className="ui-button ui-button--primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
 										>
 											<Plus size={16} />
 											Add
@@ -1264,7 +1264,7 @@ export function DepositBonusesPage({
 												type="button"
 												disabled={!canEdit}
 												onClick={saveProjectName}
-												className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="ui-button ui-button--secondary inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Pencil size={15} />
 												Применить
@@ -1308,7 +1308,7 @@ export function DepositBonusesPage({
 											type="button"
 											disabled={!canEdit}
 											onClick={() => setDeleteProjectId(activeProject.id)}
-											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
+											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 											title="Удалить проект"
 											aria-label="Удалить проект"
 										>
@@ -1384,7 +1384,7 @@ export function DepositBonusesPage({
 												<button
 													type="button"
 													onClick={resetBonusForm}
-													className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+													className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 												>
 													<X size={15} />
 													Отмена
@@ -1392,7 +1392,7 @@ export function DepositBonusesPage({
 											)}
 											<button
 												type="submit"
-												className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+												className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 											>
 												<Plus size={16} />
 												{editingBonusId
@@ -1481,7 +1481,7 @@ export function DepositBonusesPage({
 															<button
 																type="button"
 																onClick={() => void copyBonus(bonus)}
-																className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+																className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 															>
 																<Copy size={15} />
 																Копировать
@@ -1490,7 +1490,7 @@ export function DepositBonusesPage({
 																type="button"
 																disabled={!canEdit}
 																onClick={() => editBonus(bonus)}
-																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+																className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 																title="Редактировать бонус"
 																aria-label="Редактировать бонус"
 															>
@@ -1500,7 +1500,7 @@ export function DepositBonusesPage({
 																type="button"
 																disabled={!canEdit}
 																onClick={() => setDeleteBonusId(bonus.id)}
-																className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
+																className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 																title="Удалить бонус"
 																aria-label="Удалить бонус"
 															>
@@ -1604,14 +1604,14 @@ function ConfirmDialog({
 					<button
 						type="button"
 						onClick={onCancel}
-						className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
 						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+						className="ui-button ui-button--danger inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
 					>
 						Удалить
 					</button>

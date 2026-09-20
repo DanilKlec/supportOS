@@ -17,7 +17,7 @@ export function ToastContainer() {
 						<button
 							type="button"
 							onClick={toast.action.onClick}
-							className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10"
+							className="ui-button ui-button--primary rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10"
 						>
 							{toast.action.label}
 						</button>

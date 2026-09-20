@@ -732,7 +732,7 @@ export function SharedBindEditor({
 								setError("");
 								setReviewed(false);
 							}}
-							className="mt-3 rounded-lg border border-border px-3 py-2 text-sm"
+							className="ui-button ui-button--secondary mt-3 rounded-lg border border-border px-3 py-2 text-sm"
 						>
 							Продолжить с моими правками
 						</button>
@@ -770,7 +770,7 @@ export function SharedBindEditor({
 									setRecovery(null);
 									setReviewed(false);
 								}}
-								className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
+								className="ui-button ui-button--primary rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
 							>
 								Восстановить черновик
 							</button>
@@ -784,7 +784,7 @@ export function SharedBindEditor({
 										setDraftStatus("Не удалось удалить черновик");
 									}
 								}}
-								className="rounded-lg border border-border px-3 py-2 text-sm"
+								className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2 text-sm"
 							>
 								Удалить черновик
 							</button>
@@ -901,14 +901,14 @@ export function SharedBindEditor({
 						type="button"
 						disabled={saving}
 						onClick={close}
-						className="rounded-xl border border-border px-4 py-2.5 text-sm hover:bg-surface-elevated disabled:opacity-50"
+						className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2.5 text-sm hover:bg-surface-elevated disabled:opacity-50"
 					>
 						Отмена
 					</button>
 					<button
 						type="submit"
 						disabled={saving || !!recovery || !!conflict || conflictLoading}
-						className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
+						className="ui-button ui-button--primary flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
 					>
 						<Check size={17} />
 						{saving

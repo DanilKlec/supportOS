@@ -206,7 +206,7 @@ export function useSharedPublication(
 										type="button"
 										disabled={busy}
 										onClick={() => void publish()}
-										className="rounded-lg bg-accent px-3 py-2 text-accent-foreground"
+										className="ui-button ui-button--primary rounded-lg bg-accent px-3 py-2 text-accent-foreground"
 									>
 										Сохранить для себя
 									</button>
@@ -214,7 +214,7 @@ export function useSharedPublication(
 										type="button"
 										disabled={busy}
 										onClick={() => void reload()}
-										className="rounded-lg border border-border px-3 py-2"
+										className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2"
 									>
 										Отменить изменения
 									</button>
@@ -271,7 +271,7 @@ export function useSharedPublication(
 							type="button"
 							disabled={busy}
 							onClick={() => replace(initial.current)}
-							className="rounded-lg border border-border px-3 py-2"
+							className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2"
 						>
 							Взять сохранённые данные браузера
 						</button>
@@ -280,7 +280,7 @@ export function useSharedPublication(
 						type="button"
 						disabled={busy}
 						onClick={() => void reload()}
-						className="rounded-lg border border-border px-3 py-2"
+						className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2"
 					>
 						Загрузить общую версию
 					</button>
@@ -289,7 +289,7 @@ export function useSharedPublication(
 							type="button"
 							disabled={!ready || busy || !dirty}
 							onClick={() => void publish()}
-							className="rounded-lg bg-accent px-3 py-2 text-accent-foreground disabled:opacity-40"
+							className="ui-button ui-button--primary rounded-lg bg-accent px-3 py-2 text-accent-foreground disabled:opacity-40"
 						>
 							{busy ? "Сохранение…" : "Сохранить для всех"}
 						</button>

@@ -313,7 +313,7 @@ function AgentMonitor() {
 							<button
 								type="button"
 								disabled={busy}
-								className={control}
+								className={`${control} ui-button`}
 								onClick={() => void act("sync", {})}
 							>
 								<RefreshCw size={16} className="inline" /> Обновить
@@ -321,7 +321,7 @@ function AgentMonitor() {
 							<button
 								type="button"
 								disabled={busy}
-								className={control}
+								className={`${control} ui-button`}
 								onClick={() => void act("logout", {})}
 							>
 								<LogOut size={16} className="inline" /> Выйти из мониторинга
@@ -407,7 +407,7 @@ function AgentMonitor() {
 								/>
 							</label>
 							<button
-								className={control}
+								className={`${control} ui-button`}
 								type="button"
 								onClick={() => {
 									setDay(workDay());
@@ -416,7 +416,11 @@ function AgentMonitor() {
 							>
 								Текущая смена
 							</button>
-							<button className={control} type="button" onClick={exportCsv}>
+							<button
+								className={`${control} ui-button`}
+								type="button"
+								onClick={exportCsv}
+							>
 								<Download size={16} className="inline" /> CSV отчёт
 							</button>
 						</div>
@@ -480,7 +484,7 @@ function AgentMonitor() {
 								</select>
 							</label>
 							<button
-								className={control}
+								className={`${control} ui-button`}
 								type="button"
 								onClick={() => setManage(!manage)}
 								disabled={!canManage}

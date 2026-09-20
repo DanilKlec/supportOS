@@ -355,7 +355,7 @@ export function ProjectEmailsPage({
 							style={!management ? { display: "none" } : undefined}
 							disabled={!canEdit}
 							onClick={openCreate}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+							className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
 						>
 							<Plus size={16} />
 							Add project
@@ -369,7 +369,7 @@ export function ProjectEmailsPage({
 									current === "import" ? "closed" : "import",
 								)
 							}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
 							Импорт
@@ -505,7 +505,7 @@ export function ProjectEmailsPage({
 													"Почты проекта скопированы",
 												)
 											}
-											className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+											className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
 										>
 											<Copy size={16} />
 											Копировать всё
@@ -515,7 +515,7 @@ export function ProjectEmailsPage({
 											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => editRecord(selectedRecord)}
-											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+											className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 											aria-label="Редактировать почты проекта"
 										>
 											<Pencil size={16} />
@@ -525,7 +525,7 @@ export function ProjectEmailsPage({
 											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => setDeleteId(selectedRecord.id)}
-											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
+											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
 											aria-label="Удалить почты проекта"
 										>
 											<Trash2 size={16} />
@@ -616,7 +616,7 @@ function ProjectEmailEditor({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					aria-label="Закрыть редактор"
 				>
 					<X size={16} />
@@ -663,13 +663,13 @@ function ProjectEmailEditor({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary inline-flex h-10 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					Отмена
 				</button>
 				<button
 					type="submit"
-					className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+					className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
 				>
 					<Plus size={16} />
 					{editing ? "Save" : "Add"}
@@ -717,7 +717,7 @@ function ProjectEmailImportPanel({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					aria-label="Закрыть импорт"
 				>
 					<X size={16} />
@@ -747,7 +747,7 @@ function ProjectEmailImportPanel({
 					type="button"
 					onClick={onLoadPreview}
 					disabled={importing || !sheetUrl.trim()}
-					className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+					className="ui-button ui-button--primary inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					{importing ? (
 						<Loader2 size={16} className="animate-spin" />
@@ -775,7 +775,7 @@ function ProjectEmailImportPanel({
 								preview.records.length === 0 ||
 								preview.errors.length > 0
 							}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{committing && <Loader2 size={15} className="animate-spin" />}
 							Commit import
@@ -848,7 +848,7 @@ function EmailRow({
 				type="button"
 				onClick={() => onCopy(email)}
 				disabled={!email}
-				className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 				aria-label={`Copy ${label}`}
 			>
 				<Copy size={15} />
@@ -918,14 +918,14 @@ function DeleteConfirmDialog({
 					<button
 						type="button"
 						onClick={onCancel}
-						className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
 						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+						className="ui-button ui-button--danger inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
 					>
 						Удалить
 					</button>

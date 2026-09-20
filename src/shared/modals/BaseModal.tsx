@@ -122,7 +122,7 @@ export function BaseModal({
 						title="Закрыть"
 						onClick={handleClose}
 						disabled={closeDisabled}
-						className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+						className="ui-button ui-button--ghost ui-button--icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<X size={18} />
 					</button>

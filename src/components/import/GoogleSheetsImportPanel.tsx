@@ -198,7 +198,7 @@ export function GoogleSheetsImportPanel({
 					<button
 						type="submit"
 						disabled={loadingPreview || saving || !url.trim() || !isAdmin}
-						className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						{loadingPreview ? (
 							<Loader2 size={16} className="animate-spin" />
@@ -291,7 +291,7 @@ export function GoogleSheetsImportPanel({
 								!isAdmin ||
 								preview.rows.every((row) => row.errors.length > 0)
 							}
-							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{saving ? (
 								<Loader2 size={16} className="animate-spin" />

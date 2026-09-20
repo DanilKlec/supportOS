@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
@@ -13,6 +13,7 @@ export function SpaceFrame({ children }: { children: ReactNode }) {
 	const space = spaceFor(pathname);
 	if (
 		!space ||
+		["/bonuses", "/bonus-tools", "/project-emails"].includes(pathname) ||
 		space.title === "Рабочее пространство" ||
 		space.title === "Инструменты"
 	)
@@ -32,26 +33,6 @@ export function SpaceFrame({ children }: { children: ReactNode }) {
 			<header className="space-header shrink-0 min-w-0 border-b border-border">
 				<p className="section-eyebrow">{space.title}</p>
 				<SectionNavigation label={space.title} items={items} active={active} />
-				{pathname === "/bonuses" && (
-					<nav aria-label="Режим бонусов" className="flex gap-1 pb-2">
-						<Link
-							to="/bonuses"
-							hash=""
-							className="space-tab"
-							aria-current={!hash.startsWith("calculator") ? "page" : undefined}
-						>
-							Справочник
-						</Link>
-						<Link
-							to="/bonuses"
-							hash="calculator"
-							className="space-tab"
-							aria-current={hash.startsWith("calculator") ? "page" : undefined}
-						>
-							Калькулятор
-						</Link>
-					</nav>
-				)}
 			</header>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
 		</>

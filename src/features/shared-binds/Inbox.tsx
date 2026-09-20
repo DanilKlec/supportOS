@@ -152,7 +152,7 @@ export function Inbox() {
 								key={t.id}
 								aria-pressed={filter === t.id}
 								onClick={() => setFilter(t.id)}
-								className="rounded-lg border border-border px-3 py-2 text-xs aria-pressed:bg-surface-elevated"
+								className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2 text-xs aria-pressed:bg-surface-elevated"
 							>
 								{t.label}
 							</button>
@@ -209,7 +209,7 @@ export function Inbox() {
 										type="button"
 										disabled={!!busy}
 										onClick={() => void show(item)}
-										className="ml-auto rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground"
+										className="ui-button ui-button--primary ml-auto rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground"
 									>
 										{busy === item.key ? "Открываем…" : "Открыть бинд"}
 									</button>

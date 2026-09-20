@@ -425,7 +425,7 @@ export function ToolsMenu() {
 					setOpen(true);
 					setThemeMode(getAppearanceSettings().themeMode);
 				}}
-				className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-surface-elevated/50 px-3 text-sm font-medium text-foreground transition hover:bg-surface-elevated"
+				className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-surface-elevated/50 px-3 text-sm font-medium text-foreground transition hover:bg-surface-elevated"
 			>
 				<PanelRight size={18} />
 				<span className="hidden sm:inline">Меню</span>

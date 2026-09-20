@@ -330,7 +330,7 @@ function SettingsPage() {
 								<button
 									type="button"
 									onClick={resetAppearance}
-									className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+									className="ui-button ui-button--secondary rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
 									Reset
 								</button>
@@ -636,7 +636,7 @@ function SettingsPage() {
 							<button
 								type="button"
 								onClick={resetWorkspace}
-								className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--secondary rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								Reset layout
 							</button>
@@ -868,7 +868,7 @@ function SettingsPage() {
 										<button
 											type="button"
 											onClick={signOut}
-											className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+											className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
 										>
 											<LogOut size={16} />
 											Sign out

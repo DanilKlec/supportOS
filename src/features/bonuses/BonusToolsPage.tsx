@@ -538,7 +538,7 @@ export function BonusToolsPage({
 							type="button"
 							disabled={!canEdit}
 							onClick={openCreateRule}
-							className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+							className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 						>
 							<Plus size={16} />
 							Add rule
@@ -549,7 +549,7 @@ export function BonusToolsPage({
 							style={!management ? { display: "none" } : undefined}
 							onClick={() => void updateFromGoogle(sourceUrl)}
 							disabled={loading || !canEdit}
-							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{loading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -564,7 +564,7 @@ export function BonusToolsPage({
 							disabled={!canEdit}
 							style={!management ? { display: "none" } : undefined}
 							onClick={() => setSourceOpen((current) => !current)}
-							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
 							Source
@@ -598,7 +598,7 @@ export function BonusToolsPage({
 								style={!management ? { display: "none" } : undefined}
 								onClick={() => void updateFromGoogle(sourceUrl)}
 								disabled={loading || !sourceUrl.trim()}
-								className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+								className="ui-button ui-button--primary inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								{loading ? (
 									<Loader2 size={16} className="animate-spin" />
@@ -707,7 +707,7 @@ export function BonusToolsPage({
 										type="button"
 										disabled={!canEdit}
 										onClick={() => openEditRule(selectedRule)}
-										className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+										className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<Pencil size={15} />
 										Edit
@@ -719,7 +719,7 @@ export function BonusToolsPage({
 										onClick={() =>
 											void copyText(quickBind, "Bonus rules copied")
 										}
-										className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+										className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 									>
 										<Copy size={15} />
 										Copy Rules
@@ -760,7 +760,7 @@ export function BonusToolsPage({
 												onClick={() =>
 													void copyText(value, `${column.label} copied`)
 												}
-												className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="ui-button ui-button--secondary ui-button--small mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={13} />
 												Copy
@@ -804,7 +804,7 @@ export function BonusToolsPage({
 										onClick={() =>
 											void copyText(selectedAmount, "Currency value copied")
 										}
-										className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+										className="ui-button ui-button--secondary ui-button--small mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<Copy size={13} />
 										Copy
@@ -937,7 +937,7 @@ export function BonusToolsPage({
 														type="button"
 														disabled={!canEdit}
 														onClick={() => openEditRule(rule)}
-														className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+														className="ui-button ui-button--secondary ui-button--small inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
 														<Pencil size={13} />
 														Edit
@@ -947,7 +947,7 @@ export function BonusToolsPage({
 														onClick={() =>
 															void copyText(bind, `${rule.site} copied`)
 														}
-														className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
+														className="ui-button ui-button--secondary ui-button--small inline-flex h-9 items-center gap-2 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
 														<Copy size={13} />
 														Copy
@@ -995,7 +995,7 @@ export function BonusToolsPage({
 							<button
 								type="button"
 								onClick={() => setRuleEditorOpen(false)}
-								className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 								aria-label="Close editor"
 							>
 								<X size={16} />
@@ -1053,13 +1053,13 @@ export function BonusToolsPage({
 							<button
 								type="button"
 								onClick={() => setRuleEditorOpen(false)}
-								className="inline-flex h-11 items-center rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--secondary inline-flex h-11 items-center rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								Cancel
 							</button>
 							<button
 								type="submit"
-								className="inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+								className="ui-button ui-button--primary inline-flex h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 							>
 								{editingRuleId ? <Pencil size={16} /> : <Plus size={16} />}
 								{editingRuleId ? "Save rule" : "Add rule"}

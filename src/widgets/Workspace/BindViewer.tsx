@@ -799,7 +799,7 @@ export function BindViewer() {
 							<button
 								type="button"
 								onClick={() => void copyContent()}
-								className="hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
+								className="ui-button ui-button--primary hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
 							>
 								{copied ? <Check size={17} /> : <Copy size={17} />}
 								{copied ? "Copied" : "Copy"}
@@ -911,7 +911,7 @@ export function BindViewer() {
 								<button
 									type="button"
 									onClick={() => void copyContent()}
-									className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+									className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 								>
 									<Copy size={15} />
 									Copy MAP

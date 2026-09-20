@@ -1008,7 +1008,7 @@ function BindHistoryModal({
 									<button
 										type="button"
 										onClick={() => restore(entry.id)}
-										className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated"
+										className="ui-button ui-button--secondary shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated"
 									>
 										Restore
 									</button>
@@ -1225,7 +1225,7 @@ function BindFormModal({
 						<button
 							type="button"
 							onClick={requestClose}
-							className="rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-elevated"
+							className="ui-button ui-button--secondary rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-elevated"
 						>
 							Close
 						</button>
@@ -1404,7 +1404,7 @@ function BindFormModal({
 								type="button"
 								onClick={addLanguage}
 								disabled={saving}
-								className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
+								className="ui-button ui-button--secondary ui-button--small inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								<Plus size={15} />
 								Добавить язык
@@ -1547,7 +1547,7 @@ function BindFormModal({
 												setTags((current) => toggleTag(current, tag))
 											}
 											disabled={saving}
-											className="rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+											className="ui-button ui-button--secondary rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 										>
 											#{tag}
 										</button>
@@ -1678,7 +1678,7 @@ function ModalActions({
 				type="button"
 				onClick={onCancel}
 				disabled={saving}
-				className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+				className="ui-button ui-button--secondary"
 			>
 				Отмена
 			</button>
@@ -1686,11 +1686,8 @@ function ModalActions({
 			<button
 				type="submit"
 				disabled={saving}
-				className={`min-h-10 rounded-lg px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-					danger
-						? "bg-red-500 hover:bg-red-400"
-						: "bg-accent hover:bg-accent/90"
-				}`}
+				aria-busy={saving}
+				className={`ui-button ${danger ? "ui-button--danger" : "ui-button--primary"}`}
 			>
 				{saving ? "Сохранение…" : submitLabel}
 			</button>

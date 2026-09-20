@@ -134,7 +134,7 @@ export function TranslatorSettingsPage({
 										lingvaEndpoint.trim().replace(/\/+$/, "") ===
 											DEFAULT_LINGVA_ENDPOINT || checking
 									}
-									className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
 									Use Default
@@ -200,7 +200,7 @@ export function TranslatorSettingsPage({
 									type="button"
 									onClick={useBuiltInEndpoint}
 									disabled={isBuiltIn || checking}
-									className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
 									Use Built-In
@@ -237,7 +237,7 @@ export function TranslatorSettingsPage({
 							type="button"
 							onClick={testConnection}
 							disabled={checking}
-							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{checking ? (
 								<Loader2 size={16} className="animate-spin" />

@@ -53,7 +53,7 @@ export function BindEditor({ bind }: BindEditorProps) {
 				<div className="flex flex-wrap items-center gap-2">
 					<button
 						type="button"
-						className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors"
+						className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors"
 					>
 						<Terminal size={16} />
 						Copy current
@@ -66,21 +66,21 @@ export function BindEditor({ bind }: BindEditorProps) {
 					</button>
 					<button
 						type="button"
-						className="inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface transition-colors"
+						className="ui-button ui-button--ghost inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface transition-colors"
 					>
 						<Edit2 size={16} />
 						Edit
 					</button>
 					<button
 						type="button"
-						className="inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-muted hover:bg-surface transition-colors"
+						className="ui-button ui-button--ghost inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-muted hover:bg-surface transition-colors"
 					>
 						<Clock size={16} />
 						History
 					</button>
 					<button
 						type="button"
-						className="inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-muted hover:bg-surface transition-colors"
+						className="ui-button ui-button--ghost inline-flex items-center gap-2 rounded-lg bg-surface-elevated px-4 py-2 text-sm font-medium text-muted hover:bg-surface transition-colors"
 					>
 						<Zap size={16} />
 						AI

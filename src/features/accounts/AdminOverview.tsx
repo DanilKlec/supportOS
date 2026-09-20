@@ -101,7 +101,7 @@ export function AdminOverview({
 				</div>
 				<button
 					type="button"
-					className="rounded-xl border border-border px-3 py-2 text-xs"
+					className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs"
 					onClick={() => {
 						void accounts.refetch();
 						if (can(access, "knowledge.write")) void proposals.refetch();
@@ -182,7 +182,7 @@ export function AdminOverview({
 							<button
 								type="button"
 								onClick={() => onUser(u)}
-								className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs"
+								className="ui-button ui-button--secondary shrink-0 rounded-lg border border-border px-3 py-2 text-xs"
 							>
 								Настроить доступ
 							</button>

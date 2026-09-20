@@ -250,7 +250,7 @@ export function AIControlCenter({
 											<button
 												type="button"
 												key={kind}
-												className={control}
+												className={`${control} ui-button`}
 												onClick={() => {
 													setEntry({
 														...blank(kind),
@@ -354,7 +354,7 @@ export function AIControlCenter({
 							disabled={
 								busy || !request.trim() || !can(user?.access, "ai.playground")
 							}
-							className={control}
+							className={`${control} ui-button`}
 							onClick={() => void run()}
 						>
 							{busy ? "Проверка…" : "Подготовить ответ"}
@@ -374,7 +374,7 @@ export function AIControlCenter({
 						{reviewed.length > 0 && (
 							<button
 								type="button"
-								className={control}
+								className={`${control} ui-button`}
 								onClick={() => onSection(entry.kind as AISection)}
 							>
 								Вернуться к публикации
@@ -575,7 +575,7 @@ export function AIControlCenter({
 								<button
 									disabled={busy || !query.data || !editable}
 									type="submit"
-									className={control}
+									className={`${control} ui-button`}
 								>
 									Сохранить Draft
 								</button>
@@ -583,7 +583,7 @@ export function AIControlCenter({
 									<>
 										<button
 											type="button"
-											className={control}
+											className={`${control} ui-button`}
 											onClick={() => {
 												setPreview(true);
 												setDraftIds([entry.id]);
@@ -603,7 +603,7 @@ export function AIControlCenter({
 														reviewedVersion !== query.data?.version
 													}
 													title="Сначала проверьте сохранённый Draft в Playground"
-													className={control}
+													className={`${control} ui-button`}
 													onClick={() => {
 														if (
 															window.confirm(
@@ -618,7 +618,7 @@ export function AIControlCenter({
 												<button
 													type="button"
 													disabled={busy}
-													className={control}
+													className={`${control} ui-button`}
 													onClick={() => void save("archive")}
 												>
 													Архивировать
@@ -629,7 +629,7 @@ export function AIControlCenter({
 											<button
 												type="button"
 												disabled={busy}
-												className={control}
+												className={`${control} ui-button`}
 												onClick={() => void save("delete")}
 											>
 												Удалить Draft
@@ -644,7 +644,7 @@ export function AIControlCenter({
 						<>
 							<button
 								type="button"
-								className={control}
+								className={`${control} ui-button`}
 								disabled={busy}
 								onClick={async () => {
 									setBusy(true);

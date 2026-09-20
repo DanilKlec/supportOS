@@ -342,7 +342,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								type="button"
 								disabled={busy}
 								onClick={() => setLinkOpen(true)}
-								className="rounded-xl border border-border px-3 py-2 text-xs"
+								className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs"
 							>
 								Связь версий
 							</button>
@@ -350,7 +350,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								type="button"
 								aria-pressed={compare}
 								onClick={() => setCompare((v) => !v)}
-								className="rounded-xl border border-border px-3 py-2 text-xs"
+								className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs"
 							>
 								Сравнить
 							</button>
@@ -358,7 +358,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								type="button"
 								aria-expanded={historyOpen}
 								onClick={() => setHistoryOpen((v) => !v)}
-								className="rounded-xl border border-border px-3 py-2 text-xs"
+								className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs"
 							>
 								История
 							</button>
@@ -379,7 +379,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 												showToast("Предложение отправлено на проверку");
 											})
 										}
-										className="rounded-xl border border-border px-3 py-2 text-xs"
+										className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs"
 									>
 										Предложить мою версию команде
 									</button>
@@ -413,7 +413,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 													]);
 												});
 										}}
-										className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted"
+										className="ui-button ui-button--ghost flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted"
 									>
 										<RotateCcw size={13} />
 										Сбросить мою ветку
@@ -428,7 +428,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								setError("");
 								setShareOpen(true);
 							}}
-							className="rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-40"
+							className="ui-button ui-button--secondary rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-40"
 						>
 							Поделиться
 						</button>
@@ -454,7 +454,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							type="button"
 							disabled={busy}
 							onClick={() => setEditor(item)}
-							className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm"
+							className="ui-button ui-button--secondary flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm"
 						>
 							<Pencil size={15} />
 							{incoming.some((s) => s.id === selected.branch)
@@ -468,7 +468,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									showToast(ok ? "Ответ скопирован" : "Не удалось скопировать"),
 								)
 							}
-							className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
+							className="ui-button ui-button--primary flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
 						>
 							<Copy size={16} />
 							Копировать
@@ -484,7 +484,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 								useKnowledgeStore.getState().setLanguage(t.language as any)
 							}
 							aria-pressed={translation?.language === t.language}
-							className="rounded-lg border border-border px-3 py-1 text-xs uppercase aria-pressed:bg-surface-elevated"
+							className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-1 text-xs uppercase aria-pressed:bg-surface-elevated"
 						>
 							{t.language}
 						</button>
@@ -567,7 +567,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 									type="button"
 									disabled={busy}
 									onClick={() => setEditor(revision.snapshot)}
-									className="mt-3 rounded-lg border border-border px-3 py-2 text-xs"
+									className="ui-button ui-button--secondary mt-3 rounded-lg border border-border px-3 py-2 text-xs"
 								>
 									Взять за основу моей версии
 								</button>
@@ -745,7 +745,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 											share.email.toLowerCase() === email.toLowerCase(),
 									)
 								}
-								className="rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
+								className="ui-button ui-button--primary rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
 							>
 								Предоставить доступ
 							</button>

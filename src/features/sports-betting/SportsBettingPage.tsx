@@ -394,7 +394,7 @@ export function SportsBettingPage() {
 							type="button"
 							onClick={() => void loadFeed(true)}
 							disabled={refreshing}
-							className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<RefreshCw
 								size={16}
@@ -589,7 +589,7 @@ export function SportsBettingPage() {
 														"Event summary copied",
 													)
 												}
-												className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={15} />
 												Copy

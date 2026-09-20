@@ -108,14 +108,14 @@ export function BindLinkEditor({
 					type="button"
 					disabled={!chosen}
 					onClick={() => save(selected)}
-					className="rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground disabled:opacity-40"
+					className="ui-button ui-button--primary rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground disabled:opacity-40"
 				>
 					Связать версии
 				</button>
 				<button
 					type="button"
 					onClick={() => save(null)}
-					className="rounded-xl border border-border px-4 py-2 text-sm"
+					className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2 text-sm"
 				>
 					Оставить раздельно
 				</button>

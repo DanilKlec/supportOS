@@ -359,7 +359,7 @@ export function Topbar({
 							setKind(item.id);
 							setActiveResultIndex(0);
 						}}
-						className="rounded-lg px-3 py-1 text-xs text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+						className="ui-button ui-button--ghost rounded-lg px-3 py-1 text-xs text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
 					>
 						{item.label}
 					</button>
@@ -535,7 +535,7 @@ export function Topbar({
 										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
 									)
 								}
-								className="rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
+								className="ui-button ui-button--primary rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
 							>
 								Копировать
 							</button>
@@ -559,7 +559,7 @@ export function Topbar({
 									});
 									setPreview(null);
 								}}
-								className="rounded-xl border border-border px-4 py-2 text-sm"
+								className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2 text-sm"
 							>
 								Открыть раздел
 							</button>
@@ -656,7 +656,7 @@ export function Topbar({
 								title={`Выйти: ${authSession.user.email}`}
 								aria-label="Выйти из аккаунта"
 								onClick={signOut}
-								className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--ghost inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
 								<span className="hidden max-w-28 truncate lg:block">
 									{authSession.user.access?.display_name ||
@@ -669,7 +669,7 @@ export function Topbar({
 								type="button"
 								title="Cloud login"
 								onClick={() => void navigate({ to: "/login" })}
-								className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--ghost inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
 								<LogIn size={16} />
 							</button>

@@ -251,7 +251,7 @@ export function AnswerAssistantPage({
 					<button
 						type="button"
 						onClick={reset}
-						className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 					>
 						<RefreshCw size={15} />
 						Новый ответ
@@ -365,7 +365,7 @@ export function AnswerAssistantPage({
 							<button
 								type="submit"
 								disabled={loading || !customerMessage.trim()}
-								className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+								className="ui-button ui-button--primary inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{loading ? (
 									<Loader2 size={18} className="animate-spin" />
@@ -395,7 +395,7 @@ export function AnswerAssistantPage({
 									type="button"
 									onClick={saveAnswer}
 									disabled={!answer.trim()}
-									className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+									className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
 									aria-label="Сохранить ответ в память"
 								>
 									<Save size={16} />
@@ -404,7 +404,7 @@ export function AnswerAssistantPage({
 									type="button"
 									onClick={() => void copyAnswer()}
 									disabled={!answer.trim()}
-									className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+									className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
 								>
 									<Copy size={16} />
 									Копировать
@@ -519,7 +519,7 @@ export function AnswerAssistantPage({
 										type="button"
 										onClick={() => void checkAI()}
 										disabled={aiChecking}
-										className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
+										className="ui-button ui-button--secondary mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
 									>
 										{aiChecking ? (
 											<Loader2 size={15} className="animate-spin" />

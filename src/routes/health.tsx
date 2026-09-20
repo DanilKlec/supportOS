@@ -226,7 +226,7 @@ export function HealthPage() {
 												<button
 													type="button"
 													onClick={() => openIssue(issue)}
-													className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+													className="ui-button ui-button--secondary rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
 												>
 													Open
 												</button>
