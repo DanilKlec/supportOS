@@ -11,11 +11,13 @@ export function ReferencePage() {
 		access,
 		pathname === "/project-emails" ? "projects.write" : "bonuses.write",
 	);
-	const management = hash === "manage" && allowed;
+	const calculator =
+		pathname === "/bonus-tools" || hash.startsWith("calculator");
+	const management = ["manage", "calculator-manage"].includes(hash) && allowed;
 	const Page =
 		pathname === "/project-emails"
 			? ProjectEmailsPage
-			: pathname === "/bonuses"
+			: !calculator
 				? DepositBonusesPage
 				: BonusToolsPage;
 	return (
@@ -24,7 +26,7 @@ export function ReferencePage() {
 				<nav aria-label="Управление справочником" className="flex gap-1 px-4">
 					<Link
 						to={pathname}
-						hash=""
+						hash={calculator ? "calculator" : ""}
 						className="space-tab"
 						aria-current={!management ? "page" : undefined}
 					>
@@ -32,7 +34,7 @@ export function ReferencePage() {
 					</Link>
 					<Link
 						to={pathname}
-						hash="manage"
+						hash={calculator ? "calculator-manage" : "manage"}
 						className="space-tab"
 						aria-current={management ? "page" : undefined}
 					>

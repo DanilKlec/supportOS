@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { AmbientBackground } from "@/components/brand/AmbientBackground";
+
 import { PersonalLibrary } from "@/features/productivity/PersonalLibrary";
 import { SelectionActions } from "@/features/productivity/SelectionActions";
 import { WorkspaceContinuity } from "@/features/productivity/WorkspaceContinuity";
@@ -75,7 +75,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 			<PersonalLibrary key={`library-${actor}`} />
 			<SelectionActions key={`selection-${actor}`} />
 			<WorkspaceSharedBindsSync />
-			<AmbientBackground />
+
 			{
 				<Topbar
 					showKnowledgeControls={knowledgeRoute}
@@ -94,7 +94,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					<div className="fixed inset-0 z-40 md:hidden">
 						<button
 							type="button"
-							aria-label="Close navigation"
+							aria-label="Закрыть папки"
 							onClick={() => setMobileSidebarOpen(false)}
 							className="absolute inset-0 bg-black/45"
 						/>
@@ -117,7 +117,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 				<SupportComposer key={actor} />
 			</div>
 
-			<WorkspaceDock />
+			{knowledgeRoute && <WorkspaceDock />}
 		</div>
 	);
 }

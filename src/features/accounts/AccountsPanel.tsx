@@ -145,7 +145,7 @@ export function AccountsPanel({
 					setUsers(data.users);
 					setTotal(data.total);
 				}
-				if (tab === "audit") {
+				if (tab === "audit" && usersAllowed) {
 					const data = await accessApi("audit", undefined, {}, abort.signal);
 					if (abort.signal.aborted) return;
 					setAudit(data.rows);
@@ -397,7 +397,7 @@ export function AccountsPanel({
 					["roles", "Роли и разрешения"],
 					["audit", "Журнал изменений"],
 				]
-					.filter(([id]) => id !== "users" || usersAllowed)
+					.filter(([id]) => (id === "roles" ? rolesAllowed : usersAllowed))
 					.map(([id, label]) => (
 						<button
 							type="button"
@@ -646,7 +646,7 @@ export function AccountsPanel({
 					</div>
 				</>
 			)}
-			{tab === "roles" && (
+			{tab === "roles" && rolesAllowed && (
 				<>
 					{embedded && (
 						<div className="overflow-auto border border-border rounded-lg">
@@ -798,7 +798,7 @@ export function AccountsPanel({
 					</div>
 				</>
 			)}
-			{tab === "audit" && (
+			{tab === "audit" && usersAllowed && (
 				<>
 					{!audit.length && !busy && <p>Изменений доступа пока нет.</p>}
 					{audit.map((row) => (

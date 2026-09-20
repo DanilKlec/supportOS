@@ -4,6 +4,7 @@ import { Copy, FileText, Pencil, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { LocalBindActions } from "@/components/binds/LocalBindActions";
 import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
 import type { BindBranches } from "@/services/shared-binds.service";
@@ -72,6 +73,10 @@ export function WorkspaceSharedBindsSync() {
 	useEffect(() => {
 		const values = (common.data ?? [])
 			.filter((b) => !b.archived)
+			.filter(
+				(b) =>
+					!locals.some((local) => local.id === links[b.id] && local.archived),
+			)
 			.map((base) => {
 				const own = (personal.data ?? []).find(
 					(b) => b.sourceBindId === base.id && !b.archived,
@@ -322,6 +327,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					</div>
 					<div className="flex flex-wrap gap-2">
 						<MoreActions>
+							{local && <LocalBindActions bind={local} />}
 							{incoming.some((share) => share.id === selected.branch) && (
 								<button
 									type="button"

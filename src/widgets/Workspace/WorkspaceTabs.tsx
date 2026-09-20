@@ -158,8 +158,8 @@ export function WorkspaceTabs() {
 
 							<button
 								type="button"
-								aria-label={pinned ? "Unpin tab" : "Pin tab"}
-								title={pinned ? "Unpin" : "Pin"}
+								aria-label={pinned ? "Открепить вкладку" : "Закрепить вкладку"}
+								title={pinned ? "Открепить" : "Закрепить"}
 								onClick={() => pinTab(bind.id)}
 								className={`flex h-6 w-6 items-center justify-center rounded-md hover:bg-surface ${
 									pinned
@@ -173,8 +173,8 @@ export function WorkspaceTabs() {
 							{!pinned && (
 								<button
 									type="button"
-									aria-label="Close tab"
-									title="Close"
+									aria-label="Закрыть вкладку"
+									title="Закрыть"
 									onClick={() => removeTab(bind.id)}
 									className="flex h-6 w-6 items-center justify-center rounded-md opacity-60 hover:bg-surface hover:opacity-100 group-focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
 								>
@@ -189,9 +189,9 @@ export function WorkspaceTabs() {
 					<div className="shrink-0">
 						<button
 							type="button"
-							aria-label="More tabs"
+							aria-label="Все вкладки"
 							aria-expanded={overflowOpen}
-							title="More tabs"
+							title="Все вкладки"
 							onClick={() => setOverflowOpen((open) => !open)}
 							className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-sm text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 						>
@@ -232,8 +232,10 @@ export function WorkspaceTabs() {
 
 									<button
 										type="button"
-										aria-label={pinned ? "Unpin tab" : "Pin tab"}
-										title={pinned ? "Unpin" : "Pin"}
+										aria-label={
+											pinned ? "Открепить вкладку" : "Закрепить вкладку"
+										}
+										title={pinned ? "Открепить" : "Закрепить"}
 										onClick={() => pinTab(bind.id)}
 										className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-background ${
 											pinned
@@ -247,7 +249,7 @@ export function WorkspaceTabs() {
 									{!pinned && (
 										<button
 											type="button"
-											aria-label="Close tab"
+											aria-label="Закрыть вкладку"
 											onClick={() => removeTab(bind.id)}
 											className="flex h-7 w-7 items-center justify-center rounded-md opacity-60 hover:bg-background hover:opacity-100"
 										>

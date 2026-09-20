@@ -50,7 +50,7 @@ export function ActionMenuPortal({
 			ref={menu}
 			role="menu"
 			data-workspace-actions
-			className="fixed z-[100] max-h-[calc(100dvh-16px)] w-64 max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-2xl"
+			className="action-menu fixed z-[100] max-h-[calc(100dvh-16px)] w-64 max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-2xl"
 			style={position}
 			onKeyDown={(event) => {
 				if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))

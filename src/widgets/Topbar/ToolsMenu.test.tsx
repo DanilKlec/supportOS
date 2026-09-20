@@ -52,6 +52,12 @@ it("groups allowed routes, searches and hides administration from Support", () =
 	expect(screen.queryByText("Восстановить локальную копию")).toBeNull();
 	expect(screen.queryByText("Общая база")).toBeNull();
 	expect(screen.getByText("Бинды")).toBeTruthy();
+	expect(screen.queryByRole("button", { name: "Материалы" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Оформление" })).toBeNull();
+	fireEvent.change(screen.getByRole("textbox"), {
+		target: { value: "Оформление" },
+	});
+	expect(screen.getByRole("button", { name: "Оформление" })).toBeTruthy();
 	fireEvent.change(screen.getByRole("textbox"), {
 		target: { value: "Спортивные" },
 	});

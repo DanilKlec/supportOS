@@ -10,7 +10,7 @@ it("closes on Escape, outside click and action selection", async () => {
 			<button type="button">История</button>
 		</MoreActions>,
 	);
-	const summary = screen.getByText("Ещё ···"),
+	const summary = screen.getByLabelText("Действия бинда"),
 		details = summary.parentElement as HTMLDetailsElement;
 	details.open = true;
 	fireEvent.keyDown(document, { key: "Escape" });

@@ -57,7 +57,10 @@ export function MoreActions({ children }: { children: ReactNode }) {
 				aria-haspopup="menu"
 				className="flex min-h-10 min-w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-border px-3 py-2 text-xs"
 			>
-				Ещё ···
+				<span aria-hidden="true" className="text-lg leading-none">
+					···
+				</span>
+				<span className="ml-2">Действия</span>
 			</summary>
 			{open && <ActionMenuPortal anchor={ref}>{children}</ActionMenuPortal>}
 		</details>

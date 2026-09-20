@@ -1,10 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { TranslatorSettingsPage } from "@/features/translator/TranslatorSettingsPage";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslatorStore } from "@/store/translator.store";
 import { can } from "../../../shared/access.js";
+import { AISettingsPage } from "./AISettingsPage";
 export function IntegrationsPanel() {
+	const hash = useRouterState({ select: (s) => s.location.hash });
 	const user = useAuthStore((s) => s.session?.user);
 	const configured = useAuthStore((s) => s.configured);
 	const provider = useTranslatorStore((s) => s.provider);
@@ -18,6 +21,20 @@ export function IntegrationsPanel() {
 			return d;
 		},
 	});
+	if (!can(user?.access, "technical")) return null;
+	if (hash === "integrations-ai" || hash === "integrations-translator")
+		return (
+			<div className="space-y-4">
+				<Link className="space-tab" to="/settings" hash="integrations">
+					← Все интеграции
+				</Link>
+				{hash === "integrations-ai" ? (
+					<AISettingsPage />
+				) : (
+					<TranslatorSettingsPage embedded />
+				)}
+			</div>
+		);
 	return (
 		<div className="divide-y divide-border">
 			<section className="py-4">
@@ -39,7 +56,7 @@ export function IntegrationsPanel() {
 								Повторить
 							</button>
 						)}
-						<Link className="space-tab" to="/settings/ai">
+						<Link className="space-tab" to="/settings" hash="integrations-ai">
 							Настроить AI →
 						</Link>
 					</>
@@ -53,7 +70,11 @@ export function IntegrationsPanel() {
 					Провайдер: {provider}. Доступность проверяется при переводе.
 				</p>
 				{can(user?.access, "technical") && (
-					<Link className="space-tab" to="/settings/translator">
+					<Link
+						className="space-tab"
+						to="/settings"
+						hash="integrations-translator"
+					>
 						Настроить →
 					</Link>
 				)}
@@ -79,9 +100,11 @@ export function IntegrationsPanel() {
 				<p className="text-sm text-muted">
 					Доступность проверяется при загрузке событий.
 				</p>
-				<Link className="space-tab" to="/sports-betting">
-					Открыть инструмент →
-				</Link>
+				{can(user?.access, "tools") && (
+					<Link className="space-tab" to="/sports-betting">
+						Открыть инструмент →
+					</Link>
+				)}
 			</section>
 		</div>
 	);

@@ -16,6 +16,7 @@ import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
 import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
 import { Inbox } from "@/features/shared-binds/Inbox";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
+import { ComposerLauncher } from "@/features/spaces/ComposerLauncher";
 import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
 import { contentApi } from "@/services/shared-content.service";
@@ -28,7 +29,7 @@ import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
-import { can, routePermission } from "../../../shared/access.js";
+import { can, canAccessPage } from "../../../shared/access.js";
 import { type CatalogResult, catalogResults } from "./search-catalog";
 import { ToolsMenu } from "./ToolsMenu";
 
@@ -305,7 +306,7 @@ export function Topbar({
 		)
 		.filter(
 			(i) =>
-				can(access, i.permission ?? routePermission(i.to)) &&
+				canAccessPage(access, i.to, i.hash) &&
 				searchValue.trim() &&
 				(i.label + " " + i.group + " " + i.to + " " + (i.hash ?? ""))
 					.toLowerCase()
@@ -569,9 +570,7 @@ export function Topbar({
 			<header className="relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
 				<button
 					type="button"
-					aria-label={
-						layout.showSidebar ? "Collapse navigation" : "Open navigation"
-					}
+					aria-label={layout.showSidebar ? "Свернуть папки" : "Open navigation"}
 					onClick={toggleSidebar}
 					style={!showKnowledgeControls ? { display: "none" } : undefined}
 					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
@@ -640,7 +639,7 @@ export function Topbar({
 				<div className="ml-auto flex shrink-0 items-center gap-2">
 					<button
 						type="button"
-						aria-label="Search"
+						aria-label="Поиск"
 						onClick={() => {
 							setMobileSearchOpen(true);
 							window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
@@ -675,6 +674,7 @@ export function Topbar({
 								<LogIn size={16} />
 							</button>
 						))}
+					{showKnowledgeControls && <ComposerLauncher />}
 					<Inbox />
 					<ToolsMenu />
 				</div>
@@ -683,7 +683,7 @@ export function Topbar({
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label="Search materials"
+						aria-label="Поиск материалов"
 						className="fixed inset-0 z-50 flex flex-col bg-background text-foreground md:hidden"
 					>
 						<div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
@@ -701,7 +701,7 @@ export function Topbar({
 							/>
 							<button
 								type="button"
-								aria-label="Close search"
+								aria-label="Закрыть поиск"
 								onClick={() => setMobileSearchOpen(false)}
 								className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 							>

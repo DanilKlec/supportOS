@@ -50,7 +50,8 @@ export function TeamActivity() {
 			query: monitor,
 			allowed: can(user?.access, "monitor.read"),
 		},
-	].filter((s) => s.allowed && (filter === "all" || filter === s.id));
+	].filter((s) => s.allowed);
+	const effectiveFilter = sources.some((s) => s.id === filter) ? filter : "all";
 	return (
 		<>
 			<nav
@@ -62,39 +63,43 @@ export function TeamActivity() {
 					["access", "Доступы"],
 					["content", "Контент"],
 					["monitor", "Мониторинг"],
-				].map(([id, label]) => (
-					<button
-						type="button"
-						className="space-tab"
-						key={id}
-						aria-pressed={filter === id}
-						onClick={() => setFilter(id)}
-					>
-						{label}
-					</button>
-				))}
+				]
+					.filter(([id]) => id === "all" || sources.some((s) => s.id === id))
+					.map(([id, label]) => (
+						<button
+							type="button"
+							className="space-tab"
+							key={id}
+							aria-pressed={effectiveFilter === id}
+							onClick={() => setFilter(id)}
+						>
+							{label}
+						</button>
+					))}
 			</nav>
-			{sources.map((s) => (
-				<section className="mb-6" key={s.id}>
-					<h2 className="font-semibold mb-2">{s.label}</h2>
-					{s.query.isPending ? (
-						<p>Загрузка событий…</p>
-					) : s.query.error ? (
-						<p role="alert">
-							Не удалось загрузить события.{" "}
-							<button
-								type="button"
-								className="underline"
-								onClick={() => void s.query.refetch()}
-							>
-								Повторить
-							</button>
-						</p>
-					) : (
-						<ActivityRows kind={s.id} data={s.query.data} />
-					)}
-				</section>
-			))}
+			{sources
+				.filter((s) => effectiveFilter === "all" || s.id === effectiveFilter)
+				.map((s) => (
+					<section className="mb-6" key={s.id}>
+						<h2 className="font-semibold mb-2">{s.label}</h2>
+						{s.query.isPending ? (
+							<p>Загрузка событий…</p>
+						) : s.query.error ? (
+							<p role="alert">
+								Не удалось загрузить события.{" "}
+								<button
+									type="button"
+									className="underline"
+									onClick={() => void s.query.refetch()}
+								>
+									Повторить
+								</button>
+							</p>
+						) : (
+							<ActivityRows kind={s.id} data={s.query.data} />
+						)}
+					</section>
+				))}
 		</>
 	);
 }

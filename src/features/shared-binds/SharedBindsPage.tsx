@@ -127,7 +127,7 @@ export function SharedBindsPage() {
 	};
 	return (
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto">
-			<div className="mx-auto max-w-7xl p-4 sm:p-7 lg:p-9">
+			<div className="mx-auto max-w-7xl p-4 sm:p-6">
 				<div className="mb-7 flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<span className="text-[11px] font-semibold uppercase tracking-[.18em] text-accent">

@@ -38,6 +38,7 @@ vi.mock("@/services/translator.service", () => ({
 	translatorService: { translate: mocks.translate },
 }));
 
+import { ComposerLauncher } from "./ComposerLauncher";
 import { SupportComposer } from "./SupportComposer";
 
 beforeEach(() => {
@@ -68,23 +69,43 @@ afterEach(() => {
 	vi.clearAllMocks();
 });
 it("keeps the draft when leaving for Email and returning", () => {
-	const view = render(<SupportComposer />);
-	fireEvent.click(screen.getByRole("button", { name: "Support Composer" }));
+	const view = render(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Помощник ответа" }));
 	fireEvent.change(screen.getByLabelText("Сообщение клиента"), {
 		target: { value: "Вопрос клиента" },
 	});
 	mocks.location.pathname = "/project-emails";
-	view.rerender(<SupportComposer />);
+	view.rerender(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
 	expect(screen.queryByLabelText("Сообщение клиента")).toBeNull();
 	mocks.location.pathname = "/";
-	view.rerender(<SupportComposer />);
+	view.rerender(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
 	expect(
 		(screen.getByLabelText("Сообщение клиента") as HTMLTextAreaElement).value,
 	).toBe("Вопрос клиента");
 });
 it("uses existing generation and translation services", async () => {
-	render(<SupportComposer />);
-	fireEvent.click(screen.getByRole("button", { name: "Support Composer" }));
+	render(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Помощник ответа" }));
 	fireEvent.change(screen.getByLabelText("Сообщение клиента"), {
 		target: { value: "Помогите" },
 	});
@@ -106,13 +127,23 @@ it("uses existing generation and translation services", async () => {
 });
 it("opens a translation deep link and hides tools without permission", () => {
 	mocks.location.hash = "composer-translate";
-	const view = render(<SupportComposer />);
+	const view = render(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
 	expect(screen.getByRole("button", { name: "Перевести" })).toBeTruthy();
 	useAuthStore.setState({
 		session: {
 			user: { access: { status: "active", permissions: ["binds.read"] } },
 		} as any,
 	});
-	view.rerender(<SupportComposer />);
+	view.rerender(
+		<>
+			<ComposerLauncher />
+			<SupportComposer />
+		</>,
+	);
 	expect(screen.queryByRole("button", { name: "Перевести" })).toBeNull();
 });

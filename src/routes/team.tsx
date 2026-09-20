@@ -1,24 +1,11 @@
-import {
-	createFileRoute,
-	useNavigate,
-	useRouterState,
-} from "@tanstack/react-router";
-import { AdminOverview } from "@/features/accounts/AdminOverview";
+import { createFileRoute } from "@tanstack/react-router";
 import { TeamActivity } from "@/features/spaces/TeamActivity";
 export const Route = createFileRoute("/team")({ component: TeamPage });
 function TeamPage() {
-	const hash = useRouterState({ select: (s) => s.location.hash });
-	const navigate = useNavigate();
 	return (
-		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 md:p-6">
-			{hash === "activity" ? (
-				<TeamActivity />
-			) : (
-				<AdminOverview
-					onUser={() => void navigate({ to: "/settings/users" })}
-					onAudit={() => void navigate({ to: "/team", hash: "activity" })}
-				/>
-			)}
+		<div className="supportos-page-scroll min-h-0 flex-1 overflow-auto py-4 sm:py-6">
+			<h1 className="mb-4 text-2xl font-semibold">Активность команды</h1>
+			<TeamActivity />
 		</div>
 	);
 }

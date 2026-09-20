@@ -12,7 +12,7 @@ import { useToast } from "@/shared/hooks/useToast";
 import { useViewState } from "@/shared/hooks/useViewState";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { copyToClipboard } from "@/shared/lib/clipboard";
-import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can } from "../../../shared/access.js";
@@ -28,7 +28,6 @@ export function SupportComposer() {
 	const hash = useRouterState({ select: (s) => s.location.hash });
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const navigate = useNavigate();
-	const showLauncher = useWorkspaceStore((s) => s.layout.showTranslatorWidget);
 	const access = useAuthStore((s) => s.session?.user.access);
 	const projectId = useBonusStore((s) => s.activeProjectId);
 	const projects = useBonusStore((s) => s.projects);
@@ -37,6 +36,11 @@ export function SupportComposer() {
 		import("@/services/answer-assistant.service").AnswerTone
 	>(`composer-tone:${projectId ?? "all"}`, "neutral");
 	const [expanded, setExpanded] = useViewState("composer", "expanded", false);
+	useEffect(() => {
+		const open = () => setExpanded(true);
+		window.addEventListener("supportos:open-composer", open);
+		return () => window.removeEventListener("supportos:open-composer", open);
+	}, [setExpanded]);
 	const [mode, setMode] = usePreference("composer-mode", "answer");
 	const [input, setInput] = useViewState("composer", "input", "");
 	const [output, setOutput] = useViewState("composer", "output", "");
@@ -238,15 +242,6 @@ export function SupportComposer() {
 	if (pathname !== "/" || !can(access, "composer.use")) return null;
 	return (
 		<>
-			{showLauncher && (
-				<button
-					type="button"
-					className="absolute right-3 top-2 z-20 rounded-xl bg-surface border border-border px-3 py-2 text-sm"
-					onClick={() => setExpanded(true)}
-				>
-					Support Composer
-				</button>
-			)}
 			{open && (
 				<aside
 					onKeyDown={(event) => {
@@ -260,11 +255,11 @@ export function SupportComposer() {
 							void run();
 						}
 					}}
-					aria-label="Support Composer"
+					aria-label="Помощник ответа"
 					className="composer-panel absolute inset-0 z-30 flex min-h-0 flex-col border-l border-border bg-surface shadow-xl lg:relative lg:inset-auto lg:w-[420px] lg:shrink-0"
 				>
 					<header className="flex items-center justify-between p-3">
-						<h2 className="font-semibold">Support Composer</h2>
+						<h2 className="font-semibold">Помощник ответа</h2>
 						<button
 							type="button"
 							className="min-h-10 px-3 text-sm"
@@ -285,7 +280,7 @@ export function SupportComposer() {
 						<button
 							type="button"
 							className="min-h-10 px-3"
-							aria-label="Закрыть Composer"
+							aria-label="Закрыть помощник"
 							onClick={() => {
 								setExpanded(false);
 								if (requested) void navigate({ to: "/", hash: "" });
@@ -294,7 +289,11 @@ export function SupportComposer() {
 							✕
 						</button>
 					</header>
-					<nav className="flex overflow-auto px-2" aria-label="Режим Composer">
+					<p className="px-4 pb-3 text-xs leading-5 text-muted">
+						Подготовьте, переведите или проверьте ответ клиенту. Результат можно
+						скопировать в чат.
+					</p>
+					<nav className="flex overflow-auto px-2" aria-label="Режим помощника">
 						{modes.map(([id, label]) => (
 							<button
 								type="button"

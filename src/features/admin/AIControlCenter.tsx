@@ -4,7 +4,7 @@ import { answerAssistantService } from "@/services/answer-assistant.service";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
-import { can, canTrain } from "../../../shared/access.js";
+import { can, canAccessPage } from "../../../shared/access.js";
 import { evaluateAIAnswer } from "../../../shared/ai-evaluation.js";
 export type AISection =
 	| "knowledge"
@@ -93,7 +93,7 @@ export function AIControlCenter({
 	const query = useQuery({
 		queryKey: ["ai-runtime", user?.id],
 		queryFn: () => api<Runtime>("/api/ai/knowledge"),
-		enabled: canTrain(user?.access),
+		enabled: canAccessPage(user?.access, "/admin", section),
 		staleTime: 30000,
 	});
 	const [entry, setEntry] = useState<Entry>(() => blank(section)),
@@ -124,7 +124,7 @@ export function AIControlCenter({
 		if (!["playground", "feedback"].includes(section) && entry.kind !== section)
 			setEntry(blank(section));
 	}, [section, entry.kind]);
-	if (!canTrain(user?.access)) return null;
+	if (!canAccessPage(user?.access, "/admin", section)) return null;
 	const entries = query.data?.document.entries ?? [];
 	const editable = can(
 		user?.access,
@@ -242,24 +242,28 @@ export function AIControlCenter({
 									{feedback.language}
 								</p>
 								<div className="flex gap-2">
-									{(["knowledge", "rules", "tests"] as const).map((kind) => (
-										<button
-											type="button"
-											key={kind}
-											className={control}
-											onClick={() => {
-												setEntry({
-													...blank(kind),
-													title: feedback.reason,
-													project: feedback.project,
-													language: feedback.language,
-												});
-												onSection(kind);
-											}}
-										>
-											Создать {kind}
-										</button>
-									))}
+									{(["knowledge", "rules", "tests"] as const)
+										.filter((kind) =>
+											canAccessPage(user?.access, "/admin", kind),
+										)
+										.map((kind) => (
+											<button
+												type="button"
+												key={kind}
+												className={control}
+												onClick={() => {
+													setEntry({
+														...blank(kind),
+														title: feedback.reason,
+														project: feedback.project,
+														language: feedback.language,
+													});
+													onSection(kind);
+												}}
+											>
+												Создать {kind}
+											</button>
+										))}
 								</div>
 							</div>
 						))}

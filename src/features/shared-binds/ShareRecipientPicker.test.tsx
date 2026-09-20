@@ -77,7 +77,10 @@ it("loads immediately, excludes self, marks shared recipients, searches and page
 		target: { value: "Maria" },
 	});
 	await waitFor(() => expect(screen.queryByText("Ivan")).toBeNull());
-	expect(fetcher.mock.calls.at(-1)?.[0]).toContain("page=1&search=Maria");
+	await waitFor(() =>
+		expect(fetcher.mock.calls.at(-1)?.[0]).toContain("page=1&search=Maria"),
+	);
+	await screen.findByText("Maria");
 	fireEvent.change(screen.getByLabelText("Поиск по имени или email"), {
 		target: { value: "" },
 	});

@@ -9,6 +9,8 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useModalStore } from "@/shared/modals/modal.store";
+import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 
 const mock = vi.hoisted(() => ({
@@ -61,6 +63,12 @@ const base = {
 beforeEach(() => {
 	vi.resetAllMocks();
 	localStorage.clear();
+	useKnowledgeStore.setState({
+		binds: [],
+		remoteBinds: [],
+		favorites: [],
+		pinnedTabs: [],
+	});
 	useAuthStore.setState({
 		session: {
 			accessToken: "test",
@@ -101,6 +109,33 @@ function show() {
 	);
 	return client;
 }
+
+it("exposes folder and archive actions for the linked library bind in the shared viewer", async () => {
+	const local = {
+		...base,
+		id: "library-bind",
+		ownerId: "support",
+		sourceBindId: base.id,
+	};
+	useKnowledgeStore.setState({ binds: [local] });
+	show();
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Переместить в папку" }),
+	);
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "moveBind",
+		payload: { bindId: "library-bind" },
+	});
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	fireEvent.click(await screen.findByRole("button", { name: "В архив" }));
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "deleteNode",
+		payload: { id: "library-bind", type: "bind" },
+	});
+	expect(mock.resetPersonal).not.toHaveBeenCalled();
+});
 it("Support can save a personal version without changing the common original", async () => {
 	mock.savePersonal.mockResolvedValue({
 		...base,
@@ -462,7 +497,7 @@ it.each([
 	});
 	const client = show();
 	await screen.findByRole("heading", { name: "Полученная версия", level: 1 });
-	fireEvent.click(screen.getByText("Ещё ···"));
+	fireEvent.click(screen.getByText("Действия"));
 	fireEvent.click(
 		await screen.findByRole("button", { name: "Отказаться от версии" }),
 	);

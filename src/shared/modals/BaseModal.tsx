@@ -98,7 +98,7 @@ export function BaseModal({
 		<div className="fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4">
 			<button
 				type="button"
-				aria-label="Close modal"
+				aria-label="Закрыть окно"
 				onClick={handleClose}
 				disabled={closeDisabled}
 				className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm disabled:cursor-not-allowed"
@@ -119,10 +119,10 @@ export function BaseModal({
 
 					<button
 						type="button"
-						title="Close"
+						title="Закрыть"
 						onClick={handleClose}
 						disabled={closeDisabled}
-						className="rounded-md p-1.5 text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+						className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<X size={18} />
 					</button>

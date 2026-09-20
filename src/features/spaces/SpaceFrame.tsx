@@ -1,57 +1,52 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth.store";
-import { can, routePermission } from "../../../shared/access.js";
+import { canAccessPage } from "../../../shared/access.js";
 import { type SpaceItem, spaceFor } from "./navigation";
+import { SectionNavigation } from "./SectionNavigation";
 export function SpaceFrame({ children }: { children: ReactNode }) {
-	const { pathname, hash } = useRouterState({ select: (s) => s.location });
+	const { pathname: rawPath, hash } = useRouterState({
+		select: (s) => s.location,
+	});
+	const pathname = rawPath.replace(/\/+$/, "") || "/";
 	const access = useAuthStore((s) => s.session?.user.access);
-	const space = spaceFor(pathname.replace(/\/+$/, "") || "/");
+	const space = spaceFor(pathname);
 	if (
 		!space ||
 		space.title === "Рабочее пространство" ||
 		space.title === "Инструменты"
 	)
 		return <>{children}</>;
+	const items = (space.items as readonly SpaceItem[]).filter((item) =>
+		canAccessPage(access, item.to, item.hash),
+	);
+	const active =
+		items.find((item) => pathname === item.to && hash === (item.hash ?? "")) ??
+		items.find(
+			(item) =>
+				pathname === item.to && item.hash && hash.startsWith(`${item.hash}-`),
+		) ??
+		items.find((item) => pathname === item.to && !item.hash);
 	return (
 		<>
-			<header className="shrink-0 min-w-0 border-b border-border px-4 pt-3">
-				<h1 className="text-lg font-semibold">{space.title}</h1>
-				<nav
-					aria-label={space.title}
-					className="space-tabs supportos-scroll flex gap-1 overflow-x-auto py-2"
-				>
-					{(space.items as readonly SpaceItem[])
-						.filter((i) => can(access, i.permission ?? routePermission(i.to)))
-						.map((i) => (
-							<Link
-								key={i.to + (i.hash ?? "")}
-								to={i.to}
-								hash={i.hash ?? ""}
-								className="space-tab"
-								aria-current={
-									pathname === i.to && hash === (i.hash ?? "")
-										? "page"
-										: undefined
-								}
-							>
-								{i.label}
-							</Link>
-						))}
-				</nav>
-				{["/bonuses", "/bonus-tools"].includes(pathname) && (
+			<header className="space-header shrink-0 min-w-0 border-b border-border">
+				<p className="section-eyebrow">{space.title}</p>
+				<SectionNavigation label={space.title} items={items} active={active} />
+				{pathname === "/bonuses" && (
 					<nav aria-label="Режим бонусов" className="flex gap-1 pb-2">
 						<Link
 							to="/bonuses"
+							hash=""
 							className="space-tab"
-							aria-current={pathname === "/bonuses" ? "page" : undefined}
+							aria-current={!hash.startsWith("calculator") ? "page" : undefined}
 						>
 							Справочник
 						</Link>
 						<Link
-							to="/bonus-tools"
+							to="/bonuses"
+							hash="calculator"
 							className="space-tab"
-							aria-current={pathname === "/bonus-tools" ? "page" : undefined}
+							aria-current={hash.startsWith("calculator") ? "page" : undefined}
 						>
 							Калькулятор
 						</Link>

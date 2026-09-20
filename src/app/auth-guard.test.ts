@@ -64,3 +64,43 @@ it("permits a signed-in route and the public login", async () => {
 		requireAppAuth({ location: { pathname: "/admin", href: "/admin" } }),
 	).rejects.toMatchObject({ options: { to: "/settings" } });
 });
+it("checks permissions before redirecting legacy pages and privileged hashes", async () => {
+	useAuthStore.setState({
+		session: {
+			accessToken: "token",
+			user: {
+				id: "u",
+				email: "u@example.test",
+				role: "support",
+				access: {
+					status: "active",
+					permissions: ["roles.manage"],
+					roles: [],
+					version: 1,
+					display_name: "",
+				},
+			},
+		},
+	});
+	await expect(
+		requireAppAuth({
+			location: {
+				pathname: "/settings/users",
+				href: "/settings/users#roles",
+				hash: "roles",
+			},
+		}),
+	).rejects.toMatchObject({ options: { to: "/admin", hash: "roles" } });
+	for (const location of [
+		{ pathname: "/settings/users", href: "/settings/users" },
+		{
+			pathname: "/settings",
+			href: "/settings#integrations-ai",
+			hash: "integrations-ai",
+		},
+		{ pathname: "/admin", href: "/admin#audit", hash: "audit" },
+	])
+		await expect(requireAppAuth({ location })).rejects.toMatchObject({
+			options: { to: "/settings", hash: "" },
+		});
+});

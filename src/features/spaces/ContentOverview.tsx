@@ -5,7 +5,7 @@ import { getBindTitle } from "@/shared/lib/bind-search";
 import { getKnowledgeHealthReport } from "@/shared/lib/knowledge-health";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
-import { can } from "../../../shared/access.js";
+import { can, canAccessPage } from "../../../shared/access.js";
 export function ContentOverview() {
 	const { binds, categories, folders, language, openBind } =
 		useKnowledgeStore();
@@ -52,12 +52,13 @@ export function ContentOverview() {
 		},
 	];
 	return (
-		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 md:p-6">
+		<div className="supportos-page-scroll min-h-0 flex-1 overflow-auto py-4 sm:py-6">
+			<h1 className="mb-2 text-2xl font-semibold">Обзор контента</h1>
 			<p className="mb-4 text-sm text-muted">
 				Обзор загруженной рабочей библиотеки. Предложения поступают из общей
 				базы команды.
 			</p>
-			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-3 sm:grid-cols-2">
 				{[
 					{ label: "Материалы", value: active.length, to: "/" },
 					{
@@ -71,17 +72,18 @@ export function ContentOverview() {
 						to: "/health",
 					},
 					{ label: "Архив", value: report.stats.archivedBinds, to: "/archive" },
-				].map((c) => (
-					<Link
-						className="rounded-xl border border-border p-4 hover:bg-surface-elevated"
-						to={c.to}
-						key={c.label}
-					>
-						<span className="block text-sm">{c.label}</span>
-						<strong className="block py-2 text-2xl">{c.value}</strong>
-						<span className="text-sm text-accent">Открыть →</span>
-					</Link>
-				))}
+				]
+					.filter((c) => canAccessPage(user?.access, c.to))
+					.map((c) => (
+						<Link
+							className="rounded-xl border border-border p-4 hover:bg-surface-elevated"
+							to={c.to}
+							key={c.label}
+						>
+							<span className="block text-sm">{c.label}</span>
+							<strong className="block py-2 text-2xl">{c.value}</strong>
+						</Link>
+					))}
 			</div>
 			{can(user?.access, "knowledge.write") && (
 				<section className="my-5 border-b border-border py-4">
@@ -108,33 +110,51 @@ export function ContentOverview() {
 					)}
 				</section>
 			)}
-			<div className="grid gap-6 pt-4 lg:grid-cols-2">
-				{lists.map((list) => (
-					<section key={list.title}>
-						<h2 className="mb-2 font-semibold">{list.title}</h2>
-						{!list.rows.length ? (
-							<p className="py-4 text-sm text-muted">
-								Подходящих материалов нет.
-							</p>
-						) : (
-							list.rows.map((b) => (
-								<button
-									type="button"
-									key={b.id}
-									onClick={() => {
-										openBind(b.id);
-										void navigate({ to: "/" });
-									}}
-									className="flex w-full items-center justify-between gap-3 border-b border-border/50 py-3 text-left text-sm"
-								>
-									<span className="truncate">{getBindTitle(b, language)}</span>
-									<span className="shrink-0 text-accent">Открыть →</span>
-								</button>
-							))
-						)}
-					</section>
-				))}
-			</div>
+			{!active.length ? (
+				<section className="my-6 rounded-xl border border-border bg-surface p-6">
+					<h2 className="font-semibold">Библиотека пока пуста</h2>
+					<p className="mt-2 text-sm text-muted">
+						Здесь появятся последние изменения и часто используемые материалы.
+					</p>
+					<Link className="space-tab mt-4" to="/">
+						Перейти к биндам
+					</Link>
+				</section>
+			) : (
+				<div className="grid gap-6 pt-4 lg:grid-cols-2">
+					{lists
+						.filter((list, index) => index < 2 || list.rows.length > 0)
+						.map((list) => (
+							<section
+								key={list.title}
+								className="min-w-0 rounded-xl border border-border bg-surface p-4"
+							>
+								<h2 className="mb-2 font-semibold">{list.title}</h2>
+								{!list.rows.length ? (
+									<p className="py-4 text-sm text-muted">
+										Подходящих материалов нет.
+									</p>
+								) : (
+									list.rows.map((b) => (
+										<button
+											type="button"
+											key={b.id}
+											onClick={() => {
+												openBind(b.id);
+												void navigate({ to: "/" });
+											}}
+											className="flex w-full items-center justify-between gap-3 border-b border-border/50 py-3 text-left text-sm"
+										>
+											<span className="truncate">
+												{getBindTitle(b, language)}
+											</span>
+										</button>
+									))
+								)}
+							</section>
+						))}
+				</div>
+			)}
 			<p className="mt-6 text-xs text-muted">
 				Сообщения «Не нашёл нужный ответ» доступны в разделе качества. Счётчики
 				копирования относятся к этой библиотеке.

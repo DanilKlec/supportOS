@@ -8,7 +8,11 @@ import {
 	useTranslatorStore,
 } from "@/store/translator.store";
 
-export function TranslatorSettingsPage() {
+export function TranslatorSettingsPage({
+	embedded = false,
+}: {
+	embedded?: boolean;
+}) {
 	const provider = useTranslatorStore((state) => state.provider);
 	const endpoint = useTranslatorStore((state) => state.endpoint);
 	const lingvaEndpoint = useTranslatorStore((state) => state.lingvaEndpoint);
@@ -52,8 +56,12 @@ export function TranslatorSettingsPage() {
 	};
 
 	return (
-		<div className="h-full overflow-auto bg-background">
-			<div className="mx-auto max-w-3xl p-6">
+		<div
+			className={
+				embedded ? "bg-background" : "h-full overflow-auto bg-background"
+			}
+		>
+			<div className={embedded ? "max-w-3xl" : "mx-auto max-w-3xl p-6"}>
 				<div className="mb-6">
 					<h1 className="text-2xl font-bold">Translator Settings</h1>
 					<p className="mt-1 text-sm text-muted">

@@ -34,7 +34,7 @@ import {
 } from "@/shared/lib/appearance";
 import { useAuthStore } from "@/store/auth.store";
 import type { Permission } from "../../../shared/access.js";
-import { can, canAdmin, routePermission } from "../../../shared/access.js";
+import { can, canAccessPage, canAdmin } from "../../../shared/access.js";
 
 type AppRoute =
 	| "/admin"
@@ -106,7 +106,7 @@ function getFocusableItems(container: HTMLDivElement | null) {
 		container.querySelectorAll<HTMLElement>(
 			"[data-tools-item]:not([disabled])",
 		),
-	);
+	).filter((item) => !item.closest("[hidden]"));
 }
 
 export function ToolsMenu() {
@@ -210,7 +210,14 @@ export function ToolsMenu() {
 	groups.push({
 		title: "Администрирование",
 		items: canAdmin(role)
-			? [{ type: "route", label: "Admin Panel", icon: Settings, to: "/admin" }]
+			? [
+					{
+						type: "route",
+						label: "Администрирование",
+						icon: Settings,
+						to: "/admin",
+					},
+				]
 			: [],
 	});
 	groups.push({
@@ -274,11 +281,12 @@ export function ToolsMenu() {
 	});
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
 		try {
-			return JSON.parse(
-				sessionStorage.getItem("supportos-menu-groups") ?? "{}",
-			);
+			return {
+				"Быстрые действия": true,
+				...JSON.parse(sessionStorage.getItem("supportos-menu-groups") ?? "{}"),
+			};
 		} catch {
-			return {};
+			return { "Быстрые действия": true };
 		}
 	});
 	const toggleGroup = (title: string) =>
@@ -313,7 +321,7 @@ export function ToolsMenu() {
 					menuRef.current?.querySelectorAll<HTMLElement>(
 						"button:not([disabled]), input:not([disabled]), a[href]",
 					) ?? [],
-				);
+				).filter((node) => !node.closest("[hidden]"));
 				const first = nodes[0],
 					last = nodes[nodes.length - 1];
 				if (
@@ -369,7 +377,7 @@ export function ToolsMenu() {
 			items: group.items
 				.filter((item) => {
 					if (item.type === "route")
-						return can(role, item.permission ?? routePermission(item.to));
+						return canAccessPage(role, item.to, item.hash);
 					if (item.action === importJson) return can(role, "knowledge.write");
 					if (item.action === exportJson) return can(role, "binds.read");
 					return can(role, "work");
@@ -381,6 +389,28 @@ export function ToolsMenu() {
 				),
 		}))
 		.filter((group) => group.items.length);
+	// Keep the drawer at section level; search still reaches every nested destination.
+	const displayGroups = query.trim()
+		? visibleGroups
+		: [
+				{
+					title: "Разделы",
+					items: visibleGroups
+						.filter((g) => g.title !== "Быстрые действия")
+						.map((group) => {
+							const first = group.items[0];
+							return {
+								...first,
+								label:
+									group.title === "Рабочее пространство"
+										? "Бинды"
+										: group.title,
+								description: undefined,
+							};
+						}),
+				},
+				...visibleGroups.filter((g) => g.title === "Быстрые действия"),
+			];
 	return (
 		<>
 			<button
@@ -422,7 +452,7 @@ export function ToolsMenu() {
 							aria-modal="true"
 							aria-labelledby="workspace-menu-title"
 							onKeyDown={handleMenuKeyDown}
-							className="workspace-drawer absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col border-l border-border bg-surface text-foreground shadow-2xl"
+							className="workspace-drawer absolute inset-y-0 right-0 flex w-full max-w-[360px] flex-col border-l border-border bg-surface text-foreground shadow-2xl"
 						>
 							<header className="flex items-center gap-3 px-6 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
 								<span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface-elevated">
@@ -472,7 +502,7 @@ export function ToolsMenu() {
 								}}
 								className="supportos-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5"
 							>
-								{visibleGroups.map((group) => (
+								{displayGroups.map((group) => (
 									<section key={group.title} className="mb-3 p-1">
 										<h3 className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted">
 											<button

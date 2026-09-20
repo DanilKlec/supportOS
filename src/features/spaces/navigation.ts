@@ -5,10 +5,10 @@ export const spaces = [
 		items: [
 			{ label: "Бинды", to: "/" },
 			{
-				label: "Support Composer",
+				label: "Помощник ответа",
 				to: "/",
 				hash: "composer-answer",
-				permission: "tools",
+				permission: "composer.use",
 			},
 		],
 	},
@@ -22,17 +22,14 @@ export const spaces = [
 			{ label: "Предложения", to: "/shared-binds", hash: "proposals" },
 			{ label: "Качество", to: "/health" },
 			{ label: "Архив", to: "/archive" },
-			{ label: "AI-инструкции", to: "/ai/knowledge" },
 		],
 	},
 	{
 		title: "Команда",
 		items: [
-			{ label: "Обзор", to: "/team" },
+			{ label: "Активность", to: "/team" },
 			{ label: "Сейчас", to: "/agent-monitor" },
 			{ label: "Расписание", to: "/agent-monitor", hash: "schedule" },
-			{ label: "Сотрудники", to: "/settings/users" },
-			{ label: "Активность", to: "/team", hash: "activity" },
 		],
 	},
 	{
@@ -44,8 +41,18 @@ export const spaces = [
 		items: [
 			{ label: "Общие", to: "/settings" },
 			{ label: "Оформление", to: "/settings", hash: "appearance" },
-			{ label: "Интеграции", to: "/settings", hash: "integrations" },
-			{ label: "Данные", to: "/settings", hash: "data" },
+			{
+				label: "Интеграции",
+				to: "/settings",
+				hash: "integrations",
+				permission: "technical",
+			},
+			{
+				label: "Данные",
+				to: "/settings",
+				hash: "data",
+				permission: "binds.read",
+			},
 		],
 	},
 ] as const;
@@ -55,6 +62,31 @@ export type SpaceItem = {
 	hash?: string;
 	permission?: Permission;
 };
+
+export function canonicalPage(path: string, hash = "") {
+	path = path.replace(/\/+$/, "") || "/";
+	hash = hash.replace(/^#/, "");
+	if (path === "/settings/users")
+		return {
+			to: "/admin",
+			hash: ["roles", "audit"].includes(hash) ? hash : "users",
+		};
+	if (path === "/ai/knowledge") return { to: "/admin", hash: "knowledge" };
+	if (path === "/settings/ai")
+		return { to: "/settings", hash: "integrations-ai" };
+	if (path === "/settings/translator")
+		return { to: "/settings", hash: "integrations-translator" };
+	if (path === "/admin" && ["integrations", "system"].includes(hash))
+		return { to: "/settings", hash: "integrations" };
+	if (path === "/admin" && hash === "qc")
+		return { to: "/shared-binds", hash: "proposals" };
+	if (path === "/bonus-tools")
+		return {
+			to: "/bonuses",
+			hash: hash === "manage" ? "calculator-manage" : "calculator",
+		};
+	return { to: path, hash };
+}
 export function spaceFor(path: string) {
 	if (path === "/bonus-tools") return spaces[1];
 	if (

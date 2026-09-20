@@ -7,4 +7,6 @@ export function normalizeRole(value:unknown): Role;
 export function can(access:unknown,permission:Permission):boolean;
 export function canAdmin(access:unknown):boolean;
 export function canTrain(access:unknown):boolean;
-export function routePermission(path:string):Permission;
+export const adminPermissions: Record<string,Permission>;
+export function routePermission(path:string,hash?:string):Permission;
+export function canAccessPage(access:unknown,path:string,hash?:string):boolean;

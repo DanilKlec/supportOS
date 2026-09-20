@@ -168,7 +168,7 @@ const workspaceToggleOptions: Array<{
 	},
 	{
 		key: "showTranslatorWidget",
-		title: "Support Composer",
+		title: "Помощник ответа",
 		description: "Кнопка контекстного помощника.",
 		icon: Languages,
 	},
@@ -182,9 +182,11 @@ const workspaceToggleOptions: Array<{
 
 function SettingsPage() {
 	const hash = useRouterState({ select: (s) => s.location.hash });
-	const section = ["appearance", "integrations", "data"].includes(hash)
-		? hash
-		: "general";
+	const section = hash.startsWith("integrations")
+		? "integrations"
+		: ["appearance", "data"].includes(hash)
+			? hash
+			: "general";
 	const importInputRef = useRef<HTMLInputElement>(null);
 	const { showToast } = useToast();
 	const [appearance, setAppearance] = useState<AppearanceSettings>(() => {
@@ -288,7 +290,7 @@ function SettingsPage() {
 
 	return (
 		<div className="h-full overflow-auto bg-background">
-			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+			<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
 				<header className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<h2 className="text-xl font-semibold text-foreground">

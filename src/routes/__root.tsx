@@ -1,6 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
 import { supabaseService } from "@/services/supabase.service";
-import { can, routePermission } from "../../shared/access.js";
+import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -68,6 +68,7 @@ function RootComponent() {
 		select: (state) => state.location.pathname,
 	});
 
+	const hash = useRouterState({ select: (state) => state.location.hash });
 	const lightweight = isLightweightRoute(pathname);
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
@@ -75,7 +76,7 @@ function RootComponent() {
 	const accessGranted =
 		!loading &&
 		Boolean(session) &&
-		can(session?.user.access, routePermission(pathname));
+		canAccessPage(session?.user.access, pathname, hash);
 	useEffect(() => {
 		if (loading) return;
 		if (!session && !isLoginRoute) {

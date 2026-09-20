@@ -337,7 +337,7 @@ export function Sidebar({
 
 				<button
 					type="button"
-					aria-label={mobile ? "Close navigation" : "Collapse navigation"}
+					aria-label={mobile ? "Закрыть папки" : "Свернуть папки"}
 					onClick={() =>
 						mobile ? onRequestClose?.() : setLayout({ showSidebar: false })
 					}

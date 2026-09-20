@@ -191,7 +191,7 @@ export function WorkspaceContinuity() {
 							/>
 						</label>
 						<label className="block">
-							Ширина Composer: {composerPixels}px
+							Ширина помощника: {composerPixels}px
 							<input
 								className="block w-full"
 								type="range"
@@ -239,9 +239,9 @@ export function WorkspaceContinuity() {
 						{[
 							["Ctrl / ⌘ K", "Поиск"],
 							["Alt 1 / 2 / 3 / 4", "Бинды / Email / Бонусы / Калькулятор"],
-							["Alt A / R", "Composer: ответ"],
-							["Alt T", "Composer: перевод"],
-							["Ctrl / ⌘ Enter", "Выполнить в Composer"],
+							["Alt A / R", "Помощник: ответ"],
+							["Alt T", "Помощник: перевод"],
+							["Ctrl / ⌘ Enter", "Выполнить в помощнике"],
 							["Esc", "Закрыть верхний диалог"],
 						].map(([key, label]) => (
 							<div key={key} className="flex justify-between gap-4">
