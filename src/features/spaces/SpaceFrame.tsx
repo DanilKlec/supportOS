@@ -2,7 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
-import { type SpaceItem, spaceFor } from "./navigation";
+import { isContentReference, type SpaceItem, spaceFor } from "./navigation";
 import { SectionNavigation } from "./SectionNavigation";
 export function SpaceFrame({ children }: { children: ReactNode }) {
 	const { pathname: rawPath, hash } = useRouterState({
@@ -13,7 +13,8 @@ export function SpaceFrame({ children }: { children: ReactNode }) {
 	const space = spaceFor(pathname);
 	if (
 		!space ||
-		["/bonuses", "/bonus-tools", "/project-emails"].includes(pathname) ||
+		(["/bonuses", "/bonus-tools", "/project-emails"].includes(pathname) &&
+			!isContentReference(pathname, hash)) ||
 		space.title === "Рабочее пространство" ||
 		space.title === "Инструменты"
 	)

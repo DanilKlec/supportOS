@@ -17,8 +17,9 @@ export const spaces = [
 		items: [
 			{ label: "Обзор", to: "/content" },
 			{ label: "Материалы", to: "/shared-binds" },
-			{ label: "Почты", to: "/project-emails" },
-			{ label: "Бонусы", to: "/bonuses" },
+			{ label: "Почты", to: "/project-emails", hash: "content" },
+			{ label: "Бонусы", to: "/bonuses", hash: "content" },
+			{ label: "Калькулятор", to: "/bonuses", hash: "content-calculator" },
 			{ label: "Предложения", to: "/shared-binds", hash: "proposals" },
 			{ label: "Качество", to: "/health" },
 			{ label: "Архив", to: "/archive" },
@@ -96,4 +97,15 @@ export function spaceFor(path: string) {
 	)
 		return spaces[4];
 	return spaces.find((s) => s.items.some((i) => i.to === path));
+}
+
+export function isContentReference(path: string, hash: string) {
+	return (
+		["/bonuses", "/bonus-tools", "/project-emails"].includes(
+			path.replace(/\/+$/, ""),
+		) &&
+		["content", "content-calculator", "manage", "calculator-manage"].includes(
+			hash,
+		)
+	);
 }

@@ -48,12 +48,12 @@ export function WorkspaceDock() {
 								aria-current={
 									pathname === to &&
 									(targetHash
-										? hash.startsWith(targetHash)
-										: !hash.startsWith("calculator"))
+										? hash.includes(targetHash)
+										: !hash.includes("calculator"))
 										? "page"
 										: undefined
 								}
-								className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-xs font-medium transition sm:px-4 sm:text-sm ${pathname === to && (targetHash ? hash.startsWith(targetHash) : !hash.startsWith("calculator")) ? "bg-accent/10 text-accent ring-1 ring-accent/20" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
+								className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-xs font-medium transition sm:px-4 sm:text-sm ${pathname === to && (targetHash ? hash.includes(targetHash) : !hash.includes("calculator")) ? "bg-accent/10 text-accent ring-1 ring-accent/20" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
 							>
 								<Icon size={18} strokeWidth={1.7} />
 								<span className="hidden md:inline">{label}</span>
