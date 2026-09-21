@@ -642,7 +642,10 @@ export function SharedBindEditor({
 		)
 			onClose();
 	};
-	function update(field: "title" | "content", value: string) {
+	function update(
+		field: "title" | "content" | "agentInstructions",
+		value: string,
+	) {
 		dirty.current = true;
 		setTranslations((current) => {
 			const found = current.find((t) => t.language === language);
@@ -851,6 +854,18 @@ export function SharedBindEditor({
 							onChange={(e) => update("title", e.target.value)}
 							placeholder="Например, условия бонуса на депозит"
 							className={`${inputClass} mt-2`}
+						/>
+					</label>
+					<label className="block text-sm font-medium">
+						Инструкция для агента
+						<textarea
+							maxLength={8000}
+							value={translation?.agentInstructions ?? ""}
+							onChange={(event) =>
+								update("agentInstructions", event.target.value)
+							}
+							placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
+							className={`${inputClass} mt-2 min-h-28 resize-y leading-6`}
 						/>
 					</label>
 					<label className="block text-sm font-medium">

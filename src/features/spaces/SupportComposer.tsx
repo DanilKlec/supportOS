@@ -36,6 +36,9 @@ export function SupportComposer() {
 		import("@/services/answer-assistant.service").AnswerTone
 	>(`composer-tone:${projectId ?? "all"}`, "neutral");
 	const [expanded, setExpanded] = useViewState("composer", "expanded", false);
+	const [intent, setIntent] = useViewState<
+		import("@/services/answer-assistant.service").AnswerIntent
+	>("composer", "intent", "general");
 	useEffect(() => {
 		const open = () => setExpanded(true);
 		window.addEventListener("supportos:open-composer", open);
@@ -159,6 +162,9 @@ export function SupportComposer() {
 		activeTab,
 		projectId,
 		tone,
+		intent,
+		translation?.content,
+		translation?.agentInstructions,
 	]);
 	async function run() {
 		const version = ++requestVersion.current;
@@ -197,11 +203,13 @@ export function SupportComposer() {
 							? "Перепиши исходный ответ яснее, сохраняя факты и ограничения."
 							: input,
 					context,
+					agentInstructions: translation?.agentInstructions,
 					referenceAnswer:
 						activeMode === "rewrite" ? input : translation?.content,
 					responseStyle: activeMode === "rewrite" ? "expanded-bind" : undefined,
 					settings: {
 						...data.settings,
+						intent,
 						tone,
 						language,
 						aiEnabled:
@@ -312,7 +320,7 @@ export function SupportComposer() {
 						))}
 					</nav>
 					<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 space-y-3">
-						<label className="block text-sm">
+						<label className="composer-setting block text-sm">
 							Проект
 							<select
 								className="ml-2 max-w-full rounded border border-border bg-background p-2"
@@ -331,7 +339,31 @@ export function SupportComposer() {
 								))}
 							</select>
 						</label>
-						<label className="block text-sm">
+						<label className="composer-setting block text-sm">
+							Тема обращения
+							<select
+								className="ml-2 rounded border border-border bg-background p-2"
+								value={intent}
+								onChange={(event) =>
+									setIntent(event.target.value as typeof intent)
+								}
+							>
+								{[
+									["general", "Общая"],
+									["deposit", "Депозит"],
+									["withdrawal", "Вывод"],
+									["bonus", "Бонус"],
+									["verification", "Верификация"],
+									["technical", "Техническая проблема"],
+									["sports-betting", "Спортивные ставки"],
+								].map(([value, label]) => (
+									<option key={value} value={value}>
+										{label}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="composer-setting block text-sm">
 							Тон
 							<select
 								className="ml-2 rounded border border-border bg-background p-2"
@@ -388,7 +420,7 @@ export function SupportComposer() {
 							</div>
 						) : (
 							<>
-								<label className="block text-sm">
+								<label className="composer-setting block text-sm">
 									{activeMode === "answer"
 										? "Сообщение клиента"
 										: "Исходный текст"}
@@ -486,7 +518,7 @@ export function SupportComposer() {
 										{error}
 									</p>
 								)}
-								<label className="block text-sm">
+								<label className="composer-setting block text-sm">
 									Ответ
 									<textarea
 										value={output}

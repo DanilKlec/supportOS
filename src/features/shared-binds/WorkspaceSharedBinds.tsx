@@ -498,7 +498,19 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							редактированием своей.
 						</p>
 					)}
-				<article className="rounded-2xl border border-border bg-surface p-6 leading-7 whitespace-pre-wrap break-words">
+				{translation?.agentInstructions && (
+					<section className="bind-instructions">
+						<p className="section-eyebrow">Инструкция</p>
+						<h2>Что должен знать агент</h2>
+						<p className="whitespace-pre-wrap">
+							{translation.agentInstructions}
+						</p>
+					</section>
+				)}
+				<article className="bind-answer rounded-2xl border border-border bg-surface p-6 leading-7 whitespace-pre-wrap break-words">
+					<div className="bind-answer-heading">
+						<span>Готовый ответ</span>
+					</div>
 					<ReactMarkdown remarkPlugins={[remarkGfm]}>
 						{translation?.content ?? ""}
 					</ReactMarkdown>

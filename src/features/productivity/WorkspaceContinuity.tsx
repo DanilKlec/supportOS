@@ -29,11 +29,11 @@ export function WorkspaceContinuity() {
 	const [view, setView] = useState(false);
 	const [sidebarPixels, setSidebarPixels] = usePreference(
 		"sidebar-pixels",
-		300,
+		290,
 	);
 	const [composerPixels, setComposerPixels] = usePreference(
 		"composer-pixels",
-		420,
+		336,
 	);
 	const [density, setDensity] = usePreference("density", "comfortable");
 	const [focus, setFocus] = useState(false);

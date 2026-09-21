@@ -51,6 +51,7 @@ export interface GenerateAnswerRequest {
 	customerMessage: string;
 	context: string;
 	referenceAnswer?: string;
+	agentInstructions?: string;
 	responseStyle?: "standard" | "expanded-bind";
 	settings: AssistantSettings;
 	glossary: GlossaryTerm[];
@@ -513,6 +514,7 @@ async function generateWithAI(request: GenerateAnswerRequest) {
 			language: request.settings.language,
 			product: request.settings.product,
 			intent: request.settings.intent,
+			agentInstructions: request.agentInstructions,
 			tone: getToneInstruction(request.settings.tone),
 			glossary,
 			memory: memoryMatches,
@@ -643,7 +645,10 @@ class AnswerAssistantService {
 			answer = buildRuleBasedAnswer(resolvedRequest);
 		}
 
-		answer = applyGlossary(answer, resolvedRequest.glossary, language);
+		// AI already received the authoritative server glossary. Local replacements
+		// must not overwrite published terminology after generation.
+		if (mode === "free")
+			answer = applyGlossary(answer, resolvedRequest.glossary, language);
 
 		const issues = this.checkAnswer({
 			answer,

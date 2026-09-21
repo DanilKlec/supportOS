@@ -2,6 +2,8 @@ export interface BindTranslation {
 	language: string;
 	title: string;
 	content: string;
+	/** Internal handling guidance; never included in the copied customer reply. */
+	agentInstructions?: string;
 	updatedAt: string;
 	aiGenerated?: boolean;
 }

@@ -36,3 +36,23 @@ it("reconstructs both original texts including empty and large strings", () => {
 		expect(d.prefix + d.added + d.suffix).toBe(after);
 	}
 });
+it("detects instruction-only changes without changing the customer answer", () => {
+	const updated = {
+		...base,
+		translations: base.translations.map((t) => ({
+			...t,
+			agentInstructions: "Check payment status internally",
+		})),
+	};
+	expect(bindChange(base, updated)).toBe("changed");
+	expect(updated.translations[0].content).toBe(base.translations[0].content);
+	expect(
+		bindChange(base, {
+			...base,
+			translations: base.translations.map((t) => ({
+				...t,
+				agentInstructions: "",
+			})),
+		}),
+	).toBe("unchanged");
+});

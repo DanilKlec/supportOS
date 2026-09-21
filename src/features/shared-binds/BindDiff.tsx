@@ -62,7 +62,11 @@ export function BindDiff({
 			{languages.map((language) => {
 				const old = before?.translations.find((t) => t.language === language),
 					next = after.translations.find((t) => t.language === language);
-				if (old?.title === next?.title && old?.content === next?.content)
+				if (
+					old?.title === next?.title &&
+					old?.content === next?.content &&
+					(old?.agentInstructions ?? "") === (next?.agentInstructions ?? "")
+				)
 					return null;
 				return (
 					<section
@@ -86,6 +90,11 @@ export function BindDiff({
 							label="Текст"
 							before={old?.content}
 							after={next?.content}
+						/>
+						<TextChange
+							label="Инструкция для агента"
+							before={old?.agentInstructions}
+							after={next?.agentInstructions}
 						/>
 					</section>
 				);

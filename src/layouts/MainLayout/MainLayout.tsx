@@ -110,6 +110,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
 				<main
 					ref={scrollRoot}
+					data-page={pathname.replace(/\/+$/, "") || "/"}
 					className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden"
 				>
 					<SpaceFrame>{children}</SpaceFrame>
@@ -118,9 +119,12 @@ export function MainLayout({ children }: { children: ReactNode }) {
 			</div>
 
 			{(knowledgeRoute ||
-				["/bonuses", "/bonus-tools", "/project-emails"].includes(
-					pathname.replace(/\/+$/, ""),
-				)) && <WorkspaceDock />}
+				[
+					"/bonuses",
+					"/bonus-tools",
+					"/project-emails",
+					"/agent-monitor",
+				].includes(pathname.replace(/\/+$/, ""))) && <WorkspaceDock />}
 		</div>
 	);
 }

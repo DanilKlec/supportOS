@@ -40,6 +40,7 @@ interface TranslationDraft {
 	language: string;
 	title: string;
 	content: string;
+	agentInstructions?: string;
 }
 
 const DEFAULT_BIND_LANGUAGES = ["ru", "en", "de", "pt", "el"];
@@ -1139,6 +1140,7 @@ function BindFormModal({
 					language: translation.language,
 					title: translation.title,
 					content: translation.content,
+					agentInstructions: translation.agentInstructions,
 				}))
 			: DEFAULT_BIND_LANGUAGES.map((code) => createTranslationDraft(code));
 
@@ -1451,6 +1453,20 @@ function BindFormModal({
 									/>
 								</Field>
 
+								<Field label="Инструкция для агента">
+									<textarea
+										value={activeDraft.agentInstructions ?? ""}
+										maxLength={8000}
+										onChange={(event) =>
+											updateDraft(activeDraft.language, {
+												agentInstructions: event.target.value,
+											})
+										}
+										disabled={saving}
+										className={textareaClass}
+										placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
+									/>
+								</Field>
 								<Field
 									label="Содержание"
 									error={errors[`content.${activeDraft.language}`]}
@@ -1902,6 +1918,7 @@ function prepareTranslations(
 				language,
 				title,
 				content,
+				agentInstructions: draft.agentInstructions?.trim() || undefined,
 				updatedAt: new Date().toISOString(),
 			});
 		}

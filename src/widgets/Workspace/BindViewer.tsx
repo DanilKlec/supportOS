@@ -689,209 +689,210 @@ export function BindViewer() {
 	}
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col">
+		<div className="bind-viewer flex min-h-0 flex-1 flex-col">
 			<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto">
 				<div
 					className={`mx-auto w-full ${contentWidthClass} px-4 py-5 pb-28 sm:px-6 md:px-8 md:py-7 md:pb-8`}
 				>
-					<nav
-						aria-label="Breadcrumbs"
-						className="mb-4 flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted"
-					>
-						<span className="truncate">
-							{category?.name ?? "Без категории"}
-						</span>
-						{folderPath && (
-							<>
-								<span>/</span>
-								<span className="truncate">{folderPath}</span>
-							</>
-						)}
-					</nav>
+					<div className="bind-context">
+						<nav
+							aria-label="Breadcrumbs"
+							className="mb-4 flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted"
+						>
+							<span className="truncate">
+								{category?.name ?? "Без категории"}
+							</span>
+							{folderPath && (
+								<>
+									<span>/</span>
+									<span className="truncate">{folderPath}</span>
+								</>
+							)}
+						</nav>
 
-					<div className="flex min-w-0 flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
-						<div className="min-w-0 flex-1">
-							<div className="flex min-w-0 items-start gap-3">
-								<h1 className="min-w-0 break-words text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">
-									{title}
-								</h1>
-								{bind.pinned && (
-									<span className="mt-1 inline-flex h-6 items-center gap-1 rounded-full bg-accent/10 px-2 text-xs font-medium text-accent">
-										<Pin size={12} fill="currentColor" />
-										Pinned
-									</span>
+						<div className="flex min-w-0 flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
+							<div className="min-w-0 flex-1">
+								<div className="flex min-w-0 items-start gap-3">
+									<h1 className="min-w-0 break-words text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">
+										{title}
+									</h1>
+									{bind.pinned && (
+										<span className="mt-1 inline-flex h-6 items-center gap-1 rounded-full bg-accent/10 px-2 text-xs font-medium text-accent">
+											<Pin size={12} fill="currentColor" />
+											Pinned
+										</span>
+									)}
+								</div>
+
+								{bind.tags.length > 0 && (
+									<div className="mt-3 flex flex-wrap gap-1.5">
+										{bind.tags.map((tag) => (
+											<span
+												key={tag}
+												className="max-w-full truncate rounded-full bg-surface-elevated px-2.5 py-1 text-xs text-muted"
+											>
+												#{tag}
+											</span>
+										))}
+									</div>
 								)}
 							</div>
 
-							{bind.tags.length > 0 && (
-								<div className="mt-3 flex flex-wrap gap-1.5">
-									{bind.tags.map((tag) => (
-										<span
-											key={tag}
-											className="max-w-full truncate rounded-full bg-surface-elevated px-2.5 py-1 text-xs text-muted"
-										>
-											#{tag}
-										</span>
-									))}
-								</div>
-							)}
-						</div>
-
-						<div className="ui-actions items-center flex min-w-0 max-w-full flex-wrap  gap-2">
-							<div className="hidden min-w-0 max-w-full flex-wrap rounded-xl bg-surface p-1 sm:flex">
-								{languageCodes.map((code) => {
-									const exists = bind.translations.some(
-										(item) => item.language === code,
-									);
-
-									return (
-										<button
-											key={code}
-											type="button"
-											onClick={() => setLanguage(code as LanguageCode)}
-											title={
-												exists
-													? getLanguageName(code)
-													: `${getLanguageName(code)} missing`
-											}
-											className={`h-8 rounded-lg px-2.5 text-xs font-semibold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
-												language === code
-													? "bg-accent text-accent-foreground"
-													: exists
-														? "text-muted hover:bg-surface-elevated hover:text-foreground"
-														: "text-muted/55 hover:bg-surface-elevated"
-											}`}
-										>
-											{code}
-										</button>
-									);
-								})}
-							</div>
-
-							<div className="relative sm:hidden">
-								<select
-									value={language}
-									onChange={(event) =>
-										setLanguage(event.target.value as LanguageCode)
-									}
-									aria-label="Language"
-									className="h-10 appearance-none rounded-xl border border-border bg-surface pl-3 pr-9 text-sm font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-								>
+							<div className="ui-actions items-center flex min-w-0 max-w-full flex-wrap  gap-2">
+								<div className="hidden min-w-0 max-w-full flex-wrap rounded-xl bg-surface p-1 sm:flex">
 									{languageCodes.map((code) => {
 										const exists = bind.translations.some(
 											(item) => item.language === code,
 										);
 
 										return (
-											<option key={code} value={code}>
-												{code.toUpperCase()}
-												{exists ? "" : " missing"}
-											</option>
+											<button
+												key={code}
+												type="button"
+												onClick={() => setLanguage(code as LanguageCode)}
+												title={
+													exists
+														? getLanguageName(code)
+														: `${getLanguageName(code)} missing`
+												}
+												className={`h-8 rounded-lg px-2.5 text-xs font-semibold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
+													language === code
+														? "bg-accent text-accent-foreground"
+														: exists
+															? "text-muted hover:bg-surface-elevated hover:text-foreground"
+															: "text-muted/55 hover:bg-surface-elevated"
+												}`}
+											>
+												{code}
+											</button>
 										);
 									})}
-								</select>
-								<ChevronDown
-									size={16}
-									className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-								/>
-							</div>
+								</div>
 
-							<button
-								type="button"
-								onClick={() => void copyContent()}
-								className="ui-button ui-button--primary hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
-							>
-								{copied ? <Check size={17} /> : <Copy size={17} />}
-								{copied ? "Copied" : "Copy"}
-							</button>
+								<div className="relative sm:hidden">
+									<select
+										value={language}
+										onChange={(event) =>
+											setLanguage(event.target.value as LanguageCode)
+										}
+										aria-label="Language"
+										className="h-10 appearance-none rounded-xl border border-border bg-surface pl-3 pr-9 text-sm font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									>
+										{languageCodes.map((code) => {
+											const exists = bind.translations.some(
+												(item) => item.language === code,
+											);
 
-							<div ref={actionsRef} className="relative shrink-0">
+											return (
+												<option key={code} value={code}>
+													{code.toUpperCase()}
+													{exists ? "" : " missing"}
+												</option>
+											);
+										})}
+									</select>
+									<ChevronDown
+										size={16}
+										className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+									/>
+								</div>
+
 								<button
 									type="button"
-									aria-label="Действия бинда"
-									aria-haspopup="menu"
-									aria-expanded={actionsOpen}
-									onClick={() => setActionsOpen((value) => !value)}
-									className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+									onClick={() => void copyContent()}
+									className="ui-button ui-button--primary hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
 								>
-									<MoreHorizontal size={19} />
+									{copied ? <Check size={17} /> : <Copy size={17} />}
+									{copied ? "Copied" : "Copy"}
 								</button>
 
-								{actionsOpen && (
-									<ActionMenuPortal anchor={actionsRef}>
-										<ViewerMenuItem
-											icon={<Files size={15} />}
-											label="Переместить"
-											onClick={() =>
-												runAction(() =>
-													modalManager.open("moveBind", {
-														bindId: bind.id,
-														categoryId: bind.categoryId,
-														folderId: bind.folderId,
-													}),
-												)
-											}
-										/>
-										<ViewerMenuItem
-											icon={<Copy size={15} />}
-											label="Копировать заголовок"
-											onClick={() => runAction(() => void copyTitle())}
-										/>
-										<ViewerMenuItem
-											icon={<Edit3 size={15} />}
-											label="Редактировать"
-											onClick={() => runAction(editBind)}
-										/>
-										<ViewerMenuItem
-											icon={
-												<Star
-													size={15}
-													fill={bind.favorite ? "currentColor" : "none"}
-												/>
-											}
-											label={
-												bind.favorite ? "Убрать из избранного" : "В избранное"
-											}
-											onClick={() => runAction(toggleFavorite)}
-										/>
-										<ViewerMenuItem
-											icon={
-												<Pin
-													size={15}
-													fill={bind.pinned ? "currentColor" : "none"}
-												/>
-											}
-											label={bind.pinned ? "Открепить" : "Закрепить"}
-											onClick={() => runAction(togglePinned)}
-										/>
-										<ViewerMenuItem
-											icon={<Files size={15} />}
-											label="Дублировать"
-											onClick={() => runAction(duplicateBind)}
-										/>
-										<ViewerMenuItem
-											icon={<History size={15} />}
-											label="История"
-											onClick={() => runAction(showHistory)}
-										/>
-										<ViewerMenuItem
-											icon={<Search size={15} />}
-											label="Найти дубликаты"
-											onClick={() => runAction(findDuplicates)}
-										/>
-										<div className="my-1 border-t border-border" />
-										<ViewerMenuItem
-											icon={<Trash2 size={15} />}
-											label="Архивировать"
-											danger
-											onClick={() => runAction(deleteBind)}
-										/>
-									</ActionMenuPortal>
-								)}
+								<div ref={actionsRef} className="relative shrink-0">
+									<button
+										type="button"
+										aria-label="Действия бинда"
+										aria-haspopup="menu"
+										aria-expanded={actionsOpen}
+										onClick={() => setActionsOpen((value) => !value)}
+										className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+									>
+										<MoreHorizontal size={19} />
+									</button>
+
+									{actionsOpen && (
+										<ActionMenuPortal anchor={actionsRef}>
+											<ViewerMenuItem
+												icon={<Files size={15} />}
+												label="Переместить"
+												onClick={() =>
+													runAction(() =>
+														modalManager.open("moveBind", {
+															bindId: bind.id,
+															categoryId: bind.categoryId,
+															folderId: bind.folderId,
+														}),
+													)
+												}
+											/>
+											<ViewerMenuItem
+												icon={<Copy size={15} />}
+												label="Копировать заголовок"
+												onClick={() => runAction(() => void copyTitle())}
+											/>
+											<ViewerMenuItem
+												icon={<Edit3 size={15} />}
+												label="Редактировать"
+												onClick={() => runAction(editBind)}
+											/>
+											<ViewerMenuItem
+												icon={
+													<Star
+														size={15}
+														fill={bind.favorite ? "currentColor" : "none"}
+													/>
+												}
+												label={
+													bind.favorite ? "Убрать из избранного" : "В избранное"
+												}
+												onClick={() => runAction(toggleFavorite)}
+											/>
+											<ViewerMenuItem
+												icon={
+													<Pin
+														size={15}
+														fill={bind.pinned ? "currentColor" : "none"}
+													/>
+												}
+												label={bind.pinned ? "Открепить" : "Закрепить"}
+												onClick={() => runAction(togglePinned)}
+											/>
+											<ViewerMenuItem
+												icon={<Files size={15} />}
+												label="Дублировать"
+												onClick={() => runAction(duplicateBind)}
+											/>
+											<ViewerMenuItem
+												icon={<History size={15} />}
+												label="История"
+												onClick={() => runAction(showHistory)}
+											/>
+											<ViewerMenuItem
+												icon={<Search size={15} />}
+												label="Найти дубликаты"
+												onClick={() => runAction(findDuplicates)}
+											/>
+											<div className="my-1 border-t border-border" />
+											<ViewerMenuItem
+												icon={<Trash2 size={15} />}
+												label="Архивировать"
+												danger
+												onClick={() => runAction(deleteBind)}
+											/>
+										</ActionMenuPortal>
+									)}
+								</div>
 							</div>
 						</div>
 					</div>
-
 					{!exactTranslation && (
 						<div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
 							{language.toUpperCase()} is missing. Showing{" "}
@@ -977,7 +978,34 @@ export function BindViewer() {
 						</section>
 					)}
 
-					<section className="mt-6 rounded-xl bg-surface px-4 py-5 sm:px-6 md:p-8">
+					{translation.agentInstructions && (
+						<section className="bind-instructions">
+							<p className="section-eyebrow">Инструкция</p>
+							<h2>Что должен знать агент</h2>
+							<p className="whitespace-pre-wrap">
+								{translation.agentInstructions}
+							</p>
+						</section>
+					)}
+					<section className="bind-answer mt-6 rounded-xl bg-surface px-4 py-5 sm:px-6 md:p-8">
+						<div className="bind-answer-heading">
+							<div>
+								<span className="section-eyebrow">
+									Готовый ответ · {translation.language.toUpperCase()}
+								</span>
+								<h2 className="mt-1 text-base text-foreground">
+									Отправить клиенту
+								</h2>
+							</div>
+							<button
+								type="button"
+								onClick={copyContent}
+								className="ui-button ui-button--primary ui-button--small"
+							>
+								<Copy size={15} />
+								{copied ? "Скопировано" : "Копировать"}
+							</button>
+						</div>
 						{displayContent.trim() ? (
 							<div className="prose max-w-none leading-7 dark:prose-invert prose-headings:tracking-normal prose-pre:rounded-xl prose-pre:border prose-pre:border-border prose-pre:bg-background">
 								<ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -989,6 +1017,17 @@ export function BindViewer() {
 								No content in this translation
 							</div>
 						)}
+						<div className="bind-answer-meta">
+							<span>
+								{displayContent.length} символов ·{" "}
+								{translation.language.toUpperCase()}
+							</span>
+							<span>
+								{qualityIssues.length
+									? `Замечания: ${qualityIssues.length}`
+									: "Нет замечаний автопроверки"}
+							</span>
+						</div>
 					</section>
 
 					<details className="mt-4 rounded-xl border border-border bg-surface">

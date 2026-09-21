@@ -99,8 +99,8 @@ function filterTree(
 
 const sidebarWidthClass = {
 	narrow: "w-64",
-	standard: "w-64",
-	wide: "w-72",
+	standard: "w-[290px]",
+	wide: "w-80",
 };
 
 interface SidebarProps {
@@ -115,7 +115,7 @@ export function Sidebar({
 	onNavigate,
 }: SidebarProps) {
 	const navigate = useNavigate();
-	const [sidebarPixels] = usePreference("sidebar-pixels", 300);
+	const [sidebarPixels] = usePreference("sidebar-pixels", 290);
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);

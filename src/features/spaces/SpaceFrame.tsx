@@ -1,4 +1,15 @@
-import { useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+	Archive,
+	ArrowLeft,
+	BookOpen,
+	Calculator,
+	ChartNoAxesCombined,
+	Gift,
+	Mail,
+	RefreshCw,
+	ShieldCheck,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
@@ -29,6 +40,57 @@ export function SpaceFrame({ children }: { children: ReactNode }) {
 				pathname === item.to && item.hash && hash.startsWith(`${item.hash}-`),
 		) ??
 		items.find((item) => pathname === item.to && !item.hash);
+	if (space.title === "Контент") {
+		const icons = [
+			ChartNoAxesCombined,
+			BookOpen,
+			Mail,
+			Gift,
+			Calculator,
+			RefreshCw,
+			ShieldCheck,
+			Archive,
+		];
+		return (
+			<div className="context-layout">
+				<aside className="context-sidebar">
+					<Link to="/" className="context-home">
+						<ArrowLeft size={15} />
+						Рабочее пространство
+					</Link>
+					<div className="context-heading">
+						<strong>Quality Control</strong>
+						<span>Контент и качество</span>
+					</div>
+					<nav aria-label="Контент">
+						{items.map((item) => {
+							const Icon =
+								icons[(space.items as readonly SpaceItem[]).indexOf(item)] ??
+								BookOpen;
+							return (
+								<Link
+									key={`${item.to}#${item.hash ?? ""}`}
+									to={item.to}
+									hash={item.hash ?? ""}
+									className="context-nav-item"
+									aria-current={item === active ? "page" : undefined}
+								>
+									<Icon size={17} />
+									<span>{item.label}</span>
+								</Link>
+							);
+						})}
+					</nav>
+				</aside>
+				<div className="context-content">
+					<div className="context-mobile">
+						<SectionNavigation label="Контент" items={items} active={active} />
+					</div>
+					{children}
+				</div>
+			</div>
+		);
+	}
 	return (
 		<>
 			<header className="space-header shrink-0 min-w-0 border-b border-border">

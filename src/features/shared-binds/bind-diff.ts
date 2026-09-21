@@ -1,14 +1,24 @@
 export interface BindContent {
 	slug?: string;
 	tags: string[];
-	translations: { language: string; title: string; content: string }[];
+	translations: {
+		language: string;
+		title: string;
+		content: string;
+		agentInstructions?: string;
+	}[];
 }
 export function contentKey(value: BindContent) {
 	return JSON.stringify({
 		slug: value.slug,
 		tags: [...new Set(value.tags)].sort(),
 		translations: value.translations
-			.map(({ language, title, content }) => ({ language, title, content }))
+			.map(({ language, title, content, agentInstructions }) => ({
+				language,
+				title,
+				content,
+				agentInstructions: agentInstructions ?? "",
+			}))
 			.sort((a, b) => a.language.localeCompare(b.language)),
 	});
 }

@@ -58,7 +58,7 @@ export function ContentOverview() {
 				Обзор загруженной рабочей библиотеки. Предложения поступают из общей
 				базы команды.
 			</p>
-			<div className="grid gap-3 sm:grid-cols-2">
+			<div className="content-stats grid gap-3 sm:grid-cols-2">
 				{[
 					{ label: "Материалы", value: active.length, to: "/" },
 					{

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
@@ -234,6 +234,7 @@ export function Topbar({
 	const authConfigured = useAuthStore((s) => s.configured);
 	const authSession = useAuthStore((s) => s.session);
 	const access = authSession?.user.access;
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const enabled = searchFocused || mobileSearchOpen;
 	const emails = useQuery({
 		queryKey: ["search-emails", authSession?.user.id],
@@ -567,7 +568,7 @@ export function Topbar({
 					</BaseModal>
 				)}
 
-			<header className="relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
+			<header className="product-topbar relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
 				<button
 					type="button"
 					aria-label={layout.showSidebar ? "Свернуть папки" : "Open navigation"}
@@ -590,6 +591,37 @@ export function Topbar({
 					</div>
 				</div>
 
+				<nav className="product-spaces" aria-label="Пространства">
+					{[
+						{ to: "/", label: "Workspace" },
+						{ to: "/content", label: "QC" },
+						{ to: "/admin", label: "Admin" },
+					]
+						.filter((item) => canAccessPage(access, item.to))
+						.map((item) => (
+							<Link
+								key={item.to}
+								to={item.to}
+								className="space-tab"
+								aria-current={
+									(
+										item.to === "/content"
+											? [
+													"/content",
+													"/shared-binds",
+													"/health",
+													"/archive",
+												].includes(pathname)
+											: pathname === item.to
+									)
+										? "page"
+										: undefined
+								}
+							>
+								{item.label}
+							</Link>
+						))}
+				</nav>
 				<div className="hidden min-w-0 flex-1 justify-center px-4 md:flex">
 					<div className="relative w-full max-w-2xl">
 						<Search

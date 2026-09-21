@@ -94,7 +94,12 @@ it("previews a saved draft before enabling explicit publication", async () => {
 								text: "Verified answer",
 								provider: "openai",
 								model: "test",
-								metadata: { knowledgeIds: ["k"], preview: true },
+								metadata: {
+									knowledgeIds: ["k"],
+									appliedDraftIds: ["k"],
+									version: 1,
+									preview: true,
+								},
 							}
 						: init?.method === "POST"
 							? { ok: true }

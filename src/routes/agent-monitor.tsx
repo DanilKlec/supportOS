@@ -294,8 +294,8 @@ function AgentMonitor() {
 		setTimeout(() => URL.revokeObjectURL(url), 1000);
 	}
 	return (
-		<div className="h-full overflow-auto bg-background p-4 text-foreground md:p-6">
-			<div className="mx-auto max-w-7xl space-y-5">
+		<div className="monitor-page h-full overflow-auto bg-background p-4 text-foreground md:p-6">
+			<div className="mx-auto w-full space-y-5">
 				<header className="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted">

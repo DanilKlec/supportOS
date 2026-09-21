@@ -283,6 +283,7 @@ function updateTranslation(
 		content: content ?? previous?.content ?? "",
 		updatedAt: now(),
 		aiGenerated: previous?.aiGenerated,
+		agentInstructions: previous?.agentInstructions,
 	};
 
 	if (index >= 0) {

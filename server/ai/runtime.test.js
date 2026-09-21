@@ -22,3 +22,24 @@ it('extends global context with matching project instructions, rules and glossar
  expect(context.approvedGuidance).toBe('Global policy\n\nProject instructions\n\nNo promises');
  expect(context.metadata.ruleIds).toEqual(['r']);expect(context.glossary[0].target).toBe('вывод');expect(context.metadata.preview).toBe(false);
 });
+it('retrieves relevant approved knowledge over unrelated high-priority records',()=>{
+ const entries=Array.from({length:15},(_,i)=>({id:`bonus-${i}`,kind:'knowledge',title:'Bonus',content:'Bonus rules',priority:100}));
+ entries.push({id:'withdrawal',kind:'knowledge',title:'Withdrawal review',content:'Contact finance',priority:1});
+ const document={entries:entries.map(entry=>({...entry,status:'published',published:entry}))};
+ const context=buildAIContext(document,{customerMessage:'Withdrawal pending',language:'en'});
+ expect(context.metadata.knowledgeIds).toEqual(['withdrawal']);
+ expect(context.approvedGuidance).not.toContain('Bonus rules');
+});
+it('reports only drafts actually used for this request and preserves project isolation',()=>{
+ const entry={...input,id:'draft',status:'draft'};
+ expect(buildAIContext({entries:[entry]},{project:'other',language:'ru',intent:'withdrawal',customerMessage:'help'},{draftIds:['draft']}).metadata.appliedDraftIds).toEqual([]);
+ expect(buildAIContext({entries:[entry]},{project:'windetta',language:'ru',intent:'withdrawal',customerMessage:'help'},{draftIds:['draft']}).metadata.appliedDraftIds).toEqual(['draft']);
+});
+it('does not let client glossary override published terminology',()=>{
+ const entry={id:'g',kind:'glossary',title:'withdrawal',content:'вывод средств',language:'ru'};
+ const context=buildAIContext({entries:[{...entry,status:'published',published:entry}]},{language:'ru',glossary:[{source:'Withdrawal',target:'wrong',language:'ru'}]});
+ expect(context.glossary).toHaveLength(1);expect(context.glossary[0].target).toBe('вывод средств');
+});
+it('fails explicitly instead of silently truncating mandatory rules',()=>{
+ expect(()=>buildAIContext({global:'x'.repeat(16001)},{language:'en'})).toThrow('лимит контекста');
+});

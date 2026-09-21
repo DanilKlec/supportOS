@@ -15,6 +15,6 @@ export default async function handler(request,response){
   const guidance=await readGuidance();
   const context=buildAIContext({...guidance.document,global:guidance.document?.global??guidance.content},body,{draftIds:body.preview&&Array.isArray(body.draftIds)?body.draftIds.filter(id=>typeof id==='string').slice(0,150):[]});
   const result=await generateAIReply({...body,approvedGuidance:context.approvedGuidance,glossary:context.glossary});
-  sendJson(response,200,{...result,...(can(actor.access,'ai.playground')||can(actor.access,'ai.tests')?{metadata:context.metadata}:{})});
+  sendJson(response,200,{...result,...(can(actor.access,'ai.playground')||can(actor.access,'ai.tests')?{metadata:{...context.metadata,version:guidance.version}}:{})});
  }catch(error){sendJson(response,error.status??500,{error:error.status?error.message:'Не удалось подготовить ответ'});}
 }

@@ -119,8 +119,12 @@ it("creates nested content through menus, edits Viewer and Tree, moves to catego
 	treeAction("Вывод", "Новый бинд");
 	field("Заголовок", "Выплата");
 	field("Содержание", "Проверьте статус выплаты.");
+	field("Инструкция для агента", "Сверьте статус во внутренней системе.");
 	fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 	const bind = useKnowledgeStore.getState().binds[0];
+	expect(bind.translations[0].agentInstructions).toBe(
+		"Сверьте статус во внутренней системе.",
+	);
 	expect(bind.folderId).toBe(child.id);
 	expect(bind.categoryId).toBe(cat.id);
 	expect(
@@ -135,6 +139,9 @@ it("creates nested content through menus, edits Viewer and Tree, moves to catego
 	expect(
 		screen.getByRole("button", { name: "Действия: Обновлённая выплата" }),
 	).toBeTruthy();
+	expect(
+		useKnowledgeStore.getState().binds[0].translations[0].agentInstructions,
+	).toBe("Сверьте статус во внутренней системе.");
 	viewerAction("Переместить");
 	fireEvent.change(screen.getByLabelText("Куда переместить"), {
 		target: { value: JSON.stringify([cat.id, ""]) },

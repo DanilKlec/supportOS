@@ -289,8 +289,8 @@ function SettingsPage() {
 	const resolvedTheme = resolveThemeMode(appearance.themeMode);
 
 	return (
-		<div className="h-full overflow-auto bg-background">
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
+		<div className="settings-page h-full overflow-auto bg-background">
+			<div className="mx-auto flex w-full flex-col gap-5 p-4 sm:p-6">
 				<header className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<h2 className="text-xl font-semibold text-foreground">

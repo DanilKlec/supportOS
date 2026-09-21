@@ -80,7 +80,10 @@ export function TeamActivity() {
 			{sources
 				.filter((s) => effectiveFilter === "all" || s.id === effectiveFilter)
 				.map((s) => (
-					<section className="mb-6" key={s.id}>
+					<section
+						className="activity-card mb-4 rounded-xl border border-border bg-surface p-4"
+						key={s.id}
+					>
 						<h2 className="font-semibold mb-2">{s.label}</h2>
 						{s.query.isPending ? (
 							<p>Загрузка событий…</p>

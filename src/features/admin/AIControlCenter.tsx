@@ -5,7 +5,9 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage } from "../../../shared/access.js";
-import { evaluateAIAnswer } from "../../../shared/ai-evaluation.js";
+import { FeedbackOverview } from "./FeedbackOverview";
+import { RegressionPanel } from "./RegressionPanel";
+import { sectionDescriptions } from "./section-descriptions";
 export type AISection =
 	| "knowledge"
 	| "rules"
@@ -108,16 +110,16 @@ export function AIControlCenter({
 		[preview, setPreview] = useState(false),
 		[draftIds, setDraftIds] = useState<string[]>([]),
 		[answer, setAnswer] = useState(""),
-		[debug, setDebug] = useState<object>(),
-		[testResults, setTestResults] = useState<
-			{
-				id: string;
-				name: string;
-				passed: boolean;
-				missing: string[];
-				forbidden: string[];
-			}[]
-		>([]);
+		[debug, setDebug] = useState<{
+			[key: string]: unknown;
+			version?: number;
+			appliedDraftIds?: string[];
+			ruleIds?: string[];
+			knowledgeIds?: string[];
+			glossaryIds?: string[];
+			projectIds?: string[];
+			omittedKnowledgeIds?: string[];
+		}>();
 	const [reviewed, setReviewed] = useState<string[]>([]);
 	const [reviewedVersion, setReviewedVersion] = useState<number>();
 	useEffect(() => {
@@ -166,7 +168,14 @@ export function AIControlCenter({
 			text: string;
 			provider: string;
 			model: string;
-			metadata: object;
+			metadata: {
+				version?: number;
+				appliedDraftIds?: string[];
+				ruleIds?: string[];
+				knowledgeIds?: string[];
+				glossaryIds?: string[];
+				projectIds?: string[];
+			};
 		}>("/api/ai/generate", {
 			purpose: section === "tests" ? "test" : "playground",
 			customerMessage: input,
@@ -186,6 +195,9 @@ export function AIControlCenter({
 		return { ...result, guard };
 	};
 	const run = async () => {
+		setReviewed([]);
+		setAnswer("");
+		setDebug(undefined);
 		setBusy(true);
 		setMessage("");
 		try {
@@ -197,8 +209,8 @@ export function AIControlCenter({
 				model: result.model,
 				policyGuard: result.guard,
 			});
-			setReviewed(preview ? draftIds : []);
-			setReviewedVersion(query.data?.version);
+			setReviewed(preview ? (result.metadata.appliedDraftIds ?? []) : []);
+			setReviewedVersion(result.metadata.version);
 		} catch (error) {
 			setMessage((error as Error).message);
 		} finally {
@@ -217,7 +229,14 @@ export function AIControlCenter({
 	};
 	return (
 		<div className="space-y-4">
-			<h2 className="text-xl font-semibold">AI · {section}</h2>
+			<header>
+				<h2 className="text-xl font-semibold">
+					{sectionDescriptions[section].title}
+				</h2>
+				<p className="mt-2 text-sm text-muted">
+					{sectionDescriptions[section].description}
+				</p>
+			</header>
 			{query.isPending && <p>Загрузка…</p>}
 			{query.error && (
 				<p role="alert">
@@ -229,45 +248,22 @@ export function AIControlCenter({
 			)}
 			{message && <output className="block text-sm">{message}</output>}
 			{section === "feedback" ? (
-				<div className="divide-y divide-border">
-					{(query.data?.document.feedback ?? [])
-						.filter((f) => f.rating === "negative")
-						.map((feedback) => (
-							<div
-								key={`${feedback.createdAt}-${feedback.reason}`}
-								className="py-3 text-sm"
-							>
-								<p>
-									{feedback.reason} · {feedback.project || "Все проекты"} ·{" "}
-									{feedback.language}
-								</p>
-								<div className="flex gap-2">
-									{(["knowledge", "rules", "tests"] as const)
-										.filter((kind) =>
-											canAccessPage(user?.access, "/admin", kind),
-										)
-										.map((kind) => (
-											<button
-												type="button"
-												key={kind}
-												className={`${control} ui-button`}
-												onClick={() => {
-													setEntry({
-														...blank(kind),
-														title: feedback.reason,
-														project: feedback.project,
-														language: feedback.language,
-													});
-													onSection(kind);
-												}}
-											>
-												Создать {kind}
-											</button>
-										))}
-								</div>
-							</div>
-						))}
-				</div>
+				<FeedbackOverview
+					feedback={query.data?.document.feedback ?? []}
+					projects={projects}
+					kinds={(["knowledge", "rules", "tests"] as const).filter((kind) =>
+						canAccessPage(user?.access, "/admin", kind),
+					)}
+					onCreate={(kind, feedback) => {
+						setEntry({
+							...blank(kind),
+							title: feedback.reason,
+							project: feedback.project,
+							language: feedback.language,
+						});
+						onSection(kind);
+					}}
+				/>
 			) : section === "playground" ? (
 				<div className="grid gap-4 xl:grid-cols-2">
 					<div className="space-y-3">
@@ -364,6 +360,58 @@ export function AIControlCenter({
 						<h3>Ответ</h3>
 						<p className="my-3 whitespace-pre-wrap">{answer}</p>
 						{debug && (
+							<section className="rounded-xl border border-border bg-surface p-4 space-y-2">
+								<h3 className="text-sm font-semibold">
+									Использованные источники · версия {debug.version}
+								</h3>
+								{(
+									[
+										"projectIds",
+										"ruleIds",
+										"knowledgeIds",
+										"glossaryIds",
+									] as const
+								).map((key) => (
+									<div key={key} className="text-sm">
+										<span className="text-muted">
+											{key === "projectIds"
+												? "Инструкции"
+												: key === "ruleIds"
+													? "Правила"
+													: key === "knowledgeIds"
+														? "Знания"
+														: "Термины"}
+											:{" "}
+										</span>
+										{debug[key]?.length
+											? debug[key]
+													?.map(
+														(id) =>
+															entries.find((item) => item.id === id)?.title ??
+															id,
+													)
+													.join(", ")
+											: "Нет"}
+									</div>
+								))}
+								{preview &&
+									draftIds.some(
+										(id) => !debug.appliedDraftIds?.includes(id),
+									) && (
+										<p className="text-xs text-amber-400">
+											Некоторые выбранные черновики не применились. Проверьте
+											проект, язык, тему, включение и соответствие вопросу.
+										</p>
+									)}
+								{Boolean(debug.omittedKnowledgeIds?.length) && (
+									<p className="text-xs text-amber-400">
+										Часть знаний не вошла в лимит контекста. Сократите материалы
+										или уточните их область действия.
+									</p>
+								)}
+							</section>
+						)}
+						{debug && (
 							<details>
 								<summary>Метаданные и Policy Guard</summary>
 								<pre className="overflow-auto whitespace-pre-wrap text-xs">
@@ -405,7 +453,7 @@ export function AIControlCenter({
 								className={`${control} w-full`}
 								onClick={() => setEntry(blank(section))}
 							>
-								Создать Draft
+								{section === "tests" ? "Создать тест" : "Создать Draft"}
 							</button>
 							{entries
 								.filter(
@@ -577,54 +625,61 @@ export function AIControlCenter({
 									type="submit"
 									className={`${control} ui-button`}
 								>
-									Сохранить Draft
+									{entry.kind === "tests"
+										? "Сохранить тест"
+										: "Сохранить Draft"}
 								</button>
 								{entry.id && (
 									<>
 										<button
 											type="button"
 											className={`${control} ui-button`}
+											disabled={!can(user?.access, "ai.playground")}
 											onClick={() => {
+												if (!can(user?.access, "ai.playground")) return;
 												setPreview(true);
 												setDraftIds([entry.id]);
 												setRequest(entry.kind === "tests" ? entry.content : "");
 												onSection("playground");
 											}}
 										>
-											Playground
+											{can(user?.access, "ai.playground")
+												? "Playground"
+												: "Нет доступа к Playground"}
 										</button>
-										{can(user?.access, "ai.publish") && (
-											<>
-												<button
-													type="button"
-													disabled={
-														busy ||
-														!reviewed.includes(entry.id) ||
-														reviewedVersion !== query.data?.version
-													}
-													title="Сначала проверьте сохранённый Draft в Playground"
-													className={`${control} ui-button`}
-													onClick={() => {
-														if (
-															window.confirm(
-																"Опубликовать сохранённый Draft для Support? Несохранённые изменения не публикуются.",
+										{entry.kind !== "tests" &&
+											can(user?.access, "ai.publish") && (
+												<>
+													<button
+														type="button"
+														disabled={
+															busy ||
+															!reviewed.includes(entry.id) ||
+															reviewedVersion !== query.data?.version
+														}
+														title="Сначала проверьте сохранённый Draft в Playground"
+														className={`${control} ui-button`}
+														onClick={() => {
+															if (
+																window.confirm(
+																	"Опубликовать сохранённый Draft для Support? Несохранённые изменения не публикуются.",
+																)
 															)
-														)
-															void save("publish");
-													}}
-												>
-													Publish
-												</button>
-												<button
-													type="button"
-													disabled={busy}
-													className={`${control} ui-button`}
-													onClick={() => void save("archive")}
-												>
-													Архивировать
-												</button>
-											</>
-										)}
+																void save("publish");
+														}}
+													>
+														Publish
+													</button>
+													<button
+														type="button"
+														disabled={busy}
+														className={`${control} ui-button`}
+														onClick={() => void save("archive")}
+													>
+														Архивировать
+													</button>
+												</>
+											)}
 										{!entry.published && (
 											<button
 												type="button"
@@ -640,66 +695,12 @@ export function AIControlCenter({
 							</div>
 						</form>
 					</div>
-					{section === "tests" && (
-						<>
-							<button
-								type="button"
-								className={`${control} ui-button`}
-								disabled={busy}
-								onClick={async () => {
-									setBusy(true);
-									setMessage("");
-									const results = [];
-									try {
-										for (const test of entries
-											.filter(
-												(e) =>
-													e.kind === "tests" &&
-													e.enabled &&
-													e.status !== "archived",
-											)
-											.slice(0, 20)) {
-											const result = await generate(
-												test.content,
-												test.project,
-												test.language,
-												test.intent,
-											);
-											const { missing, forbidden, passed } = evaluateAIAnswer(
-												result.text,
-												test,
-											);
-											results.push({
-												id: test.id,
-												name: test.title,
-												passed,
-												missing,
-												forbidden,
-											});
-											setTestResults([...results]);
-										}
-									} catch (error) {
-										setMessage((error as Error).message);
-									} finally {
-										setBusy(false);
-									}
-								}}
-							>
-								Запустить до 20 тестов ·{" "}
-								{preview ? "Draft Preview" : "Production"}
-							</button>
-							{testResults.map((result) => (
-								<p key={result.id} className="text-sm">
-									{result.name}: {result.passed ? "Passed" : "Failed"}{" "}
-									{result.missing.length
-										? `Не найдено: ${result.missing.join(", ")}`
-										: ""}{" "}
-									{result.forbidden.length
-										? `Запрещено: ${result.forbidden.join(", ")}`
-										: ""}
-								</p>
-							))}
-						</>
+					{section === "tests" && query.data && (
+						<RegressionPanel
+							entries={entries}
+							version={query.data.version}
+							canPreview={can(user?.access, "ai.playground")}
+						/>
 					)}
 				</>
 			)}
