@@ -8,9 +8,13 @@ import { BindDiff } from "./BindDiff";
 export function BindProposals({
 	sourceId,
 	mineOnly = false,
+	proposalId,
+	expanded = false,
 }: {
 	sourceId?: string;
 	mineOnly?: boolean;
+	proposalId?: string;
+	expanded?: boolean;
 }) {
 	const user = useAuthStore((s) => s.session?.user);
 	const client = useQueryClient();
@@ -50,7 +54,9 @@ export function BindProposals({
 				<span className="text-muted">
 					{proposals.data
 						? proposals.data.filter(
-								(p) => !mineOnly || p.author_id === user?.id,
+								(p) =>
+									(!mineOnly || p.author_id === user?.id) &&
+									(!proposalId || p.id === proposalId),
 							).length
 						: "—"}
 				</span>
@@ -63,19 +69,27 @@ export function BindProposals({
 			{proposals.isPending && (
 				<p className="mt-3 text-sm text-muted">Загрузка предложений…</p>
 			)}
-			{proposals.data?.filter((p) => !mineOnly || p.author_id === user?.id)
-				.length === 0 && (
+			{proposals.data?.filter(
+				(p) =>
+					(!mineOnly || p.author_id === user?.id) &&
+					(!proposalId || p.id === proposalId),
+			).length === 0 && (
 				<p className="mt-2 text-xs text-muted">
 					Нет предложений, ожидающих проверки.
 				</p>
 			)}
 			{proposals.data
-				?.filter((p) => !mineOnly || p.author_id === user?.id)
+				?.filter(
+					(p) =>
+						(!mineOnly || p.author_id === user?.id) &&
+						(!proposalId || p.id === proposalId),
+				)
 				.map((p) => {
 					const base = sources.data?.find((b) => b.id === p.source_id);
 					return (
 						<details
 							key={p.id}
+							open={expanded || undefined}
 							className="mt-3 rounded-xl border border-border p-3"
 						>
 							<summary className="cursor-pointer text-sm">

@@ -87,7 +87,7 @@ it("uses individual bearer auth and signs out through Supabase", async () => {
 		target: { value: "online" },
 	});
 	await screen.findByText("Agent A");
-	fireEvent.click(screen.getByRole("button", { name: "Выйти из мониторинга" }));
+	fireEvent.click(screen.getByRole("button", { name: "Выйти из SupportOS" }));
 	await waitFor(() => expect(auth.signOut).toHaveBeenCalledOnce());
 	client.clear();
 });

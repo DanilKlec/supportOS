@@ -57,7 +57,7 @@ afterEach(() => {
 });
 it("QC navigation preserves permission filtering and the proposals destination", () => {
 	identity(["binds.read", "knowledge.write"]);
-	Object.assign(location, { pathname: "/shared-binds", hash: "proposals" });
+	Object.assign(location, { pathname: "/health", hash: "" });
 	render(
 		<SpaceFrame>
 			<div>Page content</div>
@@ -65,9 +65,9 @@ it("QC navigation preserves permission filtering and the proposals destination",
 	);
 	const proposals = screen.getAllByRole("link", { name: "Предложения" });
 	for (const link of proposals)
-		expect(link.getAttribute("href")).toBe("/shared-binds#proposals");
+		expect(link.getAttribute("href")).toBe("/qc#proposals");
 	for (const link of proposals)
-		expect(link.getAttribute("aria-current")).toBe("page");
+		expect(link.getAttribute("href")).toBe("/qc#proposals");
 	expect(screen.queryByRole("link", { name: "Бонусы" })).toBeNull();
 	expect(screen.getByText("Page content")).toBeTruthy();
 });

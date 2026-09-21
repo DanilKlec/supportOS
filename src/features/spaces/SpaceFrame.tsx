@@ -24,6 +24,7 @@ export function SpaceFrame({ children }: { children: ReactNode }) {
 	const space = spaceFor(pathname);
 	if (
 		!space ||
+		pathname === "/qc" ||
 		(["/bonuses", "/bonus-tools", "/project-emails"].includes(pathname) &&
 			!isContentReference(pathname, hash)) ||
 		space.title === "Рабочее пространство" ||

@@ -10,3 +10,4 @@ export function canTrain(access:unknown):boolean;
 export const adminPermissions: Record<string,Permission>;
 export function routePermission(path:string,hash?:string):Permission;
 export function canAccessPage(access:unknown,path:string,hash?:string):boolean;
+export const qcPermissions: Record<string,Permission>;

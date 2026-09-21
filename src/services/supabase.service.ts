@@ -98,7 +98,9 @@ class SupabaseService {
 			options: { emailRedirectTo: `${window.location.origin}/login` },
 		});
 		if (error) throw error;
-		return this.accept(data.session);
+		this.accept(data.session);
+		if (data.session) await this.refreshIdentity();
+		return this.getSession();
 	}
 	async signOut() {
 		if (supabase) {

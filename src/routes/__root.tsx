@@ -1,3 +1,4 @@
+import { PendingApproval } from "@/features/auth/PendingApproval";
 import { requireAppAuth } from "@/app/auth-guard";
 import { supabaseService } from "@/services/supabase.service";
 import { canAccessPage } from "../../shared/access.js";
@@ -128,7 +129,7 @@ function RootComponent() {
 					</MainLayout>
 				) : (
 					<div className="min-h-screen bg-background p-8">
-						{!loading && session && (
+						{!loading && session?.user.access?.status === "pending" ? <PendingApproval /> : !loading && session && (
 							<>
 								<p>Нет доступа к этому разделу. Обратитесь к администратору.</p>
 								<button

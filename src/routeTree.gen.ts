@@ -14,6 +14,7 @@ import { Route as TeamRouteImport } from './routes/team'
 import { Route as SportsBettingRouteImport } from './routes/sports-betting'
 import { Route as SharedBindsRouteImport } from './routes/shared-binds'
 import { Route as RecentRouteImport } from './routes/recent'
+import { Route as QcRouteImport } from './routes/qc'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LivechatRouteImport } from './routes/livechat'
@@ -59,6 +60,11 @@ const SharedBindsRoute = SharedBindsRouteImport.update({
 const RecentRoute = RecentRouteImport.update({
   id: '/recent',
   path: '/recent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QcRoute = QcRouteImport.update({
+  id: '/qc',
+  path: '/qc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectEmailsRoute = ProjectEmailsRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
   '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
@@ -324,6 +335,7 @@ export interface FileRouteTypes {
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
     | '/shared-binds'
     | '/sports-betting'
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
+  QcRoute: typeof QcRoute
   RecentRoute: typeof RecentRoute
   SharedBindsRoute: typeof SharedBindsRoute
   SportsBettingRoute: typeof SportsBettingRoute
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       path: '/recent'
       fullPath: '/recent'
       preLoaderRoute: typeof RecentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/qc': {
+      id: '/qc'
+      path: '/qc'
+      fullPath: '/qc'
+      preLoaderRoute: typeof QcRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/project-emails': {
@@ -569,6 +589,7 @@ const rootRouteChildren: RootRouteChildren = {
   LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
+  QcRoute: QcRoute,
   RecentRoute: RecentRoute,
   SharedBindsRoute: SharedBindsRoute,
   SportsBettingRoute: SportsBettingRoute,

@@ -8,6 +8,7 @@ interface BaseModalProps {
 	onClose: () => void;
 	closeDisabled?: boolean;
 	size?: "sm" | "md" | "lg" | "xl";
+	placement?: "center" | "right";
 }
 
 const widths = {
@@ -24,6 +25,7 @@ export function BaseModal({
 	onClose,
 	closeDisabled = false,
 	size = "md",
+	placement = "center",
 }: BaseModalProps) {
 	const titleId = useId();
 	const dialog = useRef<HTMLElement>(null);
@@ -95,7 +97,9 @@ export function BaseModal({
 	}
 
 	return createPortal(
-		<div className="fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4">
+		<div
+			className={`fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4 ${placement === "right" ? "ops-drawer" : ""}`}
+		>
 			<button
 				type="button"
 				aria-label="Закрыть окно"

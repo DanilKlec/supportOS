@@ -594,7 +594,7 @@ export function Topbar({
 				<nav className="product-spaces" aria-label="Пространства">
 					{[
 						{ to: "/", label: "Workspace" },
-						{ to: "/content", label: "QC" },
+						{ to: "/qc", label: "QC" },
 						{ to: "/admin", label: "Admin" },
 					]
 						.filter((item) => canAccessPage(access, item.to))
@@ -605,8 +605,9 @@ export function Topbar({
 								className="space-tab"
 								aria-current={
 									(
-										item.to === "/content"
+										item.to === "/qc"
 											? [
+													"/qc",
 													"/content",
 													"/shared-binds",
 													"/health",

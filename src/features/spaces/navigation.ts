@@ -15,12 +15,12 @@ export const spaces = [
 	{
 		title: "Контент",
 		items: [
-			{ label: "Обзор", to: "/content" },
-			{ label: "Материалы", to: "/shared-binds" },
+			{ label: "Обзор", to: "/qc", hash: "overview" },
+			{ label: "Материалы", to: "/qc", hash: "materials" },
 			{ label: "Почты", to: "/project-emails", hash: "content" },
 			{ label: "Бонусы", to: "/bonuses", hash: "content" },
 			{ label: "Калькулятор", to: "/bonuses", hash: "content-calculator" },
-			{ label: "Предложения", to: "/shared-binds", hash: "proposals" },
+			{ label: "Предложения", to: "/qc", hash: "proposals" },
 			{ label: "Качество", to: "/health" },
 			{ label: "Архив", to: "/archive" },
 		],
@@ -67,20 +67,38 @@ export type SpaceItem = {
 export function canonicalPage(path: string, hash = "") {
 	path = path.replace(/\/+$/, "") || "/";
 	hash = hash.replace(/^#/, "");
+	const legacyAI: Record<string, string> = {
+		knowledge: "knowledge",
+		rules: "rules",
+		projects: "instructions",
+		glossary: "glossary",
+		playground: "playground",
+		tests: "tests",
+		feedback: "feedback",
+	};
+	if (path === "/admin" && legacyAI[hash])
+		return { to: "/qc", hash: legacyAI[hash] };
+	if (path === "/content") return { to: "/qc", hash: "overview" };
+	if (path === "/shared-binds")
+		return {
+			to: "/qc",
+			hash: hash === "proposals" ? "proposals" : "materials",
+		};
+
 	if (path === "/settings/users")
 		return {
 			to: "/admin",
 			hash: ["roles", "audit"].includes(hash) ? hash : "users",
 		};
-	if (path === "/ai/knowledge") return { to: "/admin", hash: "knowledge" };
+	if (path === "/ai/knowledge") return { to: "/qc", hash: "knowledge" };
 	if (path === "/settings/ai")
 		return { to: "/settings", hash: "integrations-ai" };
 	if (path === "/settings/translator")
 		return { to: "/settings", hash: "integrations-translator" };
-	if (path === "/admin" && ["integrations", "system"].includes(hash))
+	if (path === "/admin" && hash === "system")
 		return { to: "/settings", hash: "integrations" };
 	if (path === "/admin" && hash === "qc")
-		return { to: "/shared-binds", hash: "proposals" };
+		return { to: "/qc", hash: "proposals" };
 	if (path === "/bonus-tools")
 		return {
 			to: "/bonuses",

@@ -1,6 +1,8 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
+import type { Bind } from "@/entities/bind";
 import type { MonitorData } from "@/features/agent-monitor/live-model";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
@@ -448,6 +450,7 @@ export function AccountsPanel({
 					{userEdit && (
 						<BaseModal
 							title="Профиль и доступы сотрудника"
+							placement="right"
 							size="xl"
 							onClose={() => setUserEdit(null)}
 							closeDisabled={busy}
@@ -825,19 +828,23 @@ export function AccountsPanel({
 }
 function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 	const access = useAuthStore((s) => s.session?.user.access);
+	const [personalBinds, setPersonalBinds] = useState<Bind[]>([]);
 	const [tab, setTab] = useState("profile"),
 		[rows, setRows] = useState<Audit[]>([]),
 		[monitor, setMonitor] = useState<MonitorData>(),
 		[error, setError] = useState(""),
 		[loading, setLoading] = useState(false);
 	useEffect(() => {
-		if (tab === "profile") return;
+		if (tab === "profile" || tab === "projects") return;
 		const abort = new AbortController();
 		setLoading(true);
 		setError("");
 		void (async () => {
 			try {
-				if (tab === "activity") {
+				if (tab === "binds" && can(access, "binds.manage")) {
+					const data = await sharedBindsService.personal(user.id);
+					if (!abort.signal.aborted) setPersonalBinds(data);
+				} else if (tab === "activity") {
 					const result = await accessApi(
 						"audit",
 						undefined,
@@ -876,6 +883,8 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 				{[
 					["profile", "Профиль, роли и доступ"],
 					["activity", "Активность"],
+					["projects", "Проекты"],
+					...(can(access, "binds.manage") ? [["binds", "Личные бинды"]] : []),
 					...(can(access, "monitor.read") ? [["monitor", "Мониторинг"]] : []),
 				].map(([id, label]) => (
 					<button
@@ -891,6 +900,31 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 				))}
 			</div>
 			<div hidden={tab !== "profile"}>{children}</div>
+			{tab === "projects" && (
+				<p className="ops-empty">
+					Назначения сотрудников на проекты не поддерживаются текущим API.
+					Проекты справочников не означают выданный доступ.
+				</p>
+			)}
+			{tab === "binds" && !loading && !error && (
+				<div>
+					{personalBinds.length ? (
+						personalBinds.map((bind) => (
+							<details
+								key={bind.id}
+								className="rounded-lg border border-border p-3"
+							>
+								<summary>{bind.translations[0]?.title || bind.slug}</summary>
+								<p className="whitespace-pre-wrap text-sm">
+									{bind.translations[0]?.content}
+								</p>
+							</details>
+						))
+					) : (
+						<p>Личных биндов нет.</p>
+					)}
+				</div>
+			)}
 			{loading && <p>Загрузка…</p>}
 			{error && <p role="alert">{error}</p>}
 			{tab === "activity" && !loading && (
@@ -1092,7 +1126,9 @@ function EditUser({
 }) {
 	const [name, setName] = useState(user.display_name);
 	const [selected, setSelected] = useState(user.roles);
-	const [status, setStatus] = useState(user.status);
+	const [status, setStatus] = useState(
+		user.status === "pending" ? "active" : user.status,
+	);
 	const effective = [
 		...new Set(
 			roles
@@ -1118,6 +1154,13 @@ function EditUser({
 			}}
 		>
 			<h3 className="font-semibold">Доступ: {user.email}</h3>
+			{user.status === "pending" && (
+				<p className="text-sm text-muted">
+					Новая заявка. Выберите роли и подтвердите регистрацию. До
+					подтверждения доступ закрыт. Для отклонения выберите статус
+					«Отключён».
+				</p>
+			)}
 			<input
 				className={control}
 				aria-label="Имя сотрудника"
@@ -1157,7 +1200,9 @@ function EditUser({
 				className={`${control} ui-button`}
 				disabled={busy || (status === "active" && !selected.length)}
 			>
-				Сохранить доступ
+				{user.status === "pending" && status === "active"
+					? "Подтвердить и выдать роли"
+					: "Сохранить доступ"}
 			</button>{" "}
 			<button
 				type="button"

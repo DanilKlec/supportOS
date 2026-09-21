@@ -25,7 +25,7 @@ export const Route = createFileRoute("/login")({
 	}),
 	component: LoginPage,
 });
-function LoginPage() {
+export function LoginPage() {
 	const navigate = useNavigate();
 	const { redirect } = Route.useSearch();
 	const session = useAuthStore((state) => state.session);
@@ -34,6 +34,9 @@ function LoginPage() {
 		if (session && !loading)
 			void navigate({ href: safeAuthRedirect(redirect), replace: true });
 	}, [session, loading, redirect, navigate]);
+	const [register, setRegister] = useState(false);
+	const [confirmation, setConfirmation] = useState("");
+	const [notice, setNotice] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
@@ -45,6 +48,16 @@ function LoginPage() {
 		setError("");
 		setBusy(true);
 		try {
+			if (register) {
+				if (password !== confirmation) throw new Error("Пароли не совпадают");
+				await supabaseService.signUp(email, password);
+				setPassword("");
+				setConfirmation("");
+				setNotice(
+					"Регистрация отправлена. Если требуется подтверждение почты, откройте письмо и подтвердите адрес. Доступ появится после проверки администратором и назначения ролей.",
+				);
+				return;
+			}
 			await supabaseService.signIn(email, password);
 			await navigate({ href: safeAuthRedirect(redirect), replace: true });
 		} catch (error) {
@@ -121,13 +134,49 @@ function LoginPage() {
 						Ваше рабочее пространство
 					</p>
 					<h2 className="text-3xl font-semibold tracking-tight">
-						С возвращением
+						{register ? "Регистрация" : "С возвращением"}
 					</h2>
 					<p className="mt-3 text-sm leading-6 text-zinc-400">
-						Войдите в свой аккаунт SupportOS,
+						{register
+							? "Создайте аккаунт для проверки администратором."
+							: "Войдите в свой аккаунт SupportOS,"}
 						<br />
-						чтобы продолжить работу.
+						{register
+							? "Роли и доступ назначит администратор после проверки."
+							: "чтобы продолжить работу."}
 					</p>
+					<div className="mt-5 flex gap-3">
+						<button
+							type="button"
+							disabled={busy}
+							aria-pressed={!register}
+							onClick={() => {
+								setRegister(false);
+								setError("");
+								setNotice("");
+								setPassword("");
+								setConfirmation("");
+							}}
+						>
+							Вход
+						</button>
+						<button
+							type="button"
+							disabled={busy}
+							aria-pressed={register}
+							onClick={() => {
+								setRegister(true);
+								setError("");
+								setNotice("");
+								setPassword("");
+							}}
+						>
+							Регистрация
+						</button>
+					</div>
+					{notice && (
+						<output className="mt-4 block text-sm leading-6">{notice}</output>
+					)}
 					<form onSubmit={submit} className="mt-8 space-y-5">
 						{!enabled && (
 							<p
@@ -171,7 +220,8 @@ function LoginPage() {
 								<input
 									id="login-password"
 									type={showPassword ? "text" : "password"}
-									autoComplete="current-password"
+									autoComplete={register ? "new-password" : "current-password"}
+									minLength={register ? 12 : undefined}
 									required
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
@@ -192,6 +242,24 @@ function LoginPage() {
 								</button>
 							</div>
 						</div>
+						{register && (
+							<label className="block text-sm text-zinc-300">
+								Повторите пароль
+								<input
+									className="login-input mt-2"
+									type="password"
+									autoComplete="new-password"
+									required
+									minLength={12}
+									value={confirmation}
+									onChange={(e) => setConfirmation(e.target.value)}
+									disabled={busy || !enabled}
+								/>
+								<span className="mt-2 block text-xs text-muted">
+									Не менее 12 символов.
+								</span>
+							</label>
+						)}
 						<button
 							type="submit"
 							disabled={!enabled || busy}
@@ -200,12 +268,18 @@ function LoginPage() {
 							{busy ? (
 								<LoaderCircle size={18} className="animate-spin" />
 							) : null}
-							{busy ? "Входим…" : "Войти в пространство"}
+							{busy
+								? register
+									? "Отправляем…"
+									: "Входим…"
+								: register
+									? "Отправить заявку"
+									: "Войти в пространство"}
 							{!busy && <ArrowRight size={17} />}
 						</button>
 					</form>
 					<p className="mt-7 border-t border-white/10 pt-6 text-center text-xs leading-5 text-zinc-500">
-						Нет аккаунта или забыли пароль?
+						Забыли пароль?
 						<br />
 						<span className="text-zinc-400">
 							Обратитесь к администратору команды.

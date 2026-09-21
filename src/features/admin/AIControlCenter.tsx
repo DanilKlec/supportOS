@@ -5,6 +5,7 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage } from "../../../shared/access.js";
+import { AIWorkflowGuide } from "./AIWorkflowGuide";
 import { FeedbackOverview } from "./FeedbackOverview";
 import { RegressionPanel } from "./RegressionPanel";
 import { sectionDescriptions } from "./section-descriptions";
@@ -237,6 +238,12 @@ export function AIControlCenter({
 					{sectionDescriptions[section].description}
 				</p>
 			</header>
+			<AIWorkflowGuide
+				available={(Object.keys(sectionDescriptions) as AISection[]).filter(
+					(id) => canAccessPage(user?.access, "/admin", id),
+				)}
+				onSection={onSection}
+			/>
 			{query.isPending && <p>Загрузка…</p>}
 			{query.error && (
 				<p role="alert">

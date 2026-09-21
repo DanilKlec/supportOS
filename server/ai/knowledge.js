@@ -11,8 +11,8 @@ export default async function handler(req,res){
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
   const action=body.action??'instructions';
   const actor=await requireUser(req,{permission:req.method==='POST'&&action==='feedback'?'composer.use':null});
-  if(action!=='feedback'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к AI Training'});
-  if(req.method==='GET'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к AI Training'});
+  if(action!=='feedback'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к знаниям AI'});
+  if(req.method==='GET'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к знаниям AI'});
   if(req.method==='GET')return send(200,await readGuidance());
   if(action==='feedback'){
    const reasons=['Неверная информация','Не тот язык','Слишком длинно','Не учтена policy','Не найден материал','Другое'];

@@ -324,7 +324,7 @@ function AgentMonitor() {
 								className={`${control} ui-button`}
 								onClick={() => void act("logout", {})}
 							>
-								<LogOut size={16} className="inline" /> Выйти из мониторинга
+								<LogOut size={16} className="inline" /> Выйти из SupportOS
 							</button>
 						</div>
 					)}

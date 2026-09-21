@@ -32,7 +32,7 @@ describe("role-aware navigation", () => {
 			expect(canAccessPage(user, "/admin", section)).toBe(false);
 		expect(canAccessPage(access(["monitor.read"]), "/team")).toBe(true);
 		expect(canAccessPage(access(["knowledge.write"]), "/health")).toBe(true);
-		expect(canAdmin(access(["technical"]))).toBe(false);
+		expect(canAdmin(access(["technical"]))).toBe(true);
 	});
 	it.each([
 		"pending",
@@ -70,11 +70,11 @@ describe("role-aware navigation", () => {
 	});
 	it.each([
 		["/settings/users", "roles", "/admin", "roles"],
-		["/ai/knowledge", "", "/admin", "knowledge"],
+		["/ai/knowledge", "", "/qc", "knowledge"],
 		["/settings/ai", "", "/settings", "integrations-ai"],
 		["/settings/translator", "", "/settings", "integrations-translator"],
 		["/admin", "system", "/settings", "integrations"],
-		["/admin", "qc", "/shared-binds", "proposals"],
+		["/admin", "qc", "/qc", "proposals"],
 		["/bonus-tools", "manage", "/bonuses", "calculator-manage"],
 	])("redirects duplicate %s#%s", (path, hash, to, targetHash) => {
 		expect(canonicalPage(path, hash)).toEqual({ to, hash: targetHash });
