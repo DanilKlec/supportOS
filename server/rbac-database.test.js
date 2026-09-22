@@ -40,5 +40,9 @@ it('migrates existing roles once, enforces transactional RBAC and logs changes',
  await pg.exec('reset role');
  const newId='44444444-4444-4444-8444-444444444444';await pg.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',[newId,'new@example.com',JSON.stringify({role:'creator'})]);
  expect(await context(newId)).toMatchObject({status:'pending',roles:[],permissions:[]});
+ await expect(change(newId,'user.update',{id:newId,version:1,status:'active',roles:['admin']})).rejects.toThrow();
+ await change(ids.admin,'user.update',{id:newId,version:1,status:'active',roles:['support','qc'],display_name:'New employee'});
+ expect(await context(newId)).toMatchObject({status:'active',roles:expect.arrayContaining([expect.objectContaining({id:'support'}),expect.objectContaining({id:'qc'})])});
+ expect((await context(newId)).permissions).toContain('work');
  }finally{await pg.close();}
 },30000);

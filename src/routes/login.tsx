@@ -46,6 +46,7 @@ export function LoginPage() {
 	async function submit(event: FormEvent) {
 		event.preventDefault();
 		setError("");
+		setNotice("");
 		setBusy(true);
 		try {
 			if (register) {

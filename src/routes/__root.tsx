@@ -1,5 +1,5 @@
-import { PendingApproval } from "@/features/auth/PendingApproval";
 import { requireAppAuth } from "@/app/auth-guard";
+import { PendingApproval } from "@/features/auth/PendingApproval";
 import { supabaseService } from "@/services/supabase.service";
 import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
@@ -128,23 +128,30 @@ function RootComponent() {
 						<Outlet />
 					</MainLayout>
 				) : (
-					<div className="min-h-screen bg-background p-8">
-						{!loading && session?.user.access?.status === "pending" ? <PendingApproval /> : !loading && session && (
-							<>
-								<p>Нет доступа к этому разделу. Обратитесь к администратору.</p>
-								<button
-									type="button"
-									onClick={() => void navigate({ to: "/settings" })}
-								>
-									Мой аккаунт
-								</button>
-								<button
-									type="button"
-									onClick={() => void supabaseService.signOut()}
-								>
-									Выйти
-								</button>
-							</>
+					<div className="min-h-screen bg-background p-4 sm:p-8">
+						{!loading && session?.user.access?.status === "pending" ? (
+							<PendingApproval />
+						) : (
+							!loading &&
+							session && (
+								<>
+									<p>
+										Нет доступа к этому разделу. Обратитесь к администратору.
+									</p>
+									<button
+										type="button"
+										onClick={() => void navigate({ to: "/settings" })}
+									>
+										Мой аккаунт
+									</button>
+									<button
+										type="button"
+										onClick={() => void supabaseService.signOut()}
+									>
+										Выйти
+									</button>
+								</>
+							)
 						)}
 					</div>
 				)}

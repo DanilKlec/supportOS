@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({
 		onAuthStateChange: vi.fn(),
 		signInWithPassword: vi.fn(),
 		signOut: vi.fn(),
+		signUp: vi.fn(),
 	},
 	callback: undefined,
 }));
@@ -55,6 +56,49 @@ beforeEach(async () => {
 	store = (await import("@/store/auth.store")).useAuthStore;
 });
 afterEach(() => vi.unstubAllGlobals());
+it("registers without granting access while email confirmation is required", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signUp.mockResolvedValue({
+		data: { session: null },
+		error: null,
+	});
+	expect(
+		await service.signUp(" new@example.test ", "long-password"),
+	).toBeUndefined();
+	expect(fixture.auth.signUp).toHaveBeenCalledWith({
+		email: "new@example.test",
+		password: "long-password",
+		options: { emailRedirectTo: "https://app.test/login" },
+	});
+	expect(store.getState().session).toBeUndefined();
+});
+it("loads pending server access after signup with an immediate session", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signUp.mockResolvedValue({ data: { session }, error: null });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "pending",
+							roles: [],
+							permissions: [],
+							version: 1,
+							display_name: "",
+						},
+					}),
+				),
+		),
+	);
+	await service.signUp("new@example.test", "long-password");
+	expect(store.getState().session.user.access).toMatchObject({
+		status: "pending",
+		roles: [],
+		permissions: [],
+	});
+});
 it("does not restore permissions from an older concurrent access response", async () => {
 	await service.initialize();
 	let resolveOld;

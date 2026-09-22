@@ -95,6 +95,45 @@ afterEach(() => {
 	vi.clearAllMocks();
 	useAuthStore.setState({ session: undefined });
 });
+it("approves a pending registration and assigns selected roles in one request", async () => {
+	render(
+		<AccountsPanel
+			initialUser={{
+				id: "new",
+				email: "new@example.com",
+				display_name: "",
+				status: "pending",
+				roles: [],
+				version: 1,
+			}}
+		/>,
+	);
+	const approve = await screen.findByRole("button", {
+		name: "Подтвердить и выдать роли",
+	});
+	expect((approve as HTMLButtonElement).disabled).toBe(true);
+	fireEvent.click(await screen.findByRole("checkbox", { name: "Support" }));
+	fireEvent.click(screen.getByRole("checkbox", { name: "QC" }));
+	fireEvent.click(approve);
+	fireEvent.click(
+		screen.getByRole("button", { name: "Подтвердить изменения" }),
+	);
+	await screen.findByText("Изменения сохранены");
+	const requests = mock.fetch.mock.calls.filter(
+		([, init]) => init?.method === "POST",
+	);
+	expect(requests).toHaveLength(1);
+	expect(JSON.parse(requests[0][1].body)).toEqual({
+		action: "user.update",
+		payload: {
+			id: "new",
+			display_name: "",
+			status: "active",
+			roles: ["support", "qc"],
+			version: 1,
+		},
+	});
+});
 it("assigns multiple roles with the profile version and shows success only after saving", async () => {
 	render(<AccountsPanel />);
 	await screen.findByText("user@example.com");
