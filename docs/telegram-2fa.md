@@ -31,3 +31,11 @@
 Trusted devices не реализованы. Это собственный дополнительный фактор приложения, он не меняет Supabase JWT `aal` на `aal2`. Все будущие API и новые таблицы должны сохранять серверную/RLS-проверку 2FA.
 
 Ссылки: [Supabase session_id и отзыв сессий](https://supabase.com/docs/guides/auth/sessions), [Telegram Bot API](https://core.telegram.org/bots/api).
+
+## Статус запуска — 23 сентября 2026
+
+Миграция `20260923192252_telegram_login_2fa` применена к `exijfprfwmyplggayrpt`. Код опубликован в `test-auth-monitor` (коммит реализации `f5393d0`). Vercel Authentication установлен в All Deployments; единственное публичное исключение — `support-os-git-test-auth-monitor-afda.vercel.app`. Старый production перенаправляет на вход Vercel.
+
+Проверено: 252 теста в 66 файлах, TypeScript и production build; на сервере 2FA endpoint требует Bearer, прежний webhook принимает секрет (200). RLS включён на трёх новых таблицах, прав anon/authenticated нет; управляющие RPC недоступны этим ролям; пять рабочих таблиц имеют restrictive 2FA policy. Реальный вход с Telegram-подтверждением владельцем аккаунта ожидает проверки.
+
+Security Advisor: новые server-only таблицы имеют ожидаемое INFO «RLS enabled, no policy». Новых WARN не появилось; ранее существовавшие предупреждения о `supportos_access` и отключённой проверке скомпрометированных паролей сохранены.
