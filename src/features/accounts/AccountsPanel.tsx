@@ -28,6 +28,11 @@ type User = {
 	status: string;
 	version: number;
 	roles: string[];
+	telegram?: {
+		telegram_id: number;
+		telegram_username: string | null;
+		verified_at: string;
+	} | null;
 };
 type Audit = {
 	id: number;
@@ -1154,6 +1159,15 @@ function EditUser({
 			}}
 		>
 			<h3 className="font-semibold">Доступ: {user.email}</h3>
+			{user.telegram && (
+				<p className="text-sm text-muted">
+					Telegram подтверждён:{" "}
+					{user.telegram.telegram_username
+						? `@${user.telegram.telegram_username}`
+						: "без username"}{" "}
+					· ID {user.telegram.telegram_id}
+				</p>
+			)}
 			{user.status === "pending" && (
 				<p className="text-sm text-muted">
 					Новая заявка. Выберите роли и подтвердите регистрацию. До

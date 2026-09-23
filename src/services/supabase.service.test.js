@@ -56,6 +56,22 @@ beforeEach(async () => {
 	store = (await import("@/store/auth.store")).useAuthStore;
 });
 afterEach(() => vi.unstubAllGlobals());
+it("signs in a Telegram login through its internal identity, preserving legacy email login", async () => {
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn(" Operator ", "long-password");
+	expect(fixture.auth.signInWithPassword).toHaveBeenLastCalledWith({
+		email: "operator@telegram.supportos.invalid",
+		password: "long-password",
+	});
+	await service.signIn(" a@example.test ", "long-password");
+	expect(fixture.auth.signInWithPassword).toHaveBeenLastCalledWith({
+		email: "a@example.test",
+		password: "long-password",
+	});
+});
 it("registers without granting access while email confirmation is required", async () => {
 	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
 	fixture.auth.signUp.mockResolvedValue({

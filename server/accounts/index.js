@@ -3,6 +3,7 @@ import {requireUser} from '../_auth.js';
 import {can} from '../../shared/access.js';
 import {changeAccess} from '../_rbac.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
+import {displayIdentity} from '../../shared/login-identity.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export function adminClient(env=process.env) {
  const resolved=config(env);
@@ -43,7 +44,13 @@ export default async function handler(req,res) {
    const page=Number(url.searchParams.get('page')??1);if(!Number.isInteger(page)||page<1||page>10000)throw fail('Некорректная страница');
     const status=url.searchParams.get('status')??'',role=url.searchParams.get('role')??'';
     if(!['','active','pending','disabled'].includes(status)||role&&!/^[a-z][a-z0-9_]{1,39}$/.test(role))throw fail('Некорректный фильтр');
-    return send(200,await db(env,'rpc/supportos_rbac_list_users',{search_text:(url.searchParams.get('search')??'').slice(0,120),page_number:page,status_filter:status,role_filter:role}));
+    const result=await db(env,'rpc/supportos_rbac_list_users',{search_text:(url.searchParams.get('search')??'').slice(0,120),page_number:page,status_filter:status,role_filter:role});
+    if(env.TELEGRAM_BOT_TOKEN && result.users?.length){
+     const ids=result.users.map(user=>user.id).filter(id=>/^[a-f0-9-]{36}$/i.test(id));
+     const identities=ids.length?await db(env,`supportos_telegram_registration?select=id,telegram_id,telegram_username,verified_at&id=in.(${ids.join(',')})&completed_at=not.is.null`):[];
+     result.users=result.users.map(user=>({...user,email:displayIdentity(user.email),telegram:identities.find(identity=>identity.id===user.id)??null}));
+    }
+    return send(200,result);
   }
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
   if(body.action==='create'){

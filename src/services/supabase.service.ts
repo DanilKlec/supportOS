@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { type AuthSession, useAuthStore } from "@/store/auth.store";
 import { normalizeRole } from "../../shared/access.js";
+import { loginEmail } from "../../shared/login-identity.js";
 import { supabase } from "./supabase-client";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -82,7 +83,7 @@ class SupabaseService {
 	async signIn(email: string, password: string) {
 		if (!supabase) throw new Error("Supabase is not configured");
 		const { data, error } = await supabase.auth.signInWithPassword({
-			email: email.trim(),
+			email: loginEmail(email),
 			password,
 		});
 		if (error) throw error;

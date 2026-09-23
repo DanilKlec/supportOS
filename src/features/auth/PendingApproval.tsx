@@ -16,9 +16,18 @@ import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { supabaseService } from "@/services/supabase.service";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
-export function PendingApproval() {
+import { displayIdentity } from "../../../shared/login-identity.js";
+export function PendingApproval({
+	registeredEmail,
+	onBackToLogin,
+}: {
+	registeredEmail?: string;
+	onBackToLogin?: () => void;
+} = {}) {
 	const navigate = useNavigate();
-	const email = useAuthStore((s) => s.session?.user.email);
+	const sessionEmail = useAuthStore((s) => s.session?.user.email);
+	const email = displayIdentity(sessionEmail ?? registeredEmail ?? "");
+	const awaitingEmail = Boolean(onBackToLogin);
 	const [busy, setBusy] = useState(false),
 		[message, setMessage] = useState("");
 	async function check() {
@@ -75,12 +84,13 @@ export function PendingApproval() {
 				</div>
 				<span className="approval-status">
 					<span />
-					Ожидает одобрения
+					{awaitingEmail ? "Проверьте почту" : "Ожидает одобрения"}
 				</span>
 				<h1 id="approval-title">Вы почти в команде.</h1>
 				<p className="approval-description">
-					Аккаунт создан. Остался один шаг: администратор проверит заявку и
-					откроет нужные вам инструменты.
+					{awaitingEmail
+						? "Регистрация отправлена. Откройте письмо и подтвердите адрес, затем войдите в аккаунт. Администратор проверит заявку и назначит роли."
+						: "Аккаунт создан. Остался один шаг: администратор проверит заявку и откроет нужные вам инструменты."}
 				</p>
 				<div className="approval-account">
 					<span className="approval-avatar" aria-hidden="true">
@@ -102,12 +112,34 @@ export function PendingApproval() {
 							<Check size={17} />
 						</span>
 						<div>
-							<strong>Регистрация завершена</strong>
-							<p>Ваша заявка сохранена</p>
+							<strong>
+								{awaitingEmail
+									? "Регистрация отправлена"
+									: "Регистрация завершена"}
+							</strong>
+							<p>
+								{awaitingEmail ? "Данные отправлены" : "Ваша заявка сохранена"}
+							</p>
 						</div>
 						<span className="approval-step-label">Готово</span>
 					</li>
-					<li className="is-current" aria-current="step">
+					{awaitingEmail && (
+						<li className="is-current" aria-current="step">
+							<span className="approval-step-icon">
+								<Clock3 size={17} />
+							</span>
+							<div>
+								<strong>Подтвердите почту</strong>
+								<p>
+									Перейдите по ссылке из письма. Проверьте также папку «Спам».
+								</p>
+							</div>
+						</li>
+					)}
+					<li
+						className={awaitingEmail ? undefined : "is-current"}
+						aria-current={awaitingEmail ? undefined : "step"}
+					>
 						<span className="approval-step-icon">
 							<Clock3 size={17} />
 						</span>
@@ -132,34 +164,48 @@ export function PendingApproval() {
 					</output>
 				)}
 				<div className="approval-actions">
-					<button
-						type="button"
-						disabled={busy}
-						className="ui-button ui-button--primary"
-						onClick={() => void check()}
-					>
-						<RefreshCw
-							size={16}
-							className={busy ? "animate-spin motion-reduce:animate-none" : ""}
-							aria-hidden="true"
-						/>
-						{busy ? "Проверяем…" : "Проверить статус"}
-					</button>
-					<button
-						type="button"
-						disabled={busy}
-						className="ui-button"
-						onClick={() =>
-							void supabaseService
-								.signOut()
-								.catch(() =>
-									setMessage("Не удалось выйти. Попробуйте ещё раз."),
-								)
-						}
-					>
-						<LogOut size={16} aria-hidden="true" />
-						Выйти
-					</button>
+					{awaitingEmail ? (
+						<button
+							type="button"
+							className="ui-button ui-button--primary"
+							onClick={onBackToLogin}
+						>
+							Перейти ко входу
+						</button>
+					) : (
+						<>
+							<button
+								type="button"
+								disabled={busy}
+								className="ui-button ui-button--primary"
+								onClick={() => void check()}
+							>
+								<RefreshCw
+									size={16}
+									className={
+										busy ? "animate-spin motion-reduce:animate-none" : ""
+									}
+									aria-hidden="true"
+								/>
+								{busy ? "Проверяем…" : "Проверить статус"}
+							</button>
+							<button
+								type="button"
+								disabled={busy}
+								className="ui-button"
+								onClick={() =>
+									void supabaseService
+										.signOut()
+										.catch(() =>
+											setMessage("Не удалось выйти. Попробуйте ещё раз."),
+										)
+								}
+							>
+								<LogOut size={16} aria-hidden="true" />
+								Выйти
+							</button>
+						</>
+					)}
 				</div>
 				<p className="approval-footnote">
 					Можно закрыть страницу и вернуться позже.
