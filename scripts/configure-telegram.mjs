@@ -19,8 +19,7 @@ const endpoint=`${url.origin}/api/registration?action=webhook`;
 const probe=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':secret},body:JSON.stringify({}),signal:AbortSignal.timeout(15000)}).catch(()=>null);
 if(!probe?.ok)throw new Error('The deployed webhook did not accept its secret. Deploy/configure SupportOS before registering it.');
 await call('setWebhook',{url:endpoint,secret_token:secret,allowed_updates:['message','callback_query']});
-await call('setMyCommands',{commands:[{command:'start',description:'Подтвердить регистрацию SupportOS'},{command:'help',description:'Как получить доступ'}]});
-await call('setMyDescription',{description:'Подтвердите свою заявку в SupportOS через Telegram. Начните регистрацию на сайте и перейдите сюда по кнопке подтверждения. Доступ и роли назначает администратор в SupportOS. Не отправляйте боту пароли.'});
+// Profile is configured separately by configure-telegram-profile.mjs.
 const status=await call('getWebhookInfo',{});
 if(status.url!==endpoint)throw new Error('Webhook URL was not saved.');
 console.log(`Webhook configured for @${bot.username}. Pending updates: ${status.pending_update_count}.`);
