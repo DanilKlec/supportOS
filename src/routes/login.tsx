@@ -17,6 +17,7 @@ import {
 } from "@/components/brand/AmbientBackground";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { TelegramRegistration } from "@/features/auth/TelegramRegistration";
+import { TelegramPassword } from "@/features/auth/TelegramPassword";
 import { supabaseService } from "@/services/supabase.service";
 import {
 	readTelegramChallenge,
@@ -44,6 +45,7 @@ export function LoginPage() {
 			void navigate({ href: safeAuthRedirect(redirect), replace: true });
 	}, [session, loading, redirect, navigate]);
 	const [register, setRegister] = useState(false);
+	const [recovery, setRecovery] = useState(false);
 	const [confirmation, setConfirmation] = useState("");
 	const [challenge, setChallenge] = useState<TelegramChallenge | undefined>(
 		readTelegramChallenge,
@@ -86,6 +88,14 @@ export function LoginPage() {
 			setBusy(false);
 		}
 	}
+	if (recovery)
+		return (
+			<div className="min-h-screen bg-background p-6 text-foreground">
+				<div className="mx-auto max-w-lg pt-16">
+					<TelegramPassword mode="recovery" onBack={() => setRecovery(false)} />
+				</div>
+			</div>
+		);
 	if (challenge)
 		return (
 			<TelegramRegistration
@@ -331,11 +341,17 @@ export function LoginPage() {
 						</button>
 					</form>
 					<p className="mt-7 border-t border-white/10 pt-6 text-center text-xs leading-5 text-zinc-500">
-						Забыли пароль?
-						<br />
-						<span className="text-zinc-400">
-							Обратитесь к администратору команды.
-						</span>
+						<button
+							type="button"
+							className="text-zinc-400 hover:text-white"
+							onClick={() => {
+								setPassword("");
+								setConfirmation("");
+								setRecovery(true);
+							}}
+						>
+							Забыли пароль? Восстановить через Telegram
+						</button>
 					</p>
 				</section>
 			</div>

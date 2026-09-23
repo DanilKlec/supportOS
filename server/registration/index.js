@@ -4,6 +4,7 @@ import { config, db, equal } from '../agent-monitor/_server.js';
 import { loginEmail, normalizeLogin } from '../../shared/login-identity.js';
 import { requireIdentity } from '../_auth.js';
 import { twoFactorAction, loginCallback, telegram as sendTelegram } from '../telegram-2fa.js';
+import { passwordAction, passwordBot } from '../telegram-password.js';
 
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -22,6 +23,7 @@ async function telegram(env,method,body) {
  return result.result;
 }
 async function webhook(body,env) {
+ if(await passwordBot(body,env))return;
  const callback=body.callback_query;
  if(callback) {
   const id=callback.from?.id;
@@ -73,6 +75,7 @@ export default async function handler(req,res) {
   let body;try{body=JSON.parse(raw);}catch{throw fail('Invalid JSON');}
   if(!body||typeof body!=='object'||Array.isArray(body))throw fail('Invalid JSON');
   if(action==='webhook'){await webhook(body,env);return send(200,{ok:true});}
+  if(action?.startsWith('password-'))return send(200,await passwordAction(req,action.slice(9),body,env));
   if(action?.startsWith('2fa-'))return send(200,await twoFactorAction(req,await requireIdentity(req,env),action.slice(4),body,env));
   if(action==='begin') {
    let login;try{login=normalizeLogin(body.login);}catch(error){throw fail(error.message);}
