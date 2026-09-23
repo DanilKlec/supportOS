@@ -41,6 +41,7 @@ it("permits a signed-in route and the public login", async () => {
 	useAuthStore.setState({
 		session: {
 			accessToken: "token",
+			telegramVerified: true,
 			user: {
 				id: "u",
 				email: "test@example.test",
@@ -68,6 +69,7 @@ it("checks permissions before redirecting legacy pages and privileged hashes", a
 	useAuthStore.setState({
 		session: {
 			accessToken: "token",
+			telegramVerified: true,
 			user: {
 				id: "u",
 				email: "u@example.test",

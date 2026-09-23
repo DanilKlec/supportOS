@@ -34,5 +34,5 @@ export default async function handler(req,res){
   const changed=body.id||document.entries?.at(-1)?.id||'main';
   const kind=document.entries?.find(entry=>entry.id===changed)?.kind??current.document?.entries?.find(entry=>entry.id===changed)?.kind??'instructions';
   await db(config(),'rpc/supportos_save_ai_runtime',{actor:actor.id,expected:body.expected,operation:action,value:{...document,_change:{id:action==='instructions'?'main':changed,kind}}});return send(200,{ok:true});
- }catch(error){return send(error.status??500,{error:error.status?error.message:'Не удалось сохранить AI. Обновите данные и повторите.'});}
+ }catch(error){return send(error.status??500,{code:error.code,error:error.status?error.message:'Не удалось сохранить AI. Обновите данные и повторите.'});}
 }

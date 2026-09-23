@@ -38,8 +38,9 @@ export function LoginPage() {
 	const { redirect } = Route.useSearch();
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
+	const authError = useAuthStore((state) => state.error);
 	useEffect(() => {
-		if (session && !loading)
+		if (session?.telegramVerified && !loading)
 			void navigate({ href: safeAuthRedirect(redirect), replace: true });
 	}, [session, loading, redirect, navigate]);
 	const [register, setRegister] = useState(false);
@@ -56,6 +57,7 @@ export function LoginPage() {
 	async function submit(event: FormEvent) {
 		event.preventDefault();
 		setError("");
+		useAuthStore.getState().setError(undefined);
 		setBusy(true);
 		try {
 			if (register) {
@@ -71,7 +73,7 @@ export function LoginPage() {
 				return;
 			}
 			await supabaseService.signIn(email, password);
-			await navigate({ href: safeAuthRedirect(redirect), replace: true });
+			setPassword("");
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Не удалось войти";
@@ -227,12 +229,12 @@ export function LoginPage() {
 								Вход ещё не настроен. Обратитесь к администратору.
 							</p>
 						)}
-						{error && (
+						{(error || authError) && (
 							<p
 								role="alert"
 								className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-300"
 							>
-								{error}
+								{error || authError}
 							</p>
 						)}
 						<label className="block text-sm font-medium text-zinc-300">

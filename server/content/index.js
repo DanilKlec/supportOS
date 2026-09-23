@@ -23,5 +23,5 @@ export default async function handler(req,res) {
   });
   const result=await response.json();
   return send(response.ok?200:result.code==='42501'?403:result.code==='40001'?409:400,response.ok?result:{error:['42501','40001','22023'].includes(result.code)?result.message:'Не удалось опубликовать данные'});
- }catch(error){send(error.status??500,{error:error.status?error.message:'Не удалось загрузить общие данные'});}
+ }catch(error){send(error.status??500,{code:error.code,error:error.status?error.message:'Не удалось загрузить общие данные'});}
 }

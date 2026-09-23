@@ -77,5 +77,5 @@ export default async function handler(req,res) {
   ]);
   const currentAssignments=currentDay===day ? assignments : await allRows(env,`monitor_assignments?select=*&day=eq.${currentDay}&order=agent_id,shift`);
   return send(200,{agents,observations,assignments,currentAssignments,audit,totals,historyLimited:observations.length>=1000,lastSync:health.find(row=>row.id==='collect')?.updated_at ?? null,lastWebhook:health.find(row=>row.id==='webhook')?.updated_at ?? null,serverTime:Date.now()});
- } catch(error) {return send(error.status ?? 500,{error:error.status?error.message:'Ошибка мониторинга. Проверьте настройки сервера и соединение.'});}
+ } catch(error) {return send(error.status ?? 500,{code:error.code,error:error.status?error.message:'Ошибка мониторинга. Проверьте настройки сервера и соединение.'});}
 }

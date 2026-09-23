@@ -2,6 +2,8 @@ import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { adminClient } from '../accounts/index.js';
 import { config, db, equal } from '../agent-monitor/_server.js';
 import { loginEmail, normalizeLogin } from '../../shared/login-identity.js';
+import { requireIdentity } from '../_auth.js';
+import { twoFactorAction, loginCallback, telegram as sendTelegram } from '../telegram-2fa.js';
 
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -24,6 +26,7 @@ async function webhook(body,env) {
  if(callback) {
   const id=callback.from?.id;
   if(callback.message?.chat?.type!=='private'||callback.message.chat.id!==id||callback.from?.is_bot||!Number.isSafeInteger(id)||id<=0) return;
+  if(await loginCallback(callback,env))return;
   const match=/^confirm:([A-Za-z0-9_-]{43})$/.exec(callback.data ?? '');
   if(!match) return;
   const result=await db(env,'rpc/supportos_tg_confirm',{start_digest:hash(match[1]),tg_id:id,tg_username:callback.from.username ?? null});
@@ -34,6 +37,13 @@ async function webhook(body,env) {
  const message=body.message;
  const id=message?.from?.id;
  if(message?.chat?.type!=='private'||message.chat.id!==id||message.from?.is_bot||!Number.isSafeInteger(id)||id<=0) return;
+ const link=/^\/start(?:@\w+)? link_([A-Za-z0-9_-]{43})$/.exec(message.text??'');
+ if(link) {
+  const rows=await db(env,`supportos_telegram_link_requests?select=user_id&challenge_hash=eq.${hash(link[1])}&status=eq.pending&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=1`);
+  if(!rows[0]){await sendTelegram(env,'sendMessage',{chat_id:id,text:'Запрос привязки истёк. Вернитесь на сайт.'});return;}
+  const users=await db(env,`supportos_users?select=email,display_name&id=eq.${rows[0].user_id}&limit=1`);
+  await sendTelegram(env,'sendMessage',{chat_id:id,text:`Привязать Telegram к аккаунту SupportOS «${users[0]?.display_name||users[0]?.email||rows[0].user_id}»? Подтверждайте только свой аккаунт. После подтверждения привязку проверит администратор.`,reply_markup:{inline_keyboard:[[{text:'Подтвердить привязку',callback_data:`link_confirm:${link[1]}`}]]}});return;
+ }
  const match=/^\/start(?:@\w+)? ([A-Za-z0-9_-]{43})$/.exec(message.text ?? '');
  if(!match) {
   if(/^\/(start|help)(?:@\w+)?$/.test(message.text ?? '')) await telegram(env,'sendMessage',{chat_id:id,text:'Для регистрации откройте SupportOS, выберите «Регистрация» и перейдите сюда по кнопке «Подтвердить через Telegram». Доступ и роли назначает администратор. Не отправляйте боту пароли.'});
@@ -63,6 +73,7 @@ export default async function handler(req,res) {
   let body;try{body=JSON.parse(raw);}catch{throw fail('Invalid JSON');}
   if(!body||typeof body!=='object'||Array.isArray(body))throw fail('Invalid JSON');
   if(action==='webhook'){await webhook(body,env);return send(200,{ok:true});}
+  if(action?.startsWith('2fa-'))return send(200,await twoFactorAction(req,await requireIdentity(req,env),action.slice(4),body,env));
   if(action==='begin') {
    let login;try{login=normalizeLogin(body.login);}catch(error){throw fail(error.message);}
    const browserToken=randomBytes(32).toString('base64url'),startToken=randomBytes(32).toString('base64url');
@@ -92,5 +103,5 @@ export default async function handler(req,res) {
    if(!await db(env,'rpc/supportos_tg_finish',{request_id:claim.id}))throw fail('Не удалось завершить регистрацию. Попробуйте ещё раз.',503);
   }
   return send(200,{login:claim.login});
- }catch(error){return send(error.status??503,{error:error.status?error.message:'Регистрация временно недоступна. Обратитесь к администратору.'});}
+ }catch(error){return send(error.status??503,{error:error.status?error.message:'Регистрация временно недоступна. Обратитесь к администратору.',code:error.code});}
 }

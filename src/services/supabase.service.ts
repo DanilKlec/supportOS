@@ -17,8 +17,29 @@ class SupabaseService {
 	}
 	private accept(session: Session | null) {
 		const previous = this.getSession();
+		let sessionId: string | undefined;
+		try {
+			sessionId = session
+				? JSON.parse(
+						atob(
+							session.access_token
+								.split(".")[1]
+								.replace(/-/g, "+")
+								.replace(/_/g, "/"),
+						),
+					).session_id
+				: undefined;
+		} catch {
+			/* Server validates session identity. */
+		}
 		const next: AuthSession | undefined = session
 			? {
+					sessionId,
+					telegramVerified: Boolean(
+						sessionId &&
+							previous?.sessionId === sessionId &&
+							previous.telegramVerified,
+					),
 					accessToken: session.access_token,
 					refreshToken: session.refresh_token,
 					expiresAt: session.expires_at ? session.expires_at * 1000 : undefined,
@@ -104,6 +125,22 @@ class SupabaseService {
 		return this.getSession();
 	}
 	async signOut() {
+		const current = this.getSession();
+		if (current) {
+			try {
+				await fetch("/api/registration?action=2fa-cancel", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${current.accessToken}`,
+					},
+					body: "{}",
+					signal: AbortSignal.timeout(10000),
+				});
+			} catch {
+				/* Supabase local sign-out still revokes the session. */
+			}
+		}
 		if (supabase) {
 			const { error } = await supabase.auth.signOut({ scope: "local" });
 			if (error) throw error;
@@ -140,6 +177,17 @@ class SupabaseService {
 				return;
 			}
 			const result = await response.json();
+			if (result.code === "telegram_2fa_required") {
+				useAuthStore.setState({
+					session: {
+						...current,
+						telegramVerified: false,
+						user: { ...current.user, access: undefined, role: "pending" },
+					},
+					error: undefined,
+				});
+				return;
+			}
 			if (!response.ok)
 				throw new Error(result.error ?? "Не удалось проверить доступ");
 			if (
@@ -158,6 +206,7 @@ class SupabaseService {
 			useAuthStore.setState({
 				session: {
 					...current,
+					telegramVerified: true,
 					user: {
 						...current.user,
 						access,
@@ -175,6 +224,7 @@ class SupabaseService {
 				useAuthStore.setState({
 					session: {
 						...current,
+						telegramVerified: false,
 						user: { ...current.user, access: undefined, role: "pending" },
 					},
 					error:

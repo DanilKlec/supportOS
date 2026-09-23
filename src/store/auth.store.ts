@@ -13,6 +13,8 @@ export interface AuthUser {
 }
 
 export interface AuthSession {
+	telegramVerified?: boolean;
+	sessionId?: string;
 	accessToken: string;
 	refreshToken?: string;
 	expiresAt?: number;

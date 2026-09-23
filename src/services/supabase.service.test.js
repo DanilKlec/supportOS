@@ -190,3 +190,14 @@ it("uses the SDK refreshed access token for API requests", async () => {
 	});
 	expect(await service.getAccessToken()).toBe("fresh");
 });
+it('keeps confirmation on token refresh but resets it for a new Supabase session',async()=>{
+ const jwt=id=>'x.'+btoa(JSON.stringify({session_id:id}))+'.sig';
+ fixture.auth.getSession.mockResolvedValue({data:{session:{...session,access_token:jwt('first')}},error:null});
+ await service.initialize();
+ expect(service.getSession().telegramVerified).toBe(true);
+ fixture.callback('TOKEN_REFRESHED',{...session,access_token:jwt('first')});
+ expect(service.getSession().telegramVerified).toBe(true);
+ fixture.callback('SIGNED_IN',{...session,access_token:jwt('second')});
+ expect(service.getSession().telegramVerified).toBe(false);
+ fixture.callback('SIGNED_OUT',null);
+});

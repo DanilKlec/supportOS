@@ -1,10 +1,12 @@
+vi.mock('../telegram-2fa.js',()=>({requireTelegram:async()=>{}}));
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../_rbac.js',()=>({loadAccess:async(id)=>({status:'active',roles:[],permissions:id==='ordinary'?[]:['work','monitor.read','monitor.write']})}));
 import { normalizeStatus, collect, config } from './_server.js';
 import handler from './index.js';
 const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'test-public', SUPABASE_SERVICE_ROLE_KEY: 'test-service', LIVECHAT_AUTHORIZATION: 'Basic test', LIVECHAT_ORGANIZATION_ID: 'org', LIVECHAT_WEBHOOK_SECRET: 'webhook-test', MONITOR_COLLECTOR_SECRET: 'collector-test' };
 const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, end(value) { this.body=JSON.parse(value); } });
-const request = (extra = {}) => ({ method:'GET', url:'/?day=2026-09-08', headers:{authorization:'Bearer user-token',host:'localhost',origin:'http://localhost'}, ...extra });
+const bearer = id => 'Bearer x.'+Buffer.from(JSON.stringify({sub:id,session_id:'11111111-1111-4111-8111-111111111111'})).toString('base64url')+'.sig';
+const request = (extra = {}) => ({ method:'GET', url:'/?day=2026-09-08', headers:{authorization:bearer('verified'),host:'localhost',origin:'http://localhost'}, ...extra });
 beforeEach(() => { for (const [key,value] of Object.entries(env)) vi.stubEnv(key,value); });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe('monitor server security', () => {
@@ -31,11 +33,11 @@ describe('monitor server security', () => {
  });
  it('does not trust user_metadata supervisor roles', async () => {
   const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({id:'ordinary',app_metadata:{role:'user'},user_metadata:{role:'admin'}}))); vi.stubGlobal('fetch',fetch); const res=response();
-  await handler(request(),res); expect(res.statusCode).toBe(403); expect(fetch).toHaveBeenCalledTimes(1);
+  await handler(request({headers:{authorization:bearer('ordinary')}}),res); expect(res.statusCode).toBe(403); expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('records the verified supervisor id, ignoring a forged actor in the body', async () => {
   const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({id:'supervisor-uuid',app_metadata:{role:'supervisor'}}))).mockResolvedValueOnce(new Response('null')); vi.stubGlobal('fetch',fetch); const res=response();
-  await handler(request({method:'POST',url:'/?action=assignment&day=2026-09-08',body:{agentId:'a',shift:'night',enabled:true,username:'forged'}}),res);
+  await handler(request({method:'POST',headers:{authorization:bearer('supervisor-uuid'),host:'localhost',origin:'http://localhost'},url:'/?action=assignment&day=2026-09-08',body:{agentId:'a',shift:'night',enabled:true,username:'forged'}}),res);
   expect(res.statusCode).toBe(200); expect(JSON.parse(fetch.mock.calls[1][1].body).username).toBe('supervisor-uuid');
   expect(fetch.mock.calls[0][0]).toContain('/auth/v1/user');
   expect(fetch.mock.calls[0][1].headers.apikey).toBe('test-public');

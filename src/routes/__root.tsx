@@ -1,5 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
 import { PendingApproval } from "@/features/auth/PendingApproval";
+import { TelegramTwoFactor } from "@/features/auth/TelegramTwoFactor";
 import { supabaseService } from "@/services/supabase.service";
 import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
@@ -77,6 +78,7 @@ function RootComponent() {
 	const accessGranted =
 		!loading &&
 		Boolean(session) &&
+		Boolean(session?.telegramVerified) &&
 		canAccessPage(session?.user.access, pathname, hash);
 	useEffect(() => {
 		if (loading) return;
@@ -123,7 +125,9 @@ function RootComponent() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
-				{accessGranted || isLoginRoute ? (
+				{!loading && session && !session.telegramVerified ? (
+					<TelegramTwoFactor key={session.sessionId ?? session.user.id} />
+				) : accessGranted || isLoginRoute ? (
 					<MainLayout>
 						<Outlet />
 					</MainLayout>

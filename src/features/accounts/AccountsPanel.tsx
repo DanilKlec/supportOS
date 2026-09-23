@@ -7,6 +7,7 @@ import { BaseModal } from "@/shared/modals/BaseModal";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
 import { AdminOverview } from "./AdminOverview";
+import { TelegramLinkRequests } from "./TelegramLinkRequests";
 export type ManagedRole = {
 	id: string;
 	name: string;
@@ -242,6 +243,7 @@ export function AccountsPanel({
 	const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 	return (
 		<section className="accounts-registry space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+			{usersAllowed && <TelegramLinkRequests />}
 			{confirmation && (
 				<BaseModal
 					title="Подтвердить изменения прав"

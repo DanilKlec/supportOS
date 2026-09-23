@@ -23,6 +23,17 @@ export default async function handler(req,res) {
   const actor=await requireUser(req,{permission:null});
   if(req.method==='GET'&&action==='me')return send(200,{id:actor.id,access:actor.access});
   const env=config();
+  if(action==='telegram-links') {
+   if(!can(actor.access,'users.manage'))throw fail('Недостаточно прав',403);
+   if(req.method==='GET') {
+    const requests=await db(env,'supportos_telegram_link_requests?select=id,user_id,telegram_id,telegram_username,verified_at&status=eq.verified&order=verified_at.asc&limit=100');
+    const users=requests.length?await db(env,`supportos_users?select=id,email,display_name&id=in.(${requests.map(r=>r.user_id).join(',')})`):[];
+    return send(200,{requests:requests.map(r=>({...r,user:users.find(u=>u.id===r.user_id)}))});
+   }
+   const data=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
+   if(!/^[a-f0-9-]{36}$/i.test(data.id??'')||typeof data.approve!=='boolean')throw fail('Некорректная заявка');
+   return send(200,{ok:await db(env,'rpc/supportos_tg_link_review',{actor:actor.id,actor_session:actor.sessionId,request_id:data.id,approve:data.approve})});
+  }
   if(req.method==='GET') {
    if(action==='users'&&url.searchParams.get('purpose')==='share') {
     if(!can(actor.access,'binds.read'))throw fail('Нет доступа к биндам',403);
@@ -68,5 +79,5 @@ export default async function handler(req,res) {
   }
   if(!['user.update','role.save','role.delete'].includes(body.action))throw fail('Неизвестное действие');
   return send(200,await changeAccess(actor.id,body.action,body.payload));
- }catch(error){return send(error.status??500,{error:error.status?error.message:'Ошибка управления доступами'});}
+ }catch(error){return send(error.status??500,{error:error.status?error.message:'Ошибка управления доступами',code:error.code});}
 }

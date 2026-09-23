@@ -66,5 +66,5 @@ export default async function handler(req,res) {
   const result=await response.json();
   if(!response.ok)throw fail(['42501','40001','22023'].includes(result.code)?result.message:'Не удалось сохранить личную версию',result.code==='42501'?403:result.code==='40001'?409:400);
   return send(200,result);
- }catch(error){return send(error.status??500,{error:error.status?error.message:'Не удалось загрузить бинды'});}
+ }catch(error){return send(error.status??500,{code:error.code,error:error.status?error.message:'Не удалось загрузить бинды'});}
 }
