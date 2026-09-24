@@ -289,7 +289,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-5 sm:p-8">
 			<div className="mx-auto max-w-5xl space-y-5">
 				<div className="flex flex-wrap items-center justify-between gap-3">
-					<div className="min-w-0 flex-1">
+					<div className="min-w-0 basis-full sm:flex-1">
 						<div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted">
 							<span>Версия ответа</span>
 							<output className="normal-case tracking-normal">
