@@ -1040,7 +1040,7 @@ function CreateUser({
 	);
 	return (
 		<form
-			className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6"
+			className="employee-access-form space-y-5"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -1210,23 +1210,25 @@ function EditUser({
 							.join(", ") || "нет разрешений"}
 				.
 			</p>
-			<button
-				type="submit"
-				className={`${control} ui-button`}
-				disabled={busy || (status === "active" && !selected.length)}
-			>
-				{user.status === "pending" && status === "active"
-					? "Подтвердить и выдать роли"
-					: "Сохранить доступ"}
-			</button>{" "}
-			<button
-				type="button"
-				className={`${control} ui-button`}
-				disabled={busy}
-				onClick={onCancel}
-			>
-				Отмена
-			</button>
+			<div className="ui-actions employee-access-footer">
+				<button
+					type="submit"
+					className={`${control} ui-button`}
+					disabled={busy || (status === "active" && !selected.length)}
+				>
+					{user.status === "pending" && status === "active"
+						? "Подтвердить и выдать роли"
+						: "Сохранить доступ"}
+				</button>
+				<button
+					type="button"
+					className={`${control} ui-button`}
+					disabled={busy}
+					onClick={onCancel}
+				>
+					Отмена
+				</button>
+			</div>
 		</form>
 	);
 }
