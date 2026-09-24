@@ -38,3 +38,9 @@ Validation includes PostgreSQL transaction rollback, approval expiry, wrong send
 replay, API bypass before and after approval, session revocation, RPC/table grants,
 backend credential isolation, and UI gating. A full real-user bot interaction
 must still be checked by the account owner; automated tests do not replace that.
+
+Rollout: migration `20260923194400_telegram_password_confirmation` applied to the
+shared database; code deployed on `test-auth-monitor`. Verified the deployed
+password API and the live database's service-role RPCs, guard, permit consumption
+and metadata cleanup in a rolled-back test transaction (no test accounts remain).
+The browser login route also has an explicit Vercel rewrite for direct visits.
