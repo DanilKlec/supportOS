@@ -81,8 +81,7 @@ export function TelegramPassword({
 	}, [completed, mode]);
 	const terminal =
 		challenge && ["expired", "rejected"].includes(challenge.status);
-	const button =
-		"rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium disabled:opacity-50";
+	const button = "ui-button ui-button--secondary";
 	async function perform(action: string) {
 		setBusy(true);
 		setError("");
@@ -124,7 +123,9 @@ export function TelegramPassword({
 		}
 	}
 	return (
-		<section className="space-y-5 rounded-2xl border border-border bg-surface p-6">
+		<section
+			className={`space-y-5 rounded-2xl border border-border bg-surface p-6 ${mode === "recovery" ? "auth-surface" : ""}`}
+		>
 			<div className="flex items-center gap-3">
 				<ShieldCheck className="text-primary" />
 				<h2 className="text-lg font-semibold">
@@ -155,10 +156,10 @@ export function TelegramPassword({
 							}}
 						>
 							{mode === "recovery" && (
-								<label className="block space-y-2 text-sm">
+								<label className="ui-field">
 									Логин или email
 									<input
-										className="w-full rounded-xl border border-border bg-background p-3"
+										className="ui-input w-full"
 										autoComplete="username"
 										required
 										maxLength={254}
@@ -200,10 +201,10 @@ export function TelegramPassword({
 							}}
 						>
 							<p className="text-sm">Telegram подтверждён</p>
-							<label className="block space-y-2 text-sm">
+							<label className="ui-field">
 								Новый пароль
 								<input
-									className="w-full rounded-xl border border-border bg-background p-3"
+									className="ui-input w-full"
 									type="password"
 									autoComplete="new-password"
 									required
@@ -214,10 +215,10 @@ export function TelegramPassword({
 									disabled={busy}
 								/>
 							</label>
-							<label className="block space-y-2 text-sm">
+							<label className="ui-field">
 								Повторите пароль
 								<input
-									className="w-full rounded-xl border border-border bg-background p-3"
+									className="ui-input w-full"
 									type="password"
 									autoComplete="new-password"
 									required

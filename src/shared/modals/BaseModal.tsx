@@ -98,7 +98,7 @@ export function BaseModal({
 
 	return createPortal(
 		<div
-			className={`fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4 ${placement === "right" ? "ops-drawer" : ""}`}
+			className={`modal-overlay ${placement === "right" ? "ops-drawer" : ""}`}
 		>
 			<button
 				type="button"
@@ -114,9 +114,9 @@ export function BaseModal({
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={titleId}
-				className={`relative flex h-[100dvh] max-h-[100dvh] w-full ${widths[size]} animate-slide-up flex-col overflow-hidden rounded-none border border-border bg-surface shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-xl`}
+				className={`modal-dialog ${widths[size]} animate-slide-up shadow-2xl`}
 			>
-				<div className="flex min-h-14 shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+				<div className="modal-header">
 					<h2 id={titleId} className="text-lg font-semibold text-foreground">
 						{title}
 					</h2>
@@ -126,15 +126,13 @@ export function BaseModal({
 						title="Закрыть"
 						onClick={handleClose}
 						disabled={closeDisabled}
-						className="ui-button ui-button--ghost ui-button--icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+						className="ui-button ui-button--ghost ui-button--icon inline-flex shrink-0 items-center justify-center text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<X size={18} />
 					</button>
 				</div>
 
-				<div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
-					{children}
-				</div>
+				<div className="modal-body">{children}</div>
 			</section>
 		</div>,
 		document.body,

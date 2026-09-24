@@ -191,14 +191,14 @@ export function GoogleSheetsImportPanel({
 						value={url}
 						onChange={(event) => setUrl(event.target.value)}
 						disabled={loadingPreview || saving || !isAdmin}
-						className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 						placeholder="Paste public Google Sheets URL"
 					/>
 
 					<button
 						type="submit"
 						disabled={loadingPreview || saving || !url.trim() || !isAdmin}
-						className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						{loadingPreview ? (
 							<Loader2 size={16} className="animate-spin" />
@@ -211,7 +211,7 @@ export function GoogleSheetsImportPanel({
 			</form>
 
 			<div className="grid gap-4 rounded-lg border border-border bg-surface p-4 lg:grid-cols-3">
-				<label className="block space-y-2">
+				<label className="ui-field ">
 					<span className="text-sm font-medium">Category</span>
 					<select
 						value={categoryId}
@@ -220,7 +220,7 @@ export function GoogleSheetsImportPanel({
 							setFolderId("");
 						}}
 						disabled={saving || !isAdmin}
-						className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						{categories.map((category) => (
 							<option key={category.id} value={category.id}>
@@ -230,13 +230,13 @@ export function GoogleSheetsImportPanel({
 					</select>
 				</label>
 
-				<label className="block space-y-2">
+				<label className="ui-field ">
 					<span className="text-sm font-medium">Folder</span>
 					<select
 						value={folderId}
 						onChange={(event) => setFolderId(event.target.value)}
 						disabled={saving || !isAdmin}
-						className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						<option value="">No folder</option>
 						{availableFolders.map((folder) => (
@@ -247,13 +247,13 @@ export function GoogleSheetsImportPanel({
 					</select>
 				</label>
 
-				<label className="block space-y-2">
+				<label className="ui-field ">
 					<span className="text-sm font-medium">Mode</span>
 					<select
 						value={mode}
 						onChange={(event) => setMode(event.target.value as SheetImportMode)}
 						disabled={saving || !isAdmin}
-						className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+						className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						<option value="upsert">Update and add</option>
 						<option value="replace">Replace imported set</option>
@@ -291,7 +291,7 @@ export function GoogleSheetsImportPanel({
 								!isAdmin ||
 								preview.rows.every((row) => row.errors.length > 0)
 							}
-							className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{saving ? (
 								<Loader2 size={16} className="animate-spin" />

@@ -61,13 +61,13 @@ export function KnowledgeGapButton() {
 						Укажите только общую тему, например «условия вывода бонуса». Не
 						вставляйте сообщение клиента, имена, номера, ссылки или реквизиты.
 					</p>
-					<label className="block text-sm">
+					<label className="ui-field text-sm">
 						Тема
 						<input
 							maxLength={120}
 							value={topic}
 							onChange={(e) => setTopic(e.target.value)}
-							className="my-3 w-full rounded-lg border border-border bg-background p-3"
+							className="ui-input my-3 w-full border border-border bg-background"
 						/>
 					</label>
 					{topic && !safeKnowledgeTopic(topic) && (

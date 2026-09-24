@@ -43,11 +43,11 @@ export function FolderDestination({
 		visit(category.id, undefined, 1, new Set());
 	}
 	return (
-		<label className="block text-sm">
+		<label className="ui-field text-sm">
 			Куда переместить
 			<select
 				aria-label="Куда переместить"
-				className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background p-2"
+				className="ui-input mt-2 w-full border border-border bg-background"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 			>

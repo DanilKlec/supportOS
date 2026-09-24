@@ -26,8 +26,7 @@ import { BindDiff } from "./BindDiff";
 import { draftKey, readDraft, removeDraft, writeDraft } from "./bind-drafts";
 import { CommonBindImport } from "./CommonBindImport";
 
-const inputClass =
-	"w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
+const inputClass = "w-full";
 export function SharedBindsPage() {
 	const user = useAuthStore((s) => s.session?.user);
 	const canEdit = can(user?.access, "knowledge.write");
@@ -208,7 +207,7 @@ export function SharedBindsPage() {
 								placeholder="Поиск по имени или почте"
 								value={userSearch}
 								onChange={(e) => setUserSearch(e.target.value)}
-								className={`${inputClass} max-w-sm`}
+								className={`ui-input ${`${inputClass} max-w-sm`}`}
 							/>
 							<select
 								aria-label="Сотрудник"
@@ -217,7 +216,7 @@ export function SharedBindsPage() {
 									setTarget(e.target.value);
 									setSelected(undefined);
 								}}
-								className={`${inputClass} max-w-sm`}
+								className={`ui-input ${`${inputClass} max-w-sm`}`}
 							>
 								<option value="">Выберите сотрудника</option>
 								{target &&
@@ -255,7 +254,7 @@ export function SharedBindsPage() {
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
 							placeholder="Найти ответ, название или тег…"
-							className={`${inputClass} pl-10`}
+							className={`ui-input ${`${inputClass} pl-10`}`}
 						/>
 					</div>
 					<label className="flex items-center gap-2 text-sm text-muted">
@@ -264,7 +263,7 @@ export function SharedBindsPage() {
 						<select
 							value={language}
 							onChange={(e) => setLanguage(e.target.value)}
-							className={`${inputClass} w-auto`}
+							className={`ui-input ${`${inputClass} w-auto`}`}
 						>
 							{languages.map((l) => (
 								<option key={l.code} value={l.code}>
@@ -735,7 +734,7 @@ export function SharedBindEditor({
 								setError("");
 								setReviewed(false);
 							}}
-							className="ui-button ui-button--secondary mt-3 rounded-lg border border-border px-3 py-2 text-sm"
+							className="ui-button ui-button--secondary mt-3 border border-border"
 						>
 							Продолжить с моими правками
 						</button>
@@ -773,7 +772,7 @@ export function SharedBindEditor({
 									setRecovery(null);
 									setReviewed(false);
 								}}
-								className="ui-button ui-button--primary rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground"
+								className="ui-button ui-button--primary bg-accent text-accent-foreground"
 							>
 								Восстановить черновик
 							</button>
@@ -787,7 +786,7 @@ export function SharedBindEditor({
 										setDraftStatus("Не удалось удалить черновик");
 									}
 								}}
-								className="ui-button ui-button--secondary rounded-lg border border-border px-3 py-2 text-sm"
+								className="ui-button ui-button--secondary border border-border"
 							>
 								Удалить черновик
 							</button>
@@ -821,12 +820,12 @@ export function SharedBindEditor({
 					disabled={saving || !!recovery || !!conflict || conflictLoading}
 					className="space-y-4 disabled:opacity-60"
 				>
-					<label className="block text-sm font-medium">
+					<label className="ui-field text-sm font-medium">
 						Язык перевода
 						<select
 							value={language}
 							onChange={(e) => setLanguage(e.target.value)}
-							className={`${inputClass} mt-2`}
+							className={`ui-input ${`${inputClass} mt-2`}`}
 						>
 							{[
 								...new Set([
@@ -845,7 +844,7 @@ export function SharedBindEditor({
 							))}
 						</select>
 					</label>
-					<label className="block text-sm font-medium">
+					<label className="ui-field text-sm font-medium">
 						Название
 						<input
 							ref={initialFocus}
@@ -853,10 +852,10 @@ export function SharedBindEditor({
 							value={translation?.title ?? ""}
 							onChange={(e) => update("title", e.target.value)}
 							placeholder="Например, условия бонуса на депозит"
-							className={`${inputClass} mt-2`}
+							className={`ui-input ${`${inputClass} mt-2`}`}
 						/>
 					</label>
-					<label className="block text-sm font-medium">
+					<label className="ui-field text-sm font-medium">
 						Инструкция для агента
 						<textarea
 							maxLength={8000}
@@ -865,20 +864,20 @@ export function SharedBindEditor({
 								update("agentInstructions", event.target.value)
 							}
 							placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
-							className={`${inputClass} mt-2 min-h-28 resize-y leading-6`}
+							className={`ui-input ${`${inputClass} mt-2 min-h-28 resize-y leading-6`}`}
 						/>
 					</label>
-					<label className="block text-sm font-medium">
+					<label className="ui-field text-sm font-medium">
 						Текст ответа
 						<textarea
 							maxLength={30000}
 							value={translation?.content ?? ""}
 							onChange={(e) => update("content", e.target.value)}
 							placeholder="Напишите готовый ответ для клиента…"
-							className={`${inputClass} mt-2 min-h-52 resize-y leading-6`}
+							className={`ui-input ${`${inputClass} mt-2 min-h-52 resize-y leading-6`}`}
 						/>
 					</label>
-					<label className="block text-sm font-medium">
+					<label className="ui-field text-sm font-medium">
 						Теги <span className="font-normal text-muted">· через запятую</span>
 						<input
 							maxLength={500}
@@ -888,7 +887,7 @@ export function SharedBindEditor({
 								setTags(e.target.value);
 							}}
 							placeholder="депозит, бонус, условия"
-							className={`${inputClass} mt-2`}
+							className={`ui-input ${`${inputClass} mt-2`}`}
 						/>
 					</label>
 				</fieldset>
@@ -916,14 +915,14 @@ export function SharedBindEditor({
 						type="button"
 						disabled={saving}
 						onClick={close}
-						className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2.5 text-sm hover:bg-surface-elevated disabled:opacity-50"
+						className="ui-button ui-button--secondary border border-border hover:bg-surface-elevated disabled:opacity-50"
 					>
 						Отмена
 					</button>
 					<button
 						type="submit"
 						disabled={saving || !!recovery || !!conflict || conflictLoading}
-						className="ui-button ui-button--primary flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
+						className="ui-button ui-button--primary flex items-center gap-2 bg-accent font-semibold text-accent-foreground disabled:opacity-50"
 					>
 						<Check size={17} />
 						{saving

@@ -360,7 +360,7 @@ export function Topbar({
 							setKind(item.id);
 							setActiveResultIndex(0);
 						}}
-						className="ui-button ui-button--ghost rounded-lg px-3 py-1 text-xs text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+						className="ui-button ui-button--ghost text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
 					>
 						{item.label}
 					</button>
@@ -536,7 +536,7 @@ export function Topbar({
 										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
 									)
 								}
-								className="ui-button ui-button--primary rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground"
+								className="ui-button ui-button--primary bg-accent text-accent-foreground"
 							>
 								Копировать
 							</button>
@@ -560,7 +560,7 @@ export function Topbar({
 									});
 									setPreview(null);
 								}}
-								className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2 text-sm"
+								className="ui-button ui-button--secondary border border-border"
 							>
 								Открыть раздел
 							</button>
@@ -568,13 +568,13 @@ export function Topbar({
 					</BaseModal>
 				)}
 
-			<header className="product-topbar relative flex h-16 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
+			<header className="product-topbar relative flex items-center border-b border-border bg-surface/95 text-foreground backdrop-blur">
 				<button
 					type="button"
 					aria-label={layout.showSidebar ? "Свернуть папки" : "Open navigation"}
 					onClick={toggleSidebar}
 					style={!showKnowledgeControls ? { display: "none" } : undefined}
-					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					className="ui-button ui-button--ghost ui-button--icon flex   shrink-0 items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 				>
 					<Menu size={19} />
 				</button>
@@ -641,7 +641,7 @@ export function Topbar({
 							onBlur={() => {
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
-							className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="ui-input w-full border border-border bg-background pl-10 pr-20 outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
 							placeholder="Бинды, почты, бонусы…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
@@ -677,7 +677,7 @@ export function Topbar({
 							setMobileSearchOpen(true);
 							window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
 						}}
-						className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
+						className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
 					>
 						<Search size={19} />
 					</button>
@@ -689,7 +689,7 @@ export function Topbar({
 								title={`Выйти: ${authSession.user.email}`}
 								aria-label="Выйти из аккаунта"
 								onClick={signOut}
-								className="ui-button ui-button--ghost inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--ghost inline-flex items-center gap-2 text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
 								<span className="hidden max-w-28 truncate lg:block">
 									{authSession.user.access?.display_name ||
@@ -702,7 +702,7 @@ export function Topbar({
 								type="button"
 								title="Cloud login"
 								onClick={() => void navigate({ to: "/login" })}
-								className="ui-button ui-button--ghost inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--ghost inline-flex items-center gap-2 text-muted transition hover:bg-surface-elevated hover:text-foreground"
 							>
 								<LogIn size={16} />
 							</button>
@@ -730,13 +730,13 @@ export function Topbar({
 								}}
 								onKeyDown={handleSearchKeyDown}
 								placeholder="Найти бинд…"
-								className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="ui-input min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							/>
 							<button
 								type="button"
 								aria-label="Закрыть поиск"
 								onClick={() => setMobileSearchOpen(false)}
-								className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--ghost ui-button--icon flex   shrink-0 items-center justify-center  text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={19} />
 							</button>

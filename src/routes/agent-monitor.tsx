@@ -394,12 +394,12 @@ function AgentMonitor() {
 							))}
 						</div>
 						<div className="ui-actions items-end flex flex-wrap  gap-3">
-							<label className="text-sm">
+							<label className="ui-field text-sm">
 								Дата начала смены{" "}
 								<input
 									aria-label="Дата начала смены"
 									type="date"
-									className={control}
+									className={`ui-input ${control}`}
 									value={day}
 									onChange={(e) => {
 										if (e.target.value) setDay(e.target.value);
@@ -446,14 +446,14 @@ function AgentMonitor() {
 						<div className="ui-actions items-end flex flex-wrap  gap-3">
 							<input
 								aria-label="Поиск агента"
-								className={control}
+								className={`ui-input ${control}`}
 								placeholder="Имя или почта агента…"
 								value={search}
 								onChange={(e) => setSearch(e.target.value)}
 							/>
 							<select
 								aria-label="Текущий статус"
-								className={control}
+								className={`ui-input ${control}`}
 								value={statusFilter}
 								onChange={(e) => setStatusFilter(e.target.value)}
 							>
@@ -466,11 +466,11 @@ function AgentMonitor() {
 										</option>
 									))}
 							</select>
-							<label className="text-sm">
+							<label className="ui-field text-sm">
 								Состав списка{" "}
 								<select
 									aria-label="Состав списка"
-									className={control}
+									className={`ui-input ${control}`}
 									value={rosterScope}
 									onChange={(e) =>
 										setRosterScope(e.target.value as RosterScope)
@@ -497,7 +497,7 @@ function AgentMonitor() {
 							<select
 								id="agent-sort"
 								aria-label="Сортировка агентов"
-								className={control}
+								className={`ui-input ${control}`}
 								value={sortBy}
 								onChange={(e) => setSortBy(e.target.value)}
 							>
@@ -690,7 +690,7 @@ function AgentMonitor() {
 										<div className="flex flex-wrap gap-2">
 											<select
 												aria-label="Агент в журнале"
-												className={control}
+												className={`ui-input ${control}`}
 												value={selectedAgent}
 												onChange={(e) => setSelectedAgent(e.target.value)}
 											>
@@ -703,7 +703,7 @@ function AgentMonitor() {
 											</select>
 											<select
 												aria-label="События журнала"
-												className={control}
+												className={`ui-input ${control}`}
 												value={eventFilter}
 												onChange={(e) => setEventFilter(e.target.value)}
 											>

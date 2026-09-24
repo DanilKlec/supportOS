@@ -948,7 +948,7 @@ export function DepositBonusesPage({
 						<select
 							value={selectedCurrency}
 							onChange={(event) => setSelectedCurrency(event.target.value)}
-							className="h-10 rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="ui-input border border-border bg-surface outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 						>
 							{currencies.map((currency) => (
 								<option key={currency} value={currency}>
@@ -961,7 +961,7 @@ export function DepositBonusesPage({
 							type="button"
 							onClick={() => void loadRates(true)}
 							disabled={ratesLoading}
-							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{ratesLoading ? (
 								<Loader2 size={16} className="animate-spin" />
@@ -976,7 +976,7 @@ export function DepositBonusesPage({
 							disabled={!canEdit}
 							style={!management ? { display: "none" } : undefined}
 							onClick={() => setImportOpen((current) => !current)}
-							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
 							Импорт
@@ -986,7 +986,7 @@ export function DepositBonusesPage({
 							<button
 								type="button"
 								onClick={() => void copyPackage(activeProject)}
-								className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+								className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 							>
 								<Copy size={16} />
 								Copy package
@@ -1029,7 +1029,7 @@ export function DepositBonusesPage({
 							<textarea
 								value={sheetUrl}
 								onChange={(event) => setSheetUrl(event.target.value)}
-								className="min-h-10 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="ui-input min-h-10 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 								placeholder="Paste one Google Spreadsheet URL. Each tab/sheet becomes one project. You can also paste several sheet URLs, one per line."
 							/>
 
@@ -1038,7 +1038,7 @@ export function DepositBonusesPage({
 								onChange={(event) =>
 									setMode(event.target.value as DepositBonusImportMode)
 								}
-								className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							>
 								<option value="upsert">Upsert</option>
 								<option value="replace">Replace all project sheets</option>
@@ -1048,7 +1048,7 @@ export function DepositBonusesPage({
 								type="button"
 								onClick={loadPreview}
 								disabled={importing || !sheetUrl.trim()}
-								className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+								className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								{importing ? (
 									<Loader2 size={16} className="animate-spin" />
@@ -1078,7 +1078,7 @@ export function DepositBonusesPage({
 											preview.projects.length === 0 ||
 											preview.errors.length > 0
 										}
-										className="ui-button ui-button--primary ui-button--small inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+										className="ui-button ui-button--primary ui-button--small inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 									>
 										{committing && (
 											<Loader2 size={15} className="animate-spin" />
@@ -1148,12 +1148,12 @@ export function DepositBonusesPage({
 											onChange={(event) =>
 												setNewProjectName(event.target.value)
 											}
-											className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+											className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											placeholder="Название проекта"
 										/>
 										<button
 											type="submit"
-											className="ui-button ui-button--primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
+											className="ui-button ui-button--primary inline-flex w-full items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
 										>
 											<Plus size={16} />
 											Add
@@ -1164,7 +1164,7 @@ export function DepositBonusesPage({
 										onChange={(event) =>
 											setNewProjectCurrencyGroup(event.target.value)
 										}
-										className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full min-w-0 border border-border bg-background text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										aria-label="Группа валют нового проекта"
 									>
 										<option value="">Auto currency group</option>
@@ -1186,7 +1186,7 @@ export function DepositBonusesPage({
 							<input
 								value={query}
 								onChange={(event) => setQuery(event.target.value)}
-								className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+								className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 								placeholder="Поиск проектов или бонусов…"
 							/>
 						</div>
@@ -1258,13 +1258,13 @@ export function DepositBonusesPage({
 											<input
 												value={renameValue}
 												onChange={(event) => setRenameValue(event.target.value)}
-												className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												className="ui-input min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											/>
 											<button
 												type="button"
 												disabled={!canEdit}
 												onClick={saveProjectName}
-												className="ui-button ui-button--secondary inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Pencil size={15} />
 												Применить
@@ -1283,7 +1283,7 @@ export function DepositBonusesPage({
 												onChange={(event) =>
 													updateActiveProjectCurrencyGroup(event.target.value)
 												}
-												className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												className="ui-input border border-border bg-background text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											>
 												<option value="">Определять по названию проекта</option>
 												{currencyGroupOptions.map((group) => (
@@ -1308,7 +1308,7 @@ export function DepositBonusesPage({
 											type="button"
 											disabled={!canEdit}
 											onClick={() => setDeleteProjectId(activeProject.id)}
-											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
+											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 											title="Удалить проект"
 											aria-label="Удалить проект"
 										>
@@ -1328,7 +1328,7 @@ export function DepositBonusesPage({
 														name: event.target.value,
 													}))
 												}
-												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 												placeholder="Название бонуса"
 											/>
 											<input
@@ -1339,7 +1339,7 @@ export function DepositBonusesPage({
 														minDepositAmount: event.target.value,
 													}))
 												}
-												className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 												placeholder="Мин. депозит"
 											/>
 											<input
@@ -1351,7 +1351,7 @@ export function DepositBonusesPage({
 														minDepositCurrency: event.target.value,
 													}))
 												}
-												className="h-11 rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+												className="ui-input border border-border bg-background uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 												placeholder="USD"
 											/>
 										</div>
@@ -1367,7 +1367,7 @@ export function DepositBonusesPage({
 													),
 												)
 											}
-											className="min-h-28 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+											className="ui-input min-h-28 w-full resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 											placeholder={`Bonus content / ready bind text (${getLanguageLabel(
 												selectedLanguage,
 											)})`}
@@ -1384,7 +1384,7 @@ export function DepositBonusesPage({
 												<button
 													type="button"
 													onClick={resetBonusForm}
-													className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+													className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 												>
 													<X size={15} />
 													Отмена
@@ -1392,7 +1392,7 @@ export function DepositBonusesPage({
 											)}
 											<button
 												type="submit"
-												className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+												className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 											>
 												<Plus size={16} />
 												{editingBonusId
@@ -1481,7 +1481,7 @@ export function DepositBonusesPage({
 															<button
 																type="button"
 																onClick={() => void copyBonus(bonus)}
-																className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+																className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 															>
 																<Copy size={15} />
 																Копировать
@@ -1490,7 +1490,7 @@ export function DepositBonusesPage({
 																type="button"
 																disabled={!canEdit}
 																onClick={() => editBonus(bonus)}
-																className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+																className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 																title="Редактировать бонус"
 																aria-label="Редактировать бонус"
 															>
@@ -1500,7 +1500,7 @@ export function DepositBonusesPage({
 																type="button"
 																disabled={!canEdit}
 																onClick={() => setDeleteBonusId(bonus.id)}
-																className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
+																className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
 																title="Удалить бонус"
 																aria-label="Удалить бонус"
 															>
@@ -1604,14 +1604,14 @@ function ConfirmDialog({
 					<button
 						type="button"
 						onClick={onCancel}
-						className="ui-button ui-button--secondary inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex items-center border border-border font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
 						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="ui-button ui-button--danger inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+						className="ui-button ui-button--danger inline-flex items-center bg-red-500 font-semibold text-white transition hover:bg-red-600"
 					>
 						Удалить
 					</button>

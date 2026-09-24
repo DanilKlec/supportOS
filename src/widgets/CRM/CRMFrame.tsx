@@ -92,7 +92,7 @@ VITE_CRM_VORTEXINO_URL=https://...`}
 					onClick={() =>
 						window.open(activeCrm.url, "_blank", "noopener,noreferrer")
 					}
-					className="ui-button ui-button--ghost shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+					className="ui-button ui-button--ghost shrink-0 bg-primary font-semibold text-primary-foreground"
 				>
 					Open in browser
 				</button>

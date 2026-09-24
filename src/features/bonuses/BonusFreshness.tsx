@@ -57,34 +57,34 @@ export function BonusFreshness({
 						setOpen(false);
 					}}
 				>
-					<label className="block">
+					<label className="ui-field ">
 						Действует по
 						<input
 							aria-label="Действует по"
 							type="date"
 							value={until}
 							onChange={(e) => setUntil(e.target.value)}
-							className="mt-1 block w-full rounded-lg border border-border bg-background p-2"
+							className="ui-input mt-1 block w-full border border-border bg-background"
 						/>
 					</label>
-					<label className="block">
+					<label className="ui-field ">
 						Следующая проверка
 						<input
 							aria-label="Следующая проверка"
 							type="date"
 							value={due}
 							onChange={(e) => setDue(e.target.value)}
-							className="mt-1 block w-full rounded-lg border border-border bg-background p-2"
+							className="ui-input mt-1 block w-full border border-border bg-background"
 						/>
 					</label>
-					<label className="block">
+					<label className="ui-field ">
 						Ответственный
 						<input
 							aria-label="Ответственный"
 							maxLength={120}
 							value={responsible}
 							onChange={(e) => setResponsible(e.target.value)}
-							className="mt-1 block w-full rounded-lg border border-border bg-background p-2"
+							className="ui-input mt-1 block w-full border border-border bg-background"
 						/>
 					</label>
 					<div className="ui-actions items-center flex flex-wrap gap-2">

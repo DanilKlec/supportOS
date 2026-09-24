@@ -8,7 +8,7 @@ export function ImportButton() {
 		<button
 			type="button"
 			onClick={() => fileInputRef.current?.click()}
-			className="ui-button ui-button--ghost flex items-center gap-1.5 rounded-lg bg-surface-elevated px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface hover:text-foreground"
+			className="ui-button ui-button--ghost flex items-center gap-1.5 bg-surface-elevated text-muted transition-colors hover:bg-surface hover:text-foreground"
 			title="Import from CSV file"
 		>
 			<Upload size={16} />

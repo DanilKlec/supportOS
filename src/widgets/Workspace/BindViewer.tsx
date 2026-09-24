@@ -776,7 +776,7 @@ export function BindViewer() {
 											setLanguage(event.target.value as LanguageCode)
 										}
 										aria-label="Language"
-										className="h-10 appearance-none rounded-xl border border-border bg-surface pl-3 pr-9 text-sm font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+										className="ui-input appearance-none border border-border bg-surface pl-3 pr-9 font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									>
 										{languageCodes.map((code) => {
 											const exists = bind.translations.some(
@@ -800,7 +800,7 @@ export function BindViewer() {
 								<button
 									type="button"
 									onClick={() => void copyContent()}
-									className="ui-button ui-button--primary hidden h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
+									className="ui-button ui-button--primary hidden items-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
 								>
 									{copied ? <Check size={17} /> : <Copy size={17} />}
 									{copied ? "Copied" : "Copy"}
@@ -912,7 +912,7 @@ export function BindViewer() {
 								<button
 									type="button"
 									onClick={() => void copyContent()}
-									className="ui-button ui-button--primary inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+									className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 								>
 									<Copy size={15} />
 									Copy MAP
@@ -920,26 +920,26 @@ export function BindViewer() {
 							</div>
 
 							<div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(8rem,10rem)]">
-								<label className="min-w-0">
+								<label className="ui-field min-w-0">
 									<span className="mb-1 block text-xs font-medium text-muted">
 										Bonus block
 									</span>
 									<textarea
 										value={mapBonusBlock}
 										onChange={(event) => setMapBonusBlock(event.target.value)}
-										className="supportos-scroll min-h-24 w-full min-w-0 resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input supportos-scroll min-h-24 w-full min-w-0 resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										placeholder="130% bonus up to €1000 + 100 FS"
 									/>
 								</label>
 
-								<label className="min-w-0">
+								<label className="ui-field min-w-0">
 									<span className="mb-1 block text-xs font-medium text-muted">
 										Currency group
 									</span>
 									<select
 										value={activeMapCurrencyTable?.name ?? ""}
 										onChange={(event) => setMapTableName(event.target.value)}
-										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{mapCurrencyTables.length > 0 ? (
 											mapCurrencyTables.map((table) => (
@@ -958,14 +958,14 @@ export function BindViewer() {
 									)}
 								</label>
 
-								<label className="min-w-0">
+								<label className="ui-field min-w-0">
 									<span className="mb-1 block text-xs font-medium text-muted">
 										Currency
 									</span>
 									<select
 										value={mapCurrency}
 										onChange={(event) => setMapCurrency(event.target.value)}
-										className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{mapCurrencyOptions.map((currency) => (
 											<option key={currency} value={currency}>

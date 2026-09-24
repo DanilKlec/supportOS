@@ -138,7 +138,7 @@ export function HealthPage() {
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
 							placeholder="Filter issues"
-							className="h-8 flex-1 bg-transparent text-sm outline-none"
+							className="ui-input flex-1 bg-transparent outline-none"
 						/>
 					</div>
 
@@ -226,7 +226,7 @@ export function HealthPage() {
 												<button
 													type="button"
 													onClick={() => openIssue(issue)}
-													className="ui-button ui-button--secondary rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+													className="ui-button ui-button--secondary border border-border hover:bg-surface-elevated"
 												>
 													Open
 												</button>

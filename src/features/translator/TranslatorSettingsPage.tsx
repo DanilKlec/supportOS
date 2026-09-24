@@ -134,19 +134,19 @@ export function TranslatorSettingsPage({
 										lingvaEndpoint.trim().replace(/\/+$/, "") ===
 											DEFAULT_LINGVA_ENDPOINT || checking
 									}
-									className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
 									Use Default
 								</button>
 							</div>
 
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">Lingva Endpoint</span>
 								<input
 									value={lingvaEndpoint}
 									onChange={(event) => setLingvaEndpoint(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder={DEFAULT_LINGVA_ENDPOINT}
 								/>
 							</label>
@@ -159,24 +159,24 @@ export function TranslatorSettingsPage({
 						</div>
 					) : provider === "mymemory" ? (
 						<div className="space-y-4">
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">Contact Email</span>
 								<input
 									type="email"
 									value={email}
 									onChange={(event) => setEmail(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder="Optional"
 								/>
 							</label>
 
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">API Key</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder="Optional"
 								/>
 							</label>
@@ -200,32 +200,32 @@ export function TranslatorSettingsPage({
 									type="button"
 									onClick={useBuiltInEndpoint}
 									disabled={isBuiltIn || checking}
-									className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
 									Use Built-In
 								</button>
 							</div>
 
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">
 									LibreTranslate Endpoint
 								</span>
 								<input
 									value={endpoint}
 									onChange={(event) => setEndpoint(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder="/api/translator"
 								/>
 							</label>
 
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">API Key</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder="Optional"
 								/>
 							</label>
@@ -237,7 +237,7 @@ export function TranslatorSettingsPage({
 							type="button"
 							onClick={testConnection}
 							disabled={checking}
-							className="ui-button ui-button--primary inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{checking ? (
 								<Loader2 size={16} className="animate-spin" />

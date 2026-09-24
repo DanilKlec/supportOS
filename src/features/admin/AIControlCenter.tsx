@@ -82,7 +82,7 @@ async function api<T>(path: string, body?: object): Promise<T> {
 	return data;
 }
 const control =
-	"min-h-10 rounded-lg border border-border bg-background p-2 text-sm";
+	"rounded-[var(--ui-control-radius)] border border-border bg-background px-[var(--ui-control-padding-x)] py-2 text-sm";
 export function AIControlCenter({
 	section,
 	onSection,
@@ -274,19 +274,19 @@ export function AIControlCenter({
 			) : section === "playground" ? (
 				<div className="grid gap-4 xl:grid-cols-2">
 					<div className="space-y-3">
-						<label className="block">
+						<label className="ui-field ">
 							Сообщение
 							<textarea
 								value={request}
 								maxLength={8000}
 								onChange={(e) => setRequest(e.target.value)}
-								className={`${control} block min-h-36 w-full`}
+								className={`ui-input ${`${control} block min-h-36 w-full`}`}
 							/>
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
 								aria-label="Проект Playground"
-								className={control}
+								className={`ui-input ${control}`}
 								value={project}
 								onChange={(e) => setProject(e.target.value)}
 							>
@@ -299,19 +299,19 @@ export function AIControlCenter({
 							</select>
 							<input
 								aria-label="Язык Playground"
-								className={control}
+								className={`ui-input ${control}`}
 								value={language}
 								onChange={(e) => setLanguage(e.target.value)}
 							/>
 							<input
 								aria-label="Intent Playground"
-								className={control}
+								className={`ui-input ${control}`}
 								value={intent}
 								onChange={(e) => setIntent(e.target.value)}
 							/>
 							<select
 								aria-label="Тон"
-								className={control}
+								className={`ui-input ${control}`}
 								value={tone}
 								onChange={(e) => setTone(e.target.value)}
 							>
@@ -321,7 +321,7 @@ export function AIControlCenter({
 							</select>
 							<select
 								aria-label="Режим Playground"
-								className={control}
+								className={`ui-input ${control}`}
 								value={preview ? "draft" : "production"}
 								onChange={(e) => setPreview(e.target.value === "draft")}
 							>
@@ -450,7 +450,7 @@ export function AIControlCenter({
 						<div className="space-y-2">
 							<input
 								aria-label="Поиск AI"
-								className={`${control} w-full`}
+								className={`ui-input ${`${control} w-full`}`}
 								placeholder="Поиск"
 								value={search}
 								onChange={(e) => setSearch(e.target.value)}
@@ -495,16 +495,16 @@ export function AIControlCenter({
 								void save("save");
 							}}
 						>
-							<label className="block">
+							<label className="ui-field ">
 								Название / термин
 								<input
 									required
-									className={`${control} block w-full`}
+									className={`ui-input ${`${control} block w-full`}`}
 									value={entry.title}
 									onChange={(e) => patch("title", e.target.value)}
 								/>
 							</label>
-							<label className="block">
+							<label className="ui-field ">
 								{section === "tests"
 									? "Тестовый запрос (без данных клиентов)"
 									: section === "glossary"
@@ -513,16 +513,16 @@ export function AIControlCenter({
 								<textarea
 									required
 									maxLength={8000}
-									className={`${control} block min-h-36 w-full`}
+									className={`ui-input ${`${control} block min-h-36 w-full`}`}
 									value={entry.content}
 									onChange={(e) => patch("content", e.target.value)}
 								/>
 							</label>
 							<div className="grid gap-2 sm:grid-cols-2">
-								<label>
+								<label className="ui-field">
 									Проект
 									<select
-										className={`${control} block w-full`}
+										className={`ui-input ${`${control} block w-full`}`}
 										value={entry.project}
 										onChange={(e) => patch("project", e.target.value)}
 									>
@@ -541,22 +541,22 @@ export function AIControlCenter({
 										["category", "Категория / контекст"],
 									] as const
 								).map(([key, label]) => (
-									<label key={key}>
+									<label className="ui-field" key={key}>
 										{label}
 										<input
-											className={`${control} block w-full`}
+											className={`ui-input ${`${control} block w-full`}`}
 											value={entry[key]}
 											onChange={(e) => patch(key, e.target.value)}
 										/>
 									</label>
 								))}
-								<label>
+								<label className="ui-field">
 									Приоритет
 									<input
 										type="number"
 										min={0}
 										max={100}
-										className={`${control} block w-full`}
+										className={`ui-input ${`${control} block w-full`}`}
 										value={entry.priority}
 										onChange={(e) => patch("priority", Number(e.target.value))}
 									/>
@@ -578,19 +578,19 @@ export function AIControlCenter({
 											["forbidden", "Запрещённые понятия"],
 										] as const
 									).map(([key, label]) => (
-										<label key={key} className="block">
+										<label key={key} className="ui-field ">
 											{label} · по одному на строку
 											<textarea
-												className={`${control} block w-full`}
+												className={`ui-input ${`${control} block w-full`}`}
 												value={entry[key].join("\n")}
 												onChange={(e) => patch(key, e.target.value.split("\n"))}
 											/>
 										</label>
 									))}
-									<label className="block">
+									<label className="ui-field ">
 										Эталонный ответ
 										<textarea
-											className={`${control} block w-full`}
+											className={`ui-input ${`${control} block w-full`}`}
 											value={entry.reference}
 											onChange={(e) => patch("reference", e.target.value)}
 										/>

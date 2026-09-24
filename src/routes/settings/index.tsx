@@ -330,7 +330,7 @@ function SettingsPage() {
 								<button
 									type="button"
 									onClick={resetAppearance}
-									className="ui-button ui-button--secondary rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+									className="ui-button ui-button--secondary border border-border bg-background font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
 									Reset
 								</button>
@@ -498,7 +498,7 @@ function SettingsPage() {
 							</div>
 
 							<div className="space-y-4">
-								<label className="block space-y-2">
+								<label className="ui-field ">
 									<span className="text-sm font-medium">
 										Workspace language
 									</span>
@@ -507,7 +507,7 @@ function SettingsPage() {
 										onChange={(event) =>
 											setLanguage(event.target.value as LanguageCode)
 										}
-										className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									>
 										{languages.map((item) => (
 											<option key={item.code} value={item.code}>
@@ -636,7 +636,7 @@ function SettingsPage() {
 							<button
 								type="button"
 								onClick={resetWorkspace}
-								className="ui-button ui-button--secondary rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="ui-button ui-button--secondary border border-border bg-background font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								Reset layout
 							</button>
@@ -868,7 +868,7 @@ function SettingsPage() {
 										<button
 											type="button"
 											onClick={signOut}
-											className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+											className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
 										>
 											<LogOut size={16} />
 											Sign out

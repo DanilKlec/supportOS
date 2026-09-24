@@ -75,7 +75,7 @@ export function PWAInstallButton() {
 			title={installPrompt ? "Install SupportOS" : "PWA ready"}
 			onClick={install}
 			disabled={!installPrompt}
-			className="ui-button ui-button--ghost inline-flex items-center gap-1 rounded-lg px-2 py-2 text-xs hover:bg-surface-elevated disabled:cursor-default disabled:opacity-60"
+			className="ui-button ui-button--ghost inline-flex items-center gap-1 hover:bg-surface-elevated disabled:cursor-default disabled:opacity-60"
 		>
 			<Download size={16} />
 			{online ? <Wifi size={16} /> : <WifiOff size={16} />}

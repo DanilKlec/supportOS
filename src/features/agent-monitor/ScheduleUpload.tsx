@@ -7,7 +7,7 @@ import {
 } from "./import-schedule";
 
 const control =
-	"rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-40";
+	"rounded-[var(--ui-control-radius)] border border-border bg-background px-[var(--ui-control-padding-x)] py-2 text-sm";
 export function ScheduleUpload({
 	agents,
 	onSave,
@@ -122,11 +122,11 @@ export function ScheduleUpload({
 				{selected && (
 					<>
 						<p className="text-sm">{filename}</p>
-						<label className="block">
+						<label className="ui-field ">
 							Месяц графика{" "}
 							<select
 								aria-label="Месяц графика"
-								className={control}
+								className={`ui-input ${control}`}
 								value={selected}
 								disabled={busy}
 								onChange={(e) => {

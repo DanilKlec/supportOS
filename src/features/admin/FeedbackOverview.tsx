@@ -51,7 +51,7 @@ export function FeedbackOverview({
 			<div className="ui-actions flex flex-wrap">
 				<select
 					aria-label="Проект обратной связи"
-					className="section-select"
+					className="ui-input section-select"
 					value={project}
 					onChange={(event) => setProject(event.target.value)}
 				>
@@ -66,7 +66,7 @@ export function FeedbackOverview({
 				</select>
 				<select
 					aria-label="Тип оценки"
-					className="section-select"
+					className="ui-input section-select"
 					value={rating}
 					onChange={(event) => setRating(event.target.value)}
 				>

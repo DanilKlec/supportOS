@@ -341,7 +341,7 @@ export function Sidebar({
 					onClick={() =>
 						mobile ? onRequestClose?.() : setLayout({ showSidebar: false })
 					}
-					className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 				>
 					{mobile ? <X size={18} /> : <PanelLeftClose size={18} />}
 				</button>
@@ -373,7 +373,7 @@ export function Sidebar({
 						<button
 							key={to}
 							type="button"
-							className="space-tab !px-2 !text-xs"
+							className="space-tab sidebar-tab"
 							onClick={() => {
 								void navigate({ to });
 								onNavigate?.();
@@ -394,7 +394,7 @@ export function Sidebar({
 							title="Добавить категорию"
 							aria-label="Добавить категорию"
 							onClick={createCategory}
-							className="ui-button ui-button--ghost ui-button--icon ui-button--small inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--ghost ui-button--icon ui-button--small inline-flex items-center justify-center text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
 						</button>
@@ -410,7 +410,7 @@ export function Sidebar({
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Поиск в папках…"
-							className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+							className="ui-input w-full border border-border bg-surface pl-9 pr-8 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
 							<button
@@ -465,17 +465,17 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={() => setSelectedBindIds([])}
-									className="rounded-lg p-1 text-foreground hover:bg-accent/15"
+									className="ui-button ui-button--icon ui-button--small text-foreground hover:bg-accent/15"
 									title="Снять выделение"
 								>
 									<X size={13} />
 								</button>
 							</div>
 
-							<div className="ui-actions items-center flex flex-wrap gap-1">
+							<div className="ui-actions sidebar-bulk-actions">
 								<button
 									type="button"
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground"
+									className="ui-button ui-button--small sidebar-bulk-move border-accent/25 bg-background text-foreground"
 									onClick={() =>
 										modalManager.open("moveBind", { bindIds: selectedBindIds })
 									}
@@ -485,7 +485,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={setSelectedFavorite}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
+									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
 									title={
 										allSelectedFavorite ? "Убрать из избранного" : "В избранное"
 									}
@@ -498,7 +498,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={setSelectedPinned}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
+									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
 									title={
 										allSelectedPinned
 											? "Открепить выбранные"
@@ -513,7 +513,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
+									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
 									title="Добавить тег"
 								>
 									<Tag size={14} />
@@ -521,7 +521,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={exportSelected}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
+									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
 									title="Экспортировать выбранные"
 								>
 									<Download size={14} />
@@ -529,7 +529,7 @@ export function Sidebar({
 								<button
 									type="button"
 									onClick={archiveSelected}
-									className="rounded-lg border border-red-500/30 bg-background p-1.5 text-red-300 hover:bg-red-500/10"
+									className="ui-button ui-button--icon ui-button--small border-red-500/30 bg-background text-red-300 hover:bg-red-500/10"
 									title="Архивировать выбранные"
 								>
 									<Archive size={14} />
@@ -547,12 +547,12 @@ export function Sidebar({
 											}
 										}}
 										placeholder="Tag"
-										className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-accent"
+										className="ui-input ui-input--small min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent"
 									/>
 									<button
 										type="button"
 										onClick={addTagToSelected}
-										className="rounded-lg border border-accent/30 bg-accent px-2 text-accent-foreground"
+										className="ui-button ui-button--primary ui-button--icon ui-button--small"
 										title="Apply tag"
 									>
 										<Check size={14} />

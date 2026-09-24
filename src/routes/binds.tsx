@@ -46,7 +46,7 @@ function BindsPage() {
 						<button
 							type="button"
 							onClick={() => modalManager.open("createBind", { categoryId })}
-							className="ui-button ui-button--primary flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/90"
+							className="ui-button ui-button--primary flex items-center gap-1.5 bg-accent font-medium text-accent-foreground transition-colors hover:bg-accent/90"
 						>
 							<Plus size={16} />
 							New

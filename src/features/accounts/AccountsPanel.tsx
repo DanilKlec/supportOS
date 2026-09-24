@@ -44,8 +44,7 @@ type Audit = {
 	before_data: any;
 	after_data: any;
 };
-const control =
-	"rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-40";
+const control = "border border-border bg-background disabled:opacity-40";
 const permissionGroup = (id: string) => {
 	if (
 		id.startsWith("ai.") ||
@@ -298,7 +297,7 @@ export function AccountsPanel({
 							key={id}
 							role="tab"
 							aria-selected={tab === id}
-							className={`${control} ${tab === id ? "border-accent/30 bg-accent/10 text-accent" : "border-transparent text-muted"}`}
+							className={`space-tab ${control} ${tab === id ? "border-accent/30 bg-accent/10 text-accent" : "border-transparent text-muted"}`}
 							disabled={busy}
 							onClick={() => {
 								setTab(id);
@@ -369,7 +368,7 @@ export function AccountsPanel({
 						}}
 					>
 						<input
-							className={control}
+							className={`ui-input ${control}`}
 							aria-label="Поиск пользователя"
 							placeholder="Почта или имя"
 							value={search}
@@ -385,7 +384,7 @@ export function AccountsPanel({
 						</button>
 						<select
 							aria-label="Статус сотрудников"
-							className={control}
+							className={`ui-input ${control}`}
 							value={statusFilter}
 							onChange={(e) => {
 								setStatusFilter(e.target.value);
@@ -399,7 +398,7 @@ export function AccountsPanel({
 						</select>
 						<select
 							aria-label="Роль сотрудников"
-							className={control}
+							className={`ui-input ${control}`}
 							value={roleFilter}
 							onChange={(e) => {
 								setRoleFilter(e.target.value);
@@ -1056,7 +1055,7 @@ function CreateUser({
 			<h3 className="font-semibold">Новый личный аккаунт</h3>
 			<div className="flex flex-wrap gap-2">
 				<input
-					className={control}
+					className={`ui-input ${control}`}
 					aria-label="Имя нового сотрудника"
 					placeholder="Имя"
 					maxLength={120}
@@ -1065,7 +1064,7 @@ function CreateUser({
 					disabled={busy}
 				/>
 				<input
-					className={control}
+					className={`ui-input ${control}`}
 					type="email"
 					aria-label="Почта нового аккаунта"
 					placeholder="Email"
@@ -1075,7 +1074,7 @@ function CreateUser({
 					disabled={busy}
 				/>
 				<input
-					className={control}
+					className={`ui-input ${control}`}
 					type="password"
 					autoComplete="new-password"
 					aria-label="Пароль нового аккаунта"
@@ -1178,7 +1177,7 @@ function EditUser({
 				</p>
 			)}
 			<input
-				className={control}
+				className={`ui-input ${control}`}
 				aria-label="Имя сотрудника"
 				value={name}
 				maxLength={120}
@@ -1186,7 +1185,7 @@ function EditUser({
 				disabled={busy}
 			/>
 			<select
-				className={control}
+				className={`ui-input ${control}`}
 				aria-label="Статус аккаунта"
 				value={status}
 				onChange={(e) => setStatus(e.target.value)}
@@ -1270,7 +1269,7 @@ function EditRole({
 				{role.version ? "Настройка роли" : "Новая роль"}
 			</h3>
 			<input
-				className={control}
+				className={`ui-input ${control}`}
 				aria-label="Код роли"
 				placeholder="Код: support_senior"
 				pattern="[a-z][a-z0-9_]{1,39}"
@@ -1280,7 +1279,7 @@ function EditRole({
 				disabled={busy || role.version > 0}
 			/>
 			<input
-				className={control}
+				className={`ui-input ${control}`}
 				aria-label="Название роли"
 				placeholder="Название"
 				required
@@ -1290,7 +1289,7 @@ function EditRole({
 				disabled={busy}
 			/>
 			<input
-				className={control}
+				className={`ui-input ${control}`}
 				aria-label="Описание роли"
 				placeholder="Описание"
 				maxLength={500}

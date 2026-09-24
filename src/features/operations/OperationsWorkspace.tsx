@@ -77,9 +77,10 @@ export function OperationsWorkspace({
 				</div>
 			</aside>
 			<div className="ops-content">
-				<label className="ops-mobile-nav">
+				<label className="ui-field ops-mobile-nav">
 					Раздел
 					<select
+						className="ui-input"
 						value={current?.id ?? ""}
 						onChange={(e) => onSelect(e.target.value)}
 					>

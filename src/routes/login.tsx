@@ -123,7 +123,7 @@ export function LoginPage() {
 			/>
 		);
 	return (
-		<div className="login-scene">
+		<div className="login-scene auth-surface">
 			<AmbientBackground />
 			<header className="relative z-10 flex items-center gap-3 px-6 py-7 sm:px-10 lg:px-14">
 				<SupportOSLogo className="h-9 w-9" />
@@ -325,7 +325,7 @@ export function LoginPage() {
 						<button
 							type="submit"
 							disabled={!enabled || busy}
-							className="login-submit flex h-13 w-full items-center justify-center gap-3 rounded-xl text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+							className="login-submit auth-button flex h-13 w-full items-center justify-center gap-3 rounded-xl text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{busy ? (
 								<LoaderCircle size={18} className="animate-spin" />

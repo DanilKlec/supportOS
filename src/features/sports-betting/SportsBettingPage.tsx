@@ -394,7 +394,7 @@ export function SportsBettingPage() {
 							type="button"
 							onClick={() => void loadFeed(true)}
 							disabled={refreshing}
-							className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<RefreshCw
 								size={16}
@@ -501,7 +501,7 @@ export function SportsBettingPage() {
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+							className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 							placeholder="Search sport, team, market, bookmaker..."
 						/>
 					</div>
@@ -509,7 +509,7 @@ export function SportsBettingPage() {
 					<select
 						value={activeSport}
 						onChange={(event) => setActiveSport(event.target.value)}
-						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+						className="ui-input border border-border bg-surface outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{sportOptions.map((sport) => (
 							<option key={sport} value={sport}>
@@ -521,7 +521,7 @@ export function SportsBettingPage() {
 					<select
 						value={activeMarket}
 						onChange={(event) => setActiveMarket(event.target.value)}
-						className="h-11 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+						className="ui-input border border-border bg-surface outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 					>
 						{marketOptions.map((market) => (
 							<option key={market[0]} value={market[0]}>
@@ -589,7 +589,7 @@ export function SportsBettingPage() {
 														"Event summary copied",
 													)
 												}
-												className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={15} />
 												Copy

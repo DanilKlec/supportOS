@@ -67,7 +67,7 @@ export function AIFeedback({
 				<div className="ui-actions items-center flex flex-wrap gap-2">
 					<select
 						aria-label="Причина оценки AI"
-						className="rounded border border-border bg-background p-2 text-sm"
+						className="ui-input border border-border bg-background"
 						value={reason}
 						onChange={(e) => setReason(e.target.value)}
 					>

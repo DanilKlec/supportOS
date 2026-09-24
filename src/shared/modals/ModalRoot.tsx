@@ -53,10 +53,8 @@ const COLOR_SWATCHES = [
 	"#EC4899",
 ];
 
-const inputClass =
-	"min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60";
-const textareaClass =
-	"min-h-64 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-6 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-56";
+const inputClass = "w-full";
+const textareaClass = "w-full min-h-64 md:min-h-56";
 
 export function ModalRoot() {
 	const activeModal = useModalStore((state) => state.activeModal);
@@ -185,7 +183,7 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						disabled={saving}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 					/>
 				</Field>
 
@@ -194,7 +192,7 @@ function CreateCategoryModal({ onClose }: { onClose: () => void }) {
 						value={icon}
 						onChange={(event) => setIcon(event.target.value)}
 						disabled={saving}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 						placeholder="Shield"
 					/>
 				</Field>
@@ -296,7 +294,7 @@ function CreateFolderModal({
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						disabled={saving}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 					/>
 				</Field>
 
@@ -305,7 +303,7 @@ function CreateFolderModal({
 						value={categoryId}
 						onChange={(event) => setCategoryId(event.target.value)}
 						disabled={saving || categories.length === 0}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 					>
 						{categories.length === 0 ? (
 							<option value="">Нет категорий</option>
@@ -324,7 +322,7 @@ function CreateFolderModal({
 						value={parentId}
 						onChange={(event) => setParentId(event.target.value)}
 						disabled={saving || !categoryId}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 					>
 						<option value="">Корень категории</option>
 						{availableParents.map((folder) => (
@@ -340,7 +338,7 @@ function CreateFolderModal({
 						value={icon}
 						onChange={(event) => setIcon(event.target.value)}
 						disabled={saving}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 						placeholder="Папка"
 					/>
 				</Field>
@@ -441,7 +439,7 @@ function RenameModal({
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						disabled={saving || !target}
-						className={inputClass}
+						className={`ui-input ${inputClass}`}
 					/>
 				</Field>
 
@@ -651,7 +649,7 @@ function MoveBindModal({
 				{!fixedIds.length && !payload.moveFolderId && (
 					<Field label="Бинд">
 						<select
-							className={inputClass}
+							className={`ui-input ${inputClass}`}
 							value={bindId}
 							onChange={(e) => setBindId(e.target.value)}
 						>
@@ -859,7 +857,7 @@ function CopyBindModal({
 														onChange={(event) =>
 															setEmailQuery(event.target.value)
 														}
-														className="min-h-11 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+														className="ui-input w-full border border-border bg-background pl-9 pr-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
 														placeholder="Search project, type or email..."
 													/>
 												</div>
@@ -915,7 +913,7 @@ function CopyBindModal({
 														[variable]: event.target.value,
 													}))
 												}
-												className={inputClass}
+												className={`ui-input ${inputClass}`}
 												placeholder={
 													emailVariable
 														? "Add project emails or enter email manually"
@@ -1009,7 +1007,7 @@ function BindHistoryModal({
 									<button
 										type="button"
 										onClick={() => restore(entry.id)}
-										className="ui-button ui-button--secondary shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated"
+										className="ui-button ui-button--secondary shrink-0 border border-border font-medium hover:bg-surface-elevated"
 									>
 										Restore
 									</button>
@@ -1227,7 +1225,7 @@ function BindFormModal({
 						<button
 							type="button"
 							onClick={requestClose}
-							className="ui-button ui-button--secondary rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-elevated"
+							className="ui-button ui-button--secondary border border-border hover:bg-surface-elevated"
 						>
 							Close
 						</button>
@@ -1396,7 +1394,7 @@ function BindFormModal({
 										setAddLanguageError("");
 									}}
 									disabled={saving}
-									className="h-9 w-28 rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-input w-28 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 									placeholder="es"
 								/>
 								<ErrorText message={addLanguageError} />
@@ -1406,7 +1404,7 @@ function BindFormModal({
 								type="button"
 								onClick={addLanguage}
 								disabled={saving}
-								className="ui-button ui-button--secondary ui-button--small inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
+								className="ui-button ui-button--secondary ui-button--small inline-flex items-center gap-1.5 border border-border font-medium hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								<Plus size={15} />
 								Добавить язык
@@ -1449,7 +1447,7 @@ function BindFormModal({
 											})
 										}
 										disabled={saving}
-										className={inputClass}
+										className={`ui-input ${inputClass}`}
 									/>
 								</Field>
 
@@ -1463,7 +1461,7 @@ function BindFormModal({
 											})
 										}
 										disabled={saving}
-										className={textareaClass}
+										className={`ui-input ${textareaClass}`}
 										placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
 									/>
 								</Field>
@@ -1479,7 +1477,7 @@ function BindFormModal({
 											})
 										}
 										disabled={saving}
-										className={textareaClass}
+										className={`ui-input ${textareaClass}`}
 									/>
 								</Field>
 							</div>
@@ -1503,7 +1501,7 @@ function BindFormModal({
 									value={slug}
 									onChange={(event) => setSlug(event.target.value)}
 									disabled={saving}
-									className={inputClass}
+									className={`ui-input ${inputClass}`}
 								/>
 							</Field>
 
@@ -1512,7 +1510,7 @@ function BindFormModal({
 									value={categoryId}
 									onChange={(event) => setCategoryId(event.target.value)}
 									disabled={saving || categories.length === 0}
-									className={inputClass}
+									className={`ui-input ${inputClass}`}
 								>
 									{categories.length === 0 ? (
 										<option value="">Нет категорий</option>
@@ -1531,7 +1529,7 @@ function BindFormModal({
 									value={folderId}
 									onChange={(event) => setFolderId(event.target.value)}
 									disabled={saving || !categoryId}
-									className={inputClass}
+									className={`ui-input ${inputClass}`}
 								>
 									<option value="">Корень категории</option>
 									{availableFolders.map((folder) => (
@@ -1550,7 +1548,7 @@ function BindFormModal({
 								value={tags}
 								onChange={(event) => setTags(event.target.value)}
 								disabled={saving}
-								className={inputClass}
+								className={`ui-input ${inputClass}`}
 								placeholder="kyc, withdrawal, bonus"
 							/>
 							{tagSuggestions.length > 0 && (
@@ -1563,7 +1561,7 @@ function BindFormModal({
 												setTags((current) => toggleTag(current, tag))
 											}
 											disabled={saving}
-											className="ui-button ui-button--secondary rounded-full border border-border px-2 py-1 text-xs text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+											className="ui-button ui-button--secondary rounded-full border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 										>
 											#{tag}
 										</button>
@@ -1628,7 +1626,7 @@ function Field({
 	children: ReactNode;
 }) {
 	return (
-		<fieldset aria-label={label} className="min-w-0 space-y-1.5">
+		<fieldset aria-label={label} className="min-w-0 space-y-2">
 			<legend className="flex items-center gap-2 text-sm font-medium">
 				{label}
 				{hint && <span className="text-xs font-normal text-muted">{hint}</span>}
@@ -1669,7 +1667,7 @@ function ColorField({
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
 					disabled={disabled}
-					className="h-9 w-32 rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+					className="ui-input w-32 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					placeholder="#3B82F6"
 				/>
 			</div>
@@ -1689,7 +1687,7 @@ function ModalActions({
 	danger?: boolean;
 }) {
 	return (
-		<div className="ui-actions items-center sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:-mx-5 sm:-mb-4 sm:px-5">
+		<div className="ui-actions modal-actions">
 			<button
 				type="button"
 				onClick={onCancel}

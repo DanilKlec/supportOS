@@ -202,10 +202,10 @@ export function WorkspaceContinuity() {
 								onChange={(e) => setComposerPixels(Number(e.target.value))}
 							/>
 						</label>
-						<label className="block">
+						<label className="ui-field ">
 							Плотность
 							<select
-								className="ml-3 rounded border border-border bg-background p-2"
+								className="ui-input ml-3 border border-border bg-background"
 								value={density}
 								onChange={(e) => setDensity(e.target.value)}
 							>

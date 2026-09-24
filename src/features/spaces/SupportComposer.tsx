@@ -323,7 +323,7 @@ export function SupportComposer() {
 						<label className="composer-setting block text-sm">
 							Проект
 							<select
-								className="ml-2 max-w-full rounded border border-border bg-background p-2"
+								className="ui-input ml-2 max-w-full border border-border bg-background"
 								value={projectId ?? ""}
 								onChange={(e) =>
 									useBonusStore
@@ -342,7 +342,7 @@ export function SupportComposer() {
 						<label className="composer-setting block text-sm">
 							Тема обращения
 							<select
-								className="ml-2 rounded border border-border bg-background p-2"
+								className="ui-input ml-2 border border-border bg-background"
 								value={intent}
 								onChange={(event) =>
 									setIntent(event.target.value as typeof intent)
@@ -366,7 +366,7 @@ export function SupportComposer() {
 						<label className="composer-setting block text-sm">
 							Тон
 							<select
-								className="ml-2 rounded border border-border bg-background p-2"
+								className="ui-input ml-2 border border-border bg-background"
 								value={tone}
 								onChange={(e) => setTone(e.target.value as typeof tone)}
 							>
@@ -425,7 +425,7 @@ export function SupportComposer() {
 										? "Сообщение клиента"
 										: "Исходный текст"}
 									<textarea
-										className="mt-2 w-full min-h-32 rounded-lg border border-border bg-background p-3"
+										className="ui-input mt-2 w-full min-h-32 border border-border bg-background"
 										value={input}
 										onChange={(e) => setInput(e.target.value)}
 									/>
@@ -436,7 +436,7 @@ export function SupportComposer() {
 										list="composer-languages"
 										value={language}
 										onChange={(e) => setLanguage(e.target.value)}
-										className="w-24 rounded-lg border border-border bg-background p-2"
+										className="ui-input w-24 border border-border bg-background"
 									/>
 									<datalist id="composer-languages">
 										{[
@@ -463,7 +463,7 @@ export function SupportComposer() {
 											Исходный язык
 											<input
 												aria-label="Исходный язык"
-												className="w-24 rounded-lg border border-border bg-background p-2"
+												className="ui-input w-24 border border-border bg-background"
 												value={fromLanguage}
 												onChange={(e) => setFromLanguage(e.target.value)}
 												list="composer-languages"
@@ -523,7 +523,7 @@ export function SupportComposer() {
 									<textarea
 										value={output}
 										onChange={(e) => setOutput(e.target.value)}
-										className="mt-2 w-full min-h-40 rounded-lg border border-border bg-background p-3"
+										className="ui-input mt-2 w-full min-h-40 border border-border bg-background"
 									/>
 								</label>
 								<button

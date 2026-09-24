@@ -36,12 +36,12 @@ export function BindLinkEditor({
 				Свяжите общий ответ с вашим биндом. Тексты останутся без изменений.
 				Связь сохраняется для вашего аккаунта в этом браузере.
 			</p>
-			<label className="block text-xs text-muted">
+			<label className="ui-field text-xs text-muted">
 				Найти личный бинд
 				<input
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
-					className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+					className="ui-input mt-2 w-full border border-border bg-background"
 					placeholder="Название или slug"
 				/>
 			</label>
@@ -108,14 +108,14 @@ export function BindLinkEditor({
 					type="button"
 					disabled={!chosen}
 					onClick={() => save(selected)}
-					className="ui-button ui-button--primary rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground disabled:opacity-40"
+					className="ui-button ui-button--primary bg-accent text-accent-foreground disabled:opacity-40"
 				>
 					Связать версии
 				</button>
 				<button
 					type="button"
 					onClick={() => save(null)}
-					className="ui-button ui-button--secondary rounded-xl border border-border px-4 py-2 text-sm"
+					className="ui-button ui-button--secondary border border-border"
 				>
 					Оставить раздельно
 				</button>

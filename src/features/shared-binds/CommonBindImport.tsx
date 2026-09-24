@@ -185,7 +185,7 @@ export function CommonBindImport() {
 						setUrl(e.target.value);
 						setRows([]);
 					}}
-					className="min-w-48 flex-1 rounded-xl border border-border bg-background px-3"
+					className="ui-input min-w-48 flex-1 border border-border bg-background"
 				/>
 				<button
 					type="button"

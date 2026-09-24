@@ -54,7 +54,7 @@ export function TelegramLinkRequests() {
 	}
 	return (
 		<section className="mb-6 rounded-2xl border border-border bg-surface p-5">
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-wrap items-center justify-between gap-4">
 				<h2 className="font-semibold">Привязки Telegram · {rows.length}</h2>
 				<button
 					type="button"
@@ -79,7 +79,7 @@ export function TelegramLinkRequests() {
 					key={row.id}
 					className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3"
 				>
-					<span className="mr-auto">
+					<span className="mr-auto min-w-0 break-words">
 						{row.user?.display_name || row.user?.email || row.user_id} ·{" "}
 						{row.telegram_username
 							? "@" + row.telegram_username
@@ -90,7 +90,7 @@ export function TelegramLinkRequests() {
 						type="button"
 						disabled={busy}
 						onClick={() => void review(row, true)}
-						className="rounded-lg bg-blue-600 px-3 py-2 text-white"
+						className="ui-button bg-blue-600 text-white"
 					>
 						Одобрить
 					</button>
@@ -98,7 +98,7 @@ export function TelegramLinkRequests() {
 						type="button"
 						disabled={busy}
 						onClick={() => void review(row, false)}
-						className="rounded-lg border border-border px-3 py-2"
+						className="ui-button ui-button--secondary"
 					>
 						Отклонить
 					</button>

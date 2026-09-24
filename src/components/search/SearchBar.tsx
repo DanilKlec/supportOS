@@ -32,7 +32,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder="Поиск биндов… ( / )"
-				className="w-full rounded-xl border border-border bg-surface-elevated py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+				className="ui-input w-full border border-border bg-surface-elevated pl-10 pr-10 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
 			/>
 			{value && (
 				<button

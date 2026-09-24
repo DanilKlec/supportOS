@@ -106,7 +106,7 @@ function ArchivePage() {
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
 						placeholder="Search archive"
-						className="h-9 flex-1 bg-transparent text-sm outline-none"
+						className="ui-input flex-1 bg-transparent outline-none"
 					/>
 				</div>
 
@@ -142,7 +142,7 @@ function ArchivePage() {
 										<button
 											type="button"
 											onClick={() => restoreBind(bind.id)}
-											className="ui-button ui-button--secondary inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+											className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
 										>
 											<RotateCcw size={15} />
 											Restore
@@ -150,7 +150,7 @@ function ArchivePage() {
 										<button
 											type="button"
 											onClick={() => setPendingDeleteId(bind.id)}
-											className="ui-button ui-button--danger rounded-md border border-red-500/30 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
+											className="ui-button ui-button--danger border border-red-500/30 text-red-300 hover:bg-red-500/10"
 											title="Delete forever"
 										>
 											<Trash2 size={15} />

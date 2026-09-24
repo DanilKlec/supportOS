@@ -307,7 +307,12 @@ export function ModelsPage() {
 			{["Fast model", "Reasoning model", "Fallback", "Task routing"].map(
 				(label) => (
 					<Row key={label} title={label}>
-						<input aria-label={label} disabled placeholder="Not configured" />
+						<input
+							className="ui-input"
+							aria-label={label}
+							disabled
+							placeholder="Not configured"
+						/>
 					</Row>
 				),
 			)}
@@ -362,7 +367,12 @@ export function LearningPage() {
 					"Минимальная уверенность",
 				].map((label) => (
 					<Row key={label} title={label}>
-						<input aria-label={label} disabled placeholder="Not configured" />
+						<input
+							className="ui-input"
+							aria-label={label}
+							disabled
+							placeholder="Not configured"
+						/>
 					</Row>
 				))}
 			</Panel>

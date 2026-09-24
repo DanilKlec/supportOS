@@ -17,23 +17,23 @@ export function AISettingsPage() {
 				</div>
 
 				<div className="space-y-5 rounded-lg border border-border bg-surface p-5">
-					<label className="block space-y-2">
+					<label className="ui-field ">
 						<span className="text-sm font-medium">OpenAI API Key</span>
 						<input
 							type="password"
 							value={apiKey}
 							onChange={(event) => setApiKey(event.target.value)}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							placeholder="sk-..."
 						/>
 					</label>
 
-					<label className="block space-y-2">
+					<label className="ui-field ">
 						<span className="text-sm font-medium">Model</span>
 						<input
 							value={model}
 							onChange={(event) => setModel(event.target.value)}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							placeholder="gpt-5-mini"
 						/>
 					</label>

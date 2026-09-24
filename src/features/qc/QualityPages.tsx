@@ -80,6 +80,7 @@ export function ReviewInbox({
 			)}
 			<div className="ops-toolbar">
 				<input
+					className="ui-input"
 					aria-label="Поиск очереди"
 					placeholder="Поиск по теме или материалу…"
 					value={search}
@@ -87,6 +88,7 @@ export function ReviewInbox({
 				/>
 				{!gapsOnly && (
 					<select
+						className="ui-input"
 						aria-label="Тип проверки"
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
@@ -410,9 +412,13 @@ export function KnowledgeHistory() {
 	return (
 		<div className="ops-stack">
 			<QueryState query={materials} />
-			<label className="ops-toolbar">
+			<label className="ui-field ops-toolbar">
 				Материал
-				<select value={id} onChange={(e) => setId(e.target.value)}>
+				<select
+					className="ui-input"
+					value={id}
+					onChange={(e) => setId(e.target.value)}
+				>
 					<option value="">Выберите материал</option>
 					{materials.data?.map((b) => (
 						<option key={b.id} value={b.id}>

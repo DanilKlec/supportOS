@@ -251,7 +251,7 @@ export function AnswerAssistantPage({
 					<button
 						type="button"
 						onClick={reset}
-						className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface text-muted hover:bg-surface-elevated hover:text-foreground"
 					>
 						<RefreshCw size={15} />
 						Новый ответ
@@ -282,7 +282,7 @@ export function AnswerAssistantPage({
 								<textarea
 									value={customerMessage}
 									onChange={(event) => setCustomerMessage(event.target.value)}
-									className="supportos-scroll min-h-48 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="ui-input supportos-scroll min-h-48 flex-1 resize-none border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Например: клиент спрашивает, почему вывод ещё в обработке. Нужно объяснить, что заявка проверяется финансовым отделом."
 								/>
 							</label>
@@ -294,13 +294,13 @@ export function AnswerAssistantPage({
 								<textarea
 									value={facts}
 									onChange={(event) => setFacts(event.target.value)}
-									className="supportos-scroll min-h-28 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="ui-input supportos-scroll min-h-28 resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Срок: до 3 рабочих дней. Обещать точное время нельзя. Нужно попросить дождаться обновления."
 								/>
 							</label>
 
 							<div className="grid gap-3 sm:grid-cols-2">
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Язык ответа
 									</span>
@@ -313,7 +313,7 @@ export function AnswerAssistantPage({
 											}
 											updateSettings({ language: event.target.value });
 										}}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{LANGUAGES.map((language) => (
 											<option key={language.code} value={language.code}>
@@ -323,7 +323,7 @@ export function AnswerAssistantPage({
 									</select>
 								</label>
 
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Тон
 									</span>
@@ -334,7 +334,7 @@ export function AnswerAssistantPage({
 												tone: event.target.value as AnswerTone,
 											})
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{TONES.map((tone) => (
 											<option key={tone.value} value={tone.value}>
@@ -346,7 +346,7 @@ export function AnswerAssistantPage({
 							</div>
 
 							{!languageIsPreset && (
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Код языка
 									</span>
@@ -357,7 +357,7 @@ export function AnswerAssistantPage({
 											updateSettings({ language: event.target.value });
 										}}
 										placeholder="Например: ro, bg, ka"
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 								</label>
 							)}
@@ -365,7 +365,7 @@ export function AnswerAssistantPage({
 							<button
 								type="submit"
 								disabled={loading || !customerMessage.trim()}
-								className="ui-button ui-button--primary inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+								className="ui-button ui-button--primary inline-flex w-full items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{loading ? (
 									<Loader2 size={18} className="animate-spin" />
@@ -395,7 +395,7 @@ export function AnswerAssistantPage({
 									type="button"
 									onClick={saveAnswer}
 									disabled={!answer.trim()}
-									className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+									className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
 									aria-label="Сохранить ответ в память"
 								>
 									<Save size={16} />
@@ -404,7 +404,7 @@ export function AnswerAssistantPage({
 									type="button"
 									onClick={() => void copyAnswer()}
 									disabled={!answer.trim()}
-									className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+									className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
 								>
 									<Copy size={16} />
 									Копировать
@@ -416,7 +416,7 @@ export function AnswerAssistantPage({
 							<textarea
 								value={answer}
 								onChange={(event) => setAnswer(event.target.value)}
-								className="supportos-scroll min-h-80 flex-1 resize-none rounded-lg border border-border bg-background px-4 py-4 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+								className="ui-input supportos-scroll min-h-80 flex-1 resize-none border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 								placeholder="Ответ ещё не создан."
 							/>
 
@@ -451,7 +451,7 @@ export function AnswerAssistantPage({
 								<div className="font-semibold">Параметры</div>
 							</div>
 							<div className="space-y-3 p-4">
-								<label className="block space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Тип вопроса
 									</span>
@@ -462,7 +462,7 @@ export function AnswerAssistantPage({
 												intent: event.target.value as AnswerIntent,
 											})
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{INTENTS.map((intent) => (
 											<option key={intent.value} value={intent.value}>
@@ -472,7 +472,7 @@ export function AnswerAssistantPage({
 									</select>
 								</label>
 
-								<label className="block space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Проект
 									</span>
@@ -481,7 +481,7 @@ export function AnswerAssistantPage({
 										onChange={(event) =>
 											updateSettings({ product: event.target.value })
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										placeholder="SupportOS"
 									/>
 								</label>
@@ -519,7 +519,7 @@ export function AnswerAssistantPage({
 										type="button"
 										onClick={() => void checkAI()}
 										disabled={aiChecking}
-										className="ui-button ui-button--secondary mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
+										className="ui-button ui-button--secondary mt-3 inline-flex w-full items-center justify-center gap-2 border border-border hover:bg-surface-elevated disabled:opacity-60"
 									>
 										{aiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
@@ -545,13 +545,13 @@ export function AnswerAssistantPage({
 										value={glossarySource}
 										onChange={(event) => setGlossarySource(event.target.value)}
 										placeholder="Термин"
-										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 									<input
 										value={glossaryTarget}
 										onChange={(event) => setGlossaryTarget(event.target.value)}
 										placeholder="Как писать в ответе"
-										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 								</div>
 								<button

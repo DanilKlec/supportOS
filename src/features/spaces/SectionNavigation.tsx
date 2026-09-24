@@ -38,7 +38,7 @@ export function SectionNavigation({
 				{secondary.length > 0 && (
 					<select
 						aria-label={`Ещё: ${label}`}
-						className="section-select"
+						className="ui-input section-select"
 						value={
 							secondary.some((item) => key(item) === selected) ? selected : ""
 						}
@@ -56,7 +56,7 @@ export function SectionNavigation({
 				)}
 			</div>
 			<select
-				className="section-select section-navigation-mobile"
+				className="ui-input section-select section-navigation-mobile"
 				aria-label={`Страница: ${label}`}
 				value={selected}
 				onChange={(event) => go(event.target.value)}

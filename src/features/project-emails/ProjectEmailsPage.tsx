@@ -313,7 +313,7 @@ export function ProjectEmailsPage({
 			<label className="flex flex-wrap items-center gap-2 px-3 pt-3 text-sm">
 				Проект
 				<select
-					className="min-h-10 rounded-lg border border-border bg-background px-3"
+					className="ui-input border border-border bg-background"
 					value={projectFilter}
 					onChange={(e) => {
 						setProjectFilter(e.target.value);
@@ -355,7 +355,7 @@ export function ProjectEmailsPage({
 							style={!management ? { display: "none" } : undefined}
 							disabled={!canEdit}
 							onClick={openCreate}
-							className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+							className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 						>
 							<Plus size={16} />
 							Add project
@@ -369,7 +369,7 @@ export function ProjectEmailsPage({
 									current === "import" ? "closed" : "import",
 								)
 							}
-							className="ui-button ui-button--secondary inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex items-center justify-center gap-2 border border-border bg-surface font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
 							Импорт
@@ -388,7 +388,7 @@ export function ProjectEmailsPage({
 								<input
 									value={query}
 									onChange={(event) => setQuery(event.target.value)}
-									className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="ui-input w-full border border-border bg-background pl-10 pr-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Поиск проекта или почты…"
 								/>
 							</div>
@@ -505,7 +505,7 @@ export function ProjectEmailsPage({
 													"Почты проекта скопированы",
 												)
 											}
-											className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+											className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 										>
 											<Copy size={16} />
 											Копировать всё
@@ -515,7 +515,7 @@ export function ProjectEmailsPage({
 											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => editRecord(selectedRecord)}
-											className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+											className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 											aria-label="Редактировать почты проекта"
 										>
 											<Pencil size={16} />
@@ -525,7 +525,7 @@ export function ProjectEmailsPage({
 											style={!management ? { display: "none" } : undefined}
 											disabled={!canEdit}
 											onClick={() => setDeleteId(selectedRecord.id)}
-											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
+											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
 											aria-label="Удалить почты проекта"
 										>
 											<Trash2 size={16} />
@@ -616,7 +616,7 @@ function ProjectEmailEditor({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					aria-label="Закрыть редактор"
 				>
 					<X size={16} />
@@ -624,14 +624,14 @@ function ProjectEmailEditor({
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2">
-				<label className="block space-y-1.5 md:col-span-2">
+				<label className="ui-field md:col-span-2">
 					<span className="text-sm font-medium">Project</span>
 					<input
 						value={draft.projectName}
 						onChange={(event) =>
 							onChange({ ...draft, projectName: event.target.value })
 						}
-						className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+						className="ui-input w-full border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						placeholder="Название проекта"
 					/>
 				</label>
@@ -663,13 +663,13 @@ function ProjectEmailEditor({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="ui-button ui-button--secondary inline-flex h-10 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary inline-flex items-center justify-center border border-border font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					Отмена
 				</button>
 				<button
 					type="submit"
-					className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+					className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 				>
 					<Plus size={16} />
 					{editing ? "Save" : "Add"}
@@ -717,7 +717,7 @@ function ProjectEmailImportPanel({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					aria-label="Закрыть импорт"
 				>
 					<X size={16} />
@@ -728,7 +728,7 @@ function ProjectEmailImportPanel({
 				<input
 					value={sheetUrl}
 					onChange={(event) => onSheetUrlChange(event.target.value)}
-					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+					className="ui-input border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 					placeholder="Ссылка на доступную Google-таблицу"
 				/>
 
@@ -737,7 +737,7 @@ function ProjectEmailImportPanel({
 					onChange={(event) =>
 						onModeChange(event.target.value as ProjectEmailImportMode)
 					}
-					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+					className="ui-input border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 				>
 					<option value="upsert">Upsert</option>
 					<option value="replace">Replace all emails</option>
@@ -747,7 +747,7 @@ function ProjectEmailImportPanel({
 					type="button"
 					onClick={onLoadPreview}
 					disabled={importing || !sheetUrl.trim()}
-					className="ui-button ui-button--primary inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+					className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					{importing ? (
 						<Loader2 size={16} className="animate-spin" />
@@ -775,7 +775,7 @@ function ProjectEmailImportPanel({
 								preview.records.length === 0 ||
 								preview.errors.length > 0
 							}
-							className="ui-button ui-button--primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{committing && <Loader2 size={15} className="animate-spin" />}
 							Commit import
@@ -813,13 +813,13 @@ function EmailInput({
 	onChange: (value: string) => void;
 }) {
 	return (
-		<label className="block space-y-1.5">
+		<label className="ui-field ">
 			<span className="text-sm font-medium">{label}</span>
 			<input
 				type="email"
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
-				className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+				className="ui-input w-full border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 				placeholder={`${label.toLowerCase()}@project.com`}
 			/>
 		</label>
@@ -848,7 +848,7 @@ function EmailRow({
 				type="button"
 				onClick={() => onCopy(email)}
 				disabled={!email}
-				className="ui-button ui-button--secondary ui-button--icon inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 				aria-label={`Copy ${label}`}
 			>
 				<Copy size={15} />
@@ -918,14 +918,14 @@ function DeleteConfirmDialog({
 					<button
 						type="button"
 						onClick={onCancel}
-						className="ui-button ui-button--secondary inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex items-center border border-border font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
 						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="ui-button ui-button--danger inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+						className="ui-button ui-button--danger inline-flex items-center bg-red-500 font-semibold text-white transition hover:bg-red-600"
 					>
 						Удалить
 					</button>

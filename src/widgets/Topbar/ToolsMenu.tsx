@@ -425,7 +425,7 @@ export function ToolsMenu() {
 					setOpen(true);
 					setThemeMode(getAppearanceSettings().themeMode);
 				}}
-				className="ui-button ui-button--secondary inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-surface-elevated/50 px-3 text-sm font-medium text-foreground transition hover:bg-surface-elevated"
+				className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface-elevated/50 font-medium text-foreground transition hover:bg-surface-elevated"
 			>
 				<PanelRight size={18} />
 				<span className="hidden sm:inline">Меню</span>
@@ -458,7 +458,7 @@ export function ToolsMenu() {
 								<span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface-elevated">
 									<LayoutGrid size={20} />
 								</span>
-								<div className="flex-1">
+								<div className="min-w-0 flex-1">
 									<p className="text-[10px] uppercase tracking-[.2em] text-muted">
 										SupportOS
 									</p>
@@ -473,7 +473,7 @@ export function ToolsMenu() {
 									type="button"
 									aria-label="Закрыть меню"
 									onClick={closeMenu}
-									className="flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-elevated hover:text-foreground"
+									className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
 									<X size={20} />
 								</button>
@@ -481,7 +481,7 @@ export function ToolsMenu() {
 							<div className="relative mx-6 mb-4">
 								<Search
 									size={17}
-									className="pointer-events-none absolute left-3 top-3 text-muted"
+									className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 shrink-0 text-muted"
 								/>
 								<input
 									ref={searchRef}
@@ -489,7 +489,7 @@ export function ToolsMenu() {
 									value={query}
 									onChange={(event) => setQuery(event.target.value)}
 									placeholder="Найти раздел или инструмент…"
-									className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-accent"
+									className="ui-input w-full border border-border bg-background pl-10 pr-3 outline-none focus:border-accent"
 								/>
 							</div>
 							<nav

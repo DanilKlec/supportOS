@@ -45,12 +45,12 @@ export function ShareRecipientPicker({
 	const users = accounts.data?.users.filter((account) => account.id !== user);
 	return (
 		<div className="w-full space-y-2">
-			<label className="block text-sm">
+			<label className="ui-field text-sm">
 				Поиск по имени или email
 				<input
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
-					className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2"
+					className="ui-input mt-2 w-full border border-border bg-background"
 				/>
 			</label>
 			{accounts.isFetching && (

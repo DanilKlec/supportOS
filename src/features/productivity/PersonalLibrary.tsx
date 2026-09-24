@@ -222,13 +222,13 @@ export function PersonalLibrary() {
 					{remoteBinds.some((b) => b.id === preview.id) && (
 						<BindFeedback bindId={preview.sourceBindId ?? preview.id} />
 					)}
-					<label className="block text-sm">
+					<label className="ui-field text-sm">
 						Личная заметка · только в этом браузере
 						<textarea
 							maxLength={4000}
 							value={note}
 							onChange={(e) => setNote(e.target.value)}
-							className="mt-2 w-full rounded-lg border border-border bg-background p-3"
+							className="ui-input mt-2 w-full border border-border bg-background"
 						/>
 					</label>
 					<button
@@ -250,12 +250,12 @@ export function PersonalLibrary() {
 					>
 						Сохранить заметку
 					</button>
-					<label className="mt-4 block text-sm">
+					<label className="ui-field mt-4  text-sm">
 						Открыть рядом
 						<select
 							value={compareId ?? ""}
 							onChange={(e) => setCompareId(e.target.value || undefined)}
-							className="ml-2 max-w-full rounded-lg border border-border bg-background p-2"
+							className="ui-input ml-2 max-w-full border border-border bg-background"
 						>
 							<option value="">Не выбрано</option>
 							{values

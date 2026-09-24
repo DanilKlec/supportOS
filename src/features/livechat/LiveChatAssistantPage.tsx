@@ -269,7 +269,7 @@ export function LiveChatAssistantPage() {
 						if (event.key === "Escape") setQuery("");
 					}}
 					placeholder="Search by topic, phrase or tag…"
-					className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-sm outline-none focus:border-accent"
+					className="ui-input w-full border border-border bg-surface pl-9 pr-9 outline-none focus:border-accent"
 				/>
 				{query ? (
 					<button
@@ -358,7 +358,7 @@ export function LiveChatAssistantPage() {
 								if (translation) selectTranslation(translation);
 							}}
 							disabled={!selectedBind}
-							className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none"
+							className="ui-input border border-border bg-background outline-none"
 						>
 							{availableLanguages.map((code) => (
 								<option key={code} value={code}>
@@ -377,7 +377,7 @@ export function LiveChatAssistantPage() {
 						setInserted(false);
 					}}
 					placeholder="Select a bind to preview its reply."
-					className="min-h-44 w-full resize-y rounded-lg border border-border bg-background p-3 text-sm leading-5 outline-none focus:border-accent"
+					className="ui-input min-h-44 w-full resize-y border border-border bg-background outline-none focus:border-accent"
 				/>
 
 				{templateVariables.length > 0 ? (
@@ -387,7 +387,7 @@ export function LiveChatAssistantPage() {
 						</div>
 						<div className="grid gap-2">
 							{templateVariables.map((variable) => (
-								<label key={variable} className="grid gap-1">
+								<label key={variable} className="ui-field grid gap-1">
 									<span className="text-[11px] text-muted">{variable}</span>
 									<input
 										value={variableValues[variable] ?? ""}
@@ -399,7 +399,7 @@ export function LiveChatAssistantPage() {
 											setInserted(false);
 										}}
 										placeholder={`Value for ${variable}`}
-										className="h-9 rounded-md border border-border bg-surface px-2.5 text-sm outline-none focus:border-accent"
+										className="ui-input border border-border bg-surface outline-none focus:border-accent"
 									/>
 								</label>
 							))}

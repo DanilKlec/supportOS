@@ -118,11 +118,11 @@ export function TelegramTwoFactor() {
 		),
 	);
 	return (
-		<div className="login-scene min-h-screen">
+		<div className="login-scene auth-surface min-h-screen">
 			<AmbientBackground />
 			<main className="relative z-10 m-auto w-full max-w-lg px-6 py-16">
 				<SupportOSLogo className="mb-8 h-12 w-12" />
-				<div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-8 shadow-2xl">
+				<div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-5 sm:p-8 shadow-2xl">
 					<ShieldCheck className="mb-6 h-10 w-10 text-blue-400" />
 					<h1 className="text-2xl font-semibold text-white">
 						{linking ? "Привяжите Telegram" : "Подтвердите вход в Telegram"}
@@ -154,7 +154,7 @@ export function TelegramTwoFactor() {
 							<>
 								{state.telegramUrl && (
 									<a
-										className="my-4 block rounded-xl bg-blue-600 p-3 text-center text-white"
+										className="auth-button my-4 w-full bg-blue-600 text-white"
 										href={state.telegramUrl}
 										target="_blank"
 										rel="noopener noreferrer"
@@ -164,7 +164,7 @@ export function TelegramTwoFactor() {
 								)}
 								<button
 									type="button"
-									className="w-full rounded-xl border border-white/20 p-3 text-white disabled:opacity-40"
+									className="auth-button w-full border border-white/20 text-white disabled:opacity-40"
 									disabled={busy}
 									onClick={() => void run("link")}
 								>
@@ -175,7 +175,7 @@ export function TelegramTwoFactor() {
 					) : (
 						<button
 							type="button"
-							className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 text-white disabled:opacity-40"
+							className="auth-button w-full bg-blue-600 text-white disabled:opacity-40"
 							disabled={
 								busy ||
 								state.status !== "pending" ||
@@ -189,7 +189,7 @@ export function TelegramTwoFactor() {
 					)}
 					<button
 						type="button"
-						className="mt-4 w-full p-3 text-zinc-400"
+						className="auth-button mt-4 w-full text-zinc-400"
 						disabled={busy}
 						onClick={() => void run("cancel")}
 					>

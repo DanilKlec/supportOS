@@ -59,7 +59,7 @@ export function TelegramRegistration({
 	return (
 		<div className="min-h-screen bg-background p-4 sm:p-8">
 			<section
-				className="approval-scene"
+				className="approval-scene auth-surface"
 				aria-labelledby="telegram-registration-title"
 			>
 				<AmbientBackground />
@@ -132,7 +132,7 @@ export function TelegramRegistration({
 						</li>
 					</ol>
 					{!initialPassword && (
-						<div className="mb-4 space-y-3 text-left">
+						<div className="mb-4 space-y-4 text-left">
 							<p className="text-xs text-muted">
 								После обновления страницы пароль нужно ввести снова — мы его не
 								сохраняем.
@@ -170,7 +170,7 @@ export function TelegramRegistration({
 					)}
 					<div className="grid gap-3">
 						<a
-							className="ui-button ui-button--primary flex items-center justify-center gap-2"
+							className="ui-button ui-button--primary auth-button"
 							href={challenge.telegramUrl}
 							target="_blank"
 							rel="noopener noreferrer"
@@ -180,7 +180,7 @@ export function TelegramRegistration({
 						</a>
 						<button
 							type="button"
-							className="ui-button"
+							className="ui-button auth-button"
 							disabled={busy}
 							onClick={() => void finish()}
 						>
