@@ -10,10 +10,10 @@ export function can(access, permission) {
 export function canTrain(access) { return ['ai.train','ai.rules','ai.playground','ai.tests','ai.publish'].some(permission=>can(access,permission)); }
 export function canAdmin(access) { return ['users.manage','roles.manage','technical'].some(permission=>can(access,permission)); }
 export const adminPermissions = {overview:'users.manage',users:'users.manage',roles:'roles.manage',audit:'users.manage',knowledge:'ai.train',rules:'ai.rules',projects:'ai.train',glossary:'ai.train',playground:'ai.playground',tests:'ai.tests',feedback:'ai.train',access:'users.manage','platform-projects':'technical',integrations:'technical',jobs:'technical','system-health':'technical',ai:'technical',models:'technical',learning:'technical',usage:'technical',logs:'technical',flags:'technical'};
-export const qcPermissions={overview:'knowledge.write',inbox:'knowledge.write',candidates:'knowledge.write',proposals:'knowledge.write',materials:'knowledge.write',gaps:'knowledge.write',conflicts:'knowledge.write',duplicates:'knowledge.write',glossary:'ai.train',quality:'knowledge.write',languages:'knowledge.write',reviews:'knowledge.write',trends:'knowledge.write',history:'knowledge.write',knowledge:'ai.train',rules:'ai.rules',instructions:'ai.train',playground:'ai.playground',tests:'ai.tests',feedback:'ai.train'};
+export const qcPermissions={binds:'knowledge.write',emails:'projects.read',bonuses:'bonuses.read',problems:'knowledge.write',outdated:'knowledge.write',overview:'knowledge.write',inbox:'knowledge.write',candidates:'knowledge.write',proposals:'knowledge.write',materials:'knowledge.write',gaps:'knowledge.write',conflicts:'knowledge.write',duplicates:'knowledge.write',glossary:'ai.train',quality:'knowledge.write',languages:'knowledge.write',reviews:'knowledge.write',trends:'knowledge.write',history:'knowledge.write',knowledge:'ai.train',rules:'ai.rules',instructions:'ai.train',playground:'ai.playground',tests:'ai.tests',feedback:'ai.train'};
 export function routePermission(path, hash='') {
  path=path.replace(/\/+$/,'')||'/';
- hash=hash.replace(/^#/,'');
+ hash=hash.replace(/^#/,'');if(path==='/qc')hash=hash.split('?')[0];
  if(path==='/qc')return qcPermissions[hash||'overview']??'knowledge.write';
  if(path==='/admin')return adminPermissions[hash] ?? (hash==='qc'?'knowledge.write':['integrations','system'].includes(hash)?'technical':'work');
  if(path==='/settings'&&hash.startsWith('integrations'))return 'technical';
@@ -38,8 +38,15 @@ export function routePermission(path, hash='') {
 }
 // UI and direct-link gates share the same effective-permission checks.
 export function canAccessPage(access, path, hash='') {
- path=path.replace(/\/+$/,'')||'/';hash=hash.replace(/^#/,'');
- if(path==='/qc')return (!hash?Object.values(qcPermissions).some(permission=>can(access,permission)):Object.hasOwn(qcPermissions,hash)&&can(access,qcPermissions[hash]));
+ path=path.replace(/\/+$/,'')||'/';hash=hash.replace(/^#/,'');if(path==='/qc')hash=hash.split('?')[0];
+ if(path==='/qc') {
+ const leaves=['overview','inbox','binds','knowledge','rules','instructions','glossary','playground','tests','feedback','history'];
+ if(!hash)return leaves.some(id=>can(access,qcPermissions[id]));
+ if(hash==='emails'||hash==='bonuses')return can(access,'knowledge.write')&&can(access,qcPermissions[hash]);
+ if(hash==='materials')return ['binds','knowledge','rules','instructions','glossary'].some(id=>can(access,qcPermissions[id]));
+ if(hash==='quality')return ['knowledge.write','ai.playground','ai.tests','ai.train'].some(p=>can(access,p));
+ return Object.hasOwn(qcPermissions,hash)&&can(access,qcPermissions[hash]);
+ }
  if(path==='/admin'&&!hash)return canAdmin(access);
  if(path==='/admin'&&hash&&!Object.hasOwn(adminPermissions,hash)&&!['qc','integrations','system'].includes(hash))return false;
  if(['/project-emails','/bonuses','/bonus-tools'].includes(path)&&['content','content-calculator'].includes(hash))return can(access,'knowledge.write')&&can(access,routePermission(path));

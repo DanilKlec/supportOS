@@ -113,7 +113,7 @@ export function RegressionPanel({
 						disabled={running}
 						onChange={(event) => setCompare(event.target.checked)}
 					/>{" "}
-					Сравнить Production и черновики
+					Сравнить опубликованную версию и черновики
 				</label>
 			)}
 			{compare && (
@@ -154,7 +154,7 @@ export function RegressionPanel({
 					onClick={() => void start()}
 				>
 					Запустить {cases.length} тестов
-					{compare ? " · сравнение" : " · Production"}
+					{compare ? " · сравнение" : "· опубликованная версия"}
 				</button>
 				{running && (
 					<button
@@ -204,7 +204,7 @@ export function RegressionPanel({
 						<p className="text-sm">
 							{result.production.evaluation.passed &&
 							!result.draft.evaluation.passed
-								? "Регрессия: черновик ухудшил результат"
+								? "Черновик ухудшил результат"
 								: !result.production.evaluation.passed &&
 										result.draft.evaluation.passed
 									? "Улучшение: черновик прошёл проверку"
@@ -218,8 +218,8 @@ export function RegressionPanel({
 								output && (
 									<div key={mode}>
 										<h5 className="text-sm font-medium">
-											{mode === "production" ? "Production" : "Черновики"} ·{" "}
-											{output.evaluation.passed ? "Passed" : "Failed"}
+											{mode === "production" ? "Опубликованная версия" : "Черновики"} ·{" "}
+											{output.evaluation.passed ? "Пройдено" : "Не пройдено"}
 										</h5>
 										<p className="whitespace-pre-wrap text-sm my-2">
 											{output.text || "Пустой ответ"}

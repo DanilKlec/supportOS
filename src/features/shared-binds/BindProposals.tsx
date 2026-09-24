@@ -123,7 +123,7 @@ export function BindProposals({
 											onClick={() => void resolve("accept", p.id)}
 											className="ui-button ui-button--primary bg-accent text-accent-foreground"
 										>
-											Опубликовать в основной
+											Принять изменение
 										</button>
 										<button
 											disabled={!!busy}

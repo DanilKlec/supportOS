@@ -1,3 +1,4 @@
+import { normalizeProjectEmail } from "../../shared/project-emails.js";
 import { authenticatedFetch } from "./authenticated-fetch";
 export interface Publication {
 	id: string;
@@ -25,5 +26,5 @@ export async function contentApi(
 	const result = await response.json();
 	if (!response.ok)
 		throw new Error(result.error ?? "Ошибка общего справочника");
-	return result;
+	return dataset === "emails" && result ? {...result, data: result.data.map(normalizeProjectEmail)} : result;
 }

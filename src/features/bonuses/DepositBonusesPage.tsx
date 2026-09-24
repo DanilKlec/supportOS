@@ -251,7 +251,7 @@ function formatDeposit(
 	rates?: CurrencyRates,
 ) {
 	if (!bonus.minDepositAmount || !bonus.minDepositCurrency) {
-		return "Min deposit: not specified";
+		return "Минимальный депозит не указан";
 	}
 
 	const original = currencyService.format(
@@ -264,10 +264,10 @@ function formatDeposit(
 		!converted ||
 		bonus.minDepositCurrency.toUpperCase() === selectedCurrency.toUpperCase()
 	) {
-		return `Min deposit: ${original}`;
+		return `Минимальный депозит: ${original}`;
 	}
 
-	return `Min deposit: ${original} (~${currencyService.format(
+	return `Минимальный депозит: ${original} (~${currencyService.format(
 		converted,
 		selectedCurrency,
 	)})`;
@@ -702,7 +702,7 @@ export function DepositBonusesPage({
 				upsertProjects(preview.projects);
 			}
 
-			showToast(`Imported and saved ${preview.projects.length} project sheets`);
+			showToast(`Добавлено в черновик ${preview.projects.length} project sheets`);
 			setPreview(undefined);
 			setSheetUrl("");
 			setImportOpen(false);
@@ -917,13 +917,13 @@ export function DepositBonusesPage({
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">
-							Fast bonus library
+							База бонусов
 						</div>
 						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
-							Deposit Bonuses
+							Welcome-бонусы
 						</h1>
 						<p className="mt-1 text-sm text-muted">
-							{projects.length} projects / {totalBonuses} bonuses ready to copy.
+							{projects.length} проектов / {totalBonuses} бонусов готовы к копированию.
 						</p>
 					</div>
 
@@ -968,7 +968,7 @@ export function DepositBonusesPage({
 							) : (
 								<RefreshCw size={16} />
 							)}
-							Rates
+							Курсы валют
 						</button>
 
 						<button
@@ -989,7 +989,7 @@ export function DepositBonusesPage({
 								className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 							>
 								<Copy size={16} />
-								Copy package
+								Скопировать пакет
 							</button>
 						)}
 					</div>
@@ -1003,18 +1003,17 @@ export function DepositBonusesPage({
 
 				{rates && (
 					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
-						Rates source: {rates.source}. Date: {rates.date}. Base: {rates.base}
+						Источник курсов: {rates.source}. Дата: {rates.date}. Базовая валюта: {rates.base}
 						.
 					</div>
 				)}
 
 				{activeCurrencyContext && (
 					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
-						Currency group:{" "}
-						{activeCurrencyContext.source === "manual" ? "Manual" : "Auto"} -{" "}
+						Группа валют:{" "}
+						{activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} -{" "}
 						{activeCurrencyContext.rule?.site ?? activeProject?.name} -{" "}
-						{activeCurrencyContext.table.name}. Text amounts in EUR are copied
-						as {selectedCurrency} when a matching row exists.
+						{activeCurrencyContext.table.name}. Суммы из текста в EUR копируются в {selectedCurrency} при наличии подходящей строки.
 					</div>
 				)}
 
@@ -1022,7 +1021,7 @@ export function DepositBonusesPage({
 					<div className="rounded-xl border border-border bg-surface p-4">
 						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
 							<FileSpreadsheet size={16} />
-							Google Sheets Import
+							Импорт из Google-таблицы
 						</div>
 
 						<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -1030,7 +1029,7 @@ export function DepositBonusesPage({
 								value={sheetUrl}
 								onChange={(event) => setSheetUrl(event.target.value)}
 								className="ui-input min-h-10 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-								placeholder="Paste one Google Spreadsheet URL. Each tab/sheet becomes one project. You can also paste several sheet URLs, one per line."
+								placeholder="Вставьте ссылку на Google-таблицу. Каждый лист станет проектом. Несколько ссылок указывайте по одной на строку."
 							/>
 
 							<select
@@ -1040,8 +1039,8 @@ export function DepositBonusesPage({
 								}
 								className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							>
-								<option value="upsert">Upsert</option>
-								<option value="replace">Replace all project sheets</option>
+								<option value="upsert">Добавить и обновить</option>
+								<option value="replace">Заменить все проекты</option>
 							</select>
 
 							<button
@@ -1055,7 +1054,7 @@ export function DepositBonusesPage({
 								) : (
 									<FileSpreadsheet size={16} />
 								)}
-								Preview
+								Предпросмотр
 							</button>
 						</div>
 
@@ -1067,7 +1066,7 @@ export function DepositBonusesPage({
 										<span className="font-semibold">
 											{preview.projects.length}
 										</span>{" "}
-										project sheets found
+										проектов найдено
 									</div>
 
 									<button
@@ -1083,7 +1082,7 @@ export function DepositBonusesPage({
 										{committing && (
 											<Loader2 size={15} className="animate-spin" />
 										)}
-										Commit Import
+										Применить импорт
 									</button>
 								</div>
 
@@ -1140,7 +1139,7 @@ export function DepositBonusesPage({
 							className="min-w-0 rounded-xl border border-border bg-surface p-3"
 						>
 							<fieldset disabled={!canEdit}>
-								<div className="mb-3 text-sm font-semibold">Project sheets</div>
+								<div className="mb-3 text-sm font-semibold">Проекты</div>
 								<div className="grid gap-2">
 									<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
 										<input
@@ -1156,7 +1155,7 @@ export function DepositBonusesPage({
 											className="ui-button ui-button--primary inline-flex w-full items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
 										>
 											<Plus size={16} />
-											Add
+											Добавить
 										</button>
 									</div>
 									<select
@@ -1167,7 +1166,7 @@ export function DepositBonusesPage({
 										className="ui-input w-full min-w-0 border border-border bg-background text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										aria-label="Группа валют нового проекта"
 									>
-										<option value="">Auto currency group</option>
+										<option value="">Автоматический выбор группы валют</option>
 										{currencyGroupOptions.map((group) => (
 											<option key={group.name} value={group.name}>
 												{formatCurrencyGroupLabel(group.name, group.currencies)}
@@ -1226,7 +1225,7 @@ export function DepositBonusesPage({
 													{project.name}
 												</span>
 												<span className="mt-0.5 block text-xs text-muted">
-													{visibleCount} bonuses
+													{visibleCount} бонусов
 													{currencyGroup
 														? ` - ${getCurrencyGroupShortName(currencyGroup)}`
 														: ""}
@@ -1240,7 +1239,7 @@ export function DepositBonusesPage({
 								})
 							) : (
 								<div className="px-2 py-6 text-sm text-muted">
-									No project sheets yet
+									Проектов пока нет
 								</div>
 							)}
 						</div>
@@ -1252,7 +1251,7 @@ export function DepositBonusesPage({
 								<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
 									<div className="min-w-0 flex-1">
 										<div className="mb-2 text-xs font-semibold uppercase text-muted">
-											Active sheet
+											Выбранный проект
 										</div>
 										<div className="ui-actions items-center flex max-w-xl gap-2">
 											<input
@@ -1297,7 +1296,7 @@ export function DepositBonusesPage({
 											</select>
 											<div className="text-xs text-muted">
 												{activeCurrencyContext
-													? `${activeCurrencyContext.source === "manual" ? "Manual" : "Auto"} uses ${activeCurrencyContext.table.name}.`
+													? `${activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} uses ${activeCurrencyContext.table.name}.`
 													: "Таблица валют не найдена. Выберите группу вручную или настройте общую базу."}
 											</div>
 										</div>
@@ -1368,7 +1367,7 @@ export function DepositBonusesPage({
 												)
 											}
 											className="ui-input min-h-28 w-full resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder={`Bonus content / ready bind text (${getLanguageLabel(
+											placeholder={`Текст бонуса / готовый ответ (${getLanguageLabel(
 												selectedLanguage,
 											)})`}
 										/>
@@ -1412,7 +1411,7 @@ export function DepositBonusesPage({
 										{visibleBonuses.length !== activeProject.bonuses.length
 											? ` of ${activeProject.bonuses.length}`
 											: ""}{" "}
-										bonuses
+										бонусов
 									</div>
 								</div>
 
@@ -1460,7 +1459,7 @@ export function DepositBonusesPage({
 																		onClick={() =>
 																			setSelectedLanguage(language)
 																		}
-																		title={`Switch to ${getLanguageLabel(language)}`}
+																		title={`Переключить на ${getLanguageLabel(language)}`}
 																		className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition ${
 																			selectedLanguage === language
 																				? "border-accent bg-accent/10 text-foreground"
@@ -1522,7 +1521,7 @@ export function DepositBonusesPage({
 						</div>
 					) : (
 						<div className="rounded-lg border border-border bg-surface px-4 py-12 text-center text-sm text-muted">
-							Add a project sheet to start collecting bonuses
+							Добавьте проект, чтобы начать заполнять бонусы
 						</div>
 					)}
 				</div>
@@ -1533,7 +1532,7 @@ export function DepositBonusesPage({
 				title="Удалить проект?"
 				description={
 					deleteProjectTarget
-						? `${deleteProjectTarget.name} and its bonuses will be removed.`
+						? `${deleteProjectTarget.name} и его бонусы будут удалены из черновика.`
 						: ""
 				}
 				onCancel={() => setDeleteProjectId(undefined)}
@@ -1545,7 +1544,7 @@ export function DepositBonusesPage({
 				title="Удалить бонус?"
 				description={
 					deleteBonusTarget
-						? `${deleteBonusTarget.name} will be removed from this project.`
+						? `${deleteBonusTarget.name} будет удалён из черновика проекта.`
 						: ""
 				}
 				onCancel={() => setDeleteBonusId(undefined)}

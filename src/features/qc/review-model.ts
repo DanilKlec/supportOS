@@ -7,6 +7,7 @@ export interface ReviewItem {
 	kind: "proposal" | "candidate" | "conflict" | "gap" | "outdated";
 	projectId?: string;
 	title: string;
+ searchText?: string;
 	risk?: "low" | "medium" | "high";
 	confidence?: number;
 	evidence: string[];
@@ -24,6 +25,7 @@ export function reviewItems(
 		kind: "proposal",
 		title: p.translations[0]?.title || "Предложение",
 		materialId: p.source_id,
+ searchText: p.translations.map(t=>t.content).join(" "),
 		evidence: [`Предложение оператора ${p.author}`],
 		createdAt: p.created_at,
 	}));
@@ -49,6 +51,7 @@ export function reviewItems(
 			kind: "outdated",
 			title: materials.find((b) => b.id === id)?.translations[0]?.title ?? id,
 			materialId: id,
+ searchText: materials.find(b=>b.id===id)?.translations.map(t=>t.content).join(" "),
 			evidence: [`${rows.length} отметок «Устарело» в доступной выборке`],
 			createdAt: dates.at(-1) ?? "",
 		});
@@ -69,10 +72,10 @@ export function reviewItems(
 }
 export function materialLifecycle(bind: Bind, outdatedIds: Set<string>) {
 	return bind.archived
-		? "Archived"
+		? "В архиве"
 		: outdatedIds.has(bind.id)
-			? "Needs review"
+			? "Требует проверки"
 			: bind.ownerId
-				? "Draft"
-				: "Published";
+				? "Черновик"
+				: "Опубликовано";
 }

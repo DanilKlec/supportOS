@@ -58,7 +58,7 @@ export function BindDiff({
 		added = after.tags.filter((t) => !before?.tags.includes(t));
 	return (
 		<div className="space-y-3">
-			<TextChange label="Slug" before={before?.slug} after={after.slug} />
+			<TextChange label="Код материала" before={before?.slug} after={after.slug} />
 			{languages.map((language) => {
 				const old = before?.translations.find((t) => t.language === language),
 					next = after.translations.find((t) => t.language === language);

@@ -1,3 +1,4 @@
+import { emailAddresses } from "../../../shared/project-emails.js";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -694,14 +695,10 @@ function normalizeProjectEmailSearch(value: string) {
 
 function buildProjectEmailOptions(records: ProjectEmailRecord[]) {
 	return records.flatMap((record) =>
-		[
-			{ type: "Support", value: record.supportEmail },
-			{ type: "KYC", value: record.kycEmail },
-			{ type: "VIP", value: record.vipEmail },
-		]
+		emailAddresses(record).map(row=>({...row,value:row.email}))
 			.filter((item) => item.value.trim())
 			.map((item) => ({
-				id: `${record.id}:${item.type}`,
+				id: `${record.id}:${item.id}`,
 				label: `${record.projectName} - ${item.type}`,
 				projectName: record.projectName,
 				type: item.type,

@@ -324,7 +324,7 @@ function findEndOfCentralDirectory(bytes: Uint8Array, view: DataView) {
 
 async function inflateRawBytes(compressed: Uint8Array) {
 	if (typeof DecompressionStream === "undefined") {
-		throw new Error("XLSX decompression is not supported in this browser");
+		throw new Error("Распаковка XLSX не поддерживается этим браузером");
 	}
 
 	const compressedBuffer = new Uint8Array(compressed).buffer;
@@ -343,7 +343,7 @@ async function unzipEntries(bytes: ArrayBuffer) {
 	const entries = new Map<string, string>();
 
 	if (endOfCentralDirectory < 0) {
-		throw new Error("Invalid XLSX archive");
+		throw new Error("Некорректный архив XLSX");
 	}
 
 	const entryCount = readUint16(view, endOfCentralDirectory + 10);
@@ -351,7 +351,7 @@ async function unzipEntries(bytes: ArrayBuffer) {
 
 	for (let index = 0; index < entryCount; index += 1) {
 		if (readUint32(view, centralDirectoryOffset) !== 0x02014b50) {
-			throw new Error("Invalid XLSX central directory");
+			throw new Error("Повреждён каталог XLSX");
 		}
 
 		const compressionMethod = readUint16(view, centralDirectoryOffset + 10);
@@ -367,7 +367,7 @@ async function unzipEntries(bytes: ArrayBuffer) {
 		const name = decoder.decode(nameBytes);
 
 		if (readUint32(view, localHeaderOffset) !== 0x04034b50) {
-			throw new Error("Invalid XLSX local header");
+			throw new Error("Повреждён заголовок XLSX");
 		}
 
 		const localNameLength = readUint16(view, localHeaderOffset + 26);
@@ -387,7 +387,7 @@ async function unzipEntries(bytes: ArrayBuffer) {
 
 		if (!uncompressed) {
 			throw new Error(
-				`Unsupported XLSX compression method ${compressionMethod}`,
+				`Неподдерживаемый метод сжатия XLSX ${compressionMethod}`,
 			);
 		}
 
@@ -582,7 +582,7 @@ async function parseXlsxWorkbook(bytes: ArrayBuffer): Promise<XlsxSheet[]> {
 	const relationshipsXml = entries.get("xl/_rels/workbook.xml.rels");
 
 	if (!workbookXml || !relationshipsXml) {
-		throw new Error("XLSX workbook metadata is missing");
+		throw new Error("В XLSX нет сведений о книге");
 	}
 
 	const relationships = parseWorkbookRelationships(relationshipsXml);
@@ -984,7 +984,7 @@ async function importXlsxWorkbook(
 			const bonuses = parseBonusesFromRows(sheet.rows);
 
 			if (bonuses.length === 0) {
-				warnings.push(`${sheet.title}: no bonuses found`);
+				warnings.push(`${sheet.title}: бонусы не найдены`);
 				continue;
 			}
 
@@ -1022,7 +1022,7 @@ class DepositBonusImportService {
 		const sourceUrls = splitSourceUrls(input);
 
 		if (sourceUrls.length === 0) {
-			throw new Error("Google Sheets URL is required");
+			throw new Error("Укажите ссылку на Google-таблицу");
 		}
 
 		const projects: BonusProject[] = [];
@@ -1048,7 +1048,7 @@ class DepositBonusImportService {
 				}
 
 				warnings.push(
-					"Sheet names could not be detected. Import used gid as project name.",
+					"Названия листов не определены. В качестве названия проекта использован ID листа.",
 				);
 			}
 
@@ -1060,14 +1060,14 @@ class DepositBonusImportService {
 
 				if (!response.ok) {
 					warnings.push(
-						`${tab.title}: unable to load sheet (${response.status})`,
+						`${tab.title}: не удалось загрузить лист (${response.status})`,
 					);
 					continue;
 				}
 
 				if (looksLikeGoogleSheetHtml(response.text)) {
 					warnings.push(
-						`${tab.title}: Google returned a web page instead of table data. Publish the sheet to the web or share it for anyone with the link.`,
+						`${tab.title}: Таблица недоступна. Опубликуйте её или откройте доступ по ссылке.`,
 					);
 					continue;
 				}
@@ -1076,7 +1076,7 @@ class DepositBonusImportService {
 				const bonuses = parseBonusesFromRows(rows);
 
 				if (bonuses.length === 0) {
-					warnings.push(`${tab.title}: no bonuses found`);
+					warnings.push(`${tab.title}: бонусы не найдены`);
 					continue;
 				}
 
@@ -1093,7 +1093,7 @@ class DepositBonusImportService {
 		}
 
 		if (projects.length === 0) {
-			errors.push("No importable bonus sheets found");
+			errors.push("Листы с бонусами для импорта не найдены");
 		}
 
 		return {

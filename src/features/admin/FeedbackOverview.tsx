@@ -71,8 +71,8 @@ export function FeedbackOverview({
 					onChange={(event) => setRating(event.target.value)}
 				>
 					<option value="all">Все оценки</option>
-					<option value="negative">Проблемы</option>
-					<option value="positive">Полезные ответы</option>
+					<option value="negative">Отрицательные</option>
+					<option value="positive">Положительные</option>
 				</select>
 			</div>
 			<div className="grid gap-3 sm:grid-cols-3">
@@ -114,11 +114,11 @@ export function FeedbackOverview({
 				.filter((item) => rating === "all" || item.rating === rating)
 				.map((item) => (
 					<article
-						key={`${item.createdAt}-${item.project}-${item.language}-${item.rating}-${item.reason}`}
+						key={`${new Date(item.createdAt).toLocaleString("ru")}-${item.project}-${item.language}-${item.rating}-${item.reason}`}
 						className="rounded-xl border border-border bg-surface p-4 space-y-3"
 					>
 						<p className="text-sm">
-							{item.rating === "positive" ? "Полезный ответ" : item.reason} ·{" "}
+							{item.rating === "positive" ? "Положительная оценка" : `Отрицательная оценка${item.reason ? `: ${item.reason}` : ""}`} ·{" "}
 							{name(item.project)} · {item.language}
 						</p>
 						<p className="text-xs text-muted">{item.createdAt}</p>

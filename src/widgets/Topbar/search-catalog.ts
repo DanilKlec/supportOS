@@ -1,3 +1,4 @@
+import { emailAddresses } from "../../../shared/project-emails.js";
 import type { Bind } from "@/entities/bind";
 import type { BonusProject } from "@/entities/bonus";
 import type { ProjectEmailRecord } from "@/entities/project-email";
@@ -25,15 +26,9 @@ export function catalogResults(
 	});
 	return [
 		...emails.flatMap((p) =>
-			[
-				["Support", p.supportEmail],
-				["KYC", p.kycEmail],
-				["VIP", p.vipEmail],
-			]
-				.filter(([, email]) => !!email)
-				.map(([label, email]) => ({
+			emailAddresses(p).map(({id,type:label,email}) => ({
 					...row(
-						"email:" + p.id + ":" + label,
+						"email:" + p.id + ":" + (p.emails ? id : label),
 						p.projectName + " · " + label,
 						email,
 					),

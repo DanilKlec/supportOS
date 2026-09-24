@@ -285,7 +285,7 @@ export function AIControlCenter({
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
-								aria-label="Проект Playground"
+								aria-label="Проект проверки"
 								className={`ui-input ${control}`}
 								value={project}
 								onChange={(e) => setProject(e.target.value)}
@@ -298,16 +298,16 @@ export function AIControlCenter({
 								))}
 							</select>
 							<input
-								aria-label="Язык Playground"
+								aria-label="Язык проверки"
 								className={`ui-input ${control}`}
-								value={language}
-								onChange={(e) => setLanguage(e.target.value)}
+								value={language === "auto" ? "Автоматически" : language}
+								onChange={(e) => setLanguage(e.target.value === "Автоматически" ? "auto" : e.target.value)}
 							/>
 							<input
-								aria-label="Intent Playground"
+								aria-label="Тема проверки"
 								className={`ui-input ${control}`}
-								value={intent}
-								onChange={(e) => setIntent(e.target.value)}
+								value={intent === "general" ? "Общая тема" : intent}
+								onChange={(e) => setIntent(e.target.value === "Общая тема" ? "general" : e.target.value)}
 							/>
 							<select
 								aria-label="Тон"
@@ -316,17 +316,17 @@ export function AIControlCenter({
 								onChange={(e) => setTone(e.target.value)}
 							>
 								{["neutral", "friendly", "formal", "concise"].map((t) => (
-									<option key={t}>{t}</option>
+									<option key={t} value={t}>{{neutral:"Нейтральный",friendly:"Дружелюбный",formal:"Официальный",concise:"Краткий"}[t]}</option>
 								))}
 							</select>
 							<select
-								aria-label="Режим Playground"
+								aria-label="Режим проверки"
 								className={`ui-input ${control}`}
 								value={preview ? "draft" : "production"}
 								onChange={(e) => setPreview(e.target.value === "draft")}
 							>
-								<option value="production">Production</option>
-								<option value="draft">Draft Preview</option>
+								<option value="production">Опубликованная версия</option>
+								<option value="draft">Проверка черновиков</option>
 							</select>
 						</div>
 						{preview && (
@@ -420,7 +420,7 @@ export function AIControlCenter({
 						)}
 						{debug && (
 							<details>
-								<summary>Метаданные и Policy Guard</summary>
+								<summary>Подробности проверки ответа</summary>
 								<pre className="overflow-auto whitespace-pre-wrap text-xs">
 									{JSON.stringify(debug, null, 2)}
 								</pre>
@@ -441,9 +441,7 @@ export function AIControlCenter({
 				<>
 					{section === "projects" && (
 						<p className="text-sm text-muted">
-							Инструкции без выбранного проекта действуют глобально. Инструкции
-							проекта дополняют их. Сохраните Draft и проверьте его в Playground
-							перед публикацией.
+							Инструкции без выбранного проекта действуют глобально. Инструкции проекта дополняют их. Сохраните черновик и проверьте его в проверке ответа перед публикацией.
 						</p>
 					)}
 					<div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -460,13 +458,13 @@ export function AIControlCenter({
 								className={`${control} w-full`}
 								onClick={() => setEntry(blank(section))}
 							>
-								{section === "tests" ? "Создать тест" : "Создать Draft"}
+								{section === "tests" ? "Создать тест" : "Создать черновик"}
 							</button>
 							{entries
 								.filter(
 									(e) =>
 										e.kind === section &&
-										`${e.title} ${e.content}`
+										`${e.title} ${e.content} ${projects.find(p=>p.id===e.project)?.name||e.project}`
 											.toLowerCase()
 											.includes(search.toLowerCase()),
 								)
@@ -480,7 +478,7 @@ export function AIControlCenter({
 									>
 										{e.title}
 										<small className="block text-muted">
-											{e.status}
+											{{draft:'Черновик',published:'Опубликовано',archived:'В архиве'}[e.status]||'Сохранено'}
 											{e.status === "draft" && e.published
 												? " · предыдущая версия опубликована"
 												: ""}
@@ -537,7 +535,7 @@ export function AIControlCenter({
 								{(
 									[
 										["language", "Язык"],
-										["intent", "Intent"],
+										["intent", "Тема"],
 										["category", "Категория / контекст"],
 									] as const
 								).map(([key, label]) => (
@@ -545,8 +543,8 @@ export function AIControlCenter({
 										{label}
 										<input
 											className={`ui-input ${`${control} block w-full`}`}
-											value={entry[key]}
-											onChange={(e) => patch(key, e.target.value)}
+											value={key === "intent" && entry[key] === "general" ? "Общая тема" : entry[key]}
+											onChange={(e) => patch(key, key === "intent" && e.target.value === "Общая тема" ? "general" : e.target.value)}
 										/>
 									</label>
 								))}
@@ -634,7 +632,7 @@ export function AIControlCenter({
 								>
 									{entry.kind === "tests"
 										? "Сохранить тест"
-										: "Сохранить Draft"}
+										: "Сохранить черновик"}
 								</button>
 								{entry.id && (
 									<>
@@ -651,8 +649,8 @@ export function AIControlCenter({
 											}}
 										>
 											{can(user?.access, "ai.playground")
-												? "Playground"
-												: "Нет доступа к Playground"}
+												? "Проверить черновик"
+												: "Нет доступа к проверке ответа"}
 										</button>
 										{entry.kind !== "tests" &&
 											can(user?.access, "ai.publish") && (
@@ -664,18 +662,18 @@ export function AIControlCenter({
 															!reviewed.includes(entry.id) ||
 															reviewedVersion !== query.data?.version
 														}
-														title="Сначала проверьте сохранённый Draft в Playground"
+														title="Сначала проверьте сохранённый черновик в проверке ответа"
 														className={`${control} ui-button`}
 														onClick={() => {
 															if (
 																window.confirm(
-																	"Опубликовать сохранённый Draft для Support? Несохранённые изменения не публикуются.",
+																	"Опубликовать сохранённый черновик для саппорта? Несохранённые изменения не публикуются.",
 																)
 															)
 																void save("publish");
 														}}
 													>
-														Publish
+														Опубликовать
 													</button>
 													<button
 														type="button"
@@ -694,7 +692,7 @@ export function AIControlCenter({
 												className={`${control} ui-button`}
 												onClick={() => void save("delete")}
 											>
-												Удалить Draft
+												Удалить черновик
 											</button>
 										)}
 									</>

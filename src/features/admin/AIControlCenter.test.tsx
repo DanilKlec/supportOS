@@ -117,10 +117,10 @@ it("previews a saved draft before enabling explicit publication", async () => {
 		await screen.findByRole("button", { name: /Finance policy/ }),
 	);
 	expect(
-		(screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement)
+		(screen.getByRole("button", { name: "Опубликовать" }) as HTMLButtonElement)
 			.disabled,
 	).toBe(true);
-	fireEvent.click(screen.getByRole("button", { name: "Playground" }));
+	fireEvent.click(screen.getByRole("button", { name: "Проверить черновик" }));
 	fireEvent.change(screen.getByLabelText("Сообщение"), {
 		target: { value: "Help with withdrawal" },
 	});
@@ -134,7 +134,7 @@ it("previews a saved draft before enabling explicit publication", async () => {
 		draftIds: ["k"],
 	});
 	fireEvent.click(screen.getByRole("button", { name: /Вернуться/ }));
-	fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+	fireEvent.click(screen.getByRole("button", { name: "Опубликовать" }));
 	await waitFor(() =>
 		expect(
 			mock.fetch.mock.calls.some(

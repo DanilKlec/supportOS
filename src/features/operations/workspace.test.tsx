@@ -6,6 +6,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 
+vi.mock("@/shared/hooks/useViewState",()=>({useViewState:(_scope:string,_field:string,value:unknown)=>[value,()=>{}]}));
 const state = vi.hoisted(() => ({ hash: "overview", area: "admin" }));
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@tanstack/react-router")>()),

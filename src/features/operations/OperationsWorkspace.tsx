@@ -34,15 +34,15 @@ export function OperationsWorkspace({
 		<div className="ops-workspace">
 			<aside className="ops-sidebar">
 				<Link to="/" className="ops-back">
-					← Workspace
+					← Рабочее пространство
 				</Link>
 				<div className="ops-workspace-title">
-					<p>{area === "admin" ? "Platform workspace" : "Review workspace"}</p>
-					<h1>{area === "admin" ? "Administration" : "Quality Control"}</h1>
+					<p>{area === "admin" ? "Platform workspace" : "Контроль качества"}</p>
+					<h1>{area === "admin" ? "Administration" : "QC"}</h1>
 				</div>
 				<nav
 					aria-label={
-						area === "admin" ? "Администрирование" : "Quality Control"
+						area === "admin" ? "Администрирование" : "QC"
 					}
 				>
 					{[...new Set(navigation.map((s) => s.group))].map((group) => (
@@ -71,7 +71,7 @@ export function OperationsWorkspace({
 					<strong>
 						{area === "admin"
 							? "System & access control"
-							: "Knowledge & AI quality"}
+							: "Материалы и ответы AI"}
 					</strong>
 					<p>Доступ по правам вашей учётной записи</p>
 				</div>
@@ -165,7 +165,7 @@ export function QueryState({
 }) {
 	return query.error ? (
 		<p role="alert" className="ops-empty">
-			{query.error.message}{" "}
+			{/[а-яё]/i.test(query.error.message)?query.error.message:'Не удалось загрузить данные. Повторите попытку.'}{" "}
 			<button
 				className="ui-button"
 				type="button"

@@ -50,7 +50,6 @@ export function getKnowledgeHealthReport({
 	const folderIds = new Set(folders.map((folder) => folder.id));
 	const activeBinds = binds.filter((bind) => !bind.archived);
 	const archivedBinds = binds.filter((bind) => bind.archived);
-	const contentGroups = new Map<string, Bind[]>();
 	const issues: KnowledgeHealthIssue[] = [];
 	for (const bind of activeBinds) {
 		if (Date.parse(bind.updatedAt) < Date.now() - 90 * 86400000) {
@@ -64,15 +63,7 @@ export function getKnowledgeHealthReport({
 		}
 	}
 
-	for (const bind of activeBinds) {
-		const key = getContentKey(bind);
-
-		if (key.length > 16) {
-			contentGroups.set(key, [...(contentGroups.get(key) ?? []), bind]);
-		}
-	}
-
-	for (const group of contentGroups.values()) {
+	for (const group of getDuplicateGroups(binds)) {
 		if (group.length < 2) continue;
 
 		for (const bind of group) {
@@ -198,4 +189,13 @@ export function getKnowledgeHealthReport({
 			).length,
 		},
 	};
+}
+
+export function getDuplicateGroups(binds: Bind[]): Bind[][] {
+ const groups=new Map<string,Bind[]>();
+ for(const bind of binds.filter(b=>!b.archived)){
+  const key=getContentKey(bind);
+  if(key.length>16)groups.set(key,[...(groups.get(key)??[]),bind]);
+ }
+ return [...groups.values()].filter(group=>group.length>1);
 }
