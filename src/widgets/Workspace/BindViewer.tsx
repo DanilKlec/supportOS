@@ -16,6 +16,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ActionMenuPortal } from "@/components/ActionMenuPortal";
+import { Button, IconButton, Select } from "@/components/ui";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
@@ -102,7 +103,7 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 	}
 
 	if (bind.tags.length === 0) {
-		issues.push("No tags");
+		issues.push("Нет тегов");
 	}
 
 	if (
@@ -459,7 +460,7 @@ export function BindViewer() {
 		if (copyWarnings.length > 0) {
 			showToast(`Copy check: ${copyWarnings[0]?.title}`);
 		}
-		showToast(ok ? "Copied to clipboard" : "Copy failed");
+		showToast(ok ? "Скопировано в буфер" : "Не удалось скопировать");
 	};
 
 	const copyContent = () => copyTranslation(translation);
@@ -470,7 +471,7 @@ export function BindViewer() {
 		const ok = await copyToClipboard(title);
 
 		addRecent(bind.id);
-		showToast(ok ? "Title copied" : "Copy failed");
+		showToast(ok ? "Заголовок скопирован" : "Не удалось скопировать");
 	};
 
 	const toggleFavorite = () => {
@@ -683,7 +684,7 @@ export function BindViewer() {
 	if (!bind || !translation) {
 		return (
 			<div className="flex flex-1 items-center justify-center text-muted">
-				No material selected
+				Материал не выбран
 			</div>
 		);
 	}
@@ -770,12 +771,12 @@ export function BindViewer() {
 								</div>
 
 								<div className="relative sm:hidden">
-									<select
+									<Select
 										value={language}
 										onChange={(event) =>
 											setLanguage(event.target.value as LanguageCode)
 										}
-										aria-label="Language"
+												aria-label="Язык"
 										className="ui-input appearance-none border border-border bg-surface pl-3 pr-9 font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									>
 										{languageCodes.map((code) => {
@@ -790,33 +791,34 @@ export function BindViewer() {
 												</option>
 											);
 										})}
-									</select>
+									</Select>
 									<ChevronDown
 										size={16}
 										className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
 									/>
 								</div>
 
-								<button
+								<Button
 									type="button"
 									onClick={() => void copyContent()}
-									className="ui-button ui-button--primary hidden items-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:inline-flex"
+									variant="primary"
+									className="hidden font-semibold transition hover:bg-accent/90 sm:inline-flex"
 								>
 									{copied ? <Check size={17} /> : <Copy size={17} />}
-									{copied ? "Copied" : "Copy"}
-								</button>
+											{copied ? "Скопировано" : "Копировать"}
+								</Button>
 
 								<div ref={actionsRef} className="relative shrink-0">
-									<button
+									<IconButton
 										type="button"
-										aria-label="Действия бинда"
+										label="Действия бинда"
 										aria-haspopup="menu"
 										aria-expanded={actionsOpen}
 										onClick={() => setActionsOpen((value) => !value)}
-										className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+										className="border-border bg-surface text-muted transition hover:bg-surface-elevated hover:text-foreground"
 									>
 										<MoreHorizontal size={19} />
-									</button>
+									</IconButton>
 
 									{actionsOpen && (
 										<ActionMenuPortal anchor={actionsRef}>
@@ -915,7 +917,7 @@ export function BindViewer() {
 									className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 								>
 									<Copy size={15} />
-									Copy MAP
+									Копировать MAP
 								</button>
 							</div>
 
@@ -948,12 +950,12 @@ export function BindViewer() {
 												</option>
 											))
 										) : (
-											<option value="">No tables loaded</option>
+											<option value="">Таблицы не загружены</option>
 										)}
 									</select>
 									{mapCurrencyTables.length === 0 && (
 										<div className="mt-1 text-xs text-muted">
-											Load Bonus Tools for exact currency values.
+											Загрузите Bonus Tools для точных значений валюты.
 										</div>
 									)}
 								</label>
@@ -1014,7 +1016,7 @@ export function BindViewer() {
 							</div>
 						) : (
 							<div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
-								No content in this translation
+												В этом переводе нет содержимого
 							</div>
 						)}
 						<div className="bind-answer-meta">
@@ -1071,7 +1073,7 @@ export function BindViewer() {
 												</span>
 											))
 										) : (
-											<span className="text-muted">No obvious issues</span>
+													<span className="text-muted">Явных проблем нет</span>
 										)}
 									</div>
 								</div>
@@ -1139,7 +1141,7 @@ export function BindViewer() {
 					className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 				>
 					{copied ? <Check size={18} /> : <Copy size={18} />}
-					{copied ? "Copied" : "Copy answer"}
+					{copied ? "Скопировано" : "Копировать ответ"}
 				</button>
 			</div>
 		</div>

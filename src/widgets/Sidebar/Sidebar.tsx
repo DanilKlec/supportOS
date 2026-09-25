@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { Button, IconButton, Input } from "@/components/ui";
 import {
 	Archive,
 	Check,
@@ -228,7 +229,7 @@ export function Sidebar({
 
 		setBulkTag("");
 		setBulkTagOpen(false);
-		showToast(`${changed.length} bind(s) tagged`);
+		showToast(`Теги добавлены: ${changed.length}`);
 	};
 	const exportSelected = () => {
 		if (selectedBinds.length === 0) return;
@@ -335,16 +336,15 @@ export function Sidebar({
 					</div>
 				</div>
 
-				<button
-					type="button"
-					aria-label={mobile ? "Закрыть папки" : "Свернуть папки"}
+				<IconButton
+					label={mobile ? "Закрыть папки" : "Свернуть папки"}
 					onClick={() =>
 						mobile ? onRequestClose?.() : setLayout({ showSidebar: false })
 					}
-					className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					className="text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					{mobile ? <X size={18} /> : <PanelLeftClose size={18} />}
-				</button>
+				</IconButton>
 			</div>
 
 			{layout.showSidebarFavorites &&
@@ -389,15 +389,14 @@ export function Sidebar({
 							Категории
 						</div>
 
-						<button
-							type="button"
-							title="Добавить категорию"
-							aria-label="Добавить категорию"
+				<IconButton
+					label="Добавить категорию"
 							onClick={createCategory}
-							className="ui-button ui-button--ghost ui-button--icon ui-button--small inline-flex items-center justify-center text-muted hover:bg-surface-elevated hover:text-foreground"
+					size="small"
+					className="text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
-						</button>
+				</IconButton>
 					</div>
 
 					<div className="relative">
@@ -405,17 +404,17 @@ export function Sidebar({
 							size={14}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 						/>
-						<input
+						<Input
 							type="search"
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Поиск в папках…"
-							className="ui-input w-full border border-border bg-surface pl-9 pr-8 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+							className="w-full bg-surface pl-9 pr-8 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
 							<button
 								type="button"
-								title="Clear search"
+								aria-label="Очистить поиск"
 								onClick={() => {
 									setTreeSearch("");
 									setSelectedTag("");
@@ -538,7 +537,7 @@ export function Sidebar({
 
 							{bulkTagOpen && (
 								<div className="ui-actions items-center mt-2 flex gap-1">
-									<input
+									<Input
 										value={bulkTag}
 										onChange={(event) => setBulkTag(event.target.value)}
 										onKeyDown={(event) => {
@@ -546,17 +545,18 @@ export function Sidebar({
 												addTagToSelected();
 											}
 										}}
-										placeholder="Tag"
-										className="ui-input ui-input--small min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent"
+										placeholder="Тег"
+										className="ui-input--small min-w-0 flex-1 bg-background outline-none focus:border-accent"
 									/>
-									<button
+									<IconButton
 										type="button"
 										onClick={addTagToSelected}
-										className="ui-button ui-button--primary ui-button--icon ui-button--small"
-										title="Apply tag"
+										variant="primary"
+										size="small"
+										label="Применить тег"
 									>
 										<Check size={14} />
-									</button>
+									</IconButton>
 								</div>
 							)}
 						</div>

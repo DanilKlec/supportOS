@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
+import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
@@ -165,7 +166,7 @@ function SearchResults({
 	}
 
 	return (
-		<div role="listbox" aria-label="Search results" className="py-1">
+		<div role="listbox" aria-label="Результаты поиска" className="py-1">
 			{results.map((bind, index) => {
 				const category = categories.find((item) => item.id === bind.categoryId);
 				const folderPath = getFolderPath(bind.folderId, folders);
@@ -523,7 +524,7 @@ export function Topbar({
 							}
 						</p>
 						<div className="ui-actions items-center mt-4 flex gap-2">
-							<button
+							<Button
 								type="button"
 								onClick={() =>
 									void copyToClipboard(
@@ -536,11 +537,11 @@ export function Topbar({
 										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
 									)
 								}
-								className="ui-button ui-button--primary bg-accent text-accent-foreground"
+								variant="primary"
 							>
 								Копировать
-							</button>
-							<button
+							</Button>
+							<Button
 								type="button"
 								onClick={() => {
 									if (!preview.resultKind) openBind(preview.id);
@@ -560,24 +561,23 @@ export function Topbar({
 									});
 									setPreview(null);
 								}}
-								className="ui-button ui-button--secondary border border-border"
+								variant="secondary"
 							>
 								Открыть раздел
-							</button>
+							</Button>
 						</div>
 					</BaseModal>
 				)}
 
 			<header className="product-topbar relative flex items-center border-b border-border bg-surface/95 text-foreground backdrop-blur">
-				<button
-					type="button"
-					aria-label={layout.showSidebar ? "Свернуть папки" : "Open navigation"}
+				<IconButton
+					label={layout.showSidebar ? "Свернуть папки" : "Открыть навигацию"}
 					onClick={toggleSidebar}
 					style={!showKnowledgeControls ? { display: "none" } : undefined}
-					className="ui-button ui-button--ghost ui-button--icon flex   shrink-0 items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					className="shrink-0 text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					<Menu size={19} />
-				</button>
+				</IconButton>
 
 				<div className="flex min-w-0 shrink-0 items-center gap-2">
 					<SupportOSLogo className="h-8 w-8" />
@@ -629,7 +629,7 @@ export function Topbar({
 							size={17}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 						/>
-						<input
+						<Input
 							ref={searchInputRef}
 							value={searchValue}
 							onChange={(event) => {
@@ -641,7 +641,7 @@ export function Topbar({
 							onBlur={() => {
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
-							className="ui-input w-full border border-border bg-background pl-10 pr-20 outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
+							className="w-full pl-10 pr-20 outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
 							placeholder="Бинды, почты, бонусы…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
@@ -670,42 +670,41 @@ export function Topbar({
 				</div>
 
 				<div className="ml-auto flex shrink-0 items-center gap-2">
-					<button
-						type="button"
-						aria-label="Поиск"
+					<IconButton
+						label="Поиск"
 						onClick={() => {
 							setMobileSearchOpen(true);
 							window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
 						}}
-						className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
+						className="text-muted transition hover:bg-surface-elevated hover:text-foreground md:hidden"
 					>
 						<Search size={19} />
-					</button>
+					</IconButton>
 
 					{authConfigured &&
 						(authSession ? (
-							<button
+							<Button
 								type="button"
 								title={`Выйти: ${authSession.user.email}`}
 								aria-label="Выйти из аккаунта"
 								onClick={signOut}
-								className="ui-button ui-button--ghost inline-flex items-center gap-2 text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								variant="ghost"
 							>
 								<span className="hidden max-w-28 truncate lg:block">
 									{authSession.user.access?.display_name ||
 										authSession.user.email?.split("@")[0]}
 								</span>
 								<LogOut size={16} />
-							</button>
+							</Button>
 						) : (
-							<button
+							<Button
 								type="button"
-								title="Cloud login"
+								title="Войти в облако"
 								onClick={() => void navigate({ to: "/login" })}
-								className="ui-button ui-button--ghost inline-flex items-center gap-2 text-muted transition hover:bg-surface-elevated hover:text-foreground"
+								variant="ghost"
 							>
 								<LogIn size={16} />
-							</button>
+							</Button>
 						))}
 					{showKnowledgeControls && <ComposerLauncher />}
 					<Inbox />
@@ -721,7 +720,7 @@ export function Topbar({
 					>
 						<div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
 							<Search size={18} className="shrink-0 text-muted" />
-							<input
+							<Input
 								ref={mobileSearchInputRef}
 								value={searchValue}
 								onChange={(event) => {
@@ -730,16 +729,15 @@ export function Topbar({
 								}}
 								onKeyDown={handleSearchKeyDown}
 								placeholder="Найти бинд…"
-								className="ui-input min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								className="min-w-0 flex-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							/>
-							<button
-								type="button"
-								aria-label="Закрыть поиск"
+							<IconButton
+								label="Закрыть поиск"
 								onClick={() => setMobileSearchOpen(false)}
-								className="ui-button ui-button--ghost ui-button--icon flex   shrink-0 items-center justify-center  text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="shrink-0 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={19} />
-							</button>
+							</IconButton>
 						</div>
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
