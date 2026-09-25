@@ -5,6 +5,7 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useAuthStore } from "@/store/auth.store";
+import { Button, Input, Panel, Select, Tabs } from "@/components/ui";
 import { can } from "../../../shared/access.js";
 import { AdminOverview } from "./AdminOverview";
 import { TelegramLinkRequests } from "./TelegramLinkRequests";
@@ -44,7 +45,6 @@ type Audit = {
 	before_data: any;
 	after_data: any;
 };
-const control = "border border-border bg-background disabled:opacity-40";
 const permissionGroup = (id: string) => {
 	if (
 		id.startsWith("ai.") ||
@@ -241,7 +241,7 @@ export function AccountsPanel({
 	};
 	const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 	return (
-		<section className="accounts-registry space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+		<Panel className="accounts-registry space-y-5 p-4 sm:p-6">
 			{usersAllowed && <TelegramLinkRequests />}
 			{confirmation && (
 				<BaseModal
@@ -253,10 +253,8 @@ export function AccountsPanel({
 							<li key={line}>{line}</li>
 						))}
 					</ul>
-					<div className="ui-actions items-center mt-4 flex gap-2">
-						<button
-							type="button"
-							className={`${control} ui-button`}
+					<div className="ui-actions items-center mt-4 gap-2">
+						<Button
 							onClick={() => {
 								const body = confirmation.body;
 								setConfirmation(null);
@@ -264,60 +262,39 @@ export function AccountsPanel({
 							}}
 						>
 							Подтвердить изменения
-						</button>
-						<button
-							type="button"
-							className={`${control} ui-button`}
+						</Button>
+						<Button
 							onClick={() => setConfirmation(null)}
 						>
 							Отмена
-						</button>
+						</Button>
 					</div>
 				</BaseModal>
 			)}
 			{!standalone && (
 				<h2 className="text-xl font-semibold">Пользователи, роли и доступы</h2>
 			)}
-			<div
-				className="ui-actions items-center flex flex-wrap gap-2"
-				role="tablist"
-				aria-label="Управление доступами"
-				style={embedded ? { display: "none" } : undefined}
-			>
-				{[
-					...(!standalone && usersAllowed ? [["overview", "Обзор"]] : []),
-					["users", "Пользователи"],
-					["roles", "Роли и разрешения"],
-					["audit", "Журнал изменений"],
+			<Tabs
+				className="items-center"
+				ariaLabel="Управление доступами"
+				value={tab}
+				items={[
+					...(!standalone && usersAllowed ? [{ value: "overview", label: "Обзор" }] : []),
+					{ value: "users", label: "Пользователи" },
+					{ value: "roles", label: "Роли и разрешения" },
+					{ value: "audit", label: "Журнал изменений" },
 				]
-					.filter(([id]) => (id === "roles" ? rolesAllowed : usersAllowed))
-					.map(([id, label]) => (
-						<button
-							type="button"
-							key={id}
-							role="tab"
-							aria-selected={tab === id}
-							className={`space-tab ${control} ${tab === id ? "border-accent/30 bg-accent/10 text-accent" : "border-transparent text-muted"}`}
-							disabled={busy}
-							onClick={() => {
-								setTab(id);
-								setUserEdit(null);
-								setRoleEdit(null);
-								setCreate(false);
-							}}
-						>
-							{label}
-						</button>
-					))}
-				<button
-					type="button"
-					className={`${control} ui-button`}
-					disabled={busy}
-					onClick={refresh}
-				>
-					Обновить
-				</button>
-			</div>
+					.filter((item) => (item.value === "roles" ? rolesAllowed : usersAllowed))
+					.map((item) => ({ ...item, disabled: busy }))}
+				onValueChange={(nextTab) => {
+					setTab(nextTab);
+					setUserEdit(null);
+					setRoleEdit(null);
+					setCreate(false);
+				}}
+				style={embedded ? { display: "none" } : undefined}
+			/>
+			<Button disabled={busy} onClick={refresh}>Обновить</Button>
 			{busy && <output>Загрузка…</output>}
 			{error && !create && (!userEdit || embedded) && (
 				<p role="alert" className="text-red-400">
@@ -346,9 +323,8 @@ export function AccountsPanel({
 							<h1>Пользователи</h1>
 							<p>Управляйте аккаунтами, ролями и доступом сотрудников.</p>
 						</div>
-						<button
-							type="button"
-							className="ui-button ui-button--primary"
+						<Button
+							variant="primary"
 							disabled={busy}
 							onClick={() => {
 								setCreate(true);
@@ -356,7 +332,7 @@ export function AccountsPanel({
 							}}
 						>
 							Создать аккаунт
-						</button>
+						</Button>
 					</header>
 					<form
 						className="user-registry-filters"
@@ -367,24 +343,21 @@ export function AccountsPanel({
 							refresh();
 						}}
 					>
-						<input
-							className={`ui-input ${control}`}
+						<Input
 							aria-label="Поиск пользователя"
 							placeholder="Почта или имя"
 							value={search}
 							maxLength={120}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
-						<button
+						<Button
 							type="submit"
-							className={`${control} ui-button`}
 							disabled={busy}
 						>
 							Найти
-						</button>
-						<select
+						</Button>
+						<Select
 							aria-label="Статус сотрудников"
-							className={`ui-input ${control}`}
 							value={statusFilter}
 							onChange={(e) => {
 								setStatusFilter(e.target.value);
@@ -395,10 +368,9 @@ export function AccountsPanel({
 							<option value="active">Активные</option>
 							<option value="pending">Ожидают доступа</option>
 							<option value="disabled">Отключены</option>
-						</select>
-						<select
+						</Select>
+						<Select
 							aria-label="Роль сотрудников"
-							className={`ui-input ${control}`}
 							value={roleFilter}
 							onChange={(e) => {
 								setRoleFilter(e.target.value);
@@ -411,11 +383,10 @@ export function AccountsPanel({
 									{role.name}
 								</option>
 							))}
-						</select>
+						</Select>
 						{(query || search || statusFilter || roleFilter) && (
-							<button
-								type="button"
-								className="ui-button ui-button--ghost"
+							<Button
+								variant="ghost"
 								onClick={() => {
 									setSearch("");
 									setQuery("");
@@ -425,7 +396,7 @@ export function AccountsPanel({
 								}}
 							>
 								Сбросить
-							</button>
+							</Button>
 						)}
 					</form>
 					<p className="text-sm text-muted">
@@ -557,9 +528,7 @@ export function AccountsPanel({
 											</span>
 										</td>
 										<td data-label="Действия">
-											<button
-												type="button"
-												className={`${control} ui-button`}
+											<Button
 												disabled={
 													busy ||
 													u.id === identity?.id ||
@@ -575,7 +544,7 @@ export function AccountsPanel({
 												}}
 											>
 												Изменить
-											</button>
+											</Button>
 										</td>
 									</tr>
 								))}
@@ -592,23 +561,19 @@ export function AccountsPanel({
 						</table>
 					</div>
 					<div className="ui-actions items-center flex  gap-3">
-						<button
-							type="button"
-							className={`${control} ui-button`}
+						<Button
 							disabled={busy || page === 1}
 							onClick={() => setPage((p) => p - 1)}
 						>
 							Назад
-						</button>
+						</Button>
 						<span>Страница {page}</span>
-						<button
-							type="button"
-							className={`${control} ui-button`}
+						<Button
 							disabled={busy || page * 50 >= total}
 							onClick={() => setPage((p) => p + 1)}
 						>
 							Далее
-						</button>
+						</Button>
 					</div>
 				</>
 			)}
@@ -625,9 +590,7 @@ export function AccountsPanel({
 										<th className="p-2">Разрешение</th>
 										{roles.map((r) => (
 											<th key={r.id} className="p-2">
-												<button
-													type="button"
-													className={`${control} ui-button`}
+												<Button
 													disabled={
 														!rolesAllowed ||
 														busy ||
@@ -641,7 +604,7 @@ export function AccountsPanel({
 													onClick={() => setRoleEdit(r)}
 												>
 													{r.name}
-												</button>
+												</Button>
 											</th>
 										))}
 									</tr>
@@ -689,9 +652,7 @@ export function AccountsPanel({
 						Creator.
 					</p>
 					{rolesAllowed && (
-						<button
-							type="button"
-							className={`${control} ui-button`}
+						<Button
 							disabled={busy}
 							onClick={() =>
 								setRoleEdit({
@@ -705,7 +666,7 @@ export function AccountsPanel({
 							}
 						>
 							Создать роль
-						</button>
+						</Button>
 					)}
 					{roleEdit && (
 						<EditRole
@@ -742,9 +703,7 @@ export function AccountsPanel({
 									))}
 								</ul>
 								{rolesAllowed && (
-									<button
-										type="button"
-										className={`${control} ui-button`}
+									<Button
 										disabled={
 											busy ||
 											r.id === "creator" ||
@@ -757,7 +716,7 @@ export function AccountsPanel({
 										onClick={() => setRoleEdit(r)}
 									>
 										Настроить
-									</button>
+									</Button>
 								)}
 							</div>
 						))}
@@ -805,9 +764,7 @@ export function AccountsPanel({
 						</details>
 					))}
 					{moreAudit && (
-						<button
-							type="button"
-							className={`${control} ui-button`}
+						<Button
 							disabled={busy}
 							onClick={async () => {
 								setBusy(true);
@@ -825,11 +782,11 @@ export function AccountsPanel({
 							}}
 						>
 							Показать ещё
-						</button>
+						</Button>
 					)}
 				</>
 			)}
-		</section>
+		</Panel>
 	);
 }
 function UserDetails({ user, children }: { user: User; children: ReactNode }) {
@@ -881,30 +838,18 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 	);
 	return (
 		<div className="space-y-3">
-			<div
-				className="flex flex-wrap gap-2"
-				role="tablist"
-				aria-label="Карточка сотрудника"
-			>
-				{[
-					["profile", "Профиль, роли и доступ"],
-					["activity", "Активность"],
-					["projects", "Проекты"],
-					...(can(access, "binds.manage") ? [["binds", "Личные бинды"]] : []),
-					...(can(access, "monitor.read") ? [["monitor", "Мониторинг"]] : []),
-				].map(([id, label]) => (
-					<button
-						type="button"
-						role="tab"
-						aria-selected={tab === id}
-						key={id}
-						className={`${control} ui-button`}
-						onClick={() => setTab(id)}
-					>
-						{label}
-					</button>
-				))}
-			</div>
+			<Tabs
+				ariaLabel="Карточка сотрудника"
+				value={tab}
+				onValueChange={setTab}
+				items={[
+					{ value: "profile", label: "Профиль, роли и доступ" },
+					{ value: "activity", label: "Активность" },
+					{ value: "projects", label: "Проекты" },
+					...(can(access, "binds.manage") ? [{ value: "binds", label: "Личные бинды" }] : []),
+					...(can(access, "monitor.read") ? [{ value: "monitor", label: "Мониторинг" }] : []),
+				]}
+			/>
 			<div hidden={tab !== "profile"}>{children}</div>
 			{tab === "projects" && (
 				<p className="ops-empty">
@@ -1054,8 +999,7 @@ function CreateUser({
 		>
 			<h3 className="font-semibold">Новый личный аккаунт</h3>
 			<div className="flex flex-wrap gap-2">
-				<input
-					className={`ui-input ${control}`}
+				<Input
 					aria-label="Имя нового сотрудника"
 					placeholder="Имя"
 					maxLength={120}
@@ -1063,8 +1007,7 @@ function CreateUser({
 					onChange={(e) => setName(e.target.value)}
 					disabled={busy}
 				/>
-				<input
-					className={`ui-input ${control}`}
+				<Input
 					type="email"
 					aria-label="Почта нового аккаунта"
 					placeholder="Email"
@@ -1073,8 +1016,7 @@ function CreateUser({
 					onChange={(e) => setEmail(e.target.value)}
 					disabled={busy}
 				/>
-				<input
-					className={`ui-input ${control}`}
+				<Input
 					type="password"
 					autoComplete="new-password"
 					aria-label="Пароль нового аккаунта"
@@ -1097,21 +1039,19 @@ function CreateUser({
 				Передайте пароль сотруднику лично. Письмо не отправляется. Сотрудник
 				сможет изменить пароль в настройках.
 			</p>
-			<button
+			<Button
 				type="submit"
-				className={`${control} ui-button`}
 				disabled={busy || !selected.length}
 			>
 				Создать аккаунт
-			</button>{" "}
-			<button
+			</Button>{" "}
+			<Button
 				type="button"
-				className={`${control} ui-button`}
 				disabled={busy}
 				onClick={onCancel}
 			>
 				Отмена
-			</button>
+			</Button>
 		</form>
 	);
 }
@@ -1144,7 +1084,7 @@ function EditUser({
 	];
 	return (
 		<form
-			className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6"
+			className="employee-access-form space-y-5"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -1176,16 +1116,14 @@ function EditUser({
 					«Отключён».
 				</p>
 			)}
-			<input
-				className={`ui-input ${control}`}
+			<Input
 				aria-label="Имя сотрудника"
 				value={name}
 				maxLength={120}
 				onChange={(e) => setName(e.target.value)}
 				disabled={busy}
 			/>
-			<select
-				className={`ui-input ${control}`}
+			<Select
 				aria-label="Статус аккаунта"
 				value={status}
 				onChange={(e) => setStatus(e.target.value)}
@@ -1194,7 +1132,7 @@ function EditUser({
 				<option value="active">Активен</option>
 				<option value="disabled">Отключён</option>
 				<option value="pending">Ожидает доступа</option>
-			</select>
+			</Select>
 			<RolesChoice
 				roles={roles}
 				selected={selected}
@@ -1211,23 +1149,21 @@ function EditUser({
 				.
 			</p>
 			<div className="ui-actions employee-access-footer">
-				<button
+				<Button
 					type="submit"
-					className={`${control} ui-button`}
 					disabled={busy || (status === "active" && !selected.length)}
 				>
 					{user.status === "pending" && status === "active"
 						? "Подтвердить и выдать роли"
 						: "Сохранить доступ"}
-				</button>
-				<button
+				</Button>
+				<Button
 					type="button"
-					className={`${control} ui-button`}
 					disabled={busy}
 					onClick={onCancel}
 				>
 					Отмена
-				</button>
+				</Button>
 			</div>
 		</form>
 	);
@@ -1270,8 +1206,7 @@ function EditRole({
 			<h3 className="font-semibold">
 				{role.version ? "Настройка роли" : "Новая роль"}
 			</h3>
-			<input
-				className={`ui-input ${control}`}
+			<Input
 				aria-label="Код роли"
 				placeholder="Код: support_senior"
 				pattern="[a-z][a-z0-9_]{1,39}"
@@ -1280,8 +1215,7 @@ function EditRole({
 				onChange={(e) => setId(e.target.value)}
 				disabled={busy || role.version > 0}
 			/>
-			<input
-				className={`ui-input ${control}`}
+			<Input
 				aria-label="Название роли"
 				placeholder="Название"
 				required
@@ -1290,8 +1224,7 @@ function EditRole({
 				onChange={(e) => setName(e.target.value)}
 				disabled={busy}
 			/>
-			<input
-				className={`ui-input ${control}`}
+			<Input
 				aria-label="Описание роли"
 				placeholder="Описание"
 				maxLength={500}
@@ -1361,33 +1294,30 @@ function EditRole({
 					</section>
 				))}
 			</fieldset>
-			<button type="submit" className={`${control} ui-button`} disabled={busy}>
+			<Button type="submit" disabled={busy}>
 				Сохранить роль
-			</button>{" "}
-			<button
+			</Button>{" "}
+			<Button
 				type="button"
-				className={`${control} ui-button`}
 				disabled={busy}
 				onClick={onCancel}
 			>
 				Отмена
-			</button>
+			</Button>
 			{role.version > 0 && !role.is_system && (
 				<>
-					<button
+					<Button
 						type="button"
-						className={`${control} ui-button`}
 						disabled={busy}
 						onClick={() => setDeleting(true)}
 					>
 						Удалить роль
-					</button>
+					</Button>
 					{deleting && (
 						<p>
 							Удаление возможно только если роль никому не назначена.{" "}
-							<button
+							<Button
 								type="button"
-								className={`${control} ui-button`}
 								disabled={busy}
 								onClick={() =>
 									void onSave({
@@ -1397,7 +1327,7 @@ function EditRole({
 								}
 							>
 								Подтвердить удаление
-							</button>
+							</Button>
 						</p>
 					)}
 				</>
