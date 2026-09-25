@@ -1,5 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { Button, Input, Select, Textarea } from "@/components/ui";
 import { AIFeedback } from "@/features/admin/AIFeedback";
 import { AnswerAssistantPage } from "@/features/ai/AnswerAssistantPage";
 import { usePreference } from "@/features/productivity/preferences";
@@ -268,9 +269,9 @@ export function SupportComposer() {
 				>
 					<header className="flex items-center justify-between p-3">
 						<h2 className="font-semibold">Помощник ответа</h2>
-						<button
+						<Button
 							type="button"
-							className="min-h-10 px-3 text-sm"
+							className="text-sm"
 							onClick={() => {
 								requestVersion.current++;
 								setInput("");
@@ -284,10 +285,11 @@ export function SupportComposer() {
 							}}
 						>
 							Новый кейс
-						</button>
-						<button
+						</Button>
+						<Button
 							type="button"
-							className="min-h-10 px-3"
+							variant="ghost"
+							className="px-3"
 							aria-label="Закрыть помощник"
 							onClick={() => {
 								setExpanded(false);
@@ -295,7 +297,7 @@ export function SupportComposer() {
 							}}
 						>
 							✕
-						</button>
+						</Button>
 					</header>
 					<p className="px-4 pb-3 text-xs leading-5 text-muted">
 						Подготовьте, переведите или проверьте ответ клиенту. Результат можно
@@ -322,8 +324,8 @@ export function SupportComposer() {
 					<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 space-y-3">
 						<label className="composer-setting block text-sm">
 							Проект
-							<select
-								className="ui-input ml-2 max-w-full border border-border bg-background"
+							<Select
+								className="ml-2 max-w-full bg-background"
 								value={projectId ?? ""}
 								onChange={(e) =>
 									useBonusStore
@@ -337,12 +339,12 @@ export function SupportComposer() {
 										{p.name}
 									</option>
 								))}
-							</select>
+							</Select>
 						</label>
 						<label className="composer-setting block text-sm">
 							Тема обращения
-							<select
-								className="ui-input ml-2 border border-border bg-background"
+							<Select
+								className="ml-2 bg-background"
 								value={intent}
 								onChange={(event) =>
 									setIntent(event.target.value as typeof intent)
@@ -361,12 +363,12 @@ export function SupportComposer() {
 										{label}
 									</option>
 								))}
-							</select>
+							</Select>
 						</label>
 						<label className="composer-setting block text-sm">
 							Тон
-							<select
-								className="ui-input ml-2 border border-border bg-background"
+							<Select
+								className="ml-2 bg-background"
 								value={tone}
 								onChange={(e) => setTone(e.target.value as typeof tone)}
 							>
@@ -374,7 +376,7 @@ export function SupportComposer() {
 								<option value="friendly">Дружелюбный</option>
 								<option value="formal">Формальный</option>
 								<option value="concise">Краткий</option>
-							</select>
+							</Select>
 						</label>
 						<p className="text-xs text-muted">
 							{project?.name ?? "Проект не выбран"} ·{" "}
@@ -382,14 +384,14 @@ export function SupportComposer() {
 						</p>
 						{activeMode === "sources" ? (
 							<div>
-								<button
+								<Button
 									type="button"
 									disabled={!activeTab}
-									className="min-h-10 px-3 text-sm"
+									className="text-sm"
 									onClick={() => setSourceId(activeTab)}
 								>
 									Использовать открытый материал
-								</button>
+								</Button>
 								<p className="whitespace-pre-wrap text-sm">
 									{translation
 										? context
@@ -424,19 +426,19 @@ export function SupportComposer() {
 									{activeMode === "answer"
 										? "Сообщение клиента"
 										: "Исходный текст"}
-									<textarea
-										className="ui-input mt-2 w-full min-h-32 border border-border bg-background"
+									<Textarea
+										className="mt-2 w-full min-h-32 bg-background"
 										value={input}
 										onChange={(e) => setInput(e.target.value)}
 									/>
 								</label>
 								<label className="flex items-center justify-between gap-2 text-sm">
 									Язык ответа
-									<input
+									<Input
 										list="composer-languages"
 										value={language}
 										onChange={(e) => setLanguage(e.target.value)}
-										className="ui-input w-24 border border-border bg-background"
+										className="w-24 bg-background"
 									/>
 									<datalist id="composer-languages">
 										{[
@@ -461,9 +463,9 @@ export function SupportComposer() {
 									<div className="space-y-2">
 										<label className="flex justify-between text-sm">
 											Исходный язык
-											<input
+											<Input
 												aria-label="Исходный язык"
-												className="ui-input w-24 border border-border bg-background"
+												className="w-24 bg-background"
 												value={fromLanguage}
 												onChange={(e) => setFromLanguage(e.target.value)}
 												list="composer-languages"
@@ -477,9 +479,9 @@ export function SupportComposer() {
 											/>
 											Автоперевод
 										</label>
-										<button
-											type="button"
-											className="space-tab"
+											<Button
+												type="button"
+												className="space-tab"
 											disabled={!output}
 											onClick={() => {
 												setInput(output);
@@ -491,17 +493,18 @@ export function SupportComposer() {
 											}}
 										>
 											Поменять местами
-										</button>
+											</Button>
 									</div>
 								)}
-								<button
+								<Button
 									type="button"
 									disabled={
 										busy ||
 										!(input.trim() || (activeMode === "check" && output.trim()))
 									}
 									onClick={() => void run()}
-									className="min-h-11 w-full rounded-lg bg-accent text-accent-foreground disabled:opacity-50"
+									variant="primary"
+									className="w-full"
 								>
 									{busy
 										? "Подготовка…"
@@ -512,7 +515,7 @@ export function SupportComposer() {
 												: activeMode === "rewrite"
 													? "Переписать"
 													: "Подготовить ответ"}
-								</button>
+								</Button>
 								{error && (
 									<p role="alert" className="text-sm text-red-400">
 										{error}
@@ -520,16 +523,16 @@ export function SupportComposer() {
 								)}
 								<label className="composer-setting block text-sm">
 									Ответ
-									<textarea
+									<Textarea
 										value={output}
 										onChange={(e) => setOutput(e.target.value)}
-										className="ui-input mt-2 w-full min-h-40 border border-border bg-background"
+										className="mt-2 w-full min-h-40 bg-background"
 									/>
 								</label>
-								<button
+								<Button
 									type="button"
 									disabled={!output.trim()}
-									className="space-tab"
+									className="self-start"
 									onClick={async () =>
 										showToast(
 											(await copyToClipboard(output))
@@ -539,7 +542,7 @@ export function SupportComposer() {
 									}
 								>
 									Копировать
-								</button>
+								</Button>
 								{checked && !issues.length && (
 									<output className="text-sm text-muted">
 										Проверка завершена: известных проблем не обнаружено.
