@@ -231,7 +231,7 @@ export function AnswerAssistantPage({
 	};
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-background">
+		<div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
 			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<header className="flex flex-wrap items-start justify-between gap-3">
 					<div className="min-w-0">
@@ -261,11 +261,11 @@ export function AnswerAssistantPage({
 				<form
 					data-settings-only={settingsOnly}
 					onSubmit={generate}
-					className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
+					className="grid min-h-0 min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
 				>
 					<section
 						hidden={settingsOnly}
-						className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface"
+						className="flex min-h-[34rem] min-w-0 flex-col rounded-xl border border-border bg-surface"
 					>
 						<div className="border-b border-border px-4 py-3">
 							<div className="text-sm font-semibold">Краткое описание</div>
@@ -379,7 +379,7 @@ export function AnswerAssistantPage({
 
 					<section
 						hidden={settingsOnly}
-						className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface"
+						className="flex min-h-[34rem] min-w-0 flex-col rounded-xl border border-border bg-surface"
 					>
 						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
 							<div className="min-w-0">
@@ -444,7 +444,7 @@ export function AnswerAssistantPage({
 						</div>
 					</section>
 
-					<aside className="space-y-3 xl:sticky xl:top-0 xl:self-start">
+					<aside className="min-w-0 space-y-3 xl:sticky xl:top-0 xl:self-start">
 						<section className="rounded-xl border border-border bg-surface">
 							<div className="flex items-center gap-2 border-b border-border px-4 py-3">
 								<Settings2 size={17} />

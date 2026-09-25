@@ -278,7 +278,7 @@ export function ProjectEmailsPage({
 
 	if (!publication.ready) return publication.banner;
 	return (
-		<div className="supportos-page-scroll min-h-0 flex-1 overflow-y-auto bg-background">
+		<div className="supportos-page-scroll min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
 			{publication.banner}
 			<label className="flex flex-wrap items-center gap-2 px-3 pt-3 text-sm">
 				Проект
@@ -307,7 +307,7 @@ export function ProjectEmailsPage({
 					</button>
 				)}
 			</label>
-			<div className="grid min-h-full w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6">
+			<div className="grid min-h-full min-w-0 w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6">
 				<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
@@ -347,8 +347,8 @@ export function ProjectEmailsPage({
 					</div>
 				</header>
 
-				<div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
-					<aside className="flex min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border bg-surface lg:min-h-0">
+				<div className="grid min-h-0 min-w-0 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+					<aside className="flex min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface lg:min-h-0">
 						<div className="border-b border-border p-3">
 							<div className="relative">
 								<Search

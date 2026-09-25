@@ -905,7 +905,7 @@ export function DepositBonusesPage({
 
 	if (!publication.ready) return publication.banner;
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-background">
+		<div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
 			{publication.banner}
 			<datalist id="deposit-bonus-currencies">
 				{currencies.map((currency) => (
@@ -913,7 +913,7 @@ export function DepositBonusesPage({
 				))}
 			</datalist>
 
-			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
+			<div className="supportos-page-scroll flex min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">
@@ -1132,7 +1132,7 @@ export function DepositBonusesPage({
 					</div>
 				)}
 
-				<div className="grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+				<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
 					<div className="space-y-3">
 						<form
 							onSubmit={createProject}

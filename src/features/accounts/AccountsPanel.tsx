@@ -837,7 +837,7 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 		(a) => a.id.toLowerCase() === user.email.toLowerCase(),
 	);
 	return (
-		<div className="space-y-3">
+		<div className="min-w-0 space-y-3">
 			<Tabs
 				ariaLabel="Карточка сотрудника"
 				value={tab}
@@ -850,7 +850,7 @@ function UserDetails({ user, children }: { user: User; children: ReactNode }) {
 					...(can(access, "monitor.read") ? [{ value: "monitor", label: "Мониторинг" }] : []),
 				]}
 			/>
-			<div hidden={tab !== "profile"}>{children}</div>
+			<div className="min-w-0" hidden={tab !== "profile"}>{children}</div>
 			{tab === "projects" && (
 				<p className="ops-empty">
 					Назначения сотрудников на проекты не поддерживаются текущим API.
@@ -923,7 +923,7 @@ function RolesChoice({
 	disabled: boolean;
 }) {
 	return (
-		<fieldset disabled={disabled} className="role-choice-grid">
+		<fieldset disabled={disabled} className="role-choice-grid min-w-0">
 			<legend className="mb-3 text-sm font-semibold">
 				Роли сотрудника{" "}
 				<span className="ml-2 text-xs font-normal text-muted">
@@ -985,7 +985,7 @@ function CreateUser({
 	);
 	return (
 		<form
-			className="employee-access-form space-y-5"
+			className="employee-access-form min-w-0 space-y-5"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -1084,7 +1084,7 @@ function EditUser({
 	];
 	return (
 		<form
-			className="employee-access-form space-y-5"
+			className="employee-access-form min-w-0 space-y-5"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({

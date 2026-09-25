@@ -289,8 +289,8 @@ function SettingsPage() {
 	const resolvedTheme = resolveThemeMode(appearance.themeMode);
 
 	return (
-		<div className="settings-page h-full overflow-auto bg-background">
-			<div className="mx-auto flex w-full flex-col gap-5 p-4 sm:p-6">
+		<div className="settings-page h-full min-w-0 overflow-auto bg-background">
+			<div className="mx-auto flex min-w-0 w-full flex-col gap-5 p-4 sm:p-6">
 				<header className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<h2 className="text-xl font-semibold text-foreground">
@@ -337,7 +337,7 @@ function SettingsPage() {
 							</div>
 						</div>
 
-						<div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+						<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
 							<div className="space-y-4">
 								<div className="grid gap-3 sm:grid-cols-3">
 									{themeOptions.map((option) => {
@@ -519,7 +519,7 @@ function SettingsPage() {
 
 								<div className="space-y-2">
 									<div className="text-sm font-medium">Interface density</div>
-									<div className="grid grid-cols-2 gap-2">
+									<div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2">
 										<button
 											type="button"
 											onClick={() =>
@@ -549,7 +549,7 @@ function SettingsPage() {
 
 								<div className="space-y-2">
 									<div className="text-sm font-medium">Text size</div>
-									<div className="grid grid-cols-3 gap-2">
+									<div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
 										{FONT_SCALE_OPTIONS.map((option) => {
 											const active = appearance.fontScale === option.value;
 
@@ -642,7 +642,7 @@ function SettingsPage() {
 							</button>
 						</div>
 
-						<div className="grid gap-4 lg:grid-cols-[0.95fr_1.2fr]">
+						<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)]">
 							<div className="space-y-4">
 								<div className="space-y-2">
 									<div className="flex items-center gap-2 text-sm font-medium">

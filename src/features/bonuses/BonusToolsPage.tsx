@@ -515,9 +515,9 @@ export function BonusToolsPage({
 
 	if (!publication.ready) return publication.banner;
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-background">
+		<div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
 			{publication.banner}
-			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
+			<div className="supportos-page-scroll flex min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">
@@ -625,7 +625,7 @@ export function BonusToolsPage({
 					</div>
 				)}
 
-				<div className="grid gap-3 xl:grid-cols-[minmax(16rem,1.2fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)]">
+				<div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(16rem,1.2fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)]">
 					<div className="relative">
 						<Search
 							size={16}
@@ -689,7 +689,7 @@ export function BonusToolsPage({
 					</select>
 				</div>
 
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+				<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
 					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
@@ -865,7 +865,7 @@ export function BonusToolsPage({
 						</div>
 					</div>
 
-					<div className="supportos-scroll overflow-auto">
+					<div className="supportos-scroll overflow-x-auto">
 						<table className="min-w-[72rem] text-left text-sm">
 							<thead className="bg-surface-elevated text-xs uppercase tracking-wide text-muted">
 								<tr>

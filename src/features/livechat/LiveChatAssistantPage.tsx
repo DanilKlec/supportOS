@@ -227,10 +227,10 @@ export function LiveChatAssistantPage() {
 	};
 
 	return (
-		<div className="supportos-scroll min-h-screen overflow-auto bg-background p-3 text-foreground">
+		<div className="supportos-scroll min-h-screen min-w-0 overflow-auto bg-background p-3 text-foreground">
 			<header className="mb-3 rounded-xl border border-border bg-surface p-3">
 				<div className="flex items-center justify-between gap-3">
-					<div>
+					<div className="min-w-0">
 						<div className="font-semibold">SupportOS Knowledge</div>
 						<div className="mt-0.5 text-[11px] text-muted">
 							Find, review and insert an approved reply
