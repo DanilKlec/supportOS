@@ -59,37 +59,37 @@ const RULE_FORM_FIELDS: Array<{
 	placeholder?: string;
 	multiline?: boolean;
 }> = [
-	{ key: "group", label: "Group", placeholder: "B2C / GZ / CS" },
-	{ key: "site", label: "Project", placeholder: "Project name" },
+	{ key: "group", label: "Группа", placeholder: "B2C / GZ / CS" },
+	{ key: "site", label: "Проект", placeholder: "Название проекта" },
 	{
 		key: "welcomeWager",
-		label: "Welcome wager",
-		placeholder: "35x bonus + 40x FS",
+		label: "Вейджер welcome-бонуса",
+		placeholder: "35x бонус + 40x FS",
 	},
 	{
 		key: "welcomeMaxWin",
-		label: "Welcome max / FS",
-		placeholder: "Max win / FS release",
+		label: "Максимум welcome / FS",
+		placeholder: "Максимальный выигрыш / разблокировка FS",
 	},
-	{ key: "noDeposit", label: "No deposit", placeholder: "50 EUR" },
+	{ key: "noDeposit", label: "Без депозита", placeholder: "50 EUR" },
 	{
 		key: "retentionWager",
-		label: "Retention wager",
-		placeholder: "Wager for retention",
+		label: "Вейджер удержания",
+		placeholder: "Вейджер для удержания",
 	},
 	{
 		key: "retentionMaxWin",
-		label: "Retention max / FS",
-		placeholder: "Max win / FS release",
+		label: "Максимум удержания / FS",
+		placeholder: "Максимальный выигрыш / разблокировка FS",
 	},
 	{
 		key: "events",
-		label: "Events",
-		placeholder: "Event rules",
+		label: "События",
+		placeholder: "Правила событий",
 		multiline: true,
 	},
-	{ key: "map", label: "Map", placeholder: "Map details", multiline: true },
-	{ key: "note", label: "Note", placeholder: "Internal note", multiline: true },
+	{ key: "map", label: "Карта", placeholder: "Детали карты", multiline: true },
+	{ key: "note", label: "Примечание", placeholder: "Внутреннее примечание", multiline: true },
 ];
 
 function getRuleFieldValue(rule: BonusRule, field: keyof BonusRule) {
@@ -253,14 +253,14 @@ const RULE_COLUMNS: Array<{
 	label: string;
 	convert?: boolean;
 }> = [
-	{ key: "welcomeWager", label: "Welcome wager" },
-	{ key: "welcomeMaxWin", label: "Welcome max / FS" },
-	{ key: "noDeposit", label: "No dep", convert: true },
-	{ key: "retentionWager", label: "Retention wager" },
-	{ key: "retentionMaxWin", label: "Retention max / FS" },
-	{ key: "events", label: "Events" },
-	{ key: "map", label: "Map" },
-	{ key: "note", label: "Note" },
+	{ key: "welcomeWager", label: "Вейджер welcome-бонуса" },
+	{ key: "welcomeMaxWin", label: "Максимум welcome / FS" },
+	{ key: "noDeposit", label: "Без депозита", convert: true },
+	{ key: "retentionWager", label: "Вейджер удержания" },
+	{ key: "retentionMaxWin", label: "Максимум удержания / FS" },
+	{ key: "events", label: "События" },
+	{ key: "map", label: "Карта" },
+	{ key: "note", label: "Примечание" },
 ];
 
 export function BonusToolsPage({
@@ -334,14 +334,14 @@ export function BonusToolsPage({
 				setSelectedRuleId(selectedRuleId || nextData.rules[0]?.id || "");
 				setStoredSourceUrl(nextData.sourceUrl);
 				if (showSuccess) {
-					showToast("Bonus tools updated from Google Sheet");
+					showToast("Инструменты бонусов обновлены из Google-таблицы");
 					setSourceOpen(false);
 				}
 			} catch (loadError) {
 				setError(
 					loadError instanceof Error
 						? loadError.message
-						: "Unable to load bonus tools",
+						: "Не удалось загрузить инструменты бонусов",
 				);
 			} finally {
 				setLoading(false);
@@ -443,7 +443,7 @@ export function BonusToolsPage({
 	const copyText = async (value: string, successMessage: string) => {
 		const copied = await copyToClipboard(value);
 
-		showToast(copied ? successMessage : "Copy failed");
+		showToast(copied ? successMessage : "Не удалось скопировать");
 	};
 
 	const openCreateRule = () => {
@@ -475,7 +475,7 @@ export function BonusToolsPage({
 		setRuleFormError("");
 
 		if (!ruleDraft.site.trim()) {
-			setRuleFormError("Project name is required");
+			setRuleFormError("Укажите название проекта");
 			return;
 		}
 
@@ -510,7 +510,7 @@ export function BonusToolsPage({
 		setEditingRuleId(undefined);
 		setRuleDraft(toRuleDraft());
 		setQuery("");
-		showToast(editingRule ? "Bonus rule saved" : "Bonus rule added");
+		showToast(editingRule ? "Правило бонуса сохранено" : "Правило бонуса добавлено");
 	};
 
 	if (!publication.ready) return publication.banner;
@@ -521,15 +521,15 @@ export function BonusToolsPage({
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="text-xs font-semibold uppercase text-muted">
-							Fast rules lookup
+							Быстрый поиск правил
 						</div>
 						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
-							Bonus Tools
+							Инструменты бонусов
 						</h1>
 						<div className="mt-1 text-sm text-muted">
 							{data
 								? `${data.rules.length} projects / ${data.currencyTables.length} currency tables`
-								: "Bonus rules and currency tables"}
+								: "Правила бонусов и таблицы валют"}
 						</div>
 					</div>
 
@@ -541,7 +541,7 @@ export function BonusToolsPage({
 							className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 						>
 							<Plus size={16} />
-							Add rule
+							Добавить правило
 						</button>
 
 						<button
@@ -556,7 +556,7 @@ export function BonusToolsPage({
 							) : (
 								<RefreshCw size={16} />
 							)}
-							Update
+							Обновить
 						</button>
 
 						<button
@@ -567,7 +567,7 @@ export function BonusToolsPage({
 							className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
-							Source
+							Источник
 						</button>
 					</div>
 				</div>
@@ -576,14 +576,14 @@ export function BonusToolsPage({
 					<div className="rounded-xl border border-border bg-surface p-4">
 						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
 							<FileSpreadsheet size={16} />
-							Google Sheet
+							Google-таблица
 						</div>
 
 						{data && (
 							<div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								Saved locally: {new Date(data.loadedAt).toLocaleString()}. Use
-								Update from Google when the sheet changes. Local edits can be
-								replaced by the next Google Sheet update.
+							Сохранено локально: {new Date(data.loadedAt).toLocaleString()}. Используйте
+							«Обновить», когда таблица изменится. Локальные правки могут быть
+							заменены следующим обновлением из Google-таблицы.
 							</div>
 						)}
 
@@ -605,7 +605,7 @@ export function BonusToolsPage({
 								) : (
 									<FileSpreadsheet size={16} />
 								)}
-								Update
+								Обновить
 							</button>
 						</div>
 
@@ -635,7 +635,7 @@ export function BonusToolsPage({
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
 							className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-							placeholder="Search project, wager, note..."
+							placeholder="Поиск проекта, вейджера или примечания…"
 						/>
 					</div>
 
@@ -694,7 +694,7 @@ export function BonusToolsPage({
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
 								<div className="font-semibold">
-									{selectedRule?.site ?? "No project selected"}
+										{selectedRule?.site ?? "Проект не выбран"}
 								</div>
 								<div className="mt-1 text-xs text-muted">
 									{selectedRule?.group ?? "-"} - {activeTable?.name ?? "-"}
@@ -717,7 +717,7 @@ export function BonusToolsPage({
 									<button
 										type="button"
 										onClick={() =>
-											void copyText(quickBind, "Bonus rules copied")
+												void copyText(quickBind, "Правила бонуса скопированы")
 										}
 										className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 									>
@@ -775,7 +775,7 @@ export function BonusToolsPage({
 					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex items-center gap-2 border-b border-border px-4 py-3 font-semibold">
 							<Table2 size={16} />
-							Currency
+							Валюта
 						</div>
 
 						<div className="space-y-3 p-4">
@@ -793,7 +793,7 @@ export function BonusToolsPage({
 
 							<div className="rounded-lg bg-background p-3">
 								<div className="text-xs font-semibold uppercase text-muted">
-									Selected
+									Выбрано
 								</div>
 								<div className="mt-2 text-2xl font-semibold">
 									{selectedAmount || "-"}
@@ -802,12 +802,12 @@ export function BonusToolsPage({
 									<button
 										type="button"
 										onClick={() =>
-											void copyText(selectedAmount, "Currency value copied")
+												void copyText(selectedAmount, "Значение валюты скопировано")
 										}
 										className="ui-button ui-button--secondary ui-button--small mt-3 inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 									>
 										<Copy size={13} />
-										Copy
+										Копировать
 									</button>
 								)}
 							</div>
@@ -859,7 +859,7 @@ export function BonusToolsPage({
 
 				<section className="rounded-xl border border-border bg-surface">
 					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-						<div className="font-semibold">Bonus Rules</div>
+						<div className="font-semibold">Правила бонусов</div>
 						<div className="text-sm text-muted">
 							{filteredRules.length} rows
 						</div>
@@ -869,14 +869,14 @@ export function BonusToolsPage({
 						<table className="min-w-[72rem] text-left text-sm">
 							<thead className="bg-surface-elevated text-xs uppercase tracking-wide text-muted">
 								<tr>
-									<th className="px-3 py-2 font-semibold">Project</th>
-									<th className="px-3 py-2 font-semibold">Group</th>
+							<th className="px-3 py-2 font-semibold">Проект</th>
+							<th className="px-3 py-2 font-semibold">Группа</th>
 									{RULE_COLUMNS.map((column) => (
 										<th key={column.key} className="px-3 py-2 font-semibold">
 											{column.label}
 										</th>
 									))}
-									<th className="px-3 py-2 font-semibold">Actions</th>
+							<th className="px-3 py-2 font-semibold">Действия</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border">
@@ -940,7 +940,7 @@ export function BonusToolsPage({
 														className="ui-button ui-button--secondary ui-button--small inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
 														<Pencil size={13} />
-														Edit
+																Изменить
 													</button>
 													<button
 														type="button"
@@ -950,7 +950,7 @@ export function BonusToolsPage({
 														className="ui-button ui-button--secondary ui-button--small inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
 														<Copy size={13} />
-														Copy
+																Копировать
 													</button>
 												</div>
 											</td>
@@ -985,18 +985,18 @@ export function BonusToolsPage({
 									id="bonus-rule-editor-title"
 									className="text-base font-semibold"
 								>
-									{editingRuleId ? "Edit bonus rule" : "Add bonus rule"}
+										{editingRuleId ? "Изменить правило бонуса" : "Добавить правило бонуса"}
 								</h2>
 								<p className="mt-1 text-xs text-muted">
-									Saved locally and available in search, copy, and currency
-									matching.
+									Сохранено локально и доступно для поиска, копирования и
+									сопоставления валют.
 								</p>
 							</div>
 							<button
 								type="button"
 								onClick={() => setRuleEditorOpen(false)}
 								className="ui-button ui-button--secondary ui-button--icon inline-flex shrink-0 items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-								aria-label="Close editor"
+								aria-label="Закрыть редактор"
 							>
 								<X size={16} />
 							</button>
@@ -1055,14 +1055,14 @@ export function BonusToolsPage({
 								onClick={() => setRuleEditorOpen(false)}
 								className="ui-button ui-button--secondary inline-flex items-center border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
-								Cancel
+								Отмена
 							</button>
 							<button
 								type="submit"
 								className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 							>
 								{editingRuleId ? <Pencil size={16} /> : <Plus size={16} />}
-								{editingRuleId ? "Save rule" : "Add rule"}
+								{editingRuleId ? "Сохранить правило" : "Добавить правило"}
 							</button>
 						</div>
 					</form>

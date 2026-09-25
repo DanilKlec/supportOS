@@ -150,9 +150,9 @@ export function ToolsMenu() {
 	const exportJson = () => {
 		try {
 			downloadJson(supportOSExportService.exportJson());
-			showToast("SupportOS JSON exported");
+			showToast("JSON SupportOS экспортирован");
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Export failed");
+			showToast(error instanceof Error ? error.message : "Не удалось экспортировать данные");
 		}
 		setOpen(false);
 	};
@@ -170,9 +170,9 @@ export function ToolsMenu() {
 
 		try {
 			supportOSExportService.importJson(await file.text());
-			showToast("SupportOS JSON imported");
+			showToast("JSON SupportOS импортирован");
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Import failed");
+			showToast(error instanceof Error ? error.message : "Не удалось импортировать данные");
 		}
 	};
 
@@ -188,7 +188,7 @@ export function ToolsMenu() {
 		saveAppearanceSettings(nextSettings);
 		setThemeMode(nextTheme);
 		showToast(
-			nextTheme === "dark" ? "Dark theme enabled" : "Light theme enabled",
+			nextTheme === "dark" ? "Тёмная тема включена" : "Светлая тема включена",
 		);
 		setOpen(false);
 	};

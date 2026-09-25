@@ -71,20 +71,20 @@ const themeOptions: Array<{
 }> = [
 	{
 		value: "system",
-		title: "System",
-		description: "Follow the OS theme.",
+		title: "Системная",
+		description: "Следовать теме операционной системы.",
 		icon: Monitor,
 	},
 	{
 		value: "dark",
-		title: "Dark",
-		description: "Use the dark workspace.",
+		title: "Тёмная",
+		description: "Использовать тёмное рабочее пространство.",
 		icon: Moon,
 	},
 	{
 		value: "light",
-		title: "Light",
-		description: "Use the light workspace.",
+		title: "Светлая",
+		description: "Использовать светлое рабочее пространство.",
 		icon: Sun,
 	},
 ];
@@ -96,18 +96,18 @@ const sidebarWidthOptions: Array<{
 }> = [
 	{
 		value: "narrow",
-		title: "Narrow",
-		description: "More room for bind content.",
+		title: "Узкая",
+		description: "Больше места для содержимого бинда.",
 	},
 	{
 		value: "standard",
-		title: "Standard",
-		description: "Balanced tree and content.",
+		title: "Стандартная",
+		description: "Сбалансированное дерево и содержимое.",
 	},
 	{
 		value: "wide",
-		title: "Wide",
-		description: "Better for deep folders.",
+		title: "Широкая",
+		description: "Удобнее для вложенных папок.",
 	},
 ];
 
@@ -118,18 +118,18 @@ const contentWidthOptions: Array<{
 }> = [
 	{
 		value: "standard",
-		title: "Standard",
-		description: "Readable centered bind view.",
+		title: "Стандартная",
+		description: "Удобный центрированный просмотр бинда.",
 	},
 	{
 		value: "wide",
-		title: "Wide",
-		description: "More space for long answers.",
+		title: "Широкая",
+		description: "Больше места для длинных ответов.",
 	},
 	{
 		value: "full",
-		title: "Full",
-		description: "Use the whole workspace.",
+		title: "Полная",
+		description: "Использовать всё рабочее пространство.",
 	},
 ];
 
@@ -150,20 +150,20 @@ const workspaceToggleOptions: Array<{
 }> = [
 	{
 		key: "showTopbar",
-		title: "Top bar",
-		description: "Search, create button and settings.",
+		title: "Верхняя панель",
+		description: "Поиск, создание и настройки.",
 		icon: PanelTop,
 	},
 	{
 		key: "showSidebar",
-		title: "Knowledge tree",
-		description: "Left navigation panel.",
+		title: "Дерево знаний",
+		description: "Левая панель навигации.",
 		icon: PanelLeft,
 	},
 	{
 		key: "showTabs",
-		title: "Opened tabs",
-		description: "Bind tabs above the viewer.",
+		title: "Открытые вкладки",
+		description: "Вкладки биндов над просмотрщиком.",
 		icon: FileText,
 	},
 	{
@@ -174,8 +174,8 @@ const workspaceToggleOptions: Array<{
 	},
 	{
 		key: "showSidebarFavorites",
-		title: "Favorites block",
-		description: "Pinned shortcuts in the tree.",
+		title: "Блок избранного",
+		description: "Закреплённые ярлыки в дереве.",
 		icon: Star,
 	},
 ];
@@ -237,7 +237,7 @@ function SettingsPage() {
 
 	const resetWorkspace = () => {
 		resetWorkspaceLayout();
-		showToast("Workspace layout reset");
+		showToast("Макет рабочего пространства сброшен");
 	};
 
 	const exportJson = () => {
@@ -254,7 +254,7 @@ function SettingsPage() {
 		link.click();
 		document.body.removeChild(link);
 		URL.revokeObjectURL(url);
-		showToast("SupportOS JSON exported");
+		showToast("JSON SupportOS экспортирован");
 	};
 
 	const importJson = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -267,9 +267,9 @@ function SettingsPage() {
 			const text = await file.text();
 
 			supportOSExportService.importJson(text);
-			showToast("SupportOS JSON imported");
+		showToast("JSON SupportOS импортирован");
 		} catch {
-			showToast("Import failed");
+		showToast("Не удалось импортировать файл");
 		} finally {
 			event.target.value = "";
 		}
@@ -283,7 +283,7 @@ function SettingsPage() {
 			return;
 		}
 		await knowledgeService.loadKnowledge();
-		showToast("Signed out");
+		showToast("Вы вышли из аккаунта");
 	};
 
 	const resolvedTheme = resolveThemeMode(appearance.themeMode);
@@ -306,7 +306,7 @@ function SettingsPage() {
 
 					<div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">
 						<Shield size={16} />
-						{authSession?.user.email ?? "Local workspace"}
+						{authSession?.user.email ?? "Локальное рабочее пространство"}
 					</div>
 				</header>
 
@@ -316,23 +316,23 @@ function SettingsPage() {
 							<div>
 								<div className="flex items-center gap-2 text-lg font-semibold">
 									<Palette size={18} />
-									Appearance
+									Оформление
 								</div>
 								<p className="mt-1 text-sm text-muted">
-									Customize the workspace without leaving the app.
+									Настройте рабочее пространство, не покидая приложение.
 								</p>
 							</div>
 
 							<div className="ui-actions items-center flex  gap-2">
 								<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-									Current: {resolvedTheme}
+									Текущая тема: {resolvedTheme}
 								</div>
 								<button
 									type="button"
 									onClick={resetAppearance}
 									className="ui-button ui-button--secondary border border-border bg-background font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 								>
-									Reset
+									Сбросить
 								</button>
 							</div>
 						</div>
@@ -370,7 +370,7 @@ function SettingsPage() {
 								</div>
 
 								<div className="space-y-2">
-									<div className="text-sm font-medium">Accent color</div>
+								<div className="text-sm font-medium">Цвет акцента</div>
 									<div className="flex flex-wrap gap-2">
 										{ACCENT_COLORS.map((color) => {
 											const active = appearance.accent === color.value;
@@ -403,10 +403,10 @@ function SettingsPage() {
 								<label className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
 									<span>
 										<span className="block text-sm font-medium">
-											Custom accent
+											Свой цвет акцента
 										</span>
 										<span className="mt-1 block text-xs text-muted">
-											Pick any color for active states and highlights.
+											Выберите цвет для активных состояний и выделений.
 										</span>
 									</span>
 									<input
@@ -420,7 +420,7 @@ function SettingsPage() {
 								</label>
 
 								<div className="space-y-2">
-									<div className="text-sm font-medium">Workspace palette</div>
+									<div className="text-sm font-medium">Палитра рабочего пространства</div>
 									<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 										{PALETTE_OPTIONS.map((option) => {
 											const active = appearance.palette === option.value;
@@ -456,7 +456,7 @@ function SettingsPage() {
 								{appearance.palette === "custom" && (
 									<div className="rounded-lg border border-border bg-background p-3">
 										<div className="mb-3 flex items-center justify-between gap-3">
-											<div className="text-sm font-medium">Custom colors</div>
+										<div className="text-sm font-medium">Свои цвета</div>
 											<div className="flex overflow-hidden rounded-md border border-border">
 												{CUSTOM_PALETTE_FIELDS.map((field) => (
 													<span
@@ -500,7 +500,7 @@ function SettingsPage() {
 							<div className="space-y-4">
 								<label className="ui-field ">
 									<span className="text-sm font-medium">
-										Workspace language
+										Язык рабочего пространства
 									</span>
 									<select
 										value={language}
@@ -518,7 +518,7 @@ function SettingsPage() {
 								</label>
 
 								<div className="space-y-2">
-									<div className="text-sm font-medium">Interface density</div>
+									<div className="text-sm font-medium">Плотность интерфейса</div>
 									<div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2">
 										<button
 											type="button"
@@ -531,7 +531,7 @@ function SettingsPage() {
 													: "border-border bg-background hover:bg-surface-elevated"
 											}`}
 										>
-											Comfortable
+											Комфортная
 										</button>
 										<button
 											type="button"
@@ -542,13 +542,13 @@ function SettingsPage() {
 													: "border-border bg-background hover:bg-surface-elevated"
 											}`}
 										>
-											Compact
+											Компактная
 										</button>
 									</div>
 								</div>
 
 								<div className="space-y-2">
-									<div className="text-sm font-medium">Text size</div>
+									<div className="text-sm font-medium">Размер текста</div>
 									<div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
 										{FONT_SCALE_OPTIONS.map((option) => {
 											const active = appearance.fontScale === option.value;
@@ -574,7 +574,7 @@ function SettingsPage() {
 								</div>
 
 								<div className="space-y-2">
-									<div className="text-sm font-medium">Corner style</div>
+									<div className="text-sm font-medium">Стиль углов</div>
 									<div className="grid gap-2">
 										{RADIUS_OPTIONS.map((option) => {
 											const active = appearance.radius === option.value;
@@ -610,7 +610,7 @@ function SettingsPage() {
 								<div className="rounded-lg border border-border bg-background p-3">
 									<div className="mb-2 flex items-center gap-2 text-sm font-medium">
 										<Zap size={16} />
-										App install
+										Установка приложения
 									</div>
 									<PWAInstallButton />
 								</div>
@@ -625,11 +625,11 @@ function SettingsPage() {
 							<div>
 								<div className="flex items-center gap-2 text-lg font-semibold">
 									<LayoutDashboard size={18} />
-									Workspace layout
+										Макет рабочего пространства
 								</div>
 								<p className="mt-1 text-sm text-muted">
-									Choose which panels stay visible and how much space the tree
-									and bind viewer use.
+									Выберите видимые панели и объём места для дерева и просмотрщика
+									биндов.
 								</p>
 							</div>
 
@@ -638,7 +638,7 @@ function SettingsPage() {
 								onClick={resetWorkspace}
 								className="ui-button ui-button--secondary border border-border bg-background font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
-								Reset layout
+								Сбросить макет
 							</button>
 						</div>
 
@@ -647,7 +647,7 @@ function SettingsPage() {
 								<div className="space-y-2">
 									<div className="flex items-center gap-2 text-sm font-medium">
 										<PanelLeft size={16} />
-										Tree width
+										Ширина дерева
 									</div>
 									<div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
 										{sidebarWidthOptions.map((option) => {
@@ -687,7 +687,7 @@ function SettingsPage() {
 								<div className="space-y-2">
 									<div className="flex items-center gap-2 text-sm font-medium">
 										<FileText size={16} />
-										Bind viewer width
+										Ширина просмотрщика биндов
 									</div>
 									<div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
 										{contentWidthOptions.map((option) => {
@@ -762,7 +762,7 @@ function SettingsPage() {
 																: "bg-surface-elevated text-muted"
 														}`}
 													>
-														{enabled ? "On" : "Off"}
+															{enabled ? "Вкл." : "Выкл."}
 													</span>
 												</span>
 												<span className="mt-1 block text-xs text-muted">
@@ -781,7 +781,7 @@ function SettingsPage() {
 					<section className="rounded-lg border border-border bg-surface p-5">
 						<div className="mb-5 flex items-center gap-2 text-lg font-semibold">
 							<Database size={18} />
-							Import and export
+										Импорт и экспорт
 						</div>
 
 						<div className="mb-5 grid gap-3 sm:grid-cols-2">
@@ -793,10 +793,10 @@ function SettingsPage() {
 							>
 								<span>
 									<span className="block text-sm font-semibold">
-										Import JSON
+										Импорт JSON
 									</span>
 									<span className="mt-1 block text-xs text-muted">
-										Restore a SupportOS export file.
+										Восстановить файл экспорта SupportOS.
 									</span>
 								</span>
 								<Upload size={18} />
@@ -810,10 +810,10 @@ function SettingsPage() {
 							>
 								<span>
 									<span className="block text-sm font-semibold">
-										Export JSON
+										Экспорт JSON
 									</span>
 									<span className="mt-1 block text-xs text-muted">
-										Download a full workspace backup.
+										Скачать полную резервную копию рабочего пространства.
 									</span>
 								</span>
 								<Download size={18} />
@@ -848,7 +848,7 @@ function SettingsPage() {
 						<div className="rounded-lg border border-border bg-surface p-5">
 							<div className="mb-4 flex items-center gap-2 text-lg font-semibold">
 								<Cloud size={18} />
-								Account
+													Аккаунт
 							</div>
 
 							{authConfigured ? (
@@ -871,26 +871,26 @@ function SettingsPage() {
 											className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
 										>
 											<LogOut size={16} />
-											Sign out
+																		Выйти
 										</button>
 									</div>
 								) : (
 									<div className="flex flex-wrap items-center justify-between gap-3">
 										<div className="text-sm text-muted">
-											Cloud sync is configured, but you are not signed in.
+																		Облачная синхронизация настроена, но вы не вошли в аккаунт.
 										</div>
 										<Link
 											to="/login"
 											className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
 										>
 											<LogIn size={16} />
-											Sign in
+																		Войти
 										</Link>
 									</div>
 								)
 							) : (
 								<div className="text-sm text-muted">
-									SupportOS is running in local workspace mode.
+																SupportOS работает в режиме локального рабочего пространства.
 								</div>
 							)}
 						</div>

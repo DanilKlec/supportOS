@@ -20,3 +20,66 @@ it('declines as the authenticated recipient and ignores forged recipient and act
 });
 
 it('returns only proposal outcomes addressed to the verified actor',async()=>{mocks.db.mockResolvedValue([{id:'p',source_id:'common',status:'accepted',resolved_at:'2026-09-12',translations:[{title:'Answer',content:'Private text'}]}]);const result=await run({url:`/api/binds?action=proposal-results&user_id=${other}`});expect(result.status).toBe(200);expect(mocks.db.mock.calls[0][1]).toContain(`author_id=eq.${actor}`);expect(mocks.db.mock.calls[0][1]).not.toContain(other);expect(result.data[0]).toEqual({id:'p',sourceId:'common',status:'accepted',resolvedAt:'2026-09-12',title:'Answer'});});
+
+it('pages shared binds through the authenticated server API',async()=>{
+ const row={id:'common',owner_id:null,slug:'common',category_id:'shared',translations:[],tags:[],created_at:'2026-01-01',updated_at:'2026-01-01'};
+ mocks.db.mockResolvedValue([row]);
+ const result=await run({url:'/api/binds?action=shared&limit=250&offset=500'});
+ expect(result).toEqual({status:200,data:{rows:[row]}});
+ expect(mocks.db).toHaveBeenCalledWith(expect.anything(),'supportos_binds?select=*&owner_id=is.null&order=id.asc&limit=250&offset=500');
+});
+
+it('requires knowledge write permission for shared bind mutations',async()=>{
+ const result=await run({method:'POST',body:{action:'shared-save',translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:[]}});
+ expect(result.status).toBe(403);
+ expect(result.data.error).toContain('Нет права');
+});
+
+it('updates a shared bind with an atomic timestamp guard',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ const row={id:'common',owner_id:null,slug:'common',category_id:'shared',translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:['tag'],created_at:'2026-01-01',updated_at:'2026-09-25'};
+ const fetch=vi.fn(async()=>new Response(JSON.stringify([row])));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'shared-save',id:'common',expected:'2026-09-10T10:00:00Z',translations:[{language:'ru',title:' Ответ ',content:' Текст '}],tags:['tag']}});
+ expect(result).toEqual({status:200,data:row});
+ expect(fetch.mock.calls[0][0]).toContain('supportos_binds?id=eq.common&owner_id=is.null&updated_at=eq.2026-09-10T10%3A00%3A00Z&select=*');
+ expect(fetch.mock.calls[0][1]).toMatchObject({method:'PATCH'});
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({translations:[{language:'ru',title:'Ответ',content:'Текст',updatedAt:expect.any(String)}],tags:['tag'],updated_at:expect.any(String)});
+});
+
+it('returns 409 when a shared bind timestamp no longer matches',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify([]))));
+ const result=await run({method:'POST',body:{action:'shared-save',id:'common',expected:'2026-09-10T10:00:00Z',translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:[]}});
+ expect(result.status).toBe(409);
+ expect(result.data.error).toContain('Бинд изменён другим сотрудником');
+});
+
+it('loads the runtime knowledge snapshot from server tables and applies personal overrides',async()=>{
+ mocks.allRows.mockImplementation(async(_env,path)=>{
+  if(path.startsWith('supportos_categories'))return [{id:'shared',owner_id:null,name:'Общее',icon:null,color:null,order_index:1}];
+  if(path.startsWith('supportos_folders'))return [];
+  if(path.startsWith('supportos_binds'))return [
+   {id:'base',owner_id:null,source_bind_id:null,slug:'base',category_id:'shared',folder_id:null,tags:[],translations:[],favorite:false,archived:false,created_at:'2026-01-01',updated_at:'2026-01-01'},
+   {id:'personal',owner_id:actor,source_bind_id:'base',slug:'personal',category_id:'shared',folder_id:null,tags:[],translations:[],favorite:true,archived:false,created_at:'2026-01-02',updated_at:'2026-01-02'},
+  ];
+  return [];
+ });
+ mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_bind_history')?[{id:2,source_id:'base',owner_id:actor,snapshot:{slug:'personal-old',tags:['old'],translations:[],updated_at:'2026-01-01'},created_at:'2026-01-01'}]:[]);
+ const result=await run({url:'/api/binds?action=knowledge'});
+ expect(result.status).toBe(200);
+ expect(result.data.categories).toEqual([{id:'shared',ownerId:null,name:'Общее',order:1}]);
+ expect(result.data.binds).toHaveLength(1);
+ expect(result.data.binds[0]).toMatchObject({id:'personal',ownerId:actor,sourceBindId:'base',favorite:true});
+ expect(result.data.binds[0].history).toEqual([{id:'2',createdAt:'2026-01-01',slug:'personal-old',tags:['old'],translations:[]}]);
+ expect(mocks.allRows.mock.calls.every(([,path])=>path.includes(`owner_id.eq.${actor}`))).toBe(true);
+});
+
+it('persists knowledge through the server and never accepts a forged owner',async()=>{
+ mocks.db.mockResolvedValue([]);
+ const fetch=vi.fn(async()=>new Response('',{status:201}));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'knowledge-save',categories:[{id:'mine',ownerId:other,name:'Личное',order:1}]}});
+ expect(result.status).toBe(200);
+ const saved=JSON.parse(fetch.mock.calls[0][1].body);
+ expect(saved[0]).toMatchObject({id:'mine',owner_id:actor,name:'Личное'});
+ expect((await run({method:'POST',body:{action:'knowledge-save',categories:[{id:'shared',ownerId:null,name:'Общее',order:1}]}})).status).toBe(403);
+});

@@ -1,5 +1,6 @@
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
+import { authenticatedFetch } from "@/services/authenticated-fetch";
 import type { KnowledgeDatabase } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
 import { can } from "../../shared/access.js";
@@ -188,17 +189,6 @@ export function fromBindRow(row: BindRow): Bind {
 	};
 }
 
-function mergeBinds(rows: BindRow[]) {
-	const binds = rows.map(fromBindRow);
-	const hiddenGlobalIds = new Set(
-		binds
-			.filter((bind) => bind.ownerId && bind.sourceBindId)
-			.map((bind) => bind.sourceBindId as string),
-	);
-
-	return binds.filter((bind) => bind.ownerId || !hiddenGlobalIds.has(bind.id));
-}
-
 function readQueue(key = queueKey()) {
 	if (!isBrowser()) return [];
 
@@ -230,24 +220,11 @@ class CloudKnowledgeService {
 		if (!this.canUseCloud()) return undefined;
 
 		await this.flushQueue();
-
-		const [categoryRows, folderRows, bindRows] = await Promise.all([
-			supabaseService.select<CategoryRow>(CATEGORIES_TABLE, {
-				order: "order_index.asc",
-			}),
-			supabaseService.select<FolderRow>(FOLDERS_TABLE, {
-				order: "order_index.asc",
-			}),
-			supabaseService.select<BindRow>(BINDS_TABLE, {
-				order: "updated_at.desc",
-			}),
-		]);
-
-		return {
-			categories: categoryRows.map(fromCategoryRow),
-			folders: folderRows.map(fromFolderRow),
-			binds: mergeBinds(bindRows),
-		};
+		const response = await authenticatedFetch("/api/binds?action=knowledge");
+		const data = await response.json();
+		if (!response.ok)
+			throw new Error(data.error ?? "Не удалось загрузить базу знаний");
+		return data;
 	}
 
 	saveCategory(category: KnowledgeCategory) {
@@ -394,7 +371,13 @@ class CloudKnowledgeService {
 			const id = operation.payload?.id;
 
 			if (typeof id === "string") {
-				await supabaseService.delete(operation.table, id);
+				const entity =
+					operation.table === CATEGORIES_TABLE
+						? "category"
+						: operation.table === FOLDERS_TABLE
+							? "folder"
+							: "bind";
+				await this.request({ action: "knowledge-delete", entity, id });
 			}
 
 			return;
@@ -406,7 +389,30 @@ class CloudKnowledgeService {
 				? [operation.payload]
 				: [];
 
-		await supabaseService.upsert(operation.table, rows);
+		const payload: Record<string, unknown> = { action: "knowledge-save" };
+		if (operation.table === CATEGORIES_TABLE)
+			payload.categories = rows.map((row) =>
+				fromCategoryRow(row as CategoryRow),
+			);
+		else if (operation.table === FOLDERS_TABLE)
+			payload.folders = rows.map((row) => fromFolderRow(row as FolderRow));
+		else payload.binds = rows.map((row) => fromBindRow(row as BindRow));
+		await this.request(payload);
+	}
+
+	private async request(body: Record<string, unknown>) {
+		const response = await authenticatedFetch("/api/binds", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+		});
+		const data = await response.json();
+		if (!response.ok)
+			throw Object.assign(
+				new Error(data.error ?? "Не удалось сохранить базу знаний"),
+				{ status: response.status },
+			);
+		return data;
 	}
 }
 

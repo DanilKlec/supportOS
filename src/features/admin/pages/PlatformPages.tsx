@@ -15,19 +15,10 @@ import {
 	Row,
 	Unavailable,
 } from "@/features/operations/OperationsWorkspace";
-import { operationsCapabilities } from "@/services/operations-capabilities";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage, canTrain } from "../../../../shared/access.js";
 
-function Missing({ kind }: { kind: keyof typeof operationsCapabilities }) {
-	const state = operationsCapabilities[kind]();
-	return (
-		<Unavailable
-			message={state.state === "not-configured" ? state.reason : "Нет записей."}
-		/>
-	);
-}
 export function IntegrationsPage() {
 	const user = useAuthStore((s) => s.session?.user),
 		configured = useAuthStore((s) => s.configured);
@@ -42,59 +33,50 @@ export function IntegrationsPage() {
 			),
 		staleTime: 30000,
 	});
+	const canReadAI = can(user?.access, "tools");
+	const canReadMonitor = can(user?.access, "monitor.read");
+	const canManageIntegrations = can(user?.access, "technical");
+	const showAI =
+		canReadAI && (ai.isPending || Boolean(ai.error) || Boolean(ai.data?.configured));
+	const showMonitor =
+		canReadMonitor &&
+		(monitor.isPending || Boolean(monitor.error) || Boolean(monitor.data?.lastSync));
+	if (!showAI && !showMonitor && !configured && !canManageIntegrations) return null;
 	return (
-		<Panel title="Integration health">
-			<Row
-				title="AI provider"
-				detail="Проверка конфигурации, не тестовый запрос к модели."
-			>
-				{can(user?.access, "tools") ? (
+		<Panel title="Подключения">
+			{showAI && (
+				<Row
+					title="Провайдер AI"
+					detail="Проверка конфигурации, не тестовый запрос к модели."
+				>
 					<div>
 						<QueryState query={ai} />
-						{ai.data && (
-							<Badge>
-								{ai.data.configured
-									? `${ai.data.provider} · ${ai.data.model}`
-									: "Ключ не настроен"}
-							</Badge>
+						{ai.data?.configured && (
+							<Badge>{ai.data.provider} · {ai.data.model}</Badge>
 						)}
 					</div>
-				) : (
-					<Badge>Нет прав на проверку</Badge>
-				)}
-			</Row>
-			<Row
-				title="LiveChat"
-				detail={
-					monitor.data?.lastSync
-						? `Последний подтверждённый опрос: ${new Date(monitor.data.lastSync).toLocaleString("ru")}`
-						: "Последний успешный опрос неизвестен."
-				}
-			>
-				{can(user?.access, "monitor.read") ? (
-					<>
-						<QueryState query={monitor} />
-						<Link to="/agent-monitor" className="ui-button">
-							Мониторинг
-						</Link>
-					</>
-				) : (
-					<Badge>Нет прав monitor.read</Badge>
-				)}
-			</Row>
-			<Row
-				title="Supabase"
-				detail="Наличие клиентской конфигурации не подтверждает доступность базы."
-			>
-				<Badge>{configured ? "Конфигурация подключена" : "Не настроено"}</Badge>
-			</Row>
-			<Row
-				title="Google Sheets"
-				detail="Ручной импорт справочников доступен в настройках. Телеметрия автоматической синхронизации не подключена."
-			>
-				<Badge>Нет телеметрии</Badge>
-			</Row>
-			{can(user?.access, "technical") && (
+				</Row>
+			)}
+			{showMonitor && monitor.data?.lastSync && (
+				<Row
+					title="LiveChat"
+					detail={`Последний подтверждённый опрос: ${new Date(monitor.data.lastSync).toLocaleString("ru")}`}
+				>
+					<Link to="/agent-monitor" className="ui-button">
+						Мониторинг
+					</Link>
+				</Row>
+			)}
+			{showMonitor && <QueryState query={monitor} />}
+			{configured && (
+				<Row
+					title="Supabase"
+					detail="Наличие клиентской конфигурации не подтверждает доступность базы."
+				>
+					<Badge>Конфигурация подключена</Badge>
+				</Row>
+			)}
+			{canManageIntegrations && (
 				<Row title="Управление подключениями">
 					<Link to="/settings" hash="integrations" className="ui-button">
 						Открыть настройки
@@ -136,7 +118,7 @@ export function AccessReviewPage({
 	const complete = accounts.data && users.length === accounts.data.total;
 	return (
 		<div className="ops-stack">
-			<Panel title="Access recommendations">
+			<Panel title="Рекомендации по доступам">
 				<QueryState query={accounts} />
 				<QueryState query={catalog} />
 				{accounts.data && (
@@ -149,77 +131,62 @@ export function AccessReviewPage({
 					!accounts.error &&
 					!catalog.isPending &&
 					!catalog.error &&
-					!candidates.length && (
-						<Unavailable message="В загруженной выборке нет рекомендаций." />
-					)}
-				{candidates.map((u) => (
-					<Row
-						key={u.id}
-						title={u.display_name || u.email}
-						detail={
-							!u.roles.length
-								? "Нет назначенных ролей"
-								: u.status === "pending"
-									? "Ожидает выдачи доступа"
-									: "Привилегированный аккаунт — проверьте необходимость прав"
-						}
-					>
-						<button
-							type="button"
-							className="ui-button"
-							onClick={() => onUser(u)}
+					candidates.map((u) => (
+						<Row
+							key={u.id}
+							title={u.display_name || u.email}
+							detail={
+								!u.roles.length
+									? "Нет назначенных ролей"
+									: u.status === "pending"
+										? "Ожидает выдачи доступа"
+										: "Привилегированный аккаунт — проверьте необходимость прав"
+							}
 						>
-							Проверить
-						</button>
-					</Row>
-				))}
+							<button
+								type="button"
+								className="ui-button"
+								onClick={() => onUser(u)}
+							>
+								Проверить
+							</button>
+						</Row>
+					))}
 			</Panel>
-			<Panel title="Unused custom roles">
-				{complete && catalog.data ? (
-					catalog.data.roles
-						.filter(
-							(r) => !r.is_system && !users.some((u) => u.roles.includes(r.id)),
-						)
-						.map((r) => (
-							<Row key={r.id} title={r.name}>
-								<Badge>Не назначена</Badge>
-							</Row>
-						))
-				) : (
-					<Unavailable message="Вывод о неиспользуемых ролях доступен только после полной загрузки аккаунтов и каталога." />
+			{complete &&
+				catalog.data &&
+				catalog.data.roles.some(
+					(r) => !r.is_system && !users.some((u) => u.roles.includes(r.id)),
+				) && (
+					<Panel title="Неиспользуемые пользовательские роли">
+						{catalog.data.roles
+							.filter(
+								(r) => !r.is_system && !users.some((u) => u.roles.includes(r.id)),
+							)
+							.map((r) => (
+								<Row key={r.id} title={r.name}>
+									<Badge>Не назначена</Badge>
+								</Row>
+							))}
+					</Panel>
 				)}
-				{complete &&
-					catalog.data &&
-					!catalog.data.roles.some(
-						(r) => !r.is_system && !users.some((u) => u.roles.includes(r.id)),
-					) && (
-						<Unavailable message="Неиспользуемых пользовательских ролей не найдено." />
-					)}
-			</Panel>
-			<Panel title="Unavailable signals">
-				<Unavailable message="Единого источника последней активности и назначений проектов нет. Неактивность и отсутствие проекта не вычисляются по предположениям." />
-			</Panel>
 		</div>
 	);
 }
 export function ProjectsPage() {
 	const projects = useBonusStore((s) => s.projects);
+	if (!projects.length) return null;
 	return (
-		<Panel title="Reference projects">
+		<Panel title="Проекты справочника">
 			<p className="ops-note">
 				Загруженные проекты справочника бонусов. Это не реестр доступа
 				сотрудников и не AI-инструкции проектов.
 			</p>
-			{projects.length ? (
-				projects.map((p) => (
-					<Row key={p.id} title={p.name} detail={p.id}>
-						<Badge>Reference project</Badge>
-					</Row>
-				))
-			) : (
-				<Unavailable message="В рабочем хранилище пока нет проектов справочника." />
-			)}
-			<Unavailable message="Единый backend конфигурации проектов и назначений сотрудников не подключён. Эти настройки недоступны для изменения." />
+			{projects.map((p) => (
+				<Row key={p.id} title={p.name} detail={p.id}>
+					<Badge>Проект справочника</Badge>
+				</Row>
+			))}
 		</Panel>
 	);
 }
@@ -228,24 +195,24 @@ export function AIOverviewPage() {
 	const ai = useAIStatus(),
 		runtime = useAIRuntime();
 	const feedback = runtime.data?.document.feedback ?? [];
+	const canReadAI = can(user?.access, "tools");
+	const canReadQuality = canTrain(user?.access);
 	return (
 		<div className="ops-stack">
-			<Panel title="AI runtime">
-				{can(user?.access, "tools") ? (
+			{canReadAI && (
+				<Panel title="Среда выполнения AI">
 					<>
 						<QueryState query={ai} />
-						{ai.data && (
+						{ai.data?.configured && (
 							<Row title={ai.data.provider} detail={ai.data.model}>
-								<Badge>{ai.data.configured ? "Настроен" : "Не настроен"}</Badge>
+								<Badge>Настроен</Badge>
 							</Row>
 						)}
 					</>
-				) : (
-					<Unavailable message="Нет прав на проверку конфигурации AI." />
-				)}
-			</Panel>
-			<Panel title="Quality signals">
-				{canTrain(user?.access) ? (
+				</Panel>
+			)}
+			{canReadQuality && (
+				<Panel title="Сигналы качества">
 					<>
 						<QueryState query={runtime} />
 						{runtime.data && (
@@ -274,190 +241,33 @@ export function AIOverviewPage() {
 							</>
 						)}
 					</>
-				) : (
-					<Unavailable message="Для чтения оценок и знаний нужны действующие AI-права." />
-				)}
-			</Panel>
-			<Panel title="Learning pipeline">
-				<Missing kind="candidates" />
-			</Panel>
-			<Panel title="Latency & costs">
-				<Missing kind="usage" />
-			</Panel>
+				</Panel>
+			)}
 		</div>
 	);
 }
 export function ModelsPage() {
 	const ai = useAIStatus();
 	const access = useAuthStore((s) => s.session?.user.access);
+	if (!can(access, "tools")) return null;
 	return (
-		<Panel title="Models & task routing">
-			{can(access, "tools") ? (
-				<>
-					<QueryState query={ai} />
-					{ai.data && (
-						<Row title="Primary model" detail={ai.data.provider}>
-							<Badge>{ai.data.model}</Badge>
-						</Row>
-					)}
-				</>
-			) : (
-				<Unavailable message="Нет прав на чтение конфигурации модели." />
+		<Panel title="Модели и маршрутизация задач">
+			<QueryState query={ai} />
+			{ai.data?.configured && (
+				<Row title="Основная модель" detail={ai.data.provider}>
+					<Badge>{ai.data.model}</Badge>
+				</Row>
 			)}
-			{["Fast model", "Reasoning model", "Fallback", "Task routing"].map(
-				(label) => (
-					<Row key={label} title={label}>
-						<input
-							className="ui-input"
-							aria-label={label}
-							disabled
-							placeholder="Not configured"
-						/>
-					</Row>
-				),
-			)}
-			<Missing kind="routing" />
-			<div className="ops-panel-actions">
-				<button type="button" className="ui-button" disabled>
-					Сохранение недоступно
-				</button>
-			</div>
 		</Panel>
 	);
 }
 export function LearningPage() {
-	return (
-		<div className="ops-stack">
-			<Panel title="Learning policy">
-				<p className="ops-note">
-					Работа операторов → сигналы → повторяющиеся паттерны → кандидат →
-					оценка риска → QC или разрешённая автопубликация → доступность знаний
-					при следующем запросе.
-				</p>
-				{[
-					[
-						"Candidate generation",
-						"Выделение кандидатов из подтверждённых сигналов",
-					],
-					[
-						"Auto-publish low-risk",
-						"Публикация только после подтверждённой оценки риска",
-					],
-					[
-						"Semantic auto-publish",
-						"По умолчанию выключено: смысловые изменения требуют проверки",
-					],
-				].map(([title, detail]) => (
-					<Row key={title} title={title} detail={detail}>
-						<input
-							type="checkbox"
-							aria-label={title}
-							disabled
-							checked={false}
-						/>
-					</Row>
-				))}
-				<Missing kind="learningPolicy" />
-			</Panel>
-			<Panel title="Risk & QC requirements">
-				{[
-					"Категории риска",
-					"Категории обязательного QC",
-					"Минимум подтверждений",
-					"Минимальная уверенность",
-				].map((label) => (
-					<Row key={label} title={label}>
-						<input
-							className="ui-input"
-							aria-label={label}
-							disabled
-							placeholder="Not configured"
-						/>
-					</Row>
-				))}
-			</Panel>
-		</div>
-	);
+	return null;
 }
 export function BoundaryPage({ section }: { section: string }) {
 	if (section === "learning") return <LearningPage />;
 	if (section === "models") return <ModelsPage />;
-	if (section === "jobs")
-		return (
-			<Panel title="Background operations">
-				{[
-					"LiveChat sync",
-					"Knowledge indexing",
-					"Learning analysis",
-					"Analytics refresh",
-					"Sheet sync",
-				].map((job) => (
-					<Row
-						key={job}
-						title={job}
-						detail="Реестр заданий и управление расписанием не подключены."
-					>
-						<Badge>Not configured</Badge>
-					</Row>
-				))}
-			</Panel>
-		);
-	if (section === "logs")
-		return (
-			<Panel title="AI request log">
-				<div className="ops-table-wrap">
-					<table>
-						<thead>
-							<tr>
-								{[
-									"Время",
-									"Проект / тема",
-									"Модель",
-									"Задержка",
-									"Источники",
-									"Уверенность",
-									"Safety / routing",
-								].map((c) => (
-									<th key={c}>{c}</th>
-								))}
-							</tr>
-						</thead>
-						<tbody>
-							<tr>
-								<td colSpan={7}>
-									<Missing kind="logs" />
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-			</Panel>
-		);
-	if (section === "flags")
-		return (
-			<Panel title="Server feature flags">
-				<Missing kind="flags" />
-				<div className="ops-panel-actions">
-					<button type="button" disabled className="ui-button">
-						Добавление недоступно
-					</button>
-				</div>
-			</Panel>
-		);
-	return (
-		<Panel title="Usage & budget">
-			<div className="ops-metrics">
-				{["Запросы", "Токены", "Стоимость", "Бюджет"].map((label) => (
-					<div key={label}>
-						<span>{label}</span>
-						<strong>—</strong>
-						<small>No telemetry</small>
-					</div>
-				))}
-			</div>
-			<Missing kind="usage" />
-		</Panel>
-	);
+	return null;
 }
 export function DashboardPage({
 	onUser,
@@ -472,31 +282,22 @@ export function DashboardPage({
 	return (
 		<div className="ops-stack">
 			<QueryState query={accounts} />
-			<div className="ops-metrics">
-				{[
-					["Аккаунты", accounts.data?.total],
-					[
-						"Активные в выборке",
-						accounts.data
-							? rows.filter((u) => u.status === "active").length
-							: undefined,
-					],
-					["AI requests today", undefined],
-					["Monthly AI spend", undefined],
-				].map(([label, value]) => (
-					<div key={label}>
-						<span>{label}</span>
-						<strong>{value ?? "—"}</strong>
-						<small>
-							{value === undefined
-								? "No telemetry"
-								: `${rows.length} загружено`}
-						</small>
-					</div>
-				))}
-			</div>
+			{accounts.data && (
+				<div className="ops-metrics">
+					{[
+						["Аккаунты", accounts.data.total],
+						["Активные в выборке", rows.filter((u) => u.status === "active").length],
+					].map(([label, value]) => (
+						<div key={label}>
+							<span>{label}</span>
+							<strong>{value}</strong>
+							<small>{`${rows.length} загружено`}</small>
+						</div>
+					))}
+				</div>
+			)}
 			<div className="ops-two-col">
-				<Panel title="Needs attention">
+				<Panel title="Требует внимания">
 					{rows
 						.filter((u) => u.status === "pending" || !u.roles.length)
 						.map((u) => (
@@ -523,9 +324,9 @@ export function DashboardPage({
 							<button
 								className="ui-button"
 								type="button"
-								onClick={() => onSection("access")}
+							onClick={() => onSection("access")}
 							>
-								Access Review
+								Роли и доступы
 							</button>
 						</Row>
 					)}
@@ -537,15 +338,5 @@ export function DashboardPage({
 }
 
 export function SystemHealthPage() {
-	return (
-		<div className="ops-stack">
-			<IntegrationsPage />
-			<Panel title="Knowledge index">
-				<Unavailable message="Индексирование не предоставляет отдельную телеметрию. Подбор знаний выполняется текущим AI runtime; процент готовности индекса неизвестен." />
-			</Panel>
-			<Panel title="Learning pipeline">
-				<Missing kind="candidates" />
-			</Panel>
-		</div>
-	);
+	return <IntegrationsPage />;
 }

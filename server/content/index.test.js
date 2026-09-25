@@ -11,9 +11,21 @@ it('requires email write permission and ignores forged actors',async()=>{
  expect((await run({method:'POST',body:{dataset:'emails',data:[],expected:0,actor:'forged'}})).status).toBe(200);
  expect(mocks.requireUser.mock.calls[0][1]).toEqual({permission:'projects.write'});
  expect(JSON.parse(fetch.mock.calls[0][1].body).actor).toBe('verified');
+ expect(fetch.mock.calls[0][0]).toContain('supportos_publish_normalized_content');
 });
 it('allows readers and returns an unpublished document as null',async()=>{
  mocks.db.mockResolvedValue([]);expect((await run({})).data).toBe(null);expect(mocks.requireUser.mock.calls[0][1]).toEqual({permission:'projects.read'});
+});
+it('builds the legacy frontend shape from normalized rows without reading legacy data',async()=>{
+ mocks.db.mockImplementation(async(_env,path)=>{
+  if(path.startsWith('supportos_content_revisions'))return [{id:'emails',version:7,updated_at:'2026-09-25T10:00:00Z',updated_by:'editor'}];
+  if(path.startsWith('supportos_project_emails'))return [{id:'mail-1',project_id:'project-1',type:'Support',email:'help@example.com',note:null,sort_order:0,updated_at:'2026-09-25T09:00:00Z'}];
+  if(path.startsWith('supportos_projects'))return [{id:'project-1',name:'Example',slug:'example',source_hash:'hash',updated_at:'2026-09-25T09:00:00Z'}];
+  throw new Error(`Unexpected path: ${path}`);
+ });
+ const response=await run({});
+ expect(response.data).toMatchObject({id:'emails',version:7,data:[{id:'project-1',projectName:'Example',supportEmail:'help@example.com'}]});
+ expect(mocks.db.mock.calls.some(([,path])=>path.startsWith('supportos_shared_content'))).toBe(false);
 });
 it('isolates personal reads and writes using only the verified account',async()=>{
  mocks.db.mockResolvedValue([]);

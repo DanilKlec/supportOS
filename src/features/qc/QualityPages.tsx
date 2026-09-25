@@ -68,9 +68,9 @@ export function ReviewInbox({initialFilter='all',initialItem=''}:{initialFilter?
   </div>
   <div className="ui-actions" aria-label="Тип проверки">{[['all','Все'],['proposal','Предложения'],['outdated','Устаревшие'],['gap','Пробелы']].map(([id,label])=><button type="button" key={id} className="space-tab" aria-pressed={filter===id} onClick={()=>setKind(id)}>{label}</button>)}</div>
   {(visible.length>0||selected&&current)?<div className={`qc-queue ${selected?'qc-queue--selected':''}`}>
-   <div className="ops-review-list qc-queue-list">{visible.map(i=><button type="button" key={i.id} className="ops-review-item" aria-pressed={i.id===current?.id} onClick={()=>setSelected(i.id)}><strong>{i.title}</strong>{i.projectId&&<span>{projectName(i.projectId)}</span>}<span>{kindLabels[i.kind]} · {date(i.createdAt)}</span><span>Источник: оператор</span></button>)}</div>
+   <div className="ops-review-list qc-queue-list">{visible.map(i=><button type="button" key={i.id} className="ops-review-item" aria-pressed={i.id===current?.id} onClick={()=>setSelected(i.id)}><strong>{i.title}</strong>{i.projectId&&<span>{projectName(i.projectId)}</span>}<span>{kindLabels[i.kind]} · {date(i.createdAt)}</span></button>)}</div>
    {current&&<div className="qc-queue-detail"><button className="ui-button qc-queue-back" type="button" onClick={()=>setSelected('')}>Назад к очереди</button><Panel title={current.title} aside={<Badge>{kindLabels[current.kind]}</Badge>}>
-    <div className="ops-note"><p>Источник: оператор · {date(current.createdAt)}</p>{current.projectId&&<p>Проект: {projectName(current.projectId)}</p>}{current.evidence.map(e=><p key={e}>{e}</p>)}</div>
+    <div className="ops-note"><p>{date(current.createdAt)}</p>{current.projectId&&<p>Проект: {projectName(current.projectId)}</p>}{current.evidence.map(e=><p key={e}>{e}</p>)}</div>
     {current.kind==='proposal'?<BindProposals key={current.id} sourceId={current.materialId} proposalId={current.id.slice('proposal:'.length)} expanded/>:<>
      {material&&<><h4 className="ops-note">Текущая версия · обновлена {date(material.updatedAt)}</h4><MaterialText bind={material}/></>}
      <p className="ops-note">{current.kind==='gap'?'Подготовьте проверенный ответ на эту тему в материалах команды.':'Сверьте текст с действующими правилами проекта и внесите необходимые изменения.'}</p>

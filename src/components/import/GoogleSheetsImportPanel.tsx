@@ -119,12 +119,12 @@ export function GoogleSheetsImportPanel({
 			const nextPreview = await googleSheetsService.preview(url);
 
 			setPreview(nextPreview);
-			showToast("Google Sheet loaded");
+			showToast("Google-таблица загружена");
 		} catch (previewError) {
 			setError(
 				previewError instanceof Error
 					? previewError.message
-					: "Unable to load Google Sheet",
+					: "Не удалось загрузить Google-таблицу",
 			);
 		} finally {
 			setLoadingPreview(false);
@@ -148,7 +148,7 @@ export function GoogleSheetsImportPanel({
 			showToast(`Imported ${imported} binds`);
 		} catch (commitError) {
 			setError(
-				commitError instanceof Error ? commitError.message : "Import failed",
+				commitError instanceof Error ? commitError.message : "Импорт не выполнен",
 			);
 		} finally {
 			setSaving(false);
@@ -160,18 +160,18 @@ export function GoogleSheetsImportPanel({
 			{showHeading && (
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-2xl font-bold">Google Sheets Import</h1>
+						<h1 className="text-2xl font-bold">Импорт из Google-таблицы</h1>
 						<p className="mt-1 text-sm text-muted">
-							Import rows as RU, EN, DE, PT and EL bind translations.
+							Импортируйте строки как переводы биндов на RU, EN, DE, PT и EL.
 						</p>
 					</div>
 
 					<div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
 						{configured
 							? isAdmin
-								? "Admin import enabled"
-								: "Admin role required"
-							: "Local import mode"}
+								? "Импорт для администратора включён"
+								: "Требуется роль администратора"
+							: "Локальный режим импорта"}
 					</div>
 				</div>
 			)}
@@ -192,7 +192,7 @@ export function GoogleSheetsImportPanel({
 						onChange={(event) => setUrl(event.target.value)}
 						disabled={loadingPreview || saving || !isAdmin}
 						className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-						placeholder="Paste public Google Sheets URL"
+						placeholder="Вставьте общедоступную ссылку на Google-таблицу"
 					/>
 
 					<button
@@ -205,14 +205,14 @@ export function GoogleSheetsImportPanel({
 						) : (
 							<FileSpreadsheet size={16} />
 						)}
-						Preview
+						Предпросмотр
 					</button>
 				</div>
 			</form>
 
 			<div className="grid gap-4 rounded-lg border border-border bg-surface p-4 lg:grid-cols-3">
 				<label className="ui-field ">
-					<span className="text-sm font-medium">Category</span>
+					<span className="text-sm font-medium">Категория</span>
 					<select
 						value={categoryId}
 						onChange={(event) => {
@@ -231,14 +231,14 @@ export function GoogleSheetsImportPanel({
 				</label>
 
 				<label className="ui-field ">
-					<span className="text-sm font-medium">Folder</span>
+					<span className="text-sm font-medium">Папка</span>
 					<select
 						value={folderId}
 						onChange={(event) => setFolderId(event.target.value)}
 						disabled={saving || !isAdmin}
 						className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					>
-						<option value="">No folder</option>
+						<option value="">Без папки</option>
 						{availableFolders.map((folder) => (
 							<option key={folder.id} value={folder.id}>
 								{folder.name}
@@ -248,15 +248,15 @@ export function GoogleSheetsImportPanel({
 				</label>
 
 				<label className="ui-field ">
-					<span className="text-sm font-medium">Mode</span>
+					<span className="text-sm font-medium">Режим</span>
 					<select
 						value={mode}
 						onChange={(event) => setMode(event.target.value as SheetImportMode)}
 						disabled={saving || !isAdmin}
 						className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
 					>
-						<option value="upsert">Update and add</option>
-						<option value="replace">Replace imported set</option>
+						<option value="upsert">Обновить и добавить</option>
+						<option value="replace">Заменить импортированный набор</option>
 					</select>
 				</label>
 			</div>
@@ -266,20 +266,20 @@ export function GoogleSheetsImportPanel({
 					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 						<div>
 							<div className="text-sm font-semibold">
-								{preview.rows.length} rows found
+								Найдено строк: {preview.rows.length}
 							</div>
 							<div className="mt-1 text-xs text-muted">
 								{preview.rows.filter((row) => row.errors.length === 0).length}{" "}
-								ready to import
+								готово к импорту
 							</div>
 						</div>
 
 						<div className="flex flex-wrap gap-2 text-xs">
-							<StatusPill label="New" value={previewCounts.new} />
-							<StatusPill label="Update" value={previewCounts.update} />
-							<StatusPill label="Same" value={previewCounts.unchanged} />
-							<StatusPill label="Conflict" value={previewCounts.conflict} />
-							<StatusPill label="Error" value={previewCounts.error} />
+							<StatusPill label="Новые" value={previewCounts.new} />
+							<StatusPill label="Обновления" value={previewCounts.update} />
+							<StatusPill label="Без изменений" value={previewCounts.unchanged} />
+							<StatusPill label="Конфликты" value={previewCounts.conflict} />
+							<StatusPill label="Ошибки" value={previewCounts.error} />
 						</div>
 
 						<button
@@ -298,7 +298,7 @@ export function GoogleSheetsImportPanel({
 							) : (
 								<UploadCloud size={16} />
 							)}
-							Import
+							Импортировать
 						</button>
 					</div>
 
@@ -306,13 +306,13 @@ export function GoogleSheetsImportPanel({
 						<table className="w-full border-collapse text-sm">
 							<thead className="sticky top-0 bg-surface-elevated text-left text-xs uppercase tracking-wider text-muted">
 								<tr>
-									<th className="border-b border-border px-4 py-2">Row</th>
-									<th className="border-b border-border px-4 py-2">Title</th>
-									<th className="border-b border-border px-4 py-2">Slug</th>
+									<th className="border-b border-border px-4 py-2">Строка</th>
+									<th className="border-b border-border px-4 py-2">Заголовок</th>
+									<th className="border-b border-border px-4 py-2">Идентификатор (slug)</th>
 									<th className="border-b border-border px-4 py-2">
-										Languages
+										Языки
 									</th>
-									<th className="border-b border-border px-4 py-2">Status</th>
+									<th className="border-b border-border px-4 py-2">Статус</th>
 								</tr>
 							</thead>
 
@@ -365,11 +365,11 @@ function StatusPill({ label, value }: { label: string; value: number }) {
 
 function ImportStatus({ status }: { status: PreviewStatus }) {
 	const labelByStatus: Record<PreviewStatus, string> = {
-		new: "New",
-		update: "Update",
-		unchanged: "No changes",
-		conflict: "Possible duplicate",
-		error: "Error",
+		new: "Новый",
+		update: "Обновлён",
+		unchanged: "Без изменений",
+		conflict: "Возможный дубликат",
+		error: "Ошибка",
 	};
 	const classByStatus: Record<PreviewStatus, string> = {
 		new: "text-green-300",

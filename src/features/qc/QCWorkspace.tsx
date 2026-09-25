@@ -1,9 +1,10 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { AIControlCenter, type AISection } from '@/features/admin/AIControlCenter';
 import { DepositBonusesPage } from '@/features/bonuses/DepositBonusesPage';
 import { ProjectEmailsPage } from '@/features/project-emails/ProjectEmailsPage';
 import { OperationsWorkspace } from '@/features/operations/OperationsWorkspace';
-import { qcSections } from '@/features/operations/sections';
+import { qcHashRedirects, qcSections } from '@/features/operations/sections';
 import { SharedBindsPage } from '@/features/shared-binds/SharedBindsPage';
 import { useAuthStore } from '@/store/auth.store';
 import { canAccessPage } from '../../../shared/access.js';
@@ -15,10 +16,17 @@ export function QCWorkspace() {
  const access=useAuthStore(s=>s.session?.user.access);
  const hash=useRouterState({select:s=>s.location.hash});
  const navigate=useNavigate();
- const destination=qcDestination(hash || qcSections.find(s=>canAccessPage(access,'/qc',s.id))?.id || 'overview');
+ const hashId=hash.replace(/^#/,'').split('?')[0];
+ const redirectedHash=hashId ? qcHashRedirects[hashId] : undefined;
+ const normalizedHash=redirectedHash ?? hash;
+ const destination=qcDestination(normalizedHash || qcSections.find(s=>canAccessPage(access,'/qc',s.id))?.id || 'overview');
+ useEffect(()=>{
+  if(!hash || !redirectedHash) return;
+  void navigate({to:'/qc',hash:redirectedHash,replace:true});
+ },[hash,navigate,redirectedHash]);
  const select=(id:string)=>{if(canAccessPage(access,'/qc',id))void navigate({to:'/qc',hash:id});};
  const tabs=(destination.section==='materials'?materialTabs:destination.section==='problems'?problemTabs:destination.section==='quality'?qualityTabs:[]).filter(t=>canAccessPage(access,'/qc',t.id));
- const isContainer=!hash||['materials','problems'].includes(hash);
+ const isContainer=!normalizedHash||['materials','problems'].includes(normalizedHash);
  const active=isContainer&&!tabs.some(t=>t.id===destination.tab)?tabs[0]?.id:destination.tab;
  let content:React.ReactNode;
  if(!active||!canAccessPage(access,'/qc',active)) content=<p role="alert">Нет доступа к этому инструменту.</p>;

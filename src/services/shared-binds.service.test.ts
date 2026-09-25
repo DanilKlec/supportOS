@@ -2,11 +2,12 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
 	getSession: vi.fn(),
-	select: vi.fn(),
-	insert: vi.fn(),
-	updateWhere: vi.fn(),
+	request: vi.fn(),
 }));
 vi.mock("./supabase.service", () => ({ supabaseService: mock }));
+vi.mock("./authenticated-fetch", () => ({
+	authenticatedFetch: mock.request,
+}));
 
 import { sharedBindsService } from "./shared-binds.service";
 
@@ -27,20 +28,32 @@ beforeEach(() => {
 			},
 		},
 	});
+	mock.request.mockResolvedValue(
+		new Response(JSON.stringify({ error: "unexpected request" }), {
+			status: 500,
+		}),
+	);
 });
 it("rejects shared writes by Support before making a request", async () => {
 	mock.getSession.mockReturnValue({
 		user: { access: { status: "active", permissions: ["binds.read"] } },
 	});
 	await expect(sharedBindsService.save(draft)).rejects.toThrow("Нет права");
-	expect(mock.insert).not.toHaveBeenCalled();
+	expect(mock.request).not.toHaveBeenCalled();
 });
 it("only confirms a shared save after the server returns it", async () => {
-	mock.insert.mockRejectedValue(new Error("offline"));
+	mock.request.mockRejectedValue(new Error("offline"));
 	await expect(sharedBindsService.save(draft)).rejects.toThrow("offline");
 });
 it("detects a concurrent shared edit instead of silently overwriting it", async () => {
-	mock.updateWhere.mockResolvedValue([]);
+	mock.request.mockResolvedValue(
+		new Response(
+			JSON.stringify({
+				error: "Бинд изменён другим сотрудником или доступ отозван.",
+			}),
+			{ status: 409 },
+		),
+	);
 	await expect(
 		sharedBindsService.save({
 			...draft,
@@ -51,9 +64,10 @@ it("detects a concurrent shared edit instead of silently overwriting it", async 
 			} as never,
 		}),
 	).rejects.toThrow("Бинд изменён другим сотрудником или доступ отозван");
-	expect(mock.updateWhere.mock.calls[0][1]).toMatchObject({
-		updated_at: "eq.2026-09-10T10:00:00Z",
-		owner_id: "is.null",
+	expect(JSON.parse(mock.request.mock.calls[0][1].body)).toMatchObject({
+		action: "shared-save",
+		expected: "2026-09-10T10:00:00Z",
+		id: "base",
 	});
 });
 it("paginates the common library and never selects private versions", async () => {
@@ -67,14 +81,21 @@ it("paginates the common library and never selects private versions", async () =
 		created_at: "",
 		updated_at: "",
 	};
-	mock.select
+	mock.request
 		.mockResolvedValueOnce(
-			Array.from({ length: 500 }, (_, i) => ({ ...row, id: String(i) })),
+			new Response(
+				JSON.stringify({
+					rows: Array.from({ length: 500 }, (_, i) => ({
+						...row,
+						id: String(i),
+					})),
+				}),
+			),
 		)
-		.mockResolvedValueOnce([row]);
+		.mockResolvedValueOnce(new Response(JSON.stringify({ rows: [row] })));
 	expect(await sharedBindsService.list()).toHaveLength(501);
-	expect(mock.select.mock.calls[1][1]).toMatchObject({
-		offset: 500,
-		owner_id: "is.null",
-	});
+	expect(mock.request.mock.calls.map(([url]) => url)).toEqual([
+		"/api/binds?action=shared&limit=500&offset=0",
+		"/api/binds?action=shared&limit=500&offset=500",
+	]);
 });

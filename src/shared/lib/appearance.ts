@@ -24,34 +24,34 @@ export interface AppearanceSettings {
 }
 
 export const ACCENT_COLORS = [
-	{ name: "Graphite", value: "#a1a1aa" },
-	{ name: "Blue", value: "#3b82f6" },
-	{ name: "Cyan", value: "#06b6d4" },
-	{ name: "Emerald", value: "#10b981" },
-	{ name: "Rose", value: "#f43f5e" },
-	{ name: "Amber", value: "#f59e0b" },
+	{ name: "Графит", value: "#a1a1aa" },
+	{ name: "Синий", value: "#3b82f6" },
+	{ name: "Голубой", value: "#06b6d4" },
+	{ name: "Изумрудный", value: "#10b981" },
+	{ name: "Розовый", value: "#f43f5e" },
+	{ name: "Янтарный", value: "#f59e0b" },
 ] as const;
 
 export const PALETTE_OPTIONS = [
 	{
-		name: "Obsidian",
+		name: "Обсидиан",
 		value: "slate",
-		description: "Black canvas and graphite surfaces.",
+		description: "Чёрный фон и графитовые поверхности.",
 	},
 	{
-		name: "Neutral",
+		name: "Нейтральный",
 		value: "neutral",
-		description: "Cleaner gray surfaces.",
+		description: "Чистые серые поверхности.",
 	},
 	{
-		name: "Contrast",
+		name: "Контрастный",
 		value: "contrast",
-		description: "Sharper borders and text.",
+		description: "Более выразительные границы и текст.",
 	},
 	{
-		name: "Custom",
+		name: "Свой",
 		value: "custom",
-		description: "Your own workspace colors.",
+		description: "Собственные цвета рабочего пространства.",
 	},
 ] as const;
 
@@ -59,24 +59,24 @@ export const CUSTOM_PALETTE_FIELDS: Array<{
 	key: keyof PaletteColors;
 	name: string;
 }> = [
-	{ key: "background", name: "Background" },
-	{ key: "foreground", name: "Text" },
-	{ key: "surface", name: "Surface" },
-	{ key: "surfaceElevated", name: "Raised" },
-	{ key: "border", name: "Border" },
-	{ key: "muted", name: "Muted text" },
+	{ key: "background", name: "Фон" },
+	{ key: "foreground", name: "Текст" },
+	{ key: "surface", name: "Поверхность" },
+	{ key: "surfaceElevated", name: "Приподнятая поверхность" },
+	{ key: "border", name: "Граница" },
+	{ key: "muted", name: "Приглушённый текст" },
 ];
 
 export const RADIUS_OPTIONS = [
-	{ name: "Sharp", value: "sharp", description: "Tighter corners." },
-	{ name: "Balanced", value: "balanced", description: "Default shape." },
-	{ name: "Rounded", value: "rounded", description: "Softer controls." },
+	{ name: "Острый", value: "sharp", description: "Более строгие углы." },
+	{ name: "Сбалансированный", value: "balanced", description: "Форма по умолчанию." },
+	{ name: "Закруглённый", value: "rounded", description: "Более мягкие элементы управления." },
 ] as const;
 
 export const FONT_SCALE_OPTIONS = [
-	{ name: "Small", value: "small" },
-	{ name: "Normal", value: "normal" },
-	{ name: "Large", value: "large" },
+	{ name: "Маленький", value: "small" },
+	{ name: "Обычный", value: "normal" },
+	{ name: "Большой", value: "large" },
 ] as const;
 
 const THEME_MODE_KEY = "supportos-theme-mode";

@@ -46,10 +46,10 @@ export function TranslatorSettingsPage({
 			await translatorService.testConnection();
 
 			setStatus("ok");
-			setMessage("Connected. Translation provider is ready.");
+			setMessage("Подключено. Провайдер перевода готов к работе.");
 		} catch (error) {
 			setStatus("error");
-			setMessage(error instanceof Error ? error.message : "Unable to connect.");
+			setMessage(error instanceof Error ? error.message : "Не удалось подключиться.");
 		} finally {
 			setChecking(false);
 		}
@@ -63,9 +63,9 @@ export function TranslatorSettingsPage({
 		>
 			<div className={embedded ? "max-w-3xl" : "mx-auto max-w-3xl p-6"}>
 				<div className="mb-6">
-					<h1 className="text-2xl font-bold">Translator Settings</h1>
+					<h1 className="text-2xl font-bold">Настройки переводчика</h1>
 					<p className="mt-1 text-sm text-muted">
-						Choose the translation provider used by SupportOS.
+						Выберите провайдера перевода для SupportOS.
 					</p>
 				</div>
 
@@ -80,9 +80,9 @@ export function TranslatorSettingsPage({
 									: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
 							}`}
 						>
-							<div className="text-sm font-semibold">Free Smart</div>
+							<div className="text-sm font-semibold">Умный бесплатный</div>
 							<div className="mt-1 text-xs text-muted">
-								Free Google-style translation through Lingva. No API key.
+								Бесплатный перевод в стиле Google через Lingva. API-ключ не нужен.
 							</div>
 						</button>
 
@@ -97,7 +97,7 @@ export function TranslatorSettingsPage({
 						>
 							<div className="text-sm font-semibold">MyMemory</div>
 							<div className="mt-1 text-xs text-muted">
-								Simple free fallback. Optional email/API key.
+								Простой бесплатный резервный вариант. Email и API-ключ необязательны.
 							</div>
 						</button>
 
@@ -112,7 +112,7 @@ export function TranslatorSettingsPage({
 						>
 							<div className="text-sm font-semibold">LibreTranslate</div>
 							<div className="mt-1 text-xs text-muted">
-								For a custom server or Vercel proxy.
+								Для собственного сервера или прокси Vercel.
 							</div>
 						</button>
 					</div>
@@ -121,7 +121,7 @@ export function TranslatorSettingsPage({
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-									<div className="text-sm font-medium">Free endpoint</div>
+								<div className="text-sm font-medium">Бесплатная конечная точка</div>
 									<div className="text-xs text-muted">
 										{lingvaEndpoint.trim() || DEFAULT_LINGVA_ENDPOINT}
 									</div>
@@ -137,12 +137,12 @@ export function TranslatorSettingsPage({
 									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
-									Use Default
+									Использовать стандартную
 								</button>
 							</div>
 
 							<label className="ui-field ">
-								<span className="text-sm font-medium">Lingva Endpoint</span>
+								<span className="text-sm font-medium">Конечная точка Lingva</span>
 								<input
 									value={lingvaEndpoint}
 									onChange={(event) => setLingvaEndpoint(event.target.value)}
@@ -152,47 +152,47 @@ export function TranslatorSettingsPage({
 							</label>
 
 							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								This provider does not use OpenAI or paid API keys. If the
-								public endpoint is unavailable, switch to another Lingva
-								instance or use MyMemory.
+								Этот провайдер не использует OpenAI или платные API-ключи. Если
+								общедоступная конечная точка недоступна, переключитесь на другой
+								экземпляр Lingva или используйте MyMemory.
 							</div>
 						</div>
 					) : provider === "mymemory" ? (
 						<div className="space-y-4">
 							<label className="ui-field ">
-								<span className="text-sm font-medium">Contact Email</span>
+								<span className="text-sm font-medium">Контактный email</span>
 								<input
 									type="email"
 									value={email}
 									onChange={(event) => setEmail(event.target.value)}
 									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									placeholder="Необязательно"
 								/>
 							</label>
 
 							<label className="ui-field ">
-								<span className="text-sm font-medium">API Key</span>
+								<span className="text-sm font-medium">API-ключ</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
 									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									placeholder="Необязательно"
 								/>
 							</label>
 
 							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								Anonymous MyMemory usage is limited. Adding a contact email
-								increases the free daily character limit on their API.
+								Анонимное использование MyMemory ограничено. Добавление контактного
+								email увеличивает бесплатный дневной лимит символов их API.
 							</div>
 						</div>
 					) : (
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-									<div className="text-sm font-medium">Endpoint Mode</div>
+								<div className="text-sm font-medium">Режим конечной точки</div>
 									<div className="text-xs text-muted">
-										{isBuiltIn ? "Built-in endpoint" : "Custom endpoint"}
+										{isBuiltIn ? "Встроенная конечная точка" : "Собственная конечная точка"}
 									</div>
 								</div>
 
@@ -203,13 +203,13 @@ export function TranslatorSettingsPage({
 									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
-									Use Built-In
+									Использовать встроенную
 								</button>
 							</div>
 
 							<label className="ui-field ">
 								<span className="text-sm font-medium">
-									LibreTranslate Endpoint
+									Конечная точка LibreTranslate
 								</span>
 								<input
 									value={endpoint}
@@ -220,13 +220,13 @@ export function TranslatorSettingsPage({
 							</label>
 
 							<label className="ui-field ">
-								<span className="text-sm font-medium">API Key</span>
+								<span className="text-sm font-medium">API-ключ</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
 									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									placeholder="Необязательно"
 								/>
 							</label>
 						</div>
@@ -244,7 +244,7 @@ export function TranslatorSettingsPage({
 							) : (
 								<PlugZap size={16} />
 							)}
-							Test Connection
+							Проверить подключение
 						</button>
 
 						{status === "ok" && (

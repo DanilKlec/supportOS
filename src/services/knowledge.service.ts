@@ -1,12 +1,6 @@
 import type { Bind, BindHistoryEntry, BindTranslation } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
-import {
-	mockBinds,
-	mockCategories,
-	mockFolders,
-} from "@/entities/knowledge/mock";
-import { cloudKnowledgeService } from "@/services/cloud-knowledge.service";
-import { localKnowledgeStorageService } from "@/services/local-knowledge-storage.service";
+import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { supabaseService } from "@/services/supabase.service";
 import { type KnowledgeSnapshot, useKnowledgeStore } from "@/store";
 import { can } from "../../shared/access.js";
@@ -117,6 +111,89 @@ export type CreateFolderInput = {
 
 type StoredKnowledge = KnowledgeDatabase & {
 	version?: number;
+};
+
+async function knowledgeApi(
+	body?: Record<string, unknown>,
+): Promise<Partial<KnowledgeDatabase> | undefined> {
+	const response = await authenticatedFetch(
+		body ? "/api/binds" : "/api/binds?action=knowledge",
+		body
+			? {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(body),
+				}
+			: undefined,
+	);
+	const result = await response.json();
+
+	if (!response.ok) {
+		throw Object.assign(
+			new Error(result.error ?? "Не удалось синхронизировать базу знаний"),
+			{ status: response.status },
+		);
+	}
+
+	return result;
+}
+
+let databaseMutationQueue = Promise.resolve();
+
+function enqueueKnowledgeMutation(body: Record<string, unknown>) {
+	const accountId = supabaseService.getSession()?.user.id;
+
+	if (!accountId) return;
+
+	databaseMutationQueue = databaseMutationQueue
+		.then(async () => {
+			if (supabaseService.getSession()?.user.id !== accountId) return;
+			await knowledgeApi(body);
+		})
+		.catch(() => undefined);
+}
+
+const databaseKnowledgeService = {
+	loadKnowledge: () => knowledgeApi(),
+	saveCategory: (category: KnowledgeCategory) =>
+		enqueueKnowledgeMutation({ action: "knowledge-save", categories: [category] }),
+	saveFolder: (folder: KnowledgeFolder) =>
+		enqueueKnowledgeMutation({ action: "knowledge-save", folders: [folder] }),
+	saveBind: (bind: Bind) =>
+		enqueueKnowledgeMutation({ action: "knowledge-save", binds: [bind] }),
+	saveMany: ({
+		categories,
+		folders,
+		binds,
+	}: {
+		categories?: KnowledgeCategory[];
+		folders?: KnowledgeFolder[];
+		binds?: Bind[];
+	}) =>
+		enqueueKnowledgeMutation({
+			action: "knowledge-save",
+			...(categories?.length ? { categories } : {}),
+			...(folders?.length ? { folders } : {}),
+			...(binds?.length ? { binds } : {}),
+		}),
+	deleteCategory: (id: string) =>
+		enqueueKnowledgeMutation({
+			action: "knowledge-delete",
+			entity: "category",
+			id,
+		}),
+	deleteFolder: (id: string) =>
+		enqueueKnowledgeMutation({
+			action: "knowledge-delete",
+			entity: "folder",
+			id,
+		}),
+	deleteBind: (id: string) =>
+		enqueueKnowledgeMutation({
+			action: "knowledge-delete",
+			entity: "bind",
+			id,
+		}),
 };
 
 function clone<T>(value: T): T {
@@ -295,53 +372,6 @@ function updateTranslation(
 	return next;
 }
 
-async function loadConfiguredSeedKnowledge() {
-	try {
-		const module = await import(
-			"@/entities/knowledge/mock/defaultKnowledge.json"
-		);
-		const config = module.default;
-
-		if (
-			config &&
-			Array.isArray(config.categories) &&
-			Array.isArray(config.folders) &&
-			Array.isArray(config.binds)
-		) {
-			return normalizeDatabase(config as unknown as Partial<StoredKnowledge>);
-		}
-	} catch {
-		return undefined;
-	}
-
-	return undefined;
-}
-
-async function seedKnowledge(): Promise<KnowledgeDatabase> {
-	const configuredSeed = await loadConfiguredSeedKnowledge();
-
-	if (configuredSeed) return configuredSeed;
-
-	const binds = clone(mockBinds);
-
-	return {
-		categories: clone(mockCategories),
-		folders: clone(mockFolders),
-		binds,
-		expandedFolders: mockCategories.map((category) => category.id),
-		language: "ru",
-		search: "",
-		favorites: binds.filter((bind) => bind.favorite).map((bind) => bind.id),
-		recent: [],
-		openedTabs: [],
-		pinnedTabs: [],
-		activeTab: undefined,
-		selectedBind: undefined,
-		selectedCategory: undefined,
-		selectedFolder: undefined,
-	};
-}
-
 function normalizeDatabase(
 	database: Partial<StoredKnowledge>,
 ): KnowledgeDatabase {
@@ -433,32 +463,22 @@ function normalizeDatabase(
 }
 
 class KnowledgeService {
-	private unsubscribe?: () => void;
-	private saveTimer?: number;
-
 	async loadKnowledge(): Promise<KnowledgeDatabase> {
-		const storedDatabase = await this.readStorage();
-		const database = storedDatabase ?? (await seedKnowledge());
+		const accountId = supabaseService.getSession()?.user.id;
+
+		if (!accountId) throw new Error("Войдите с личным аккаунтом");
+		const loaded = await databaseKnowledgeService.loadKnowledge();
+		if (supabaseService.getSession()?.user.id !== accountId)
+			throw new Error("Аккаунт изменился");
+		const database = normalizeDatabase(loaded ?? {});
 
 		useKnowledgeStore.getState().setKnowledge(database);
-		this.startAutoSave();
-
-		if (!storedDatabase) {
-			this.saveKnowledge();
-		}
 
 		return database;
 	}
 
 	async loadCloudKnowledge() {
-		const cloudDatabase = await cloudKnowledgeService.loadKnowledge();
-
-		if (!cloudDatabase) return undefined;
-
-		useKnowledgeStore.getState().setKnowledge(cloudDatabase);
-		this.saveKnowledge();
-
-		return cloudDatabase;
+		return this.loadKnowledge();
 	}
 
 	saveKnowledge(database?: Partial<KnowledgeDatabase>) {
@@ -466,10 +486,7 @@ class KnowledgeService {
 			useKnowledgeStore.getState().setKnowledge(database);
 		}
 
-		const snapshot = this.getSnapshot();
-		this.writeStorage(snapshot);
-
-		return snapshot;
+		return this.getSnapshot();
 	}
 
 	search(query: string) {
@@ -537,7 +554,7 @@ class KnowledgeService {
 		store.openBind(bind.id);
 		this.revealLocation(bind.categoryId, bind.folderId);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveBind(bind);
+		databaseKnowledgeService.saveBind(bind);
 
 		return bind;
 	}
@@ -564,7 +581,7 @@ class KnowledgeService {
 			store.setBinds(binds);
 			store.openBind(override.id);
 			this.saveKnowledge();
-			cloudKnowledgeService.saveBind(override);
+			databaseKnowledgeService.saveBind(override);
 
 			return override;
 		}
@@ -644,7 +661,7 @@ class KnowledgeService {
 			store.binds.map((bind) => (bind.id === id ? updated : bind)),
 		);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveBind(updated);
+		databaseKnowledgeService.saveBind(updated);
 
 		return updated;
 	}
@@ -776,7 +793,7 @@ class KnowledgeService {
 
 		store.setBinds(binds);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({ binds: changedBinds });
+		databaseKnowledgeService.saveMany({ binds: changedBinds });
 
 		return changedBinds.length > 0;
 	}
@@ -860,7 +877,7 @@ class KnowledgeService {
 			binds: mergeById(store.binds, binds),
 		});
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({ categories, folders, binds });
+		databaseKnowledgeService.saveMany({ categories, folders, binds });
 	}
 
 	deleteBind(id: string) {
@@ -890,7 +907,7 @@ class KnowledgeService {
 				selectedBind: activeTab,
 			});
 			this.saveKnowledge();
-			cloudKnowledgeService.saveBind(override);
+			databaseKnowledgeService.saveBind(override);
 
 			return;
 		}
@@ -914,7 +931,7 @@ class KnowledgeService {
 		});
 
 		this.saveKnowledge();
-		cloudKnowledgeService.deleteBind(id);
+		databaseKnowledgeService.deleteBind(id);
 	}
 
 	archiveBind(id: string) {
@@ -1077,7 +1094,7 @@ class KnowledgeService {
 					: store.selectedBind,
 		});
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({ binds: changedBinds });
+		databaseKnowledgeService.saveMany({ binds: changedBinds });
 
 		return changedBinds.filter((bind) => changedIds.has(bind.id));
 	}
@@ -1138,7 +1155,7 @@ class KnowledgeService {
 		this.saveKnowledge();
 
 		for (const bind of deletedBinds) {
-			cloudKnowledgeService.deleteBind(bind.id);
+			databaseKnowledgeService.deleteBind(bind.id);
 		}
 
 		return deletedBinds;
@@ -1166,7 +1183,7 @@ class KnowledgeService {
 		store.selectCategory(category.id);
 		store.toggleFolder(category.id);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveCategory(category);
+		databaseKnowledgeService.saveCategory(category);
 
 		return category;
 	}
@@ -1189,7 +1206,7 @@ class KnowledgeService {
 			(category) => category.id === id,
 		);
 		if (updatedCategory) {
-			cloudKnowledgeService.saveCategory(updatedCategory);
+			databaseKnowledgeService.saveCategory(updatedCategory);
 		}
 	}
 
@@ -1219,7 +1236,7 @@ class KnowledgeService {
 
 		store.setCategories(categories);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({ categories: changedCategories });
+		databaseKnowledgeService.saveMany({ categories: changedCategories });
 
 		return true;
 	}
@@ -1242,7 +1259,7 @@ class KnowledgeService {
 			),
 		});
 		this.saveKnowledge();
-		cloudKnowledgeService.deleteCategory(id);
+		databaseKnowledgeService.deleteCategory(id);
 		if (
 			!useKnowledgeStore.getState().selectedBind &&
 			store.selectedCategory === id
@@ -1288,7 +1305,7 @@ class KnowledgeService {
 		}
 
 		this.saveKnowledge();
-		cloudKnowledgeService.saveFolder(folder);
+		databaseKnowledgeService.saveFolder(folder);
 		this.revealLocation(folder.categoryId, folder.id);
 
 		return folder;
@@ -1313,7 +1330,7 @@ class KnowledgeService {
 			.getState()
 			.folders.find((folder) => folder.id === id);
 		if (updatedFolder) {
-			cloudKnowledgeService.saveFolder(updatedFolder);
+			databaseKnowledgeService.saveFolder(updatedFolder);
 		}
 	}
 
@@ -1352,7 +1369,7 @@ class KnowledgeService {
 
 		store.setFolders(folders);
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({ folders: changedFolders });
+		databaseKnowledgeService.saveMany({ folders: changedFolders });
 
 		return true;
 	}
@@ -1473,7 +1490,7 @@ class KnowledgeService {
 		}
 
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany({
+		databaseKnowledgeService.saveMany({
 			folders: changedFolders,
 			binds: changedBinds,
 		});
@@ -1497,7 +1514,7 @@ class KnowledgeService {
 			),
 		});
 		this.saveKnowledge();
-		cloudKnowledgeService.deleteFolder(id);
+		databaseKnowledgeService.deleteFolder(id);
 		if (
 			!useKnowledgeStore.getState().selectedBind &&
 			folderIds.has(store.selectedFolder ?? "")
@@ -1531,7 +1548,7 @@ class KnowledgeService {
 				favorites,
 			});
 			this.saveKnowledge();
-			cloudKnowledgeService.saveBind(override);
+			databaseKnowledgeService.saveBind(override);
 
 			return favorite;
 		}
@@ -1547,7 +1564,7 @@ class KnowledgeService {
 		this.saveKnowledge();
 		const updatedBind = binds.find((bind) => bind.id === id);
 		if (updatedBind) {
-			cloudKnowledgeService.saveBind(updatedBind);
+			databaseKnowledgeService.saveBind(updatedBind);
 		}
 
 		return favorite;
@@ -1578,7 +1595,7 @@ class KnowledgeService {
 		useKnowledgeStore.getState().setKnowledge(database);
 
 		this.saveKnowledge();
-		cloudKnowledgeService.saveMany(database);
+		databaseKnowledgeService.saveMany(database);
 
 		return database;
 	}
@@ -1632,35 +1649,6 @@ class KnowledgeService {
 			pinnedTabs: state.pinnedTabs,
 			activeTab: state.activeTab,
 		};
-	}
-
-	private async readStorage() {
-		const database = await localKnowledgeStorageService.read();
-
-		return database
-			? normalizeDatabase(database as Partial<StoredKnowledge>)
-			: undefined;
-	}
-
-	private writeStorage(database: KnowledgeDatabase) {
-		localKnowledgeStorageService.write(database);
-	}
-
-	private startAutoSave() {
-		if (typeof window === "undefined" || this.unsubscribe) return;
-
-		this.unsubscribe = useKnowledgeStore.subscribe(() => {
-			this.scheduleStorageWrite();
-		});
-	}
-
-	private scheduleStorageWrite() {
-		if (typeof window === "undefined") return;
-
-		window.clearTimeout(this.saveTimer);
-		this.saveTimer = window.setTimeout(() => {
-			this.writeStorage(this.getSnapshot());
-		}, 500);
 	}
 
 	canManageStructure(ownerId?: string | null) {

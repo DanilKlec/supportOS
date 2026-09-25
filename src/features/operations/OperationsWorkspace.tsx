@@ -8,6 +8,7 @@ export type WorkspaceSection = {
 	group: string;
 	description: string;
 	parent?: string;
+	hiddenFromNavigation?: boolean;
 };
 export function OperationsWorkspace({
 	area,
@@ -27,7 +28,9 @@ export function OperationsWorkspace({
 		canAccessPage(access, `/${area}`, s.id),
 	);
 	const navigation = available.filter(
-		(s) => !s.parent || !available.some((parent) => parent.id === s.parent),
+		(s) =>
+			!s.hiddenFromNavigation &&
+			(!s.parent || !available.some((parent) => parent.id === s.parent)),
 	);
 	const current = available.find((s) => s.id === active);
 	return (
@@ -37,12 +40,12 @@ export function OperationsWorkspace({
 					← Рабочее пространство
 				</Link>
 				<div className="ops-workspace-title">
-					<p>{area === "admin" ? "Platform workspace" : "Контроль качества"}</p>
-					<h1>{area === "admin" ? "Administration" : "QC"}</h1>
+					<p>{area === "admin" ? "Рабочее пространство платформы" : "Контроль качества"}</p>
+					<h1>{area === "admin" ? "Администрирование" : "Контроль качества"}</h1>
 				</div>
 				<nav
 					aria-label={
-						area === "admin" ? "Администрирование" : "QC"
+					area === "admin" ? "Администрирование" : "Контроль качества"
 					}
 				>
 					{[...new Set(navigation.map((s) => s.group))].map((group) => (
@@ -70,7 +73,7 @@ export function OperationsWorkspace({
 				<div className="ops-sidebar-footer">
 					<strong>
 						{area === "admin"
-							? "System & access control"
+							? "Система и контроль доступов"
 							: "Материалы и ответы AI"}
 					</strong>
 					<p>Доступ по правам вашей учётной записи</p>
@@ -84,7 +87,7 @@ export function OperationsWorkspace({
 						value={current?.id ?? ""}
 						onChange={(e) => onSelect(e.target.value)}
 					>
-						{available.map((s) => (
+						{navigation.map((s) => (
 							<option key={s.id} value={s.id}>
 								{s.label}
 							</option>

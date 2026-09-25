@@ -62,7 +62,9 @@ it.each([
 	identity(["bonuses.write", "projects.write"]);
 	render(<ReferencePage />);
 	expect(screen.getByText(`${label}:false`)).toBeTruthy();
-	expect(screen.queryByRole("link")).toBeNull();
+	expect(screen.getByRole("link", { name: "Управлять" }).getAttribute("href")).toBe(
+		pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses",
+	);
 	expect(isContentReference(pathname, hash)).toBe(false);
 });
 it.each([
@@ -73,7 +75,10 @@ it.each([
 	Object.assign(location, { pathname, hash });
 	identity([permission]);
 	render(<ReferencePage />);
-	expect(screen.getByText(`${label}:true`)).toBeTruthy();
+	expect(screen.getByText(`${label}:false`)).toBeTruthy();
+	expect(screen.getByRole("link", { name: "Управлять" }).getAttribute("href")).toBe(
+		pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses",
+	);
 	expect(isContentReference(pathname, hash)).toBe(true);
 });
 it("content does not grant editing without write permission", () => {

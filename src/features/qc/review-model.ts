@@ -3,13 +3,10 @@ import type { Signals } from "@/features/operations/data";
 import type { BindProposal } from "@/services/shared-binds.service";
 export interface ReviewItem {
 	id: string;
-	source: "agent" | "system" | "ai";
-	kind: "proposal" | "candidate" | "conflict" | "gap" | "outdated";
+	kind: "proposal" | "gap" | "outdated";
 	projectId?: string;
 	title: string;
- searchText?: string;
-	risk?: "low" | "medium" | "high";
-	confidence?: number;
+	searchText?: string;
 	evidence: string[];
 	materialId?: string;
 	createdAt: string;
@@ -21,7 +18,6 @@ export function reviewItems(
 ): ReviewItem[] {
 	const items: ReviewItem[] = proposals.map((p) => ({
 		id: `proposal:${p.id}`,
-		source: "agent",
 		kind: "proposal",
 		title: p.translations[0]?.title || "Предложение",
 		materialId: p.source_id,
@@ -32,7 +28,6 @@ export function reviewItems(
 	for (const gap of signals.gaps)
 		items.push({
 			id: `gap:${gap.id}`,
-			source: "agent",
 			kind: "gap",
 			title: gap.topic,
 			projectId: gap.project_id ?? undefined,
@@ -44,14 +39,16 @@ export function reviewItems(
 		if (row.kind === "outdated")
 			outdated.set(row.bind_id, [...(outdated.get(row.bind_id) ?? []), row]);
 	for (const [id, rows] of outdated) {
+		const material = materials.find((bind) => bind.id === id);
 		const dates = rows.map((r) => r.updated_at).sort();
 		items.push({
 			id: `outdated:${id}`,
-			source: "agent",
 			kind: "outdated",
-			title: materials.find((b) => b.id === id)?.translations[0]?.title ?? id,
+			title: material?.translations[0]?.title ?? material?.slug ?? id,
 			materialId: id,
- searchText: materials.find(b=>b.id===id)?.translations.map(t=>t.content).join(" "),
+			searchText: material?.translations
+				.map((translation) => translation.content)
+				.join(" "),
 			evidence: [`${rows.length} отметок «Устарело» в доступной выборке`],
 			createdAt: dates.at(-1) ?? "",
 		});
@@ -61,8 +58,6 @@ export function reviewItems(
 			outdated: 0,
 			proposal: 1,
 			gap: 2,
-			candidate: 3,
-			conflict: 0,
 		};
 		return (
 			priority[a.kind] - priority[b.kind] ||

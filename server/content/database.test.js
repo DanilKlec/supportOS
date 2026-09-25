@@ -49,3 +49,43 @@ it('publishes with current permissions, conflicts, atomic imports and audit',asy
  await expect(save(admin,2)).rejects.toThrow('Нет права');
  } finally {await pg.close();}
 },30000);
+
+it('publishes normalized content atomically without changing the legacy document',async()=>{
+ const pg=new PGlite();const admin='11111111-1111-4111-8111-111111111111';
+ try {
+  await pg.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key,email text,raw_app_meta_data jsonb,raw_user_meta_data jsonb,is_anonymous boolean default false);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
+  await pg.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',[admin,'admin@example.com',JSON.stringify({role:'admin'})]);
+  await pg.exec(await readFile(new URL('../../supabase/schema.sql',import.meta.url),'utf8'));
+  await pg.exec(await readFile(new URL('../../supabase/migrations/20260925031553_normalized_support_content.sql',import.meta.url),'utf8'));
+  await pg.exec(await readFile(new URL('../../supabase/migrations/20260925050000_normalized_content_crud.sql',import.meta.url),'utf8'));
+  await pg.exec('set role service_role');
+  await expect(pg.query("insert into supportos_shared_content(id,data) values('emails','[]')")).rejects.toThrow('permission denied');
+  await pg.exec('reset role');
+  const payload=[{id:'project-1',projectName:'Example',slug:'example',emails:[{id:'email-1',type:'Support',email:'help@example.com'}]}];
+  const publish=async(expected,data=payload)=>(await pg.query("select supportos_publish_normalized_content($1,'emails',$2,$3) value",[admin,expected,JSON.stringify(data)])).rows[0].value;
+  const saved=await publish(0);
+  expect(saved).toMatchObject({id:'emails',version:1,data:payload});
+  expect((await pg.query('select type,email from supportos_project_emails')).rows).toEqual([{type:'Support',email:'help@example.com'}]);
+  expect((await pg.query('select count(*)::int count from supportos_shared_content')).rows[0].count).toBe(0);
+  await expect(publish(0,[])).rejects.toThrow('уже изменены');
+  expect((await pg.query('select count(*)::int count from supportos_project_emails')).rows[0].count).toBe(1);
+  expect((await publish(1,[])).version).toBe(2);
+  expect((await pg.query('select count(*)::int count from supportos_project_emails')).rows[0].count).toBe(0);
+  const bonusPayload=[{id:'project-1',name:'Example',slug:'example',bonuses:[{id:'bonus-1',name:'Welcome',content:'Текст',translations:[{language:'ru',content:'Текст'}],order:0}]}];
+  const bonus=(await pg.query("select supportos_publish_normalized_content($1,'bonuses',0,$2) value",[admin,JSON.stringify(bonusPayload)])).rows[0].value;
+  expect(bonus.version).toBe(1);
+  expect((await pg.query('select content from supportos_welcome_bonus_translations')).rows).toEqual([{content:'Текст'}]);
+  const brokenTools=[{id:'rules',slug:'rules',sourceUrl:'https://example.com',loadedAt:'2026-09-25T10:00:00Z',warnings:[],currencyTables:[],rules:[
+   {id:'duplicate',group:'A',site:'Example',welcomeWager:'',welcomeMaxWin:'',noDeposit:'',retentionWager:'',retentionMaxWin:'',events:'',map:'',note:'',searchText:''},
+   {id:'duplicate',group:'B',site:'Example',welcomeWager:'',welcomeMaxWin:'',noDeposit:'',retentionWager:'',retentionMaxWin:'',events:'',map:'',note:'',searchText:''},
+  ]}];
+  await expect(pg.query("select supportos_publish_normalized_content($1,'bonus-tools',0,$2)",[admin,JSON.stringify(brokenTools)])).rejects.toThrow('duplicate key');
+  expect((await pg.query('select count(*)::int count from supportos_bonus_rules')).rows[0].count).toBe(0);
+  expect((await pg.query("select count(*)::int count from supportos_content_revisions where id='bonus-tools'")).rows[0].count).toBe(0);
+  const toolsPayload=[{...brokenTools[0],warnings:['Проверить источник'],rules:[brokenTools[0].rules[0]],currencyTables:[{name:'Currency',currencies:['EUR'],rows:[{base:'10 EUR',baseAmount:10,values:{EUR:'10 EUR'}}]}]}];
+  const tools=(await pg.query("select supportos_publish_normalized_content($1,'bonus-tools',0,$2) value",[admin,JSON.stringify(toolsPayload)])).rows[0].value;
+  expect(tools.version).toBe(1);
+  expect((await pg.query("select metadata->'warnings' warnings from supportos_content_revisions where id='bonus-tools'")).rows[0].warnings).toEqual(['Проверить источник']);
+  expect((await pg.query('select count(*)::int count from supportos_currency_values')).rows[0].count).toBe(1);
+ } finally {await pg.close();}
+},30000);

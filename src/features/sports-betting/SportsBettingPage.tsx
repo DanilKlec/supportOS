@@ -29,27 +29,27 @@ const DEFAULT_SOURCE_ID = "football-world-cup";
 const SPORT_SOURCE_OPTIONS = [
 	{
 		id: DEFAULT_SOURCE_ID,
-		label: "Football / FIFA World Cup",
+		label: "Футбол / FIFA World Cup",
 		sports: "soccer_fifa_world_cup",
 	},
 	{
 		id: "football-club-world-cup",
-		label: "Football / Club World Cup",
+		label: "Футбол / Club World Cup",
 		sports: "soccer_fifa_club_world_cup",
 	},
 	{
 		id: "football-champions-league",
-		label: "Football / Champions League",
+		label: "Футбол / Champions League",
 		sports: "soccer_uefa_champs_league",
 	},
 	{
 		id: "football-epl",
-		label: "Football / English Premier League",
+		label: "Футбол / English Premier League",
 		sports: "soccer_epl",
 	},
 	{
 		id: "football-spain",
-		label: "Football / Spain La Liga",
+		label: "Футбол / Spain La Liga",
 		sports: "soccer_spain_la_liga",
 	},
 	{
@@ -61,16 +61,16 @@ const SPORT_SOURCE_OPTIONS = [
 
 const QUICK_SNIPPETS = [
 	{
-		title: "Odds changed",
-		text: "Odds can change before bet confirmation. The accepted bet slip price is the price used for settlement.",
+		title: "Коэффициенты изменились",
+		text: "Коэффициенты могут измениться до подтверждения ставки. Для расчёта используется цена принятого купона.",
 	},
 	{
-		title: "Promo eligibility",
-		text: "Please check minimum odds, eligible markets, qualifying stake, expiry time, and local restrictions before placing a bet.",
+		title: "Условия промоакции",
+		text: "Перед ставкой проверьте минимальный коэффициент, доступные рынки, размер ставки, срок действия и местные ограничения.",
 	},
 	{
-		title: "Responsible betting",
-		text: "Sports betting is for adults only. Set limits, avoid chasing losses, and use self-exclusion tools if betting stops feeling controlled.",
+		title: "Ответственная игра",
+		text: "Спортивные ставки предназначены только для взрослых. Устанавливайте лимиты, не отыгрывайтесь и используйте самоисключение, если ситуация выходит из-под контроля.",
 	},
 ];
 
@@ -262,13 +262,13 @@ export function SportsBettingPage() {
 
 				applyFeed(nextFeed);
 				if (showSuccess) {
-					showToast("Live sports betting data updated");
+					showToast("Данные спортивных ставок обновлены");
 				}
 			} catch (loadError) {
 				setError(
 					loadError instanceof Error
 						? loadError.message
-						: "Unable to load live sports betting data",
+						: "Не удалось загрузить данные спортивных ставок",
 				);
 			} finally {
 				setLoading(false);
@@ -354,7 +354,7 @@ export function SportsBettingPage() {
 	const copyText = async (value: string, successMessage: string) => {
 		const copied = await copyToClipboard(value);
 
-		showToast(copied ? successMessage : "Copy failed");
+		showToast(copied ? successMessage : "Не удалось скопировать");
 	};
 
 	const selectSource = (nextSourceId: string) => {
@@ -375,20 +375,20 @@ export function SportsBettingPage() {
 					<div>
 						<div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold uppercase text-muted">
 							<Trophy size={14} />
-							Football first
+							Сначала футбол
 						</div>
 						<h1 className="text-xl font-semibold sm:text-2xl">
-							Sports Betting
+							Спортивные ставки
 						</h1>
 						<p className="mt-1 max-w-3xl text-sm text-muted">
-							Live odds for football tournaments, major leagues, bookmakers,
-							markets, and quick support copy.
+							Коэффициенты в реальном времени для футбольных турниров, крупных лиг,
+							букмекеров и быстрого копирования для поддержки.
 						</p>
 					</div>
 
 					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
-							Auto update every {formatDurationMs(pollMs)}
+							Автообновление каждые {formatDurationMs(pollMs)}
 						</div>
 						<button
 							type="button"
@@ -400,7 +400,7 @@ export function SportsBettingPage() {
 								size={16}
 								className={refreshing ? "animate-spin" : undefined}
 							/>
-							Update
+							Обновить
 						</button>
 					</div>
 				</div>
@@ -431,7 +431,7 @@ export function SportsBettingPage() {
 						<div className="flex items-start gap-3">
 							<AlertTriangle size={18} className="mt-0.5 shrink-0" />
 							<div>
-								<div className="font-semibold">Live source is unavailable</div>
+								<div className="font-semibold">Источник данных недоступен</div>
 								<div className="mt-1">{error}</div>
 								{error.includes("SPORTS_BETTING_API_KEY") && (
 									<div className="mt-2 text-red-100/80">
@@ -450,10 +450,10 @@ export function SportsBettingPage() {
 							<ShieldCheck size={18} />
 						</div>
 						<div className="min-w-0 flex-1">
-							<div className="font-semibold">Responsible betting guardrail</div>
+							<div className="font-semibold">Правила ответственной игры</div>
 							<div className="mt-0.5 text-muted">
-								Keep 18+, local eligibility, limits, self-exclusion, and risk
-								wording visible in betting promos and support replies.
+								Указывайте возраст 18+, требования региона, лимиты, самоисключение
+								и предупреждения о рисках в промоматериалах и ответах поддержки.
 							</div>
 						</div>
 					</div>
@@ -463,28 +463,28 @@ export function SportsBettingPage() {
 					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<BarChart3 size={15} />
-							Events
+							События
 						</div>
 						<div className="text-sm font-semibold">{stats.events}</div>
 					</div>
 					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Activity size={15} />
-							Live now
+							Сейчас в эфире
 						</div>
 						<div className="text-sm font-semibold">{stats.live}</div>
 					</div>
 					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Trophy size={15} />
-							Bookmakers
+							Букмекеры
 						</div>
 						<div className="text-sm font-semibold">{stats.bookmakers}</div>
 					</div>
 					<div className="flex min-h-10 items-center gap-2 rounded-lg bg-background px-3">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Clock3 size={15} />
-							Updated
+							Обновлено
 						</div>
 						<div className="text-sm font-semibold">
 							{formatTime(feed?.loadedAt)}
@@ -502,7 +502,7 @@ export function SportsBettingPage() {
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
 							className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-							placeholder="Search sport, team, market, bookmaker..."
+							placeholder="Поиск по спорту, команде, рынку или букмекеру…"
 						/>
 					</div>
 
@@ -535,9 +535,9 @@ export function SportsBettingPage() {
 					<section className="rounded-xl border border-border bg-surface">
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 							<div>
-								<div className="font-semibold">Live Odds Feed</div>
+								<div className="font-semibold">Лента коэффициентов</div>
 								<div className="mt-1 text-xs text-muted">
-									{visibleEvents.length} events visible
+									Видимых событий: {visibleEvents.length}
 								</div>
 							</div>
 							<div className="rounded-lg border border-border px-2 py-1 text-xs text-muted">
@@ -548,7 +548,7 @@ export function SportsBettingPage() {
 						<div className="divide-y divide-border">
 							{loading && !feed ? (
 								<div className="px-4 py-12 text-center text-sm text-muted">
-									Loading live sports betting data...
+								Загрузка данных спортивных ставок…
 								</div>
 							) : visibleEvents.length > 0 ? (
 								visibleEvents.map((event) => (
@@ -574,9 +574,9 @@ export function SportsBettingPage() {
 													{event.matchup}
 												</h2>
 												<div className="mt-1 text-sm text-muted">
-													Starts {formatDateTime(event.commenceTime)}
+															Начало: {formatDateTime(event.commenceTime)}
 													{event.lastUpdate
-														? ` - odds ${formatDateTime(event.lastUpdate)}`
+																? ` — коэффициенты ${formatDateTime(event.lastUpdate)}`
 														: ""}
 												</div>
 											</div>
@@ -586,13 +586,13 @@ export function SportsBettingPage() {
 												onClick={() =>
 													void copyText(
 														buildEventSummary(event),
-														"Event summary copied",
+																"Сводка события скопирована",
 													)
 												}
 												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 											>
 												<Copy size={15} />
-												Copy
+												Копировать
 											</button>
 										</div>
 
@@ -612,7 +612,7 @@ export function SportsBettingPage() {
 																)} ${formatPrice(outcome.price)} at ${
 																	outcome.bookmakerTitle
 																}`,
-																"Odd copied",
+																"Коэффициент скопирован",
 															)
 														}
 														className="rounded-lg bg-background p-3 text-left transition hover:bg-surface-elevated"
@@ -650,8 +650,8 @@ export function SportsBettingPage() {
 								))
 							) : (
 								<div className="px-4 py-12 text-center text-sm text-muted">
-									No events for {selectedSource.label}. Try another football
-									league or Mixed / Upcoming.
+									Нет событий для {selectedSource.label}. Попробуйте другую футбольную
+									лигу или вариант «Смешанные / Предстоящие».
 								</div>
 							)}
 						</div>
@@ -660,41 +660,41 @@ export function SportsBettingPage() {
 					<div className="space-y-4">
 						<section className="rounded-xl border border-border bg-surface">
 							<div className="border-b border-border px-4 py-3 font-semibold">
-								Live Source
+													Источник данных
 							</div>
 							<div className="space-y-3 p-4 text-sm">
 								<div className="flex justify-between gap-3">
-									<span className="text-muted">Provider</span>
+								<span className="text-muted">Провайдер</span>
 									<span className="font-medium">{feed?.provider ?? "-"}</span>
 								</div>
 								<div className="flex justify-between gap-3">
-									<span className="text-muted">Sports</span>
+								<span className="text-muted">Виды спорта</span>
 									<span className="max-w-44 truncate text-right font-medium">
 										{feed?.config.sports.join(", ") ?? "-"}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-									<span className="text-muted">Selected</span>
+								<span className="text-muted">Выбрано</span>
 									<span className="max-w-44 truncate text-right font-medium">
 										{selectedSource.label}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-									<span className="text-muted">Markets</span>
+								<span className="text-muted">Рынки</span>
 									<span className="font-medium">
 										{feed?.config.markets ?? "-"}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
 									<span className="text-muted">
-										{feed?.config.bookmakers ? "Bookmakers" : "Regions"}
+										{feed?.config.bookmakers ? "Букмекеры" : "Регионы"}
 									</span>
 									<span className="font-medium">
 										{feed?.config.bookmakers || feed?.config.regions || "-"}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-									<span className="text-muted">Quota left</span>
+								<span className="text-muted">Осталось запросов</span>
 									<span className="font-medium">
 										{feed?.quota?.requestsRemaining ?? "-"}
 									</span>
@@ -709,7 +709,7 @@ export function SportsBettingPage() {
 
 						<section className="rounded-xl border border-border bg-surface">
 							<div className="border-b border-border px-4 py-3 font-semibold">
-								Quick Copy
+								Быстрое копирование
 							</div>
 							<div className="space-y-2 p-4">
 								{QUICK_SNIPPETS.map((snippet) => (
@@ -717,7 +717,7 @@ export function SportsBettingPage() {
 										key={snippet.title}
 										type="button"
 										onClick={() =>
-											void copyText(snippet.text, `${snippet.title} copied`)
+											void copyText(snippet.text, `${snippet.title} скопировано`)
 										}
 										className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-background px-3 py-2 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 									>

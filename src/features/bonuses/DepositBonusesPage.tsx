@@ -702,7 +702,7 @@ export function DepositBonusesPage({
 				upsertProjects(preview.projects);
 			}
 
-			showToast(`Добавлено в черновик ${preview.projects.length} project sheets`);
+			showToast(`Добавлено в черновик проектов: ${preview.projects.length}`);
 			setPreview(undefined);
 			setSheetUrl("");
 			setImportOpen(false);
@@ -920,7 +920,7 @@ export function DepositBonusesPage({
 							База бонусов
 						</div>
 						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
-							Welcome-бонусы
+							Приветственные бонусы
 						</h1>
 						<p className="mt-1 text-sm text-muted">
 							{projects.length} проектов / {totalBonuses} бонусов готовы к копированию.
@@ -1296,7 +1296,7 @@ export function DepositBonusesPage({
 											</select>
 											<div className="text-xs text-muted">
 												{activeCurrencyContext
-													? `${activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} uses ${activeCurrencyContext.table.name}.`
+													? `${activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} использует таблицу ${activeCurrencyContext.table.name}.`
 													: "Таблица валют не найдена. Выберите группу вручную или настройте общую базу."}
 											</div>
 										</div>
