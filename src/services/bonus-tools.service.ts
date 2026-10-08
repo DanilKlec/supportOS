@@ -14,6 +14,8 @@ export const DEFAULT_BONUS_TOOLS_SHEET_URL =
 
 export interface BonusRule {
 	id: string;
+	/** Canonical supportos_projects.id; site is retained for legacy payloads. */
+	projectId?: string;
 	group: string;
 	site: string;
 	welcomeWager: string;
@@ -47,8 +49,6 @@ export interface BonusToolsData {
 	warnings: string[];
 }
 
-const BONUS_TOOLS_STORAGE_KEY = "supportos:bonus-tools:v1";
-
 const KNOWN_CURRENCY_SHEETS = [
 	"Currency GZ, EC",
 	"Currency CS",
@@ -66,42 +66,6 @@ const SHORT_CURRENCY_PROJECTS = new Set([
 	"casperbets",
 	...KNOWN_SHORT_PROJECT_KEYS,
 ]);
-
-function isBonusToolsData(value: unknown): value is BonusToolsData {
-	if (!value || typeof value !== "object") return false;
-
-	const candidate = value as Partial<BonusToolsData>;
-
-	return (
-		typeof candidate.sourceUrl === "string" &&
-		Array.isArray(candidate.rules) &&
-		Array.isArray(candidate.currencyTables) &&
-		typeof candidate.loadedAt === "string" &&
-		Array.isArray(candidate.warnings)
-	);
-}
-
-export function loadStoredBonusToolsData() {
-	if (typeof localStorage === "undefined") return undefined;
-
-	try {
-		const rawValue = localStorage.getItem(BONUS_TOOLS_STORAGE_KEY);
-
-		if (!rawValue) return undefined;
-
-		const parsed = JSON.parse(rawValue) as unknown;
-
-		return isBonusToolsData(parsed) ? parsed : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-export function saveStoredBonusToolsData(data: BonusToolsData) {
-	if (typeof localStorage === "undefined") return;
-
-	localStorage.setItem(BONUS_TOOLS_STORAGE_KEY, JSON.stringify(data));
-}
 
 function cleanCell(value: string | undefined) {
 	const text = (value ?? "").trim();

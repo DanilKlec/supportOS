@@ -145,10 +145,12 @@ export function GoogleSheetsImportPanel({
 				mode,
 			});
 
-			showToast(`Imported ${imported} binds`);
+			showToast(`Импортировано биндов: ${imported}`);
 		} catch (commitError) {
 			setError(
-				commitError instanceof Error ? commitError.message : "Импорт не выполнен",
+				commitError instanceof Error
+					? commitError.message
+					: "Импорт не выполнен",
 			);
 		} finally {
 			setSaving(false);
@@ -162,7 +164,8 @@ export function GoogleSheetsImportPanel({
 					<div>
 						<h1 className="text-2xl font-bold">Импорт из Google-таблицы</h1>
 						<p className="mt-1 text-sm text-muted">
-							Импортируйте строки как переводы биндов на RU, EN, DE, PT и EL.
+							Импортируйте строки как переводы биндов на русский, английский,
+							немецкий, португальский и греческий языки.
 						</p>
 					</div>
 
@@ -277,7 +280,10 @@ export function GoogleSheetsImportPanel({
 						<div className="flex flex-wrap gap-2 text-xs">
 							<StatusPill label="Новые" value={previewCounts.new} />
 							<StatusPill label="Обновления" value={previewCounts.update} />
-							<StatusPill label="Без изменений" value={previewCounts.unchanged} />
+							<StatusPill
+								label="Без изменений"
+								value={previewCounts.unchanged}
+							/>
 							<StatusPill label="Конфликты" value={previewCounts.conflict} />
 							<StatusPill label="Ошибки" value={previewCounts.error} />
 						</div>
@@ -307,11 +313,13 @@ export function GoogleSheetsImportPanel({
 							<thead className="sticky top-0 bg-surface-elevated text-left text-xs uppercase tracking-wider text-muted">
 								<tr>
 									<th className="border-b border-border px-4 py-2">Строка</th>
-									<th className="border-b border-border px-4 py-2">Заголовок</th>
-									<th className="border-b border-border px-4 py-2">Идентификатор (slug)</th>
 									<th className="border-b border-border px-4 py-2">
-										Языки
+										Заголовок
 									</th>
+									<th className="border-b border-border px-4 py-2">
+										Короткий идентификатор
+									</th>
+									<th className="border-b border-border px-4 py-2">Языки</th>
 									<th className="border-b border-border px-4 py-2">Статус</th>
 								</tr>
 							</thead>

@@ -1,8 +1,8 @@
-import { emailAddresses } from "../../../shared/project-emails.js";
 import type { Bind } from "@/entities/bind";
 import type { BonusProject } from "@/entities/bonus";
-import type { ProjectEmailRecord } from "@/entities/project-email";
 import type { Freshness } from "@/features/bonuses/bonus-freshness";
+import type { LegacyProjectEmailRecord } from "../../../shared/project-emails.js";
+import { emailAddresses } from "../../../shared/project-emails.js";
 export interface CatalogResult extends Bind {
 	freshness?: Freshness;
 	resultKind?: "email" | "bonus";
@@ -10,7 +10,7 @@ export interface CatalogResult extends Bind {
 	projectName?: string;
 }
 export function catalogResults(
-	emails: ProjectEmailRecord[],
+	emails: LegacyProjectEmailRecord[],
 	projects: BonusProject[],
 ): CatalogResult[] {
 	const row = (id: string, title: string, content: string): Bind => ({
@@ -26,15 +26,15 @@ export function catalogResults(
 	});
 	return [
 		...emails.flatMap((p) =>
-			emailAddresses(p).map(({id,type:label,email}) => ({
-					...row(
-						"email:" + p.id + ":" + (p.emails ? id : label),
-						p.projectName + " · " + label,
-						email,
-					),
-					resultKind: "email" as const,
-					projectName: p.projectName,
-				})),
+			emailAddresses(p).map(({ id, type: label, email }) => ({
+				...row(
+					"email:" + p.id + ":" + (p.addresses || p.emails ? id : label),
+					p.projectName + " · " + label,
+					email,
+				),
+				resultKind: "email" as const,
+				projectName: p.projectName,
+			})),
 		),
 		...projects.flatMap((p) =>
 			p.bonuses.map((b) => ({

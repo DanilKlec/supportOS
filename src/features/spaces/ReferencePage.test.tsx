@@ -57,33 +57,33 @@ it.each([
 	["/bonuses", "", "bonus"],
 	["/bonuses", "calculator", "calculator"],
 	["/project-emails", "", "emails"],
-])("work page %s#%s has no management even for editors", (pathname, hash, label) => {
+])("work page %s#%s has no management even for editors", async (pathname, hash, label) => {
 	Object.assign(location, { pathname, hash });
 	identity(["bonuses.write", "projects.write"]);
 	render(<ReferencePage />);
-	expect(screen.getByText(`${label}:false`)).toBeTruthy();
-	expect(screen.getByRole("link", { name: "Управлять" }).getAttribute("href")).toBe(
-		pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses",
-	);
+	expect(await screen.findByText(`${label}:false`)).toBeTruthy();
+	expect(
+		screen.getByRole("link", { name: "Управлять" }).getAttribute("href"),
+	).toBe(pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses");
 	expect(isContentReference(pathname, hash)).toBe(false);
 });
 it.each([
 	["/bonuses", "content", "bonus", "bonuses.write"],
 	["/bonuses", "content-calculator", "calculator", "bonuses.write"],
 	["/project-emails", "content", "emails", "projects.write"],
-])("content page %s#%s preserves editor access", (pathname, hash, label, permission) => {
+])("content page %s#%s preserves editor access", async (pathname, hash, label, permission) => {
 	Object.assign(location, { pathname, hash });
 	identity([permission]);
 	render(<ReferencePage />);
-	expect(screen.getByText(`${label}:false`)).toBeTruthy();
-	expect(screen.getByRole("link", { name: "Управлять" }).getAttribute("href")).toBe(
-		pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses",
-	);
+	expect(await screen.findByText(`${label}:false`)).toBeTruthy();
+	expect(
+		screen.getByRole("link", { name: "Управлять" }).getAttribute("href"),
+	).toBe(pathname === "/project-emails" ? "/qc#emails" : "/qc#bonuses");
 	expect(isContentReference(pathname, hash)).toBe(true);
 });
-it("content does not grant editing without write permission", () => {
+it("content does not grant editing without write permission", async () => {
 	Object.assign(location, { pathname: "/bonuses", hash: "content" });
 	identity(["bonuses.read"]);
 	render(<ReferencePage />);
-	expect(screen.getByText("bonus:false")).toBeTruthy();
+	expect(await screen.findByText("bonus:false")).toBeTruthy();
 });

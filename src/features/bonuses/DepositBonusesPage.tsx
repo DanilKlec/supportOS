@@ -1,16 +1,4 @@
-import {
-	CheckCircle2,
-	Copy,
-	FileSpreadsheet,
-	Loader2,
-	Pencil,
-	Plus,
-	RefreshCw,
-	Search,
-	Trash2,
-	Upload,
-	X,
-} from "lucide-react";
+import { Copy, Loader2, RefreshCw, Upload } from "lucide-react";
 import {
 	type FormEvent,
 	useCallback,
@@ -19,12 +7,7 @@ import {
 	useState,
 } from "react";
 import { useSharedPublication } from "@/components/SharedPublication";
-import type {
-	BonusProject,
-	DepositBonus,
-	DepositBonusTranslation,
-} from "@/entities/bonus";
-import { BONUS_PROJECT_ALIASES } from "@/entities/bonus/project-aliases";
+import type { BonusProject, DepositBonus } from "@/entities/bonus";
 import { bonusCurrencyRegistryService } from "@/services/bonus-currency-registry.service";
 import {
 	type CurrencyRates,
@@ -35,441 +18,32 @@ import {
 	type DepositBonusImportPreview,
 	depositBonusImportService,
 } from "@/services/deposit-bonus-import.service";
+import { useProjectCatalog } from "@/services/project-catalog.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useBonusStore } from "@/store/bonus.store";
-import { BonusFreshness } from "./BonusFreshness";
-
-interface BonusDraft {
-	name: string;
-	minDepositAmount: string;
-	minDepositCurrency: string;
-	contents: Record<string, string>;
-}
-
-const DEFAULT_BONUS_LANGUAGE = "ru";
-
-const BONUS_LANGUAGES = [
-	{ code: "ru", label: "RU" },
-	{ code: "en", label: "EN" },
-	{ code: "de", label: "DE" },
-	{ code: "pt", label: "PT" },
-	{ code: "el", label: "GR" },
-];
-
-const EMPTY_DRAFT_CONTENT = { [DEFAULT_BONUS_LANGUAGE]: "" };
-
-function createEmptyBonusDraft(currency = "USD"): BonusDraft {
-	return {
-		name: "",
-		minDepositAmount: "",
-		minDepositCurrency: currency,
-		contents: { ...EMPTY_DRAFT_CONTENT },
-	};
-}
-
-function formatCurrencyGroupLabel(name: string, currencies: string[]) {
-	const visibleCurrencies = currencies.slice(0, 5).join(", ");
-
-	return visibleCurrencies ? `${name} (${visibleCurrencies})` : name;
-}
-
-function getCurrencyGroupShortName(name: string) {
-	return name.replace(/^Currency\s*/i, "");
-}
-
-function isEmptyBonusDraft(draft: BonusDraft) {
-	return (
-		!draft.name.trim() &&
-		!draft.minDepositAmount.trim() &&
-		Object.values(draft.contents).every((content) => !content.trim())
-	);
-}
-
-const FALLBACK_CURRENCIES = [
-	"USD",
-	"EUR",
-	"GBP",
-	"RUB",
-	"UAH",
-	"TRY",
-	"BRL",
-	"CAD",
-	"AUD",
-	"PLN",
-	"RON",
-	"KZT",
-];
-
-function normalizeSearchText(value: string) {
-	return value
-		.toLowerCase()
-		.normalize("NFKD")
-		.replace(/[\u0300-\u036f]/g, "")
-		.replace(/\u0451/g, "\u0435")
-		.replace(/[^a-z0-9\u0430-\u044f\u0370-\u03ff]+/g, " ")
-		.trim();
-}
-
-function getSearchTokens(value: string) {
-	return normalizeSearchText(value).split(/\s+/).filter(Boolean);
-}
-
-function getSearchWords(value: string) {
-	return getSearchTokens(value);
-}
-
-function getCompactSearchText(value: string) {
-	return getSearchWords(value).join("");
-}
-
-function getInitials(value: string) {
-	return getSearchWords(value)
-		.map((word) => word[0])
-		.filter(Boolean)
-		.join("");
-}
-
-function matchesToken(value: string, token: string) {
-	const words = getSearchWords(value);
-
-	if (token.length <= 2) {
-		const compact = words.join("");
-
-		return (
-			words.includes(token) ||
-			compact === token ||
-			words.some((word) => word.length <= 4 && word.startsWith(token))
-		);
-	}
-
-	return normalizeSearchText(value).includes(token);
-}
-
-function matchesTokens(value: string, tokens: string[]) {
-	if (tokens.length === 0) return true;
-
-	return tokens.every((token) => matchesToken(value, token));
-}
-
-function getProjectAliases(project: BonusProject) {
-	const directAliases = BONUS_PROJECT_ALIASES[project.name.toUpperCase()] ?? [];
-	const slugAliases = BONUS_PROJECT_ALIASES[project.slug.toUpperCase()] ?? [];
-	const compactName = getCompactSearchText(project.name);
-	const compactSlug = getCompactSearchText(project.slug);
-	const reverseAliases = Object.entries(BONUS_PROJECT_ALIASES)
-		.filter(([, aliases]) =>
-			aliases.some((alias) => {
-				const compactAlias = getCompactSearchText(alias);
-
-				return compactAlias === compactName || compactAlias === compactSlug;
-			}),
-		)
-		.map(([alias]) => alias.toLowerCase());
-
-	return Array.from(
-		new Set(
-			[
-				...directAliases,
-				...slugAliases,
-				...reverseAliases,
-				getInitials(project.name),
-			].filter(Boolean),
-		),
-	);
-}
-
-function buildBonusSearchText(bonus: DepositBonus) {
-	return [
-		bonus.name,
-		bonus.content,
-		bonus.minDepositAmount?.toString() ?? "",
-		bonus.minDepositCurrency ?? "",
-		...getBonusTranslations(bonus).flatMap((translation) => [
-			translation.language,
-			translation.content,
-		]),
-	].join(" ");
-}
-
-function buildProjectSearchText(project: BonusProject) {
-	return [
-		project.name,
-		project.slug,
-		project.sheetId ?? "",
-		...getProjectAliases(project),
-	].join(" ");
-}
-
-function getProjectSearchScore(project: BonusProject, tokens: string[]) {
-	if (tokens.length === 0) return 0;
-
-	const projectText = buildProjectSearchText(project);
-	const projectWords = new Set(getSearchWords(projectText));
-	const projectMatches = matchesTokens(projectText, tokens);
-	const bonusMatches = project.bonuses.some((bonus) =>
-		matchesTokens(buildBonusSearchText(bonus), tokens),
-	);
-
-	if (!projectMatches && !bonusMatches) return -1;
-
-	return tokens.reduce((score, token) => {
-		if (projectWords.has(token)) return score + 120;
-		if (
-			Array.from(projectWords).some(
-				(word) => word.length <= 4 && word.startsWith(token),
-			)
-		) {
-			return score + 80;
-		}
-		if (matchesToken(projectText, token)) return score + 40;
-
-		return score + 8;
-	}, 0);
-}
-
-function getConvertedDeposit(
-	bonus: DepositBonus,
-	selectedCurrency: string,
-	rates?: CurrencyRates,
-) {
-	if (!bonus.minDepositAmount || !bonus.minDepositCurrency || !rates) {
-		return undefined;
-	}
-
-	return currencyService.convert({
-		amount: bonus.minDepositAmount,
-		from: bonus.minDepositCurrency,
-		to: selectedCurrency,
-		rates,
-	});
-}
-
-function formatDeposit(
-	bonus: DepositBonus,
-	selectedCurrency: string,
-	rates?: CurrencyRates,
-) {
-	if (!bonus.minDepositAmount || !bonus.minDepositCurrency) {
-		return "Минимальный депозит не указан";
-	}
-
-	const original = currencyService.format(
-		bonus.minDepositAmount,
-		bonus.minDepositCurrency,
-	);
-	const converted = getConvertedDeposit(bonus, selectedCurrency, rates);
-
-	if (
-		!converted ||
-		bonus.minDepositCurrency.toUpperCase() === selectedCurrency.toUpperCase()
-	) {
-		return `Минимальный депозит: ${original}`;
-	}
-
-	return `Минимальный депозит: ${original} (~${currencyService.format(
-		converted,
-		selectedCurrency,
-	)})`;
-}
-
-function getLanguageLabel(language: string) {
-	return (
-		BONUS_LANGUAGES.find((item) => item.code === language)?.label ??
-		language.toUpperCase()
-	);
-}
-
-function getBonusTranslations(bonus: DepositBonus): DepositBonusTranslation[] {
-	const translations = bonus.translations?.filter((item) =>
-		item.content?.trim(),
-	);
-	const content = bonus.content ?? "";
-
-	if (translations?.length) return translations;
-
-	return content.trim()
-		? [
-				{
-					language: DEFAULT_BONUS_LANGUAGE,
-					content,
-					updatedAt: new Date().toISOString(),
-				},
-			]
-		: [];
-}
-
-function getBonusContent(bonus: DepositBonus, language: string) {
-	const translations = getBonusTranslations(bonus);
-
-	return (
-		translations.find((translation) => translation.language === language)
-			?.content ??
-		translations.find(
-			(translation) => translation.language === DEFAULT_BONUS_LANGUAGE,
-		)?.content ??
-		translations.find((translation) => translation.language === "en")
-			?.content ??
-		translations[0]?.content ??
-		bonus.content ??
-		""
-	);
-}
-
-function getBonusContentMap(bonus: DepositBonus) {
-	const contentMap: Record<string, string> = {};
-
-	for (const translation of getBonusTranslations(bonus)) {
-		contentMap[translation.language] = translation.content;
-	}
-
-	if (!contentMap[DEFAULT_BONUS_LANGUAGE] && bonus.content?.trim()) {
-		contentMap[DEFAULT_BONUS_LANGUAGE] = bonus.content;
-	}
-
-	return contentMap;
-}
-
-function getDraftContent(draft: BonusDraft, language: string) {
-	return draft.contents[language] ?? "";
-}
-
-function setDraftLanguageContent(
-	draft: BonusDraft,
-	language: string,
-	content: string,
-): BonusDraft {
-	return {
-		...draft,
-		contents: {
-			...draft.contents,
-			[language]: content,
-		},
-	};
-}
-
-function buildDraftTranslations(draft: BonusDraft): DepositBonusTranslation[] {
-	const updatedAt = new Date().toISOString();
-
-	return Object.entries(draft.contents)
-		.map(([language, content]) => ({
-			language,
-			content: content.trim(),
-			updatedAt,
-		}))
-		.filter((translation) => translation.content);
-}
-
-function pickPrimaryDraftContent(draft: BonusDraft, language: string) {
-	const translations = buildDraftTranslations(draft);
-
-	return (
-		translations.find((translation) => translation.language === language)
-			?.content ??
-		translations.find(
-			(translation) => translation.language === DEFAULT_BONUS_LANGUAGE,
-		)?.content ??
-		translations.find((translation) => translation.language === "en")
-			?.content ??
-		translations[0]?.content ??
-		""
-	);
-}
-
-function getDisplayBonusContent({
-	bonus,
-	project,
-	language,
-	selectedCurrency,
-	currencyTableName,
-}: {
-	bonus: DepositBonus;
-	project?: BonusProject;
-	language: string;
-	selectedCurrency: string;
-	currencyTableName?: string;
-}) {
-	return bonusCurrencyRegistryService.replaceProjectMoneyText({
-		text: getBonusContent(bonus, language),
-		project,
-		targetCurrency: selectedCurrency,
-		tableName: currencyTableName,
-	});
-}
-
-function buildBonusBind({
-	bonus,
-	project,
-	language,
-	selectedCurrency,
-	currencyTableName,
-}: {
-	bonus: DepositBonus;
-	project?: BonusProject;
-	language: string;
-	selectedCurrency: string;
-	currencyTableName?: string;
-}) {
-	return getDisplayBonusContent({
-		bonus,
-		project,
-		language,
-		selectedCurrency,
-		currencyTableName,
-	}).trim();
-}
-
-function buildPackageBind({
-	project,
-	language,
-	selectedCurrency,
-	rates,
-	currencyTableName,
-}: {
-	project: BonusProject;
-	language: string;
-	selectedCurrency: string;
-	rates?: CurrencyRates;
-	currencyTableName?: string;
-}) {
-	return [
-		`${project.name} welcome package`,
-		"",
-		...project.bonuses.flatMap((bonus, index) => [
-			`${index + 1}. ${bonus.name}`,
-			formatDeposit(bonus, selectedCurrency, rates),
-			getDisplayBonusContent({
-				bonus,
-				project,
-				language,
-				selectedCurrency,
-				currencyTableName,
-			}),
-			"",
-		]),
-	]
-		.join("\n")
-		.trim();
-}
-
-function parseAmount(value: string) {
-	const normalized = value.trim().replace(",", ".");
-
-	if (!normalized) return undefined;
-
-	const amount = Number(normalized);
-
-	return Number.isFinite(amount) ? amount : undefined;
-}
-
-function toDraft(bonus: DepositBonus): BonusDraft {
-	return {
-		name: bonus.name,
-		minDepositAmount: bonus.minDepositAmount?.toString() ?? "",
-		minDepositCurrency: bonus.minDepositCurrency ?? "USD",
-		contents: getBonusContentMap(bonus),
-	};
-}
+import { BonusEditor } from "./deposit-bonuses/BonusEditor";
+import { BonusList } from "./deposit-bonuses/BonusList";
+import {
+	BONUS_LANGUAGES,
+	type BonusDraft,
+	buildBonusBind,
+	buildBonusSearchText,
+	buildDraftTranslations,
+	buildPackageBind,
+	buildProjectSearchText,
+	createEmptyBonusDraft,
+	FALLBACK_CURRENCIES,
+	getProjectSearchScore,
+	getSearchTokens,
+	isEmptyBonusDraft,
+	matchesTokens,
+	parseAmount,
+	pickPrimaryDraftContent,
+	toDraft,
+} from "./deposit-bonuses/bonus-presentation";
+import { ImportSourcePanel } from "./deposit-bonuses/ImportSourcePanel";
+import { ProjectSelector } from "./deposit-bonuses/ProjectSelector";
 
 export function DepositBonusesPage({
 	management = false,
@@ -477,7 +51,42 @@ export function DepositBonusesPage({
 	management?: boolean;
 } = {}) {
 	const { showToast } = useToast();
-	const projects = useBonusStore((state) => state.projects);
+	const bonusDataProjects = useBonusStore((state) => state.projects);
+	const projectCatalog = useProjectCatalog();
+	const projects = useMemo(() => {
+		const catalog = projectCatalog.data ?? [];
+		if (!catalog.length) return bonusDataProjects;
+
+		const dataById = new Map(
+			bonusDataProjects.map((project) => [project.id, project]),
+		);
+		const dataBySlug = new Map(
+			bonusDataProjects.map((project) => [project.slug.toLowerCase(), project]),
+		);
+		const matchedDataIds = new Set<string>();
+		const canonicalProjects: BonusProject[] = catalog.map((project) => {
+			const bonusData =
+				dataById.get(project.id) ?? dataBySlug.get(project.slug.toLowerCase());
+			if (bonusData) matchedDataIds.add(bonusData.id);
+
+			return {
+				id: project.id,
+				name: project.name,
+				slug: project.slug,
+				bonuses: bonusData?.bonuses ?? [],
+				updatedAt: bonusData?.updatedAt ?? "",
+				...(bonusData?.sheetId ? { sheetId: bonusData.sheetId } : {}),
+				...(bonusData?.sourceUrl ? { sourceUrl: bonusData.sourceUrl } : {}),
+				...(bonusData?.sourceHash ? { sourceHash: bonusData.sourceHash } : {}),
+			};
+		});
+
+		// Keep unmatched legacy drafts visible until their IDs are mapped server-side.
+		return [
+			...canonicalProjects,
+			...bonusDataProjects.filter((project) => !matchedDataIds.has(project.id)),
+		];
+	}, [bonusDataProjects, projectCatalog.data]);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
 	const selectedCurrency = useBonusStore((state) => state.selectedCurrency);
 	const selectedLanguage = useBonusStore((state) => state.depositBonusLanguage);
@@ -923,7 +532,8 @@ export function DepositBonusesPage({
 							Приветственные бонусы
 						</h1>
 						<p className="mt-1 text-sm text-muted">
-							{projects.length} проектов / {totalBonuses} бонусов готовы к копированию.
+							{projects.length} проектов / {totalBonuses} бонусов готовы к
+							копированию.
 						</p>
 					</div>
 
@@ -1003,521 +613,94 @@ export function DepositBonusesPage({
 
 				{rates && (
 					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
-						Источник курсов: {rates.source}. Дата: {rates.date}. Базовая валюта: {rates.base}
-						.
+						Источник курсов: {rates.source}. Дата: {rates.date}. Базовая валюта:{" "}
+						{rates.base}.
 					</div>
 				)}
 
 				{activeCurrencyContext && (
-					<div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+					<div className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted [overflow-wrap:anywhere]">
 						Группа валют:{" "}
-						{activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} -{" "}
-						{activeCurrencyContext.rule?.site ?? activeProject?.name} -{" "}
-						{activeCurrencyContext.table.name}. Суммы из текста в EUR копируются в {selectedCurrency} при наличии подходящей строки.
+						{activeCurrencyContext.source === "manual"
+							? "Вручную"
+							: "Автоматически"}{" "}
+						- {activeCurrencyContext.rule?.site ?? activeProject?.name} -{" "}
+						{activeCurrencyContext.table.name}. Суммы из текста в EUR копируются
+						в {selectedCurrency} при наличии подходящей строки.
 					</div>
 				)}
 
 				{management && importOpen && (
-					<div className="rounded-xl border border-border bg-surface p-4">
-						<div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-							<FileSpreadsheet size={16} />
-							Импорт из Google-таблицы
-						</div>
-
-						<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-							<textarea
-								value={sheetUrl}
-								onChange={(event) => setSheetUrl(event.target.value)}
-								className="ui-input min-h-10 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-								placeholder="Вставьте ссылку на Google-таблицу. Каждый лист станет проектом. Несколько ссылок указывайте по одной на строку."
-							/>
-
-							<select
-								value={mode}
-								onChange={(event) =>
-									setMode(event.target.value as DepositBonusImportMode)
-								}
-								className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-							>
-								<option value="upsert">Добавить и обновить</option>
-								<option value="replace">Заменить все проекты</option>
-							</select>
-
-							<button
-								type="button"
-								onClick={loadPreview}
-								disabled={importing || !sheetUrl.trim()}
-								className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
-							>
-								{importing ? (
-									<Loader2 size={16} className="animate-spin" />
-								) : (
-									<FileSpreadsheet size={16} />
-								)}
-								Предпросмотр
-							</button>
-						</div>
-
-						{preview && (
-							<div className="mt-4 rounded-lg bg-background p-3">
-								<div className="flex flex-wrap items-center justify-between gap-3">
-									<div className="inline-flex items-center gap-2 text-sm">
-										<CheckCircle2 size={16} className="text-accent" />
-										<span className="font-semibold">
-											{preview.projects.length}
-										</span>{" "}
-										проектов найдено
-									</div>
-
-									<button
-										type="button"
-										onClick={commitPreview}
-										disabled={
-											committing ||
-											preview.projects.length === 0 ||
-											preview.errors.length > 0
-										}
-										className="ui-button ui-button--primary ui-button--small inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
-									>
-										{committing && (
-											<Loader2 size={15} className="animate-spin" />
-										)}
-										Применить импорт
-									</button>
-								</div>
-
-								{preview.projects.length > 0 && (
-									<div className="mt-3 flex flex-wrap gap-2">
-										{preview.projects.map((project) => {
-											const languages = Array.from(
-												new Set(
-													project.bonuses.flatMap((bonus) =>
-														getBonusTranslations(bonus).map((translation) =>
-															getLanguageLabel(translation.language),
-														),
-													),
-												),
-											).join(", ");
-
-											return (
-												<span
-													key={`${project.slug}-${project.sheetId ?? "sheet"}`}
-													className="rounded-md border border-border px-2 py-1 text-xs text-muted"
-												>
-													{project.name}: {project.bonuses.length}
-													{languages ? ` (${languages})` : ""}
-												</span>
-											);
-										})}
-									</div>
-								)}
-
-								{preview.errors.length > 0 && (
-									<div className="mt-3 space-y-1 text-sm text-red-300">
-										{preview.errors.map((error) => (
-											<div key={error}>{error}</div>
-										))}
-									</div>
-								)}
-
-								{preview.warnings.length > 0 && (
-									<div className="mt-3 max-h-24 overflow-auto text-xs text-amber-200">
-										{preview.warnings.slice(0, 12).map((warning) => (
-											<div key={warning}>{warning}</div>
-										))}
-									</div>
-								)}
-							</div>
-						)}
-					</div>
+					<ImportSourcePanel
+						sheetUrl={sheetUrl}
+						setSheetUrl={setSheetUrl}
+						mode={mode}
+						setMode={setMode}
+						loadPreview={loadPreview}
+						importing={importing}
+						preview={preview}
+						commitPreview={commitPreview}
+						committing={committing}
+					/>
 				)}
 
-				<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
-					<div className="space-y-3">
-						<form
-							onSubmit={createProject}
-							className="min-w-0 rounded-xl border border-border bg-surface p-3"
-						>
-							<fieldset disabled={!canEdit}>
-								<div className="mb-3 text-sm font-semibold">Проекты</div>
-								<div className="grid gap-2">
-									<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-										<input
-											value={newProjectName}
-											onChange={(event) =>
-												setNewProjectName(event.target.value)
-											}
-											className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder="Название проекта"
-										/>
-										<button
-											type="submit"
-											className="ui-button ui-button--primary inline-flex w-full items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 sm:w-auto"
-										>
-											<Plus size={16} />
-											Добавить
-										</button>
-									</div>
-									<select
-										value={newProjectCurrencyGroup}
-										onChange={(event) =>
-											setNewProjectCurrencyGroup(event.target.value)
-										}
-										className="ui-input w-full min-w-0 border border-border bg-background text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-										aria-label="Группа валют нового проекта"
-									>
-										<option value="">Автоматический выбор группы валют</option>
-										{currencyGroupOptions.map((group) => (
-											<option key={group.name} value={group.name}>
-												{formatCurrencyGroupLabel(group.name, group.currencies)}
-											</option>
-										))}
-									</select>
-								</div>
-							</fieldset>
-						</form>
-
-						<div className="relative">
-							<Search
-								size={16}
-								className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-							/>
-							<input
-								value={query}
-								onChange={(event) => setQuery(event.target.value)}
-								className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-								placeholder="Поиск проектов или бонусов…"
-							/>
-						</div>
-
-						<div className="supportos-scroll max-h-[28rem] overflow-auto rounded-xl border border-border bg-surface">
-							{filteredProjects.length > 0 ? (
-								filteredProjects.map((project) => {
-									const active = project.id === activeProject?.id;
-									const currencyGroup = projectCurrencyGroups[project.id];
-									const visibleCount =
-										searchTokens.length > 0 &&
-										!matchesTokens(
-											buildProjectSearchText(project),
-											searchTokens,
-										)
-											? project.bonuses.filter((bonus) =>
-													matchesTokens(
-														buildBonusSearchText(bonus),
-														searchTokens,
-													),
-												).length
-											: project.bonuses.length;
-
-									return (
-										<button
-											key={project.id}
-											type="button"
-											onClick={() => setActiveProject(project.id)}
-											className={`flex min-h-14 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-3 text-left text-sm transition last:border-b-0 ${
-												active
-													? "bg-accent/10 text-foreground"
-													: "text-muted hover:bg-surface-elevated hover:text-foreground"
-											}`}
-										>
-											<span className="min-w-0">
-												<span className="block truncate font-medium">
-													{project.name}
-												</span>
-												<span className="mt-0.5 block text-xs text-muted">
-													{visibleCount} бонусов
-													{currencyGroup
-														? ` - ${getCurrencyGroupShortName(currencyGroup)}`
-														: ""}
-												</span>
-											</span>
-											<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
-												{project.bonuses.length}
-											</span>
-										</button>
-									);
-								})
-							) : (
-								<div className="px-2 py-6 text-sm text-muted">
-									Проектов пока нет
-								</div>
-							)}
-						</div>
-					</div>
+				<div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+					<ProjectSelector
+						canEdit={canEdit}
+						newProjectName={newProjectName}
+						setNewProjectName={setNewProjectName}
+						newProjectCurrencyGroup={newProjectCurrencyGroup}
+						setNewProjectCurrencyGroup={setNewProjectCurrencyGroup}
+						currencyGroupOptions={currencyGroupOptions}
+						createProject={createProject}
+						query={query}
+						setQuery={setQuery}
+						filteredProjects={filteredProjects}
+						activeProject={activeProject}
+						projectCurrencyGroups={projectCurrencyGroups}
+						searchTokens={searchTokens}
+						setActiveProject={setActiveProject}
+					/>
 
 					{activeProject ? (
-						<div className="space-y-4">
-							<section className="rounded-xl border border-border bg-surface">
-								<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-									<div className="min-w-0 flex-1">
-										<div className="mb-2 text-xs font-semibold uppercase text-muted">
-											Выбранный проект
-										</div>
-										<div className="ui-actions items-center flex max-w-xl gap-2">
-											<input
-												value={renameValue}
-												onChange={(event) => setRenameValue(event.target.value)}
-												className="ui-input min-w-0 flex-1 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											/>
-											<button
-												type="button"
-												disabled={!canEdit}
-												onClick={saveProjectName}
-												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-											>
-												<Pencil size={15} />
-												Применить
-											</button>
-										</div>
-										<div className="mt-3 grid max-w-xl gap-1">
-											<label
-												htmlFor="active-project-currency-group"
-												className="text-xs font-medium text-muted"
-											>
-												Группа валют
-											</label>
-											<select
-												id="active-project-currency-group"
-												value={activeProjectCurrencyGroup}
-												onChange={(event) =>
-													updateActiveProjectCurrencyGroup(event.target.value)
-												}
-												className="ui-input border border-border bg-background text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											>
-												<option value="">Определять по названию проекта</option>
-												{currencyGroupOptions.map((group) => (
-													<option key={group.name} value={group.name}>
-														{formatCurrencyGroupLabel(
-															group.name,
-															group.currencies,
-														)}
-													</option>
-												))}
-											</select>
-											<div className="text-xs text-muted">
-												{activeCurrencyContext
-													? `${activeCurrencyContext.source === "manual" ? "Вручную" : "Автоматически"} использует таблицу ${activeCurrencyContext.table.name}.`
-													: "Таблица валют не найдена. Выберите группу вручную или настройте общую базу."}
-											</div>
-										</div>
-									</div>
+						<div className="min-w-0 space-y-4">
+							<BonusEditor
+								activeProject={activeProject}
+								renameValue={renameValue}
+								setRenameValue={setRenameValue}
+								canEdit={canEdit}
+								saveProjectName={saveProjectName}
+								activeProjectCurrencyGroup={activeProjectCurrencyGroup}
+								updateActiveProjectCurrencyGroup={
+									updateActiveProjectCurrencyGroup
+								}
+								currencyGroupOptions={currencyGroupOptions}
+								activeCurrencyContext={activeCurrencyContext}
+								setDeleteProjectId={setDeleteProjectId}
+								submitBonus={submitBonus}
+								bonusDraft={bonusDraft}
+								setBonusDraft={setBonusDraft}
+								selectedLanguage={selectedLanguage}
+								formError={formError}
+								editingBonusId={editingBonusId}
+								resetBonusForm={resetBonusForm}
+							/>
 
-									<div className="ui-actions items-center flex  gap-2">
-										<button
-											type="button"
-											disabled={!canEdit}
-											onClick={() => setDeleteProjectId(activeProject.id)}
-											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
-											title="Удалить проект"
-											aria-label="Удалить проект"
-										>
-											<Trash2 size={16} />
-										</button>
-									</div>
-								</div>
-
-								<form onSubmit={submitBonus} className="space-y-3 p-4">
-									<fieldset disabled={!canEdit}>
-										<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem]">
-											<input
-												value={bonusDraft.name}
-												onChange={(event) =>
-													setBonusDraft((current) => ({
-														...current,
-														name: event.target.value,
-													}))
-												}
-												className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-												placeholder="Название бонуса"
-											/>
-											<input
-												value={bonusDraft.minDepositAmount}
-												onChange={(event) =>
-													setBonusDraft((current) => ({
-														...current,
-														minDepositAmount: event.target.value,
-													}))
-												}
-												className="ui-input border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-												placeholder="Мин. депозит"
-											/>
-											<input
-												value={bonusDraft.minDepositCurrency}
-												list="deposit-bonus-currencies"
-												onChange={(event) =>
-													setBonusDraft((current) => ({
-														...current,
-														minDepositCurrency: event.target.value,
-													}))
-												}
-												className="ui-input border border-border bg-background uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-												placeholder="USD"
-											/>
-										</div>
-
-										<textarea
-											value={getDraftContent(bonusDraft, selectedLanguage)}
-											onChange={(event) =>
-												setBonusDraft((current) =>
-													setDraftLanguageContent(
-														current,
-														selectedLanguage,
-														event.target.value,
-													),
-												)
-											}
-											className="ui-input min-h-28 w-full resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-											placeholder={`Текст бонуса / готовый ответ (${getLanguageLabel(
-												selectedLanguage,
-											)})`}
-										/>
-
-										{formError && (
-											<div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-												{formError}
-											</div>
-										)}
-
-										<div className="ui-actions items-center flex flex-wrap justify-end gap-2">
-											{editingBonusId && (
-												<button
-													type="button"
-													onClick={resetBonusForm}
-													className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-												>
-													<X size={15} />
-													Отмена
-												</button>
-											)}
-											<button
-												type="submit"
-												className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
-											>
-												<Plus size={16} />
-												{editingBonusId
-													? "Применить изменения"
-													: "Добавить бонус"}
-											</button>
-										</div>
-									</fieldset>
-								</form>
-							</section>
-
-							<section className="rounded-xl border border-border bg-surface">
-								<div className="border-b border-border px-4 py-3">
-									<div className="font-semibold">{activeProject.name}</div>
-									<div className="mt-1 text-xs text-muted">
-										{visibleBonuses.length}
-										{visibleBonuses.length !== activeProject.bonuses.length
-											? ` of ${activeProject.bonuses.length}`
-											: ""}{" "}
-										бонусов
-									</div>
-								</div>
-
-								<div className="divide-y divide-border">
-									{visibleBonuses.length > 0 ? (
-										visibleBonuses
-											.slice()
-											.sort((first, second) => first.order - second.order)
-											.map((bonus) => {
-												const content = getDisplayBonusContent({
-													bonus,
-													project: activeProject,
-													language: selectedLanguage,
-													selectedCurrency,
-													currencyTableName: activeProjectCurrencyGroup,
-												});
-												const languages = getBonusTranslations(bonus).map(
-													(translation) => translation.language,
-												);
-
-												return (
-													<div
-														key={bonus.id}
-														className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)_auto]"
-													>
-														<div>
-															<div className="text-sm font-medium">
-																{bonus.name}
-															</div>
-															<BonusFreshness
-																bonus={bonus}
-																canEdit={canEdit}
-																onChange={(patch) =>
-																	updateBonus(activeProject.id, bonus.id, patch)
-																}
-															/>
-															<div className="mt-1 text-xs text-muted">
-																{formatDeposit(bonus, selectedCurrency, rates)}
-															</div>
-															<div className="mt-2 flex flex-wrap gap-1">
-																{languages.map((language) => (
-																	<button
-																		key={language}
-																		type="button"
-																		onClick={() =>
-																			setSelectedLanguage(language)
-																		}
-																		title={`Переключить на ${getLanguageLabel(language)}`}
-																		className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition ${
-																			selectedLanguage === language
-																				? "border-accent bg-accent/10 text-foreground"
-																				: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-																		}`}
-																	>
-																		{getLanguageLabel(language)}
-																	</button>
-																))}
-															</div>
-														</div>
-
-														<div className="min-w-0 whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-sm leading-6 text-muted">
-															{content}
-														</div>
-
-														<div className="ui-actions items-center flex  gap-2">
-															<button
-																type="button"
-																onClick={() => void copyBonus(bonus)}
-																className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
-															>
-																<Copy size={15} />
-																Копировать
-															</button>
-															<button
-																type="button"
-																disabled={!canEdit}
-																onClick={() => editBonus(bonus)}
-																className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-																title="Редактировать бонус"
-																aria-label="Редактировать бонус"
-															>
-																<Pencil size={15} />
-															</button>
-															<button
-																type="button"
-																disabled={!canEdit}
-																onClick={() => setDeleteBonusId(bonus.id)}
-																className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted hover:bg-surface-elevated hover:text-red-400"
-																title="Удалить бонус"
-																aria-label="Удалить бонус"
-															>
-																<Trash2 size={15} />
-															</button>
-														</div>
-													</div>
-												);
-											})
-									) : (
-										<div className="px-4 py-12 text-center text-sm text-muted">
-											{searchTokens.length > 0
-												? "По запросу ничего не найдено"
-												: "В проекте пока нет бонусов"}
-										</div>
-									)}
-								</div>
-							</section>
+							<BonusList
+								activeProject={activeProject}
+								visibleBonuses={visibleBonuses}
+								selectedLanguage={selectedLanguage}
+								selectedCurrency={selectedCurrency}
+								activeProjectCurrencyGroup={activeProjectCurrencyGroup}
+								canEdit={canEdit}
+								updateBonus={updateBonus}
+								rates={rates}
+								setSelectedLanguage={setSelectedLanguage}
+								copyBonus={copyBonus}
+								editBonus={editBonus}
+								setDeleteBonusId={setDeleteBonusId}
+								searchTokens={searchTokens}
+							/>
 						</div>
 					) : (
 						<div className="rounded-lg border border-border bg-surface px-4 py-12 text-center text-sm text-muted">

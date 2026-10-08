@@ -24,6 +24,20 @@ describe("role-aware navigation", () => {
 		expect(canAccessPage(user, "/settings", "appearance")).toBe(true);
 		expect(canAccessPage(user, "/bonuses", "calculator")).toBe(true);
 	});
+	it("offers own-session security settings without administrative permissions", () => {
+		const security = spaces
+			.find((space) => space.title === "Настройки")
+			?.items.find((item) => item.label === "Безопасность");
+		expect(security).toEqual({
+			label: "Безопасность",
+			to: "/settings",
+			hash: "security",
+		});
+		expect(canAccessPage(access(["work"]), "/settings", "security")).toBe(true);
+		expect(
+			canAccessPage(access(["work"], "disabled"), "/settings", "security"),
+		).toBe(false);
+	});
 	it("uses individual permissions for custom administration roles", () => {
 		const user = access(["roles.manage"]);
 		expect(canAdmin(user)).toBe(true);

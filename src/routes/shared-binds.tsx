@@ -1,5 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { SharedContentHub } from "@/features/shared-binds/SharedContentHub";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { canonicalPage } from "@/features/spaces/navigation";
 export const Route = createFileRoute("/shared-binds")({
-	component: SharedContentHub,
+	beforeLoad: ({ location }) => {
+		throw redirect({
+			...canonicalPage("/shared-binds", location.hash),
+			replace: true,
+		});
+	},
 });

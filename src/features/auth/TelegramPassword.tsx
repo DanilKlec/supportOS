@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
 import { Send, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { supabaseService } from "@/services/supabase.service";
+
 type Challenge = {
 	browserToken: string;
 	telegramUrl: string;
@@ -43,10 +44,13 @@ export function TelegramPassword({
 	const [repeat, setRepeat] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	const browserToken = challenge?.browserToken;
+	const challengeStatus = challenge?.status;
 	useEffect(() => {
 		if (
-			!challenge ||
-			!["pending", "processing", "approved"].includes(challenge.status) ||
+			!browserToken ||
+			!challengeStatus ||
+			!["pending", "processing", "approved"].includes(challengeStatus) ||
 			busy
 		)
 			return;
@@ -54,7 +58,7 @@ export function TelegramPassword({
 		const timer = setInterval(async () => {
 			try {
 				const result = await passwordRequest("status", {
-					browserToken: challenge.browserToken,
+					browserToken,
 				});
 				if (!cancelled)
 					setChallenge((previous) =>
@@ -69,7 +73,7 @@ export function TelegramPassword({
 			cancelled = true;
 			clearInterval(timer);
 		};
-	}, [challenge?.browserToken, challenge?.status, busy]);
+	}, [browserToken, challengeStatus, busy]);
 	const completed = challenge?.status === "completed";
 	useEffect(() => {
 		if (completed && mode === "change")
@@ -137,10 +141,12 @@ export function TelegramPassword({
 				пароль здесь. Все старые сеансы будут завершены.
 			</p>
 			{completed ? (
-				<div role="status">
-					<p>Пароль изменён. Войдите с новым паролем.</p>
+				<div>
+					<output className="block">
+						Пароль изменён. Войдите с новым паролем.
+					</output>
 					{onBack && (
-						<button className={button} onClick={onBack}>
+						<button type="button" className={button} onClick={onBack}>
 							Вернуться ко входу
 						</button>
 					)}
@@ -169,18 +175,19 @@ export function TelegramPassword({
 									/>
 								</label>
 							)}
-							<button className={button} disabled={busy}>
+							<button type="submit" className={button} disabled={busy}>
 								{busy ? "Создаём запрос…" : "Подтвердить через Telegram"}
 							</button>
 						</form>
 					) : terminal ? (
-						<div role="status">
-							<p>
+						<div>
+							<output className="block">
 								{challenge.status === "expired"
 									? "Время подтверждения истекло."
 									: "Запрос отклонён."}
-							</p>
+							</output>
 							<button
+								type="button"
 								className={`${button} mt-3`}
 								onClick={() => {
 									setChallenge(undefined);
@@ -227,12 +234,12 @@ export function TelegramPassword({
 									disabled={busy}
 								/>
 							</label>
-							<button className={button} disabled={busy}>
+							<button type="submit" className={button} disabled={busy}>
 								{busy ? "Сохраняем…" : "Сохранить новый пароль"}
 							</button>
 						</form>
 					) : (
-						<div className="space-y-4" role="status">
+						<div className="space-y-4">
 							<a
 								className={`${button} inline-flex items-center gap-2`}
 								href={challenge.telegramUrl}
@@ -241,11 +248,11 @@ export function TelegramPassword({
 							>
 								<Send size={16} /> Открыть Telegram
 							</a>
-							<p className="text-sm text-muted-foreground">
+							<output className="block text-sm text-muted-foreground">
 								{challenge.status === "processing"
 									? "Проверяем результат смены пароля…"
 									: "Откройте бота и подтвердите запрос. Эта страница обновится автоматически."}
-							</p>
+							</output>
 							<p className="text-xs text-muted-foreground">
 								Запрос действует до{" "}
 								{new Date(challenge.expiresAt).toLocaleTimeString()}. Без
@@ -255,6 +262,7 @@ export function TelegramPassword({
 					)}
 					{challenge && !terminal && (
 						<button
+							type="button"
 							className={button}
 							disabled={busy || challenge.status === "processing"}
 							onClick={() => void perform("cancel")}
@@ -264,6 +272,7 @@ export function TelegramPassword({
 					)}
 					{onBack && (
 						<button
+							type="button"
 							className="block text-sm text-muted-foreground"
 							disabled={busy}
 							onClick={onBack}

@@ -1,8 +1,15 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+	type ComponentPropsWithoutRef,
+	forwardRef,
+	type ReactNode,
+} from "react";
 import { Button } from "./Button";
 import { classNames } from "./classNames";
 
-export type IconButtonProps = Omit<ComponentPropsWithoutRef<typeof Button>, "children" | "aria-label"> & {
+export type IconButtonProps = Omit<
+	ComponentPropsWithoutRef<typeof Button>,
+	"children" | "aria-label"
+> & {
 	label: string;
 	children: ReactNode;
 };

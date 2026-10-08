@@ -6,10 +6,10 @@ export const SUPPORTED_LANGUAGES: Array<{
 	flag: string;
 }> = [
 	{ code: "ru", label: "Русский", flag: "🇷🇺" },
-	{ code: "en", label: "English", flag: "🇬🇧" },
-	{ code: "el", label: "Ελληνικά", flag: "🇬🇷" },
-	{ code: "de", label: "Deutsch", flag: "🇩🇪" },
-	{ code: "pt", label: "Português", flag: "🇵🇹" },
+	{ code: "en", label: "Английский", flag: "🇬🇧" },
+	{ code: "el", label: "Греческий", flag: "🇬🇷" },
+	{ code: "de", label: "Немецкий", flag: "🇩🇪" },
+	{ code: "pt", label: "Португальский", flag: "🇵🇹" },
 ];
 
 export const DEFAULT_LANGUAGE_CODES: LanguageCode[] = SUPPORTED_LANGUAGES.map(

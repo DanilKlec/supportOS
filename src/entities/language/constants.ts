@@ -3,31 +3,31 @@ import type { Language } from "./types";
 export const languages: Language[] = [
 	{
 		code: "ru",
-		name: "Russian",
+		name: "Русский",
 		flag: "🇷🇺",
 		enabled: true,
 	},
 	{
 		code: "en",
-		name: "English",
+		name: "Английский",
 		flag: "🇬🇧",
 		enabled: true,
 	},
 	{
 		code: "de",
-		name: "German",
+		name: "Немецкий",
 		flag: "🇩🇪",
 		enabled: true,
 	},
 	{
 		code: "pt",
-		name: "Portuguese",
+		name: "Португальский",
 		flag: "🇵🇹",
 		enabled: true,
 	},
 	{
 		code: "el",
-		name: "Greek",
+		name: "Греческий",
 		flag: "🇬🇷",
 		enabled: true,
 	},

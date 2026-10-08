@@ -31,7 +31,7 @@ function BindsPage() {
 			<div className="flex h-full">
 				<main className="flex flex-1 items-center justify-center">
 					<p className="text-sm text-muted">
-						Select a category from the left sidebar
+						Выберите категорию в левой панели
 					</p>
 				</main>
 			</div>
@@ -49,7 +49,7 @@ function BindsPage() {
 							className="ui-button ui-button--primary flex items-center gap-1.5 bg-accent font-medium text-accent-foreground transition-colors hover:bg-accent/90"
 						>
 							<Plus size={16} />
-							New
+							Создать бинд
 						</button>
 					</div>
 

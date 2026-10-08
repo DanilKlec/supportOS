@@ -145,7 +145,14 @@ it("previews a saved draft before enabling explicit publication", async () => {
 });
 it("sends a selected feedback reason without customer text", async () => {
 	mock.fetch.mockResolvedValue(new Response("{}"));
-	render(<AIFeedback project="p" language="ru" />);
+	render(
+		<AIFeedback
+			project="p"
+			language="ru"
+			answer="Customer PII"
+			sourceIds={["bind-1"]}
+		/>,
+	);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Проблема с ответом AI" }),
 	);
@@ -160,5 +167,7 @@ it("sends a selected feedback reason without customer text", async () => {
 		reason: "Не тот язык",
 		project: "p",
 		language: "ru",
+		answer: "Customer PII",
+		sourceIds: ["bind-1"],
 	});
 });

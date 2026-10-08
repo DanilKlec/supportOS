@@ -15,7 +15,6 @@ import {
 	X,
 } from "lucide-react";
 import {
-	type ChangeEvent,
 	type KeyboardEvent,
 	useCallback,
 	useEffect,
@@ -122,7 +121,6 @@ export function ToolsMenu() {
 	const { showToast } = useToast();
 	const buttonRef = useRef<HTMLButtonElement>(null);
 	const menuRef = useRef<HTMLDivElement>(null);
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const searchRef = useRef<HTMLInputElement>(null);
@@ -147,33 +145,22 @@ export function ToolsMenu() {
 		void navigate({ to, hash: hash ?? "" });
 	};
 
-	const exportJson = () => {
+	const exportJson = async () => {
 		try {
-			downloadJson(supportOSExportService.exportJson());
-			showToast("JSON SupportOS экспортирован");
+			downloadJson(await supportOSExportService.exportJson());
+			showToast("Снимок базы знаний экспортирован");
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Не удалось экспортировать данные");
+			showToast(
+				error instanceof Error
+					? error.message
+					: "Не удалось экспортировать данные",
+			);
 		}
 		setOpen(false);
 	};
 
 	const importJson = () => {
-		fileInputRef.current?.click();
-		setOpen(false);
-	};
-
-	const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
-		const file = event.target.files?.[0];
-
-		event.target.value = "";
-		if (!file) return;
-
-		try {
-			supportOSExportService.importJson(await file.text());
-			showToast("JSON SupportOS импортирован");
-		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Не удалось импортировать данные");
-		}
+		navigateTo("/settings", "data");
 	};
 
 	const toggleTheme = () => {
@@ -261,13 +248,13 @@ export function ToolsMenu() {
 			},
 			{
 				type: "action",
-				label: "Восстановить локальную копию",
+				label: "Импорт JSON с предпросмотром",
 				icon: Import,
 				action: importJson,
 			},
 			{
 				type: "action",
-				label: "Экспорт локальной копии",
+				label: "Экспорт снимка базы знаний",
 				icon: Download,
 				action: exportJson,
 			},
@@ -430,13 +417,6 @@ export function ToolsMenu() {
 				<PanelRight size={18} />
 				<span className="hidden sm:inline">Меню</span>
 			</button>
-			<input
-				ref={fileInputRef}
-				type="file"
-				accept="application/json,.json"
-				onChange={handleImportFile}
-				className="hidden"
-			/>
 			{open &&
 				createPortal(
 					<div className="fixed inset-0 z-[80]">

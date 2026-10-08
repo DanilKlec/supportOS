@@ -21,7 +21,7 @@ export function reviewItems(
 		kind: "proposal",
 		title: p.translations[0]?.title || "Предложение",
 		materialId: p.source_id,
- searchText: p.translations.map(t=>t.content).join(" "),
+		searchText: p.translations.map((t) => t.content).join(" "),
 		evidence: [`Предложение оператора ${p.author}`],
 		createdAt: p.created_at,
 	}));

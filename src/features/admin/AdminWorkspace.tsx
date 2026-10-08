@@ -1,11 +1,13 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { AccountsPanel } from "@/features/accounts/AccountsPanel";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { LoadingState, Tabs } from "@/components/ui";
 import type { OverviewUser } from "@/features/accounts/AdminOverview";
 import { OperationsWorkspace } from "@/features/operations/OperationsWorkspace";
-import { adminHashRedirects, adminSections } from "@/features/operations/sections";
+import {
+	adminHashRedirects,
+	adminSections,
+} from "@/features/operations/sections";
 import { useAuthStore } from "@/store/auth.store";
-import { Tabs } from "@/components/ui";
 import { canAccessPage } from "../../../shared/access.js";
 import {
 	AccessReviewPage,
@@ -17,13 +19,15 @@ import {
 	SystemHealthPage,
 } from "./pages/PlatformPages";
 
+const AccountsPanel = lazy(() =>
+	import("@/features/accounts/AccountsPanel").then((module) => ({
+		default: module.AccountsPanel,
+	})),
+);
+
 type RolesTab = "roles" | "access" | "audit";
 
-function RolesAndAccess({
-	onUser,
-}: {
-	onUser: (user: OverviewUser) => void;
-}) {
+function RolesAndAccess({ onUser }: { onUser: (user: OverviewUser) => void }) {
 	const access = useAuthStore((s) => s.session?.user.access);
 	const tabs = [
 		{ value: "roles", label: "Роли" },
@@ -48,12 +52,7 @@ function RolesAndAccess({
 			{current === "access" ? (
 				<AccessReviewPage onUser={onUser} />
 			) : (
-				<AccountsPanel
-					key={current}
-					standalone
-					embedded
-					initialTab={current}
-				/>
+				<AccountsPanel key={current} standalone embedded initialTab={current} />
 			)}
 		</div>
 	);
@@ -66,8 +65,7 @@ export function AdminWorkspace() {
 	const [selectedUser, setSelectedUser] = useState<OverviewUser>();
 	const fallbackSection =
 		adminSections.find(
-			(s) =>
-				!s.hiddenFromNavigation && canAccessPage(access, "/admin", s.id),
+			(s) => !s.hiddenFromNavigation && canAccessPage(access, "/admin", s.id),
 		)?.id || "overview";
 	const redirectedHash = hash ? adminHashRedirects[hash] : undefined;
 	const requestedSection = redirectedHash ?? hash ?? fallbackSection;
@@ -94,31 +92,33 @@ export function AdminWorkspace() {
 			active={active}
 			onSelect={select}
 		>
-			{active === "overview" ? (
-				<DashboardPage onUser={onUser} onSection={select} />
-			) : active === "roles" ? (
-				<RolesAndAccess onUser={onUser} />
-			) : ["users", "audit"].includes(active) ? (
-				<AccountsPanel
-					key={active}
-					standalone
-					embedded
-					initialTab={active as "users" | "roles" | "audit"}
-					initialUser={selectedUser}
-				/>
-			) : active === "access" ? (
-				<AccessReviewPage onUser={onUser} />
-			) : active === "platform-projects" ? (
-				<ProjectsPage />
-			) : active === "system-health" ? (
-				<SystemHealthPage />
-			) : active === "integrations" ? (
-				<IntegrationsPage />
-			) : active === "ai" ? (
-				<AIOverviewPage />
-			) : (
-				<BoundaryPage section={active} />
-			)}
+			<Suspense fallback={<LoadingState message="Загружаем раздел…" />}>
+				{active === "overview" ? (
+					<DashboardPage onUser={onUser} onSection={select} />
+				) : active === "roles" ? (
+					<RolesAndAccess onUser={onUser} />
+				) : ["users", "audit"].includes(active) ? (
+					<AccountsPanel
+						key={active}
+						standalone
+						embedded
+						initialTab={active as "users" | "roles" | "audit"}
+						initialUser={selectedUser}
+					/>
+				) : active === "access" ? (
+					<AccessReviewPage onUser={onUser} />
+				) : active === "platform-projects" ? (
+					<ProjectsPage />
+				) : active === "system-health" ? (
+					<SystemHealthPage />
+				) : active === "integrations" ? (
+					<IntegrationsPage />
+				) : active === "ai" ? (
+					<AIOverviewPage />
+				) : (
+					<BoundaryPage section={active} />
+				)}
+			</Suspense>
 		</OperationsWorkspace>
 	);
 }

@@ -1,4 +1,3 @@
-import { emailAddresses, normalizeProjectEmail, projectEmailText, mergeEmailImport } from "../../../shared/project-emails.js";
 import {
 	CheckCircle2,
 	Copy,
@@ -12,9 +11,19 @@ import {
 	Upload,
 	X,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { useSharedPublication } from "@/components/SharedPublication";
-import type { ProjectEmailRecord, ProjectEmailAddress } from "@/entities/project-email";
+import type {
+	ProjectEmailAddress,
+	ProjectEmailRecord,
+} from "@/entities/project-email";
+import { useProjectCatalog } from "@/services/project-catalog.service";
 import {
 	type ProjectEmailImportMode,
 	type ProjectEmailImportPreview,
@@ -25,12 +34,21 @@ import { useViewState } from "@/shared/hooks/useViewState";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useBonusStore } from "@/store/bonus.store";
 import { useProjectEmailStore } from "@/store/project-email.store";
+import {
+	emailAddresses,
+	mergeEmailImport,
+	normalizeProjectEmail,
+	projectEmailText,
+} from "../../../shared/project-emails.js";
 
-interface EmailDraft { projectName: string; emails: ProjectEmailAddress[]; }
+interface EmailDraft {
+	projectName: string;
+	addresses: ProjectEmailAddress[];
+}
 
 type WorkPanel = "closed" | "editor" | "import";
 
-const EMPTY_DRAFT: EmailDraft = {projectName: '', emails: []};
+const EMPTY_DRAFT: EmailDraft = { projectName: "", addresses: [] };
 
 function createId(prefix: string) {
 	const random =
@@ -71,8 +89,13 @@ function toRecord(draft: EmailDraft, existing?: ProjectEmailRecord) {
 		id: existing?.id ?? createId("project-email"),
 		projectName,
 		slug: existing?.slug ?? slugify(projectName),
-        emails: draft.emails.map(row=>({...row,type:row.type.trim(),email:normalizeEmail(row.email),note:row.note?.trim()})),
-        supportEmail:'',kycEmail:'',vipEmail:'',
+		addresses: draft.addresses.map((row, order) => ({
+			...row,
+			order,
+			type: row.type.trim(),
+			email: normalizeEmail(row.email),
+			note: row.note?.trim(),
+		})),
 		sourceHash: existing?.sourceHash,
 		updatedAt: new Date().toISOString(),
 	};
@@ -95,20 +118,36 @@ export function ProjectEmailsPage({
 		management,
 	);
 	const canEdit = publication.canEdit;
-	const workspaceProject = useBonusStore(
-		(s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? "",
+	const activeProjectId = useBonusStore((state) => state.activeProjectId);
+	const projectCatalog = useProjectCatalog();
+	const catalogProjects = projectCatalog.data ?? [];
+	const workspaceProject = catalogProjects.find(
+		(project) => project.id === activeProjectId,
+	);
+	const catalogProjectForRecord = useCallback(
+		(record: ProjectEmailRecord) =>
+			catalogProjects.find((project) => project.id === record.id) ??
+			catalogProjects.find(
+				(project) => project.slug.toLowerCase() === record.slug.toLowerCase(),
+			),
+		[catalogProjects],
 	);
 	const [projectFilter, setProjectFilter] = useViewState(
 		`emails:${management}`,
 		"project-filter",
 		management ? "all" : "context",
 	);
-	const projectName =
+	const selectedProjectId =
 		projectFilter === "context"
-			? workspaceProject
+			? workspaceProject?.id
 			: projectFilter === "all"
 				? ""
-				: projectFilter;
+				: (catalogProjects.find(
+						(project) =>
+							project.id === projectFilter ||
+							project.name === projectFilter ||
+							project.slug === projectFilter,
+					)?.id ?? projectFilter);
 	const [query, setQuery] = useViewState(`emails:${management}`, "query", "");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 	const [editingId, setEditingId] = useState<string>();
@@ -132,16 +171,24 @@ export function ProjectEmailsPage({
 		return records
 			.filter(
 				(record) =>
-					!projectName ||
-					record.projectName.toLowerCase() === projectName.toLowerCase(),
+					!selectedProjectId ||
+					catalogProjectForRecord(record)?.id === selectedProjectId ||
+					record.id === selectedProjectId,
 			)
 			.filter((record) =>
-				[record.projectName,...emailAddresses(record).flatMap(row=>[row.type,row.email,row.note||""])]
+				[
+					record.projectName,
+					...emailAddresses(record).flatMap((row) => [
+						row.type,
+						row.email,
+						row.note || "",
+					]),
+				]
 					.join(" ")
 					.toLowerCase()
 					.includes(value),
 			);
-	}, [records, query, projectName]);
+	}, [catalogProjectForRecord, query, records, selectedProjectId]);
 
 	const selectedRecord =
 		filteredRecords.find((record) => record.id === selectedId) ??
@@ -180,14 +227,14 @@ export function ProjectEmailsPage({
 			return;
 		}
 
-		for (const row of draft.emails) {
+		for (const row of draft.addresses) {
 			if (!row.type.trim() || !row.email.trim() || !isEmail(row.email)) {
 				setFormError("Проверьте формат почты");
 				return;
 			}
 		}
 
-		if (draft.emails.length===0) {
+		if (draft.addresses.length === 0) {
 			setFormError("Укажите хотя бы одну почту");
 			return;
 		}
@@ -210,7 +257,7 @@ export function ProjectEmailsPage({
 		setEditingId(record.id);
 		setDraft({
 			projectName: record.projectName,
-			emails: emailAddresses(record).map(row=>({...row})),
+			addresses: emailAddresses(record).map((row) => ({ ...row })),
 		});
 		setFormError("");
 		setWorkPanel("editor");
@@ -251,11 +298,20 @@ export function ProjectEmailsPage({
 			if (mode === "replace") {
 				replaceRecords(preview.records);
 			} else {
-				upsertRecords(preview.records.map(row=>mergeEmailImport(records.find(old=>old.slug===row.slug),row)));
+				upsertRecords(
+					preview.records.map((row) =>
+						mergeEmailImport(
+							records.find((old) => old.slug === row.slug),
+							row,
+						),
+					),
+				);
 			}
 
 			setSelectedId(preview.records[0]?.id);
-			showToast(`Добавлено в черновик проектов: ${preview.records.length}. Сохраните для публикации.`);
+			showToast(
+				`Добавлено в черновик проектов: ${preview.records.length}. Сохраните для публикации.`,
+			);
 			setPreview(undefined);
 			setSheetUrl("");
 			setWorkPanel("closed");
@@ -292,12 +348,12 @@ export function ProjectEmailsPage({
 				>
 					<option value="context">
 						Рабочий проект
-						{workspaceProject ? `: ${workspaceProject}` : ": все проекты"}
+						{workspaceProject ? `: ${workspaceProject.name}` : ": все проекты"}
 					</option>
 					<option value="all">Все проекты</option>
-					{records.map((record) => (
-						<option key={record.id} value={record.projectName}>
-							{record.projectName}
+					{catalogProjects.map((project) => (
+						<option key={project.id} value={project.id}>
+							{project.name}
 						</option>
 					))}
 				</select>
@@ -347,7 +403,7 @@ export function ProjectEmailsPage({
 					</div>
 				</header>
 
-				<div className="grid min-h-0 min-w-0 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+				<div className="grid min-h-0 min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
 					<aside className="flex min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface lg:min-h-0">
 						<div className="border-b border-border p-3">
 							<div className="relative">
@@ -394,9 +450,7 @@ export function ProjectEmailsPage({
 													</span>
 												</span>
 												<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
-													{
-														emailAddresses(record).length
-													}
+													{emailAddresses(record).length}
 												</span>
 											</button>
 										);
@@ -447,7 +501,7 @@ export function ProjectEmailsPage({
 						{selectedRecord ? (
 							<section>
 								<div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between">
-									<div className="min-w-0">
+									<div className="min-w-0 sm:flex-1">
 										<div className="text-xs font-semibold uppercase text-muted">
 											Выбранный проект
 										</div>
@@ -460,7 +514,7 @@ export function ProjectEmailsPage({
 										</div>
 									</div>
 
-									<div className="ui-actions items-center flex flex-wrap  gap-2">
+									<div className="ui-actions items-center flex flex-wrap shrink-0 gap-2">
 										<button
 											type="button"
 											onClick={() =>
@@ -498,9 +552,41 @@ export function ProjectEmailsPage({
 								</div>
 
 								<div className="p-4">
-									<div className="grid gap-2">
-										{emailAddresses(selectedRecord).map(row=><EmailRow key={row.id} label={row.type} email={row.email} note={row.note} onCopy={email=>void copyText(email,'Почта скопирована')}/>)}
- {canEdit&&<button type="button" className="ui-button" onClick={()=>{editRecord(selectedRecord);setDraft({projectName:selectedRecord.projectName,emails:[...emailAddresses(selectedRecord),{id:createId('email'),type:'',email:''}]});}}>+ Добавить почту</button>}
+									<div className="grid min-w-0 grid-cols-1 gap-2">
+										{emailAddresses(selectedRecord).map((row) => (
+											<EmailRow
+												key={row.id}
+												label={row.type}
+												email={row.email}
+												note={row.note}
+												onCopy={(email) =>
+													void copyText(email, "Почта скопирована")
+												}
+											/>
+										))}
+										{canEdit && (
+											<button
+												type="button"
+												className="ui-button"
+												onClick={() => {
+													editRecord(selectedRecord);
+													setDraft({
+														projectName: selectedRecord.projectName,
+														addresses: [
+															...emailAddresses(selectedRecord),
+															{
+																id: createId("email"),
+																type: "",
+																email: "",
+																order: emailAddresses(selectedRecord).length,
+															},
+														],
+													});
+												}}
+											>
+												+ Добавить адрес
+											</button>
+										)}
 									</div>
 
 									<div className="mt-4 rounded-lg bg-background p-3 text-xs text-muted">
@@ -550,6 +636,17 @@ function ProjectEmailEditor({
 	onChange: (draft: EmailDraft) => void;
 	onSubmit: (event: FormEvent) => void;
 }) {
+	const moveAddress = (index: number, direction: -1 | 1) => {
+		const addresses = [...draft.addresses];
+		[addresses[index], addresses[index + direction]] = [
+			addresses[index + direction],
+			addresses[index],
+		];
+		onChange({
+			...draft,
+			addresses: addresses.map((item, order) => ({ ...item, order })),
+		});
+	};
 	return (
 		<form onSubmit={onSubmit} className="border-b border-border p-4">
 			<div className="mb-4 flex items-center justify-between gap-3">
@@ -585,9 +682,128 @@ function ProjectEmailEditor({
 					/>
 				</label>
 
-{draft.emails.map((row,index)=><fieldset key={row.id} className="md:col-span-2 rounded-lg border border-border p-3 space-y-3"><legend>Почта {index+1}</legend><div className="grid gap-3 md:grid-cols-2"><label className="ui-field">Тип<input className="ui-input" required maxLength={100} list="email-types" value={row.type} onChange={e=>onChange({...draft,emails:draft.emails.map(v=>v.id===row.id?{...v,type:e.target.value}:v)})}/></label><EmailInput label="Почта" value={row.email} onChange={email=>onChange({...draft,emails:draft.emails.map(v=>v.id===row.id?{...v,email}:v)})}/><label className="ui-field md:col-span-2">Комментарий<input className="ui-input" maxLength={2000} value={row.note||''} onChange={e=>onChange({...draft,emails:draft.emails.map(v=>v.id===row.id?{...v,note:e.target.value}:v)})}/></label></div><button type="button" className="ui-button ui-button--danger-quiet" onClick={()=>onChange({...draft,emails:draft.emails.filter(v=>v.id!==row.id)})}>Удалить почту из черновика</button></fieldset>)}
- <datalist id="email-types">{['Support','KYC','VIP','Finance','Payments','Verification','Complaints','Responsible Gaming','Affiliate','Security','Other'].map(t=><option key={t} value={t}/>)}</datalist>
- <button type="button" className="ui-button" disabled={draft.emails.length>=100} onClick={()=>onChange({...draft,emails:[...draft.emails,{id:createId('email'),type:'',email:''}]})}>+ Добавить почту</button>
+				{draft.addresses.map((row, index) => (
+					<fieldset
+						key={row.id}
+						className="md:col-span-2 rounded-lg border border-border p-3 space-y-3"
+					>
+						<legend>Почта {index + 1}</legend>
+						<div className="grid gap-3 md:grid-cols-2">
+							<label className="ui-field">
+								Тип
+								<input
+									className="ui-input"
+									required
+									maxLength={100}
+									list="email-types"
+									value={row.type}
+									onChange={(e) =>
+										onChange({
+											...draft,
+											addresses: draft.addresses.map((v) =>
+												v.id === row.id ? { ...v, type: e.target.value } : v,
+											),
+										})
+									}
+								/>
+							</label>
+							<EmailInput
+								label="Почта"
+								value={row.email}
+								onChange={(email) =>
+									onChange({
+										...draft,
+										addresses: draft.addresses.map((v) =>
+											v.id === row.id ? { ...v, email } : v,
+										),
+									})
+								}
+							/>
+							<label className="ui-field md:col-span-2">
+								Комментарий
+								<input
+									className="ui-input"
+									maxLength={2000}
+									value={row.note || ""}
+									onChange={(e) =>
+										onChange({
+											...draft,
+											addresses: draft.addresses.map((v) =>
+												v.id === row.id ? { ...v, note: e.target.value } : v,
+											),
+										})
+									}
+								/>
+							</label>
+						</div>
+						<div className="ui-actions flex flex-wrap gap-2">
+							<button
+								type="button"
+								className="ui-button ui-button--secondary"
+								disabled={index === 0}
+								onClick={() => moveAddress(index, -1)}
+							>
+								Выше
+							</button>
+							<button
+								type="button"
+								className="ui-button ui-button--secondary"
+								disabled={index === draft.addresses.length - 1}
+								onClick={() => moveAddress(index, 1)}
+							>
+								Ниже
+							</button>
+							<button
+								type="button"
+								className="ui-button ui-button--danger-quiet"
+								onClick={() =>
+									onChange({
+										...draft,
+										addresses: draft.addresses
+											.filter((v) => v.id !== row.id)
+											.map((item, order) => ({ ...item, order })),
+									})
+								}
+							>
+								Удалить адрес
+							</button>
+						</div>
+					</fieldset>
+				))}
+				<datalist id="email-types">
+					{[
+						{ value: "Support", label: "Поддержка" },
+						{ value: "KYC", label: "KYC" },
+						{ value: "VIP", label: "VIP" },
+						{ value: "Finance", label: "Финансы" },
+						{ value: "Verification", label: "Верификация" },
+						{ value: "Complaints", label: "Жалобы" },
+						{ value: "Responsible Gaming", label: "Ответственная игра" },
+					].map(({ value, label }) => (
+						<option key={value} value={value} label={label} />
+					))}
+				</datalist>
+				<button
+					type="button"
+					className="ui-button"
+					disabled={draft.addresses.length >= 100}
+					onClick={() =>
+						onChange({
+							...draft,
+							addresses: [
+								...draft.addresses,
+								{
+									id: createId("email"),
+									type: "",
+									email: "",
+									order: draft.addresses.length,
+								},
+							],
+						})
+					}
+				>
+					+ Добавить адрес
+				</button>
 			</div>
 
 			{error && (
@@ -766,21 +982,22 @@ function EmailInput({
 function EmailRow({
 	label,
 	email,
- note,
+	note,
 	onCopy,
 }: {
 	label: string;
 	email: string;
- note?: string;
+	note?: string;
 	onCopy: (email: string) => void;
 }) {
 	return (
-		<div className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-background px-3 py-2">
-			<div className="min-w-0">
+		<div className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg bg-background px-3 py-2">
+			<div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
 				<div className="text-xs font-semibold uppercase text-muted">
 					{label}
 				</div>
-				<div className="mt-0.5 break-all text-sm">{email || "Не указано"}</div>{note&&<p className="text-xs text-muted break-words">{note}</p>}
+				<div className="mt-0.5 break-all text-sm">{email || "Не указано"}</div>
+				{note && <p className="text-xs text-muted break-words">{note}</p>}
 			</div>
 
 			<button

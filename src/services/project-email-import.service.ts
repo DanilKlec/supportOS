@@ -1,10 +1,10 @@
-import { normalizeProjectEmail } from "../../shared/project-emails.js";
 import type { ProjectEmailRecord } from "@/entities/project-email";
 import {
 	fetchGoogleSheetText,
 	looksLikeGoogleSheetHtml,
 	toGoogleSheetExportUrl,
 } from "@/services/google-sheet-fetch.service";
+import { normalizeProjectEmail } from "../../shared/project-emails.js";
 
 export type ProjectEmailImportMode = "upsert" | "replace";
 
@@ -143,12 +143,6 @@ function extractEmail(value: string) {
 	return value.match(EMAIL_PATTERN)?.[0]?.toLowerCase() ?? "";
 }
 
-function hasAnyEmail(
-	record: Pick<ProjectEmailRecord, "supportEmail" | "kycEmail" | "vipEmail">,
-) {
-	return Boolean(record.supportEmail || record.kycEmail || record.vipEmail);
-}
-
 class ProjectEmailImportService {
 	async preview(url: string): Promise<ProjectEmailImportPreview> {
 		const sourceUrl = url.trim();
@@ -161,7 +155,9 @@ class ProjectEmailImportService {
 		const response = await fetchGoogleSheetText(csvUrl);
 
 		if (!response.ok) {
-			throw new Error(`Не удалось загрузить Google-таблицу (${response.status})`);
+			throw new Error(
+				`Не удалось загрузить Google-таблицу (${response.status})`,
+			);
 		}
 
 		if (looksLikeGoogleSheetHtml(response.text)) {
@@ -222,14 +218,29 @@ class ProjectEmailImportService {
 				id: createId("project-email"),
 				projectName,
 				slug: slugify(projectName),
-				supportEmail: extractEmail(cleanCell(row[supportColumn])),
-				kycEmail: extractEmail(cleanCell(row[kycColumn])),
-				vipEmail: extractEmail(cleanCell(row[vipColumn])),
+				addresses: headerRow.flatMap((type, index) => {
+					const email = extractEmail(cleanCell(row[index]));
+					return index !== projectColumn && email
+						? [
+								{
+									id: createId("email"),
+									type: /^(support|help)( email)?$/.test(headers[index])
+										? "Support"
+										: /^kyc( email)?$/.test(headers[index])
+											? "KYC"
+											: /^vip( email)?$/.test(headers[index])
+												? "VIP"
+												: type.trim() || "Другое",
+									email,
+									order: index,
+								},
+							]
+						: [];
+				}),
 				updatedAt: new Date().toISOString(),
 			};
 
-			record.emails = headerRow.flatMap((type,index)=>{const email=extractEmail(cleanCell(row[index]));return index!==projectColumn&&email?[{id:createId('email'),type:type.trim()||'Другое',email}]:[];});
-            if (!record.emails.length && !hasAnyEmail(record)) {
+			if (!record.addresses.length) {
 				warnings.push(`Строка ${rowIndex + 2}: почты не найдены`);
 				continue;
 			}

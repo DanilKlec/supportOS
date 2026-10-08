@@ -127,19 +127,17 @@ class SupabaseService {
 	async signOut() {
 		const current = this.getSession();
 		if (current) {
-			try {
-				await fetch("/api/registration?action=2fa-cancel", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${current.accessToken}`,
-					},
-					body: "{}",
-					signal: AbortSignal.timeout(10000),
-				});
-			} catch {
-				/* Supabase local sign-out still revokes the session. */
-			}
+			const response = await fetch("/api/registration?action=logout", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${current.accessToken}`,
+				},
+				body: "{}",
+				signal: AbortSignal.timeout(10000),
+			});
+			if (!response.ok && response.status !== 401)
+				throw new Error("Не удалось завершить сессию. Повторите попытку.");
 		}
 		if (supabase) {
 			const { error } = await supabase.auth.signOut({ scope: "local" });

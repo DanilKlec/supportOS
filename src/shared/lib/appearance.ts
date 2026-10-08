@@ -69,8 +69,16 @@ export const CUSTOM_PALETTE_FIELDS: Array<{
 
 export const RADIUS_OPTIONS = [
 	{ name: "Острый", value: "sharp", description: "Более строгие углы." },
-	{ name: "Сбалансированный", value: "balanced", description: "Форма по умолчанию." },
-	{ name: "Закруглённый", value: "rounded", description: "Более мягкие элементы управления." },
+	{
+		name: "Сбалансированный",
+		value: "balanced",
+		description: "Форма по умолчанию.",
+	},
+	{
+		name: "Закруглённый",
+		value: "rounded",
+		description: "Более мягкие элементы управления.",
+	},
 ] as const;
 
 export const FONT_SCALE_OPTIONS = [
@@ -303,10 +311,7 @@ export function getAppearanceSettings(): AppearanceSettings {
 		themeMode: isThemeMode(themeMode)
 			? themeMode
 			: DEFAULT_APPEARANCE.themeMode,
-		accent:
-			!accent || accent.toLowerCase() === "#3b82f6"
-				? DEFAULT_APPEARANCE.accent
-				: accent,
+		accent: accent || DEFAULT_APPEARANCE.accent,
 		density: isDensityMode(density) ? density : DEFAULT_APPEARANCE.density,
 		palette: isPaletteMode(palette) ? palette : DEFAULT_APPEARANCE.palette,
 		customPalette,

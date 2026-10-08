@@ -19,6 +19,13 @@ it('rejects forged webhooks before querying or sending messages',async()=>{
  const r=res();await handler(req('webhook',{message:{}},{'x-telegram-bot-api-secret-token':'forged'}),r);
  expect(r.statusCode).toBe(403);expect(mocks.db).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
 });
+it('routes critical confirmations through the same secret-verified bot webhook, without touching login/password RPCs',async()=>{
+ mocks.db.mockResolvedValue({status:'approved'});
+ const r=res();await handler(req('webhook',{callback_query:{id:'critical',from:{id:123},data:`critical_approve:${token}`,message:{chat:{type:'private',id:123}}}},{'x-telegram-bot-api-secret-token':secret}),r);
+ expect(r.statusCode).toBe(200);expect(mocks.db.mock.calls.map(c=>c[1])).toEqual(['rpc/supportos_critical_decide']);
+ expect(mocks.db.mock.calls[0][2]).toMatchObject({tg:123,decision:'approved',digest:expect.stringMatching(/^[a-f0-9]{64}$/)});
+ expect(fetch.mock.calls[0][0]).toContain('bottest-token/answerCallbackQuery');
+});
 it('rejects cross-origin browser requests',async()=>{
  const r=res();await handler(req('begin',{login:'operator'},{origin:'https://evil.test'}),r);expect(r.statusCode).toBe(403);expect(mocks.db).not.toHaveBeenCalled();
 });

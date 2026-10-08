@@ -16,7 +16,11 @@ export function Tabs({
 	className?: string;
 }) {
 	return (
-		<div className={classNames("ui-actions", className)} role="tablist" aria-label={ariaLabel}>
+		<div
+			className={classNames("ui-actions", className)}
+			role="tablist"
+			aria-label={ariaLabel}
+		>
 			{items.map((item) => (
 				<button
 					type="button"

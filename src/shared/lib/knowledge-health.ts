@@ -69,8 +69,8 @@ export function getKnowledgeHealthReport({
 		for (const bind of group) {
 			issues.push({
 				id: `duplicate-${bind.id}`,
-				title: "Possible duplicate",
-				description: `${getBindTitle(bind)} has content repeated in ${group.length - 1} other bind(s).`,
+				title: "Возможный дубль",
+				description: `${getBindTitle(bind)}: содержимое повторяется в других биндах (${group.length - 1}).`,
 				severity: "warning",
 				bindId: bind.id,
 			});
@@ -91,8 +91,8 @@ export function getKnowledgeHealthReport({
 		if (filledTranslations.length === 0) {
 			issues.push({
 				id: `empty-${bind.id}`,
-				title: "Empty bind",
-				description: `${getBindTitle(bind)} has no filled content.`,
+				title: "Пустой бинд",
+				description: `${getBindTitle(bind)}: содержимое не заполнено.`,
 				severity: "critical",
 				bindId: bind.id,
 			});
@@ -101,8 +101,8 @@ export function getKnowledgeHealthReport({
 		if (missingLanguages.length > 0) {
 			issues.push({
 				id: `missing-lang-${bind.id}`,
-				title: "Missing translations",
-				description: `${getBindTitle(bind)} is missing ${missingLanguages.map((code) => code.toUpperCase()).join(", ")}.`,
+				title: "Нет переводов",
+				description: `${getBindTitle(bind)}: отсутствуют переводы на языки ${missingLanguages.map((code) => code.toUpperCase()).join(", ")}.`,
 				severity: "warning",
 				bindId: bind.id,
 			});
@@ -111,8 +111,8 @@ export function getKnowledgeHealthReport({
 		if (bind.tags.length === 0) {
 			issues.push({
 				id: `no-tags-${bind.id}`,
-				title: "No tags",
-				description: `${getBindTitle(bind)} has no tags for filtering.`,
+				title: "Нет тегов",
+				description: `${getBindTitle(bind)}: нет тегов для фильтрации.`,
 				severity: "info",
 				bindId: bind.id,
 			});
@@ -123,8 +123,8 @@ export function getKnowledgeHealthReport({
 		) {
 			issues.push({
 				id: `long-${bind.id}`,
-				title: "Long content",
-				description: `${getBindTitle(bind)} may be hard to scan quickly.`,
+				title: "Длинный текст",
+				description: `${getBindTitle(bind)}: текст может быть трудно просмотреть быстро.`,
 				severity: "info",
 				bindId: bind.id,
 			});
@@ -133,8 +133,8 @@ export function getKnowledgeHealthReport({
 		if (!categoryIds.has(bind.categoryId)) {
 			issues.push({
 				id: `orphan-category-${bind.id}`,
-				title: "Missing category",
-				description: `${getBindTitle(bind)} points to a category that no longer exists.`,
+				title: "Нет категории",
+				description: `${getBindTitle(bind)}: указанная категория больше не существует.`,
 				severity: "critical",
 				bindId: bind.id,
 			});
@@ -143,8 +143,8 @@ export function getKnowledgeHealthReport({
 		if (bind.folderId && !folderIds.has(bind.folderId)) {
 			issues.push({
 				id: `orphan-folder-${bind.id}`,
-				title: "Missing folder",
-				description: `${getBindTitle(bind)} points to a folder that no longer exists.`,
+				title: "Нет папки",
+				description: `${getBindTitle(bind)}: указанная папка больше не существует.`,
 				severity: "critical",
 				bindId: bind.id,
 			});
@@ -158,8 +158,8 @@ export function getKnowledgeHealthReport({
 		if (!hasChildFolder && !hasBind) {
 			issues.push({
 				id: `unused-folder-${folder.id}`,
-				title: "Unused folder",
-				description: `${folder.name} has no binds or subfolders.`,
+				title: "Неиспользуемая папка",
+				description: `${folder.name}: нет биндов или вложенных папок.`,
 				severity: "info",
 				folderId: folder.id,
 				categoryId: folder.categoryId,
@@ -192,10 +192,10 @@ export function getKnowledgeHealthReport({
 }
 
 export function getDuplicateGroups(binds: Bind[]): Bind[][] {
- const groups=new Map<string,Bind[]>();
- for(const bind of binds.filter(b=>!b.archived)){
-  const key=getContentKey(bind);
-  if(key.length>16)groups.set(key,[...(groups.get(key)??[]),bind]);
- }
- return [...groups.values()].filter(group=>group.length>1);
+	const groups = new Map<string, Bind[]>();
+	for (const bind of binds.filter((b) => !b.archived)) {
+		const key = getContentKey(bind);
+		if (key.length > 16) groups.set(key, [...(groups.get(key) ?? []), bind]);
+	}
+	return [...groups.values()].filter((group) => group.length > 1);
 }

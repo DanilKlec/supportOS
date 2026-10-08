@@ -43,7 +43,7 @@ function ArchivePage() {
 		const restored = knowledgeService.restoreArchivedBind(id);
 
 		if (restored) {
-			showToast("Bind restored");
+			showToast("Бинд восстановлен");
 			void navigate({ to: "/" });
 		}
 	};
@@ -51,7 +51,7 @@ function ArchivePage() {
 	const deleteForever = (id: string) => {
 		const deleted = knowledgeService.deleteManyBinds([id]);
 
-		showToast(`${deleted.length} bind deleted`);
+		showToast(`Удалено биндов: ${deleted.length}`);
 		setPendingDeleteId(null);
 	};
 	const pendingDeleteBind = pendingDeleteId
@@ -84,11 +84,11 @@ function ArchivePage() {
 					<div>
 						<div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted">
 							<Archive size={14} />
-							Archive
+							Архив
 						</div>
-						<h1 className="text-3xl font-bold">Archived binds</h1>
+						<h1 className="text-3xl font-bold">Архив биндов</h1>
 						<p className="mt-2 max-w-2xl text-sm text-muted">
-							Restore old binds or remove items you no longer need.
+							Восстановите архивные бинды или удалите ненужные материалы.
 						</p>
 					</div>
 
@@ -96,7 +96,7 @@ function ArchivePage() {
 						<span className="text-2xl font-semibold">
 							{archivedBinds.length}
 						</span>
-						<span className="ml-2 text-muted">archived</span>
+						<span className="ml-2 text-muted">в архиве</span>
 					</div>
 				</header>
 
@@ -105,14 +105,14 @@ function ArchivePage() {
 					<input
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Search archive"
+						placeholder="Поиск в архиве"
 						className="ui-input flex-1 bg-transparent outline-none"
 					/>
 				</div>
 
 				{visibleBinds.length === 0 ? (
 					<div className="rounded-lg border border-border bg-surface p-10 text-center text-sm text-muted">
-						Nothing in archive
+						В архиве пока ничего нет
 					</div>
 				) : (
 					<div className="space-y-3">
@@ -134,7 +134,7 @@ function ArchivePage() {
 											{bind.tags.length > 0 ? ` - ${bind.tags.join(", ")}` : ""}
 										</div>
 										<div className="mt-2 line-clamp-2 text-sm text-muted">
-											{bind.translations[0]?.content || "No content"}
+											{bind.translations[0]?.content || "Нет содержимого"}
 										</div>
 									</div>
 
@@ -145,13 +145,13 @@ function ArchivePage() {
 											className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
 										>
 											<RotateCcw size={15} />
-											Restore
+											Восстановить
 										</button>
 										<button
 											type="button"
 											onClick={() => setPendingDeleteId(bind.id)}
 											className="ui-button ui-button--danger border border-red-500/30 text-red-300 hover:bg-red-500/10"
-											title="Delete forever"
+											title="Удалить навсегда"
 										>
 											<Trash2 size={15} />
 										</button>
@@ -168,12 +168,13 @@ function ArchivePage() {
 					<div
 						role="alertdialog"
 						aria-modal="true"
-						aria-label="Delete archived material"
+						aria-label="Удалить архивный материал"
 						className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl"
 					>
-						<div className="text-base font-semibold">Delete forever?</div>
+						<div className="text-base font-semibold">Удалить навсегда?</div>
 						<p className="mt-2 text-sm leading-6 text-muted">
-							This archived material will be removed permanently.
+							Этот архивный материал будет удалён без возможности
+							восстановления.
 						</p>
 						{pendingDeleteBind && (
 							<div className="mt-3 rounded-xl bg-background px-3 py-2 text-sm">
@@ -186,14 +187,14 @@ function ArchivePage() {
 								onClick={() => setPendingDeleteId(null)}
 								className="min-h-10 rounded-lg border border-border px-4 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
-								Cancel
+								Отмена
 							</button>
 							<button
 								type="button"
 								onClick={() => deleteForever(pendingDeleteId)}
 								className="min-h-10 rounded-lg bg-red-500 px-4 text-sm font-semibold text-white hover:bg-red-400"
 							>
-								Delete
+								Удалить
 							</button>
 						</div>
 					</div>

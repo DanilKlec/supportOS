@@ -18,6 +18,12 @@ it('binds change to authenticated identity, never to a client-supplied id',async
  expect(result.telegramUrl).toMatch(/start=pw_[A-Za-z0-9_-]{43}$/);
  expect(JSON.stringify(mocks.db.mock.calls)).not.toContain(result.browserToken);
 });
+it('sends only a keyed IP hash and a bounded agent for server-side parsing',async()=>{
+ mocks.db.mockResolvedValue({status:'pending'});
+ await passwordAction({headers:{'user-agent':'Chrome/130 Windows '+ 'x'.repeat(700),'x-forwarded-for':'198.51.100.1'},socket:{remoteAddress:'192.0.2.5'}},'begin',{mode:'change'},env);
+ const args=mocks.db.mock.calls[0][2];expect(args.agent).toHaveLength(512);expect(args.ip_digest).toMatch(/^[a-f0-9]{64}$/);
+ expect(JSON.stringify(args)).not.toMatch(/192\.0\.2\.5|198\.51\.100\.1/);
+});
 it('keeps recovery independent of a session and does not disclose account existence',async()=>{
  mocks.db.mockResolvedValue({status:'pending'});
  const result=await passwordAction(request,'begin',{mode:'recovery',login:'missing'},env);

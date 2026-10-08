@@ -28,7 +28,7 @@ it("aggregates outdated evidence without inventing confidence, risk or candidate
 		createdAt: "2026-01-02",
 	});
 	expect(rows[0].evidence[0]).toContain("2");
-	expect(rows[0].risk).toBeUndefined();
-	expect(rows[0].confidence).toBeUndefined();
+	expect(rows[0]).not.toHaveProperty("risk");
+	expect(rows[0]).not.toHaveProperty("confidence");
 	expect(rows[1].projectId).toBe("p");
 });

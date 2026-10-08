@@ -6,7 +6,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 
-vi.mock("@/shared/hooks/useViewState",()=>({useViewState:(_scope:string,_field:string,value:unknown)=>[value,()=>{}]}));
+vi.mock("@/shared/hooks/useViewState", () => ({
+	useViewState: (_scope: string, _field: string, value: unknown) => [
+		value,
+		() => {},
+	],
+}));
 const state = vi.hoisted(() => ({ hash: "overview", area: "admin" }));
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -62,9 +67,15 @@ vi.mock("@/store/auth.store", () => ({
 }));
 
 import { AdminWorkspace } from "@/features/admin/AdminWorkspace";
+import { qcDestination } from "@/features/qc/navigation";
 import { QCWorkspace } from "@/features/qc/QCWorkspace";
 import { ToastProvider } from "@/shared/hooks/useToast";
-import { adminSections, qcSections } from "./sections";
+import {
+	adminHashRedirects,
+	adminSections,
+	qcHashRedirects,
+	qcSections,
+} from "./sections";
 
 it("renders every workspace section with honest empty or disconnected states", () => {
 	const client = new QueryClient({
@@ -98,7 +109,15 @@ it("renders every workspace section with honest empty or disconnected states", (
 					createElement(ToastProvider, null, createElement(Component)),
 				),
 			);
-			expect(html).toContain(section.label.replaceAll("&", "&amp;"));
+			const canonicalId =
+				area === "admin"
+					? (adminHashRedirects[section.id] ?? section.id)
+					: qcDestination(qcHashRedirects[section.id] ?? section.id).section;
+			const canonicalSection = sections.find((item) => item.id === canonicalId);
+			expect(canonicalSection).toBeDefined();
+			expect(html).toContain(
+				`<h2>${canonicalSection?.label.replaceAll("&", "&amp;")}</h2>`,
+			);
 			expect(html).not.toContain("8,421");
 			expect(html).not.toContain("$412");
 			if (process.env.SUPPORTOS_PREVIEW === "1") {

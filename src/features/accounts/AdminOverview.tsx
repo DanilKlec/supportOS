@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { MonitorData } from "@/features/agent-monitor/live-model";
 import { BindProposals } from "@/features/shared-binds/BindProposals";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";
@@ -19,11 +20,14 @@ export function needsAccess(user: OverviewUser) {
 		(user.status === "active" && user.roles.length === 0)
 	);
 }
-async function get(path: string, signal?: AbortSignal) {
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 	const r = await authenticatedFetch(path, { signal });
-	const data = await r.json();
-	if (!r.ok) throw new Error(data.error ?? "Не удалось получить данные");
-	return data;
+	const data: unknown = await r.json();
+	if (!r.ok)
+		throw new Error(
+			(data as { error?: string }).error ?? "Не удалось получить данные",
+		);
+	return data as T;
 }
 export function AdminOverview({
 	onUser,
@@ -43,7 +47,7 @@ export function AdminOverview({
 			const users: OverviewUser[] = [];
 			let total = 0;
 			for (let page = 1; page <= 20; page++) {
-				const data = await get(
+				const data = await get<{ users: OverviewUser[]; total: number }>(
 					"/api/accounts?action=users&page=" + page,
 					signal,
 				);
@@ -66,7 +70,11 @@ export function AdminOverview({
 	const ai = useQuery({
 		queryKey: ["admin-overview-ai", user?.id],
 		enabled: can(access, "tools"),
-		queryFn: ({ signal }) => get("/api/ai/status", signal),
+		queryFn: ({ signal }) =>
+			get<{ configured?: boolean; provider?: string }>(
+				"/api/ai/status",
+				signal,
+			),
 		staleTime: 30000,
 	});
 	const monitor = useQuery({
@@ -74,7 +82,7 @@ export function AdminOverview({
 		refetchInterval: 30000,
 		enabled: can(access, "monitor.read"),
 		queryFn: ({ signal }) =>
-			get(
+			get<Pick<MonitorData, "lastSync">>(
 				"/api/agent-monitor?action=data&day=" +
 					new Date(Date.now() - 6 * 3600000).toISOString().slice(0, 10),
 				signal,

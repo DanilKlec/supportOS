@@ -1,25 +1,30 @@
-// The JSON document remains in the existing versioned content store.
-// Legacy columns are retained for older readers; emails is authoritative once present.
+// The first available array is authoritative, including when intentionally empty.
 export function emailAddresses(record) {
- if (Array.isArray(record.emails)) return record.emails;
- return [['supportEmail','Support'],['kycEmail','KYC'],['vipEmail','VIP']]
-  .filter(([key])=>record[key])
-  .map(([key,type])=>({id:`${record.id}:${key}`,type,email:record[key]}));
+ const source=Array.isArray(record.addresses)?record.addresses:Array.isArray(record.emails)?record.emails:
+  [['supportEmail','Support'],['kycEmail','KYC'],['vipEmail','VIP']]
+   .filter(([key])=>record[key])
+   .map(([key,type])=>({id:`${record.id}:${key}`,type,email:record[key]}));
+ return source.map((row,index)=>({...row,order:Number.isInteger(row.order)&&row.order>=0?row.order:index}))
+  .sort((a,b)=>a.order-b.order);
 }
 export function normalizeProjectEmail(record) {
- const emails=emailAddresses(record).map(row=>({...row}));
- const first=type=>emails.find(row=>row.type.toLowerCase()===type)?.email||'';
- return {...record,emails,supportEmail:first('support'),kycEmail:first('kyc'),vipEmail:first('vip')};
+ const addresses=emailAddresses(record).map((row,order)=>({...row,order}));
+ const first=type=>addresses.find(row=>row.type.toLowerCase()===type)?.email||'';
+ return {...record,addresses,emails:addresses.map(({order,...row})=>row),supportEmail:first('support'),kycEmail:first('kyc'),vipEmail:first('vip')};
 }
 export function projectEmailText(record) {
  return [record.projectName,'',...emailAddresses(record).map(row=>`${row.type}: ${row.email}`)].join('\n');
 }
 export function mergeEmailImport(existing,incoming) {
  if(!existing)return normalizeProjectEmail(incoming);
- const rows=emailAddresses(incoming);
- const types=new Set(rows.map(row=>row.type.toLowerCase()));
- return normalizeProjectEmail({...existing,...incoming,id:existing.id,emails:[
-  ...emailAddresses(existing).filter(row=>!types.has(row.type.toLowerCase())),
-  ...rows.map(row=>{const old=emailAddresses(existing).find(v=>v.type.toLowerCase()===row.type.toLowerCase());return {...old,...row,id:old?.id||row.id,note:row.note??old?.note};}),
- ]});
+ const imported=emailAddresses(incoming);
+ const used=new Set();
+ const addresses=emailAddresses(existing).map(old=>{
+  const index=imported.findIndex((row,i)=>!used.has(i)&&row.type.toLowerCase()===old.type.toLowerCase());
+  if(index<0)return old;
+  used.add(index);
+  return {...old,...imported[index],id:old.id,note:imported[index].note??old.note};
+ });
+ imported.forEach((row,index)=>{if(!used.has(index))addresses.push(row);});
+ return normalizeProjectEmail({...existing,...incoming,id:existing.id,addresses:addresses.map((row,order)=>({...row,order}))});
 }

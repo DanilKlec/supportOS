@@ -42,6 +42,7 @@ export const spaces = [
 		items: [
 			{ label: "Общие", to: "/settings" },
 			{ label: "Оформление", to: "/settings", hash: "appearance" },
+			{ label: "Безопасность", to: "/settings", hash: "security" },
 			{
 				label: "Интеграции",
 				to: "/settings",

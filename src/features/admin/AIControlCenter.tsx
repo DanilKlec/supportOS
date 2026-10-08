@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { answerAssistantService } from "@/services/answer-assistant.service";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { useProjectCatalog } from "@/services/project-catalog.service";
 import { useAuthStore } from "@/store/auth.store";
-import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage } from "../../../shared/access.js";
 import { AIWorkflowGuide } from "./AIWorkflowGuide";
 import { FeedbackOverview } from "./FeedbackOverview";
@@ -49,6 +50,16 @@ type Runtime = {
 	version: number;
 	document: { global?: string; entries: Entry[]; feedback: Feedback[] };
 };
+type FeedbackReview = {
+	id: string;
+	project_id: string;
+	source_ids: string[];
+	comment: string;
+	answer_ref: string;
+	actor_id: string;
+	created_at: string;
+	status: string;
+};
 const blank = (kind: string): Entry => ({
 	id: "",
 	kind,
@@ -77,9 +88,10 @@ async function api<T>(path: string, body?: object): Promise<T> {
 				}
 			: undefined,
 	);
-	const data = await response.json();
-	if (!response.ok) throw new Error(data.error ?? "Ошибка AI");
-	return data;
+	const data: unknown = await response.json();
+	if (!response.ok)
+		throw new Error((data as { error?: string }).error ?? "Ошибка AI");
+	return data as T;
 }
 const control =
 	"rounded-[var(--ui-control-radius)] border border-border bg-background px-[var(--ui-control-padding-x)] py-2 text-sm";
@@ -91,12 +103,22 @@ export function AIControlCenter({
 	onSection: (section: AISection) => void;
 }) {
 	const user = useAuthStore((s) => s.session?.user),
-		projects = useBonusStore((s) => s.projects),
-		client = useQueryClient();
+		client = useQueryClient(),
+		canReadSection = canAccessPage(user?.access, "/admin", section),
+		projects = useProjectCatalog({ enabled: canReadSection }).data ?? [];
 	const query = useQuery({
 		queryKey: ["ai-runtime", user?.id],
 		queryFn: () => api<Runtime>("/api/ai/knowledge"),
-		enabled: canAccessPage(user?.access, "/admin", section),
+		enabled: canReadSection,
+		staleTime: 30000,
+	});
+	const reviews = useQuery({
+		queryKey: ["ai-feedback-reviews", user?.id],
+		queryFn: () =>
+			api<{ reviews: FeedbackReview[] }>(
+				"/api/ai/knowledge?action=feedback-reviews",
+			),
+		enabled: canReadSection && section === "feedback",
 		staleTime: 30000,
 	});
 	const [entry, setEntry] = useState<Entry>(() => blank(section)),
@@ -127,8 +149,15 @@ export function AIControlCenter({
 		if (!["playground", "feedback"].includes(section) && entry.kind !== section)
 			setEntry(blank(section));
 	}, [section, entry.kind]);
-	if (!canAccessPage(user?.access, "/admin", section)) return null;
+	if (!canReadSection) return null;
 	const entries = query.data?.document.entries ?? [];
+	const visibleEntries = entries.filter(
+		(e) =>
+			e.kind === section &&
+			`${e.title} ${e.content} ${projects.find((p) => p.id === e.project)?.name || e.project}`
+				.toLowerCase()
+				.includes(search.toLowerCase()),
+	);
 	const editable = can(
 		user?.access,
 		section === "rules"
@@ -153,6 +182,30 @@ export function AIControlCenter({
 			setMessage(action === "publish" ? "Опубликовано" : "Сохранено");
 			setEntry(blank(section));
 			setReviewed([]);
+		} catch (error) {
+			setMessage((error as Error).message);
+		} finally {
+			setBusy(false);
+		}
+	};
+	const importLegacyGlossary = async () => {
+		if (!query.data || !editable) return;
+		const terms = answerAssistantService.readLegacyGlossary();
+		if (!terms.length) {
+			setMessage("Локальных терминов для импорта нет");
+			return;
+		}
+		setBusy(true);
+		setMessage("");
+		try {
+			const result = await api<{ added: number; skipped: number }>(
+				"/api/ai/knowledge",
+				{ action: "import-legacy", expected: query.data.version, terms },
+			);
+			await client.invalidateQueries({ queryKey: ["ai-runtime", user?.id] });
+			setMessage(
+				`Черновиков добавлено: ${result.added}. Пропущено совпадений: ${result.skipped}. Проверьте и опубликуйте нужные термины.`,
+			);
 		} catch (error) {
 			setMessage((error as Error).message);
 		} finally {
@@ -244,19 +297,26 @@ export function AIControlCenter({
 				)}
 				onSection={onSection}
 			/>
-			{query.isPending && <p>Загрузка…</p>}
+			{query.isPending && (
+				<LoadingState message="Загружаем знания и правила Помощника…" />
+			)}
 			{query.error && (
-				<p role="alert">
-					{query.error.message}{" "}
-					<button type="button" onClick={() => void query.refetch()}>
-						Повторить
-					</button>
-				</p>
+				<ErrorState
+					title="Не удалось загрузить знания и правила Помощника."
+					description={
+						/[а-яё]/i.test(query.error.message)
+							? query.error.message
+							: undefined
+					}
+					onRetry={() => void query.refetch()}
+					retrying={query.isFetching}
+				/>
 			)}
 			{message && <output className="block text-sm">{message}</output>}
 			{section === "feedback" ? (
 				<FeedbackOverview
 					feedback={query.data?.document.feedback ?? []}
+					reviews={reviews.data?.reviews ?? []}
 					projects={projects}
 					kinds={(["knowledge", "rules", "tests"] as const).filter((kind) =>
 						canAccessPage(user?.access, "/admin", kind),
@@ -272,8 +332,8 @@ export function AIControlCenter({
 					}}
 				/>
 			) : section === "playground" ? (
-				<div className="grid gap-4 xl:grid-cols-2">
-					<div className="space-y-3">
+				<div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
+					<div className="min-w-0 space-y-3">
 						<label className="ui-field ">
 							Сообщение
 							<textarea
@@ -301,13 +361,25 @@ export function AIControlCenter({
 								aria-label="Язык проверки"
 								className={`ui-input ${control}`}
 								value={language === "auto" ? "Автоматически" : language}
-								onChange={(e) => setLanguage(e.target.value === "Автоматически" ? "auto" : e.target.value)}
+								onChange={(e) =>
+									setLanguage(
+										e.target.value === "Автоматически"
+											? "auto"
+											: e.target.value,
+									)
+								}
 							/>
 							<input
 								aria-label="Тема проверки"
 								className={`ui-input ${control}`}
 								value={intent === "general" ? "Общая тема" : intent}
-								onChange={(e) => setIntent(e.target.value === "Общая тема" ? "general" : e.target.value)}
+								onChange={(e) =>
+									setIntent(
+										e.target.value === "Общая тема"
+											? "general"
+											: e.target.value,
+									)
+								}
 							/>
 							<select
 								aria-label="Тон"
@@ -316,7 +388,16 @@ export function AIControlCenter({
 								onChange={(e) => setTone(e.target.value)}
 							>
 								{["neutral", "friendly", "formal", "concise"].map((t) => (
-									<option key={t} value={t}>{{neutral:"Нейтральный",friendly:"Дружелюбный",formal:"Официальный",concise:"Краткий"}[t]}</option>
+									<option key={t} value={t}>
+										{
+											{
+												neutral: "Нейтральный",
+												friendly: "Дружелюбный",
+												formal: "Официальный",
+												concise: "Краткий",
+											}[t]
+										}
+									</option>
 								))}
 							</select>
 							<select
@@ -363,7 +444,7 @@ export function AIControlCenter({
 							{busy ? "Проверка…" : "Подготовить ответ"}
 						</button>
 					</div>
-					<div>
+					<div className="min-w-0 break-words">
 						<h3>Ответ</h3>
 						<p className="my-3 whitespace-pre-wrap">{answer}</p>
 						{debug && (
@@ -441,11 +522,28 @@ export function AIControlCenter({
 				<>
 					{section === "projects" && (
 						<p className="text-sm text-muted">
-							Инструкции без выбранного проекта действуют глобально. Инструкции проекта дополняют их. Сохраните черновик и проверьте его в проверке ответа перед публикацией.
+							Инструкции без выбранного проекта действуют глобально. Инструкции
+							проекта дополняют их. Сохраните черновик и проверьте его в
+							проверке ответа перед публикацией.
 						</p>
 					)}
-					<div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-						<div className="space-y-2">
+					{section === "glossary" && editable && (
+						<div className="flex flex-wrap items-center gap-2">
+							<p className="text-sm text-muted">
+								Термины становятся общими после проверки и публикации.
+							</p>
+							<button
+								type="button"
+								className="ui-button"
+								disabled={busy || !query.data}
+								onClick={() => void importLegacyGlossary()}
+							>
+								Импортировать локальные термины в черновики
+							</button>
+						</div>
+					)}
+					<div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+						<div className="min-w-0 space-y-2">
 							<input
 								aria-label="Поиск AI"
 								className={`ui-input ${`${control} w-full`}`}
@@ -460,34 +558,44 @@ export function AIControlCenter({
 							>
 								{section === "tests" ? "Создать тест" : "Создать черновик"}
 							</button>
-							{entries
-								.filter(
-									(e) =>
-										e.kind === section &&
-										`${e.title} ${e.content} ${projects.find(p=>p.id===e.project)?.name||e.project}`
-											.toLowerCase()
-											.includes(search.toLowerCase()),
-								)
-								.map((e) => (
-									<button
-										type="button"
-										key={e.id}
-										className={`${control} block w-full text-left`}
-										aria-pressed={entry.id === e.id}
-										onClick={() => choose(e)}
-									>
-										{e.title}
-										<small className="block text-muted">
-											{{draft:'Черновик',published:'Опубликовано',archived:'В архиве'}[e.status]||'Сохранено'}
-											{e.status === "draft" && e.published
-												? " · предыдущая версия опубликована"
-												: ""}
-										</small>
-									</button>
-								))}
+							{!query.isPending && !query.error && !visibleEntries.length && (
+								<EmptyState
+									title={
+										search
+											? "Ничего не найдено"
+											: "В этом разделе пока нет записей"
+									}
+									description={
+										search
+											? "Попробуйте другое название или фразу."
+											: "Записи появятся здесь после сохранения."
+									}
+								/>
+							)}
+							{visibleEntries.map((e) => (
+								<button
+									type="button"
+									key={e.id}
+									className={`${control} block w-full text-left`}
+									aria-pressed={entry.id === e.id}
+									onClick={() => choose(e)}
+								>
+									{e.title}
+									<small className="block text-muted">
+										{{
+											draft: "Черновик",
+											published: "Опубликовано",
+											archived: "В архиве",
+										}[e.status] || "Сохранено"}
+										{e.status === "draft" && e.published
+											? " · предыдущая версия опубликована"
+											: ""}
+									</small>
+								</button>
+							))}
 						</div>
 						<form
-							className="space-y-3"
+							className="min-w-0 space-y-3"
 							onSubmit={(e) => {
 								e.preventDefault();
 								void save("save");
@@ -543,8 +651,19 @@ export function AIControlCenter({
 										{label}
 										<input
 											className={`ui-input ${`${control} block w-full`}`}
-											value={key === "intent" && entry[key] === "general" ? "Общая тема" : entry[key]}
-											onChange={(e) => patch(key, key === "intent" && e.target.value === "Общая тема" ? "general" : e.target.value)}
+											value={
+												key === "intent" && entry[key] === "general"
+													? "Общая тема"
+													: entry[key]
+											}
+											onChange={(e) =>
+												patch(
+													key,
+													key === "intent" && e.target.value === "Общая тема"
+														? "general"
+														: e.target.value,
+												)
+											}
 										/>
 									</label>
 								))}

@@ -9,6 +9,7 @@ import { copyToClipboard } from "#/shared/lib/clipboard";
 import { modalManager } from "#/shared/modals/modal.store";
 import { useKnowledgeStore } from "#/store";
 import { MoreActions } from "@/components/MoreActions";
+import { getTeamGlossary } from "@/services/team-glossary.service";
 import { LocalBindActions } from "./LocalBindActions";
 
 interface BindCardProps {
@@ -36,12 +37,18 @@ function getBindContent(bind: Bind, language: string) {
 	);
 }
 
-function getCopyWarningTitle(content: string, title: string, language: string) {
-	const assistantData = answerAssistantService.load();
+async function getCopyWarningTitle(
+	content: string,
+	title: string,
+	language: string,
+) {
+	const glossary = (await getTeamGlossary().catch(() => [])).filter(
+		(term) => !term.projectId,
+	);
 	const issues = answerAssistantService.checkAnswer({
 		answer: content,
 		customerMessage: title,
-		glossary: assistantData.glossary,
+		glossary,
 		language,
 	});
 	const importantWarnings = new Set([
@@ -67,7 +74,7 @@ export function BindCard({ bind }: BindCardProps) {
 	const content = getBindContent(bind, language);
 
 	const copy = async () => {
-		const warningTitle = getCopyWarningTitle(content, title, language);
+		const warningTitle = await getCopyWarningTitle(content, title, language);
 		const ok = await copyToClipboard(content);
 
 		addRecent(bind.id);

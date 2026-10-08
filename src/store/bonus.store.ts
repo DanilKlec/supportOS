@@ -1,7 +1,14 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { BonusProject } from "@/entities/bonus";
+
+export const BONUS_LEGACY_STORAGE_KEY = "supportos:deposit-bonuses:v1";
+
+export function clearLegacyBonusRecords() {
+	if (typeof window === "undefined") return;
+
+	window.localStorage.removeItem(BONUS_LEGACY_STORAGE_KEY);
+}
 
 interface BonusState {
 	projects: BonusProject[];
@@ -80,200 +87,172 @@ function touchProject(project: BonusProject) {
 	};
 }
 
-export const useBonusStore = create<BonusState>()(
-	persist(
-		(set, get) => ({
-			projects: [],
-			activeProjectId: undefined,
-			selectedCurrency: "USD",
-			depositBonusLanguage: "ru",
-			depositBonusQuery: "",
-			bonusToolsQuery: "",
-			bonusToolsSelectedRuleId: "",
-			bonusToolsSelectedTableName: "",
-			bonusToolsSelectedBaseAmount: "",
-			bonusToolsSourceUrl: "",
-			projectCurrencyGroups: {},
-			setProjects: (projects) =>
-				set((state) => ({
-					projects: sortProjects(projects),
-					activeProjectId:
-						state.activeProjectId &&
-						projects.some((project) => project.id === state.activeProjectId)
-							? state.activeProjectId
-							: projects[0]?.id,
-				})),
-			upsertProjects: (projects) => {
-				const current = get().projects;
-				const bySlug = new Map(
-					current.map((project) => [project.slug, project]),
-				);
+export const useBonusStore = create<BonusState>()((set, get) => ({
+	projects: [],
+	activeProjectId: undefined,
+	selectedCurrency: "USD",
+	depositBonusLanguage: "ru",
+	depositBonusQuery: "",
+	bonusToolsQuery: "",
+	bonusToolsSelectedRuleId: "",
+	bonusToolsSelectedTableName: "",
+	bonusToolsSelectedBaseAmount: "",
+	bonusToolsSourceUrl: "",
+	projectCurrencyGroups: {},
+	setProjects: (projects) =>
+		set((state) => ({
+			projects: sortProjects(projects),
+			activeProjectId:
+				state.activeProjectId &&
+				projects.some((project) => project.id === state.activeProjectId)
+					? state.activeProjectId
+					: projects[0]?.id,
+		})),
+	upsertProjects: (projects) => {
+		const current = get().projects;
+		const bySlug = new Map(current.map((project) => [project.slug, project]));
 
-				for (const project of projects) {
-					bySlug.set(project.slug, project);
-				}
+		for (const project of projects) {
+			bySlug.set(project.slug, project);
+		}
 
-				const nextProjects = sortProjects(Array.from(bySlug.values()));
+		const nextProjects = sortProjects(Array.from(bySlug.values()));
 
-				set({
-					projects: nextProjects,
-					activeProjectId: get().activeProjectId ?? nextProjects[0]?.id,
-				});
-			},
-			replaceProjects: (projects) =>
-				set((state) => ({
-					projects: sortProjects(projects),
-					activeProjectId: projects.some((p) => p.id === state.activeProjectId)
-						? state.activeProjectId
-						: sortProjects(projects)[0]?.id,
-				})),
-			addProject: (name) => {
-				const trimmedName = name.trim();
+		set({
+			projects: nextProjects,
+			activeProjectId: get().activeProjectId ?? nextProjects[0]?.id,
+		});
+	},
+	replaceProjects: (projects) =>
+		set((state) => ({
+			projects: sortProjects(projects),
+			activeProjectId: projects.some((p) => p.id === state.activeProjectId)
+				? state.activeProjectId
+				: sortProjects(projects)[0]?.id,
+		})),
+	addProject: (name) => {
+		const trimmedName = name.trim();
 
-				if (!trimmedName) return undefined;
+		if (!trimmedName) return undefined;
 
-				const project: BonusProject = {
-					id: createId("bonus-project"),
-					name: trimmedName,
-					slug: slugify(trimmedName),
-					bonuses: [],
-					updatedAt: new Date().toISOString(),
-				};
+		const project: BonusProject = {
+			id: createId("bonus-project"),
+			name: trimmedName,
+			slug: slugify(trimmedName),
+			bonuses: [],
+			updatedAt: new Date().toISOString(),
+		};
 
-				set((state) => ({
-					projects: sortProjects([...state.projects, project]),
-					activeProjectId: project.id,
-				}));
+		set((state) => ({
+			projects: sortProjects([...state.projects, project]),
+			activeProjectId: project.id,
+		}));
 
-				return project;
-			},
-			renameProject: (id, name) => {
-				const trimmedName = name.trim();
+		return project;
+	},
+	renameProject: (id, name) => {
+		const trimmedName = name.trim();
 
-				if (!trimmedName) return;
+		if (!trimmedName) return;
 
-				set((state) => ({
-					projects: sortProjects(
-						state.projects.map((project) =>
-							project.id === id
-								? touchProject({
-										...project,
-										name: trimmedName,
-										slug: slugify(trimmedName),
-									})
-								: project,
-						),
-					),
-				}));
-			},
-			removeProject: (id) =>
-				set((state) => {
-					const projectCurrencyGroups = { ...state.projectCurrencyGroups };
+		set((state) => ({
+			projects: sortProjects(
+				state.projects.map((project) =>
+					project.id === id
+						? touchProject({
+								...project,
+								name: trimmedName,
+								slug: slugify(trimmedName),
+							})
+						: project,
+				),
+			),
+		}));
+	},
+	removeProject: (id) =>
+		set((state) => {
+			const projectCurrencyGroups = { ...state.projectCurrencyGroups };
 
-					delete projectCurrencyGroups[id];
+			delete projectCurrencyGroups[id];
 
-					return {
-						projects: state.projects.filter((project) => project.id !== id),
-						activeProjectId:
-							state.activeProjectId === id
-								? state.projects.find((project) => project.id !== id)?.id
-								: state.activeProjectId,
-						projectCurrencyGroups,
-					};
-				}),
-			setActiveProject: (activeProjectId) => set({ activeProjectId }),
-			addBonus: (projectId, bonus) =>
-				set((state) => ({
-					projects: state.projects.map((project) =>
-						project.id === projectId
-							? touchProject({
-									...project,
-									bonuses: [
-										...project.bonuses,
-										{
-											...bonus,
-											id: createId("deposit-bonus"),
-											order:
-												Math.max(
-													0,
-													...project.bonuses.map((item) => item.order),
-												) + 1,
-										},
-									],
-								})
-							: project,
-					),
-				})),
-			updateBonus: (projectId, bonusId, patch) =>
-				set((state) => ({
-					projects: state.projects.map((project) =>
-						project.id === projectId
-							? touchProject({
-									...project,
-									bonuses: project.bonuses.map((bonus) =>
-										bonus.id === bonusId ? { ...bonus, ...patch } : bonus,
-									),
-								})
-							: project,
-					),
-				})),
-			removeBonus: (projectId, bonusId) =>
-				set((state) => ({
-					projects: state.projects.map((project) =>
-						project.id === projectId
-							? touchProject({
-									...project,
-									bonuses: project.bonuses.filter(
-										(bonus) => bonus.id !== bonusId,
-									),
-								})
-							: project,
-					),
-				})),
-			setSelectedCurrency: (currency) =>
-				set({ selectedCurrency: normalizeCurrency(currency) }),
-			setDepositBonusLanguage: (depositBonusLanguage) =>
-				set({ depositBonusLanguage }),
-			setDepositBonusQuery: (depositBonusQuery) => set({ depositBonusQuery }),
-			setBonusToolsQuery: (bonusToolsQuery) => set({ bonusToolsQuery }),
-			setBonusToolsSelectedRule: (bonusToolsSelectedRuleId) =>
-				set({ bonusToolsSelectedRuleId }),
-			setBonusToolsSelectedTable: (bonusToolsSelectedTableName) =>
-				set({ bonusToolsSelectedTableName }),
-			setBonusToolsSelectedBaseAmount: (bonusToolsSelectedBaseAmount) =>
-				set({ bonusToolsSelectedBaseAmount }),
-			setBonusToolsSourceUrl: (bonusToolsSourceUrl) =>
-				set({ bonusToolsSourceUrl }),
-			setProjectCurrencyGroup: (projectId, tableName) =>
-				set((state) => {
-					const projectCurrencyGroups = { ...state.projectCurrencyGroups };
-					const normalizedTableName = tableName.trim();
-
-					if (normalizedTableName) {
-						projectCurrencyGroups[projectId] = normalizedTableName;
-					} else {
-						delete projectCurrencyGroups[projectId];
-					}
-
-					return { projectCurrencyGroups };
-				}),
+			return {
+				projects: state.projects.filter((project) => project.id !== id),
+				activeProjectId:
+					state.activeProjectId === id
+						? state.projects.find((project) => project.id !== id)?.id
+						: state.activeProjectId,
+				projectCurrencyGroups,
+			};
 		}),
-		{
-			name: "supportos:deposit-bonuses:v1",
-			storage: createJSONStorage(() => localStorage),
-			partialize: (state) => ({
-				projects: state.projects,
-				activeProjectId: state.activeProjectId,
-				selectedCurrency: state.selectedCurrency,
-				depositBonusLanguage: state.depositBonusLanguage,
-				depositBonusQuery: state.depositBonusQuery,
-				bonusToolsQuery: state.bonusToolsQuery,
-				bonusToolsSelectedRuleId: state.bonusToolsSelectedRuleId,
-				bonusToolsSelectedTableName: state.bonusToolsSelectedTableName,
-				bonusToolsSelectedBaseAmount: state.bonusToolsSelectedBaseAmount,
-				bonusToolsSourceUrl: state.bonusToolsSourceUrl,
-				projectCurrencyGroups: state.projectCurrencyGroups,
-			}),
-		},
-	),
-);
+	setActiveProject: (activeProjectId) => set({ activeProjectId }),
+	addBonus: (projectId, bonus) =>
+		set((state) => ({
+			projects: state.projects.map((project) =>
+				project.id === projectId
+					? touchProject({
+							...project,
+							bonuses: [
+								...project.bonuses,
+								{
+									...bonus,
+									id: createId("deposit-bonus"),
+									order:
+										Math.max(0, ...project.bonuses.map((item) => item.order)) +
+										1,
+								},
+							],
+						})
+					: project,
+			),
+		})),
+	updateBonus: (projectId, bonusId, patch) =>
+		set((state) => ({
+			projects: state.projects.map((project) =>
+				project.id === projectId
+					? touchProject({
+							...project,
+							bonuses: project.bonuses.map((bonus) =>
+								bonus.id === bonusId ? { ...bonus, ...patch } : bonus,
+							),
+						})
+					: project,
+			),
+		})),
+	removeBonus: (projectId, bonusId) =>
+		set((state) => ({
+			projects: state.projects.map((project) =>
+				project.id === projectId
+					? touchProject({
+							...project,
+							bonuses: project.bonuses.filter((bonus) => bonus.id !== bonusId),
+						})
+					: project,
+			),
+		})),
+	setSelectedCurrency: (currency) =>
+		set({ selectedCurrency: normalizeCurrency(currency) }),
+	setDepositBonusLanguage: (depositBonusLanguage) =>
+		set({ depositBonusLanguage }),
+	setDepositBonusQuery: (depositBonusQuery) => set({ depositBonusQuery }),
+	setBonusToolsQuery: (bonusToolsQuery) => set({ bonusToolsQuery }),
+	setBonusToolsSelectedRule: (bonusToolsSelectedRuleId) =>
+		set({ bonusToolsSelectedRuleId }),
+	setBonusToolsSelectedTable: (bonusToolsSelectedTableName) =>
+		set({ bonusToolsSelectedTableName }),
+	setBonusToolsSelectedBaseAmount: (bonusToolsSelectedBaseAmount) =>
+		set({ bonusToolsSelectedBaseAmount }),
+	setBonusToolsSourceUrl: (bonusToolsSourceUrl) => set({ bonusToolsSourceUrl }),
+	setProjectCurrencyGroup: (projectId, tableName) =>
+		set((state) => {
+			const projectCurrencyGroups = { ...state.projectCurrencyGroups };
+			const normalizedTableName = tableName.trim();
+
+			if (normalizedTableName) {
+				projectCurrencyGroups[projectId] = normalizedTableName;
+			} else {
+				delete projectCurrencyGroups[projectId];
+			}
+
+			return { projectCurrencyGroups };
+		}),
+}));

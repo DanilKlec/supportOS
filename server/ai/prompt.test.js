@@ -12,3 +12,8 @@ it('keeps old materials without internal instructions usable',()=>{
  expect(prompt).not.toContain('Internal handling notes');
  expect(prompt).toContain('How can I help?');
 });
+it('does not describe browser examples as approved team knowledge',()=>{
+ const prompt=buildSupportPrompt({customerMessage:'Help',memory:[{source:'private customer message',target:'unreviewed reply'}]});
+ expect(prompt).not.toContain('unreviewed reply');
+ expect(prompt).not.toContain('private customer message');
+});

@@ -1,4 +1,5 @@
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { getTeamGlossary } from "@/services/team-glossary.service";
 import { translatorService } from "@/services/translator.service";
 
 export type AnswerIntent =
@@ -18,6 +19,7 @@ export interface GlossaryTerm {
 	target: string;
 	language: string;
 	note?: string;
+	projectId?: string;
 }
 
 export interface TranslationMemoryEntry {
@@ -56,6 +58,16 @@ export interface GenerateAnswerRequest {
 	settings: AssistantSettings;
 	glossary: GlossaryTerm[];
 	memory: TranslationMemoryEntry[];
+	sources?: AnswerSource[];
+}
+
+export interface AnswerSource {
+	id: string;
+	title: string;
+	type: "material" | "rule" | "project_instruction" | "glossary";
+	project?: string;
+	version?: string;
+	ref?: string;
 }
 
 export interface CheckIssue {
@@ -71,6 +83,7 @@ export interface ReadyAnswerResult {
 	issues: CheckIssue[];
 	mode: "openai" | "gemini" | "free";
 	warning?: string;
+	sources: AnswerSource[];
 }
 
 interface AIGenerateResponse {
@@ -78,6 +91,23 @@ interface AIGenerateResponse {
 	model?: string;
 	provider?: "openai" | "gemini";
 	error?: string;
+	sources?: unknown;
+}
+interface AIStatusResponse {
+	configured?: boolean;
+	model?: string;
+	provider?: "openai" | "gemini";
+	error?: string;
+}
+
+class AIGenerateError extends Error {
+	constructor(
+		message: string,
+		readonly status?: number,
+	) {
+		super(message);
+		this.name = "AIGenerateError";
+	}
 }
 
 const STORAGE_KEY = "supportos:answer-assistant:v1";
@@ -89,30 +119,6 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
 	intent: "general",
 	aiEnabled: true,
 };
-
-const DEFAULT_GLOSSARY: GlossaryTerm[] = [
-	{
-		id: "glossary-wager",
-		source: "wager",
-		target: "wager",
-		language: "en",
-		note: "Keep as betting/bonus turnover term.",
-	},
-	{
-		id: "glossary-kyc",
-		source: "KYC",
-		target: "KYC",
-		language: "en",
-		note: "Do not translate the abbreviation.",
-	},
-	{
-		id: "glossary-self-exclusion",
-		source: "self-exclusion",
-		target: "self-exclusion",
-		language: "en",
-		note: "Responsible gambling term.",
-	},
-];
 
 function createId(prefix: string) {
 	const random =
@@ -194,6 +200,60 @@ function trimAnswer(value: string) {
 
 function normalizeWhitespace(value: string) {
 	return value.replace(/\s+/g, " ").trim();
+}
+
+function isAnswerSourceMetadata(
+	value: unknown,
+	allowedTypes: ReadonlySet<AnswerSource["type"]>,
+): value is Record<string, unknown> &
+	Pick<AnswerSource, "id" | "title" | "type"> {
+	const candidate = value as Record<string, unknown>;
+	return (
+		Boolean(value) &&
+		typeof value === "object" &&
+		typeof candidate.id === "string" &&
+		typeof candidate.title === "string" &&
+		allowedTypes.has(candidate.type as AnswerSource["type"])
+	);
+}
+
+function normalizeAnswerSources(value: unknown): AnswerSource[] {
+	if (!Array.isArray(value)) return [];
+
+	const allowedTypes = new Set<AnswerSource["type"]>([
+		"material",
+		"rule",
+		"project_instruction",
+		"glossary",
+	]);
+	const seen = new Set<string>();
+
+	return value.flatMap((item: unknown) => {
+		if (!isAnswerSourceMetadata(item, allowedTypes)) return [];
+		const candidate = item;
+
+		const source: AnswerSource = {
+			id: candidate.id.slice(0, 160),
+			title: candidate.title.slice(0, 240),
+			type: candidate.type,
+			...(typeof candidate.project === "string"
+				? { project: candidate.project.slice(0, 160) }
+				: {}),
+			...(typeof candidate.version === "string"
+				? { version: candidate.version.slice(0, 160) }
+				: {}),
+			...(typeof candidate.ref === "string"
+				? { ref: candidate.ref.slice(0, 160) }
+				: {}),
+			...(typeof candidate.ref === "string"
+				? { ref: candidate.ref.slice(0, 160) }
+				: {}),
+		};
+		const identity = `${source.type}:${source.id}`;
+		if (!source.id || !source.title || seen.has(identity)) return [];
+		seen.add(identity);
+		return [source];
+	});
 }
 
 function splitIntoShortFacts(value: string) {
@@ -389,15 +449,8 @@ function buildRuleBasedAnswer({
 	context,
 	referenceAnswer,
 	responseStyle,
-	memory,
 	settings,
 }: GenerateAnswerRequest) {
-	const matchedMemory = findMemoryMatches(customerMessage, memory).at(0);
-
-	if (matchedMemory && matchedMemory.score >= 0.75) {
-		return matchedMemory.entry.target;
-	}
-
 	const factsSource = context.trim()
 		? context
 		: looksLikeAgentBrief(customerMessage)
@@ -488,56 +541,57 @@ function buildRuleBasedAnswer({
 }
 
 async function generateWithAI(request: GenerateAnswerRequest) {
-	const memoryMatches = findMemoryMatches(
-		request.customerMessage,
-		request.memory,
-	)
-		.slice(0, 3)
-		.map((match) => match.entry);
-	const glossary = getRelevantGlossary(
-		request.glossary,
-		`${request.customerMessage} ${request.context}`,
-		request.settings.language,
-	);
-	const response = await authenticatedFetch("/api/ai/generate", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({
-			project: request.project,
-			purpose: request.purpose,
-			customerMessage: request.customerMessage,
-			context: request.context,
-			referenceAnswer: request.referenceAnswer ?? "",
-			responseStyle: request.responseStyle ?? "standard",
-			language: request.settings.language,
-			product: request.settings.product,
-			intent: request.settings.intent,
-			agentInstructions: request.agentInstructions,
-			tone: getToneInstruction(request.settings.tone),
-			glossary,
-			memory: memoryMatches,
-		}),
-	});
+	let response: Response;
+	try {
+		response = await authenticatedFetch("/api/ai/generate", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				project: request.project,
+				purpose: request.purpose,
+				customerMessage: request.customerMessage,
+				context: request.context,
+				referenceAnswer: request.referenceAnswer ?? "",
+				responseStyle: request.responseStyle ?? "standard",
+				language: request.settings.language,
+				product: request.settings.product,
+				intent: request.settings.intent,
+				agentInstructions: request.agentInstructions,
+				tone: getToneInstruction(request.settings.tone),
+			}),
+		});
+	} catch {
+		throw new AIGenerateError("AI provider is unavailable", 503);
+	}
 	const data = (await response.json().catch(() => ({}))) as AIGenerateResponse;
 
 	if (!response.ok || data.error) {
-		if (response.status === 429) {
-			throw new Error("AI request limit has been reached");
-		}
-
-		throw new Error(data.error || "AI request failed");
+		throw new AIGenerateError(
+			response.status === 429
+				? "AI request limit has been reached"
+				: data.error || "AI request failed",
+			response.status,
+		);
 	}
 
 	if (!data.text?.trim()) {
-		throw new Error("AI provider returned an empty response");
+		throw new AIGenerateError("AI provider returned an empty response", 502);
 	}
 
 	return {
 		answer: trimAnswer(data.text),
 		provider: data.provider ?? "gemini",
+		sources: normalizeAnswerSources(data.sources),
 	};
+}
+
+function shouldUseRuleBasedFallback(error: unknown) {
+	if (error instanceof AIGenerateError)
+		return error.status !== undefined && error.status >= 500;
+
+	return false;
 }
 
 class AnswerAssistantService {
@@ -545,7 +599,7 @@ class AnswerAssistantService {
 		if (!isBrowser()) {
 			return {
 				settings: DEFAULT_ASSISTANT_SETTINGS,
-				glossary: DEFAULT_GLOSSARY,
+				glossary: [],
 				memory: [],
 			};
 		}
@@ -565,13 +619,13 @@ class AnswerAssistantService {
 							? parsed.settings.aiEnabled
 							: (parsed.settings?.geminiEnabled ?? true),
 				},
-				glossary: parsed.glossary?.length ? parsed.glossary : DEFAULT_GLOSSARY,
-				memory: parsed.memory ?? [],
+				glossary: [],
+				memory: [],
 			};
 		} catch {
 			return {
 				settings: DEFAULT_ASSISTANT_SETTINGS,
-				glossary: DEFAULT_GLOSSARY,
+				glossary: [],
 				memory: [],
 			};
 		}
@@ -580,7 +634,33 @@ class AnswerAssistantService {
 	save(data: StoredAssistantData) {
 		if (!isBrowser()) return;
 
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+		try {
+			const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+			localStorage.setItem(
+				STORAGE_KEY,
+				JSON.stringify({ ...existing, settings: data.settings }),
+			);
+		} catch {
+			// Preserve unreadable legacy data for an explicit recovery/import decision.
+		}
+	}
+
+	readLegacyGlossary(): GlossaryTerm[] {
+		if (!isBrowser()) return [];
+		try {
+			const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+			return Array.isArray(parsed.glossary)
+				? parsed.glossary.filter(
+						(term: Partial<GlossaryTerm>) =>
+							Boolean(term) &&
+							typeof term.source === "string" &&
+							typeof term.target === "string" &&
+							Boolean(term.source.trim() && term.target.trim()),
+					)
+				: [];
+		} catch {
+			return [];
+		}
 	}
 
 	createGlossaryTerm(term: Omit<GlossaryTerm, "id">): GlossaryTerm {
@@ -605,11 +685,9 @@ class AnswerAssistantService {
 			throw new Error("Customer message is required");
 		}
 
-		if (request.settings.aiEnabled) {
-			return (await generateWithAI(request)).answer;
-		}
-
-		return buildRuleBasedAnswer(request);
+		// Keep the older convenience method, but route it through the same
+		// authoritative server-glossary path as the Composer.
+		return (await this.generateReadyAnswer(request)).answer;
 	}
 
 	async generateReadyAnswer(
@@ -625,6 +703,10 @@ class AnswerAssistantService {
 				: request.settings.language.trim().toLowerCase();
 		const resolvedRequest: GenerateAnswerRequest = {
 			...request,
+			glossary: (await getTeamGlossary()).filter(
+				(term) => !term.projectId || term.projectId === request.project,
+			),
+			memory: [],
 			settings: {
 				...request.settings,
 				language,
@@ -634,11 +716,20 @@ class AnswerAssistantService {
 		let answer = "";
 		let mode: ReadyAnswerResult["mode"] = "free";
 		let warning: string | undefined;
+		let generatedSources: AnswerSource[] = [];
 
 		if (resolvedRequest.settings.aiEnabled) {
-			const generated = await generateWithAI(resolvedRequest);
-			answer = generated.answer;
-			mode = generated.provider;
+			try {
+				const generated = await generateWithAI(resolvedRequest);
+				answer = generated.answer;
+				mode = generated.provider;
+				generatedSources = generated.sources;
+			} catch (error) {
+				if (!shouldUseRuleBasedFallback(error)) throw error;
+				answer = buildRuleBasedAnswer(resolvedRequest);
+				mode = "free";
+				warning = "AI недоступен. Подготовлен ответ по доступным материалам.";
+			}
 		}
 
 		if (!answer) {
@@ -663,6 +754,10 @@ class AnswerAssistantService {
 			issues,
 			mode,
 			warning,
+			sources: normalizeAnswerSources([
+				...(request.sources ?? []),
+				...generatedSources,
+			]),
 		};
 	}
 
@@ -671,12 +766,7 @@ class AnswerAssistantService {
 			method: "GET",
 			headers: { Accept: "application/json" },
 		});
-		const data = (await response.json().catch(() => ({}))) as {
-			configured?: boolean;
-			model?: string;
-			provider?: "openai" | "gemini";
-			error?: string;
-		};
+		const data = (await response.json().catch(() => ({}))) as AIStatusResponse;
 
 		if (!response.ok) {
 			throw new Error(
@@ -736,62 +826,54 @@ class AnswerAssistantService {
 				{
 					id: "empty",
 					severity: "error",
-					title: "Answer is empty",
-					detail: "Generate or write an answer before checking it.",
+					title: "Ответ пустой",
+					detail: "Напишите или сгенерируйте ответ перед проверкой.",
 				},
 			];
+		}
+		if (trimmedAnswer.length < 12) {
+			issues.push({
+				id: "too-short",
+				severity: "warning",
+				title: "Ответ слишком короткий",
+				detail: "Проверьте, хватает ли клиенту контекста и следующего шага.",
+			});
 		}
 
 		if (/\{\{[^}]+\}\}|\[[^\]]*(name|amount|date|id)[^\]]*\]/i.test(answer)) {
 			issues.push({
 				id: "placeholders",
 				severity: "error",
-				title: "Unresolved placeholder",
-				detail: "Replace template placeholders before sending the answer.",
+				title: "Не заполнен placeholder",
+				detail: "Замените шаблонные значения перед отправкой.",
 			});
 		}
 
 		if (
-			/\b(guarantee|guaranteed|definitely|100%|always approved)\b/i.test(answer)
-		) {
-			issues.push({
-				id: "promise",
-				severity: "warning",
-				title: "Risky promise",
-				detail:
-					"Avoid guarantees unless the policy or account data confirms them.",
-			});
-		}
-
-		if (trimmedAnswer.length > 900) {
-			issues.push({
-				id: "length",
-				severity: "warning",
-				title: "Long answer",
-				detail: "Consider shortening the reply for support chat readability.",
-			});
-		}
-
-		if (!/[?!.]$/.test(trimmedAnswer)) {
-			issues.push({
-				id: "punctuation",
-				severity: "warning",
-				title: "Missing final punctuation",
-				detail: "The answer should end cleanly before sending.",
-			});
-		}
-
-		if (
-			!/\b(thank|thanks|hello|hi|please|sorry|appreciate)\b|здравствуйте|добрый|спасибо|пожалуйста|понимаю|извин|сожале|благодар/i.test(
+			/\b(guarantee|guaranteed|definitely|100%|always approved|will definitely|we promise)\b|(гарантируем|гарантированно|точно|обязательно|всегда\s+(?:одобр|зачисл|верн))/i.test(
 				answer,
 			)
 		) {
 			issues.push({
-				id: "tone",
+				id: "promise",
 				severity: "warning",
-				title: "Tone may be too dry",
+				title: "Категоричное обещание",
 				detail:
-					"Add a greeting, thanks, apology, or polite next step when appropriate.",
+					"Не обещайте результат, если он не подтверждён правилами или данными аккаунта.",
+			});
+		}
+
+		if (
+			/\b(?:within|in|by)\s+\d+\s*(?:minutes?|hours?|days?)\b|(?:до|через|в\s+течение)\s+\d+\s*(?:минут(?:ы|у)?|час(?:а|ов)?|дн(?:я|ей)?)|\b\d{1,2}:\d{2}\b/i.test(
+				answer,
+			)
+		) {
+			issues.push({
+				id: "exact-timing",
+				severity: "warning",
+				title: "Слишком точный срок",
+				detail:
+					"Проверьте, что точный срок подтверждён актуальными правилами или данными аккаунта.",
 			});
 		}
 
@@ -810,8 +892,8 @@ class AnswerAssistantService {
 			issues.push({
 				id: "glossary",
 				severity: "warning",
-				title: "Glossary term missing",
-				detail: `Review terminology: ${missingTerms
+				title: "Терминология не совпадает",
+				detail: `Проверьте терминологию: ${missingTerms
 					.map((term) => term.target)
 					.join(", ")}.`,
 			});
@@ -821,9 +903,9 @@ class AnswerAssistantService {
 			issues.push({
 				id: "ok",
 				severity: "ok",
-				title: "Ready to review",
+				title: "Всё хорошо",
 				detail:
-					"No obvious placeholders, risky promises, or glossary issues found.",
+					"Не найдено placeholders, категоричных обещаний, точных сроков или расхождений терминологии.",
 			});
 		}
 

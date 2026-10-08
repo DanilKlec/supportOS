@@ -1,4 +1,5 @@
 import {requireUser} from '../_auth.js';
+import {createHash} from 'node:crypto';
 import {safeKnowledgeTopic} from '../../shared/knowledge-gap.js';
 import {can} from '../../shared/access.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
@@ -61,7 +62,7 @@ async function saveShared(env,actor,body){
  return rows[0];
 }
 
-async function knowledgeSnapshot(env,actor){
+async function knowledgeSnapshot(env,actor,{includeShadowedShared=false}={}){
  const owner=`or=(owner_id.is.null,owner_id.eq.${actor.id})`;
  const [categories,folders,rawBinds,historyRows]=await Promise.all([
   allRows(env,`supportos_categories?select=*&${owner}&order=order_index.asc,id.asc`),
@@ -70,7 +71,7 @@ async function knowledgeSnapshot(env,actor){
   db(env,`supportos_bind_history?select=id,source_id,owner_id,snapshot,created_at,operation&${owner}&order=created_at.desc,id.desc&limit=5000`),
  ]);
  const personalSources=new Set(rawBinds.filter(row=>row.owner_id&&row.source_bind_id).map(row=>row.source_bind_id));
- const binds=rawBinds.filter(row=>row.owner_id||!personalSources.has(row.id));
+ const binds=includeShadowedShared?rawBinds:rawBinds.filter(row=>row.owner_id||!personalSources.has(row.id));
  const historyBySource=new Map();
  for(const row of historyRows){
   const key=`${row.owner_id??'shared'}:${row.source_id}`;const history=historyBySource.get(key)??[];
@@ -81,6 +82,62 @@ async function knowledgeSnapshot(env,actor){
   const history=(historyBySource.get(key)??[]).filter(item=>item.snapshot?.updated_at!==row.updated_at).slice(0,25).map(item=>({id:String(item.id),createdAt:item.created_at,slug:item.snapshot?.slug??row.slug,tags:Array.isArray(item.snapshot?.tags)?item.snapshot.tags:[],translations:Array.isArray(item.snapshot?.translations)?item.snapshot.translations:[]}));
   return bindFromRow(row,history);
  })};
+}
+
+function backupKnowledge(payload){
+ const candidate=payload?.app==='SupportOS'&&[2,3].includes(payload.version)?payload.knowledge:payload;
+ if(!candidate||!Array.isArray(candidate.categories)||!Array.isArray(candidate.folders)||!Array.isArray(candidate.binds))throw fail('Некорректный файл SupportOS');
+ if(JSON.stringify(candidate).length>3000000||[candidate.categories,candidate.folders,candidate.binds].some(group=>group.length>1000))throw fail('Файл превышает лимит импорта');
+ const result={categories:candidate.categories,folders:candidate.folders,binds:candidate.binds};
+ for(const [name,items] of Object.entries(result)){
+  const ids=new Set();
+  for(const item of items){
+   if(!item||!validId(item.id)||ids.has(item.id))throw fail(`Некорректные или повторяющиеся ID: ${name}`);
+   ids.add(item.id);
+   if(item.ownerId!=null&&typeof item.ownerId!=='string')throw fail('Некорректный владелец');
+  }
+ }
+ for(const item of result.categories)if(typeof item.name!=='string'||!item.name.trim()||!Number.isFinite(item.order))throw fail('Некорректная категория');
+ for(const item of result.folders)if(!validId(item.categoryId)||typeof item.name!=='string'||!item.name.trim()||!Number.isFinite(item.order)||(item.parentId!=null&&!validId(item.parentId)))throw fail('Некорректная папка');
+ for(const item of result.binds){
+  if(!validId(item.categoryId)||(item.folderId!=null&&!validId(item.folderId))||typeof item.slug!=='string'||!item.slug.trim())throw fail('Некорректный бинд');
+  sharedContent(item,new Date().toISOString());
+ }
+ return result;
+}
+
+async function backupPlan(env,actor,payload){
+ const knowledge=backupKnowledge(payload);
+ const snapshot=await knowledgeSnapshot(env,actor,{includeShadowedShared:true});
+ const writable=can(actor.access,'knowledge.write');
+ const groups={categories:[],folders:[],binds:[]};
+ const counts={categories:{add:0,existing:0},folders:{add:0,existing:0},binds:{add:0,existing:0}};
+ const existing={};
+ for(const name of Object.keys(groups)){
+  existing[name]=await backupExistingRows(env,{categories:knowledgeTables.category,folders:knowledgeTables.folder,binds:knowledgeTables.bind}[name],knowledge[name].map(item=>item.id));
+  for(const item of knowledge[name]){
+   if(item.ownerId!=null&&item.ownerId!==actor.id)throw fail('Нельзя импортировать записи другого сотрудника',403);
+   const old=existing[name].get(item.id);
+   if(old){
+    if(old.owner_id===null&&!writable||old.owner_id!==null&&old.owner_id!==actor.id)throw fail('Нет права изменять запись из файла',403);
+    counts[name].existing++;
+   }else{
+    if(item.ownerId===null&&!writable)throw fail('Нет права создавать общие материалы',403);
+    counts[name].add++;
+   }
+   groups[name].push({item:{...item,ownerId:item.ownerId===undefined?actor.id:item.ownerId},exists:Boolean(old)});
+  }
+ }
+ const categoryIds=new Set([...snapshot.categories,...knowledge.categories].map(item=>item.id));
+ const folderIds=new Set([...snapshot.folders,...knowledge.folders].map(item=>item.id));
+ for(const folder of knowledge.folders){
+  if(!categoryIds.has(folder.categoryId)||folder.parentId&&!folderIds.has(folder.parentId))throw fail('Категория или родитель папки не найдены');
+ }
+ for(const bind of knowledge.binds)if(!categoryIds.has(bind.categoryId)||bind.folderId&&!folderIds.has(bind.folderId))throw fail('Категория или папка бинда не найдены');
+ const fingerprint=createHash('sha256').update(JSON.stringify({actor:actor.id,knowledge,current:Object.fromEntries(Object.entries(groups).map(([name,items])=>[name,items.map(({item})=>{
+  const old=existing[name].get(item.id);return [item.id,old?.updated_at??null,old?.owner_id??null];
+ })]))})).digest('hex');
+ return {knowledge,groups,counts,fingerprint};
 }
 
 async function rest(env,path,{method='GET',body,prefer}={}){
@@ -101,6 +158,15 @@ async function existingOwners(env,table,ids){
   for(const row of rows)owners.set(row.id,row.owner_id);
  }
  return owners;
+}
+async function backupExistingRows(env,table,ids){
+ const rows=new Map();
+ if(!ids.length)return rows;
+ for(let offset=0;offset<ids.length;offset+=100){
+  const chunk=ids.slice(offset,offset+100).map(encodeURIComponent).join(',');
+  for(const row of await db(env,`${table}?select=id,owner_id,updated_at&id=in.(${chunk})`))rows.set(row.id,row);
+ }
+ return rows;
 }
 
 function ownerFor(item,owners,actor,writable){
@@ -167,6 +233,20 @@ export default async function handler(req,res) {
   const url=new URL(req.url,'http://localhost');
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
   if(req.method==='GET'&&url.searchParams.get('action')==='shared')return send(200,await sharedPage(env,url));
+  if(req.method==='GET'&&url.searchParams.get('action')==='backup-export'){
+   const snapshot=await knowledgeSnapshot(env,actor,{includeShadowedShared:true});
+   return send(200,{app:'SupportOS',version:3,exportedAt:new Date().toISOString(),scope:'authorized-knowledge',knowledge:{...snapshot,binds:snapshot.binds.map(({history,...bind})=>bind)}});
+  }
+  if(req.method==='POST'&&['backup-preview','backup-apply'].includes(body.action)){
+   if(!can(actor.access,'knowledge.write'))throw fail('Нет права импорта базы знаний',403);
+   const plan=await backupPlan(env,actor,body.payload);
+   if(body.action==='backup-preview')return send(200,{token:plan.fingerprint,counts:plan.counts,existingIds:Object.fromEntries(Object.entries(plan.groups).map(([name,items])=>[name,items.filter(({exists})=>exists).slice(0,20).map(({item})=>item.id)]))});
+   if(!['merge','upsert'].includes(body.mode)||typeof body.token!=='string'||body.token!==plan.fingerprint)throw fail('Предпросмотр устарел. Повторите проверку файла',409);
+   const selected={};
+   for(const name of ['categories','folders','binds'])selected[name]=plan.groups[name].filter(({exists})=>body.mode==='upsert'||!exists).map(({item})=>item);
+   if(Object.values(selected).some(items=>items.length))await saveKnowledge(env,actor,selected);
+   return send(200,{ok:true,mode:body.mode,counts:plan.counts});
+  }
   if(req.method==='POST'&&body.action==='shared-save')return send(200,await saveShared(env,actor,body));
   if(req.method==='GET'&&url.searchParams.get('action')==='knowledge')return send(200,await knowledgeSnapshot(env,actor));
   if(req.method==='POST'&&body.action==='knowledge-save')return send(200,await saveKnowledge(env,actor,body));

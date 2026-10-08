@@ -11,6 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:report": "playwright show-report",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check"
@@ -44,6 +47,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "0.7.0",
     "@tanstack/router-cli": "^1.132.0",

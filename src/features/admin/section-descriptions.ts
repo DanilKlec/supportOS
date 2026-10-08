@@ -16,8 +16,7 @@ export const sectionDescriptions = {
 	},
 	glossary: {
 		title: "Глоссарий",
-		description:
-			"Термины, сокращения и переводы, используемые SupportOS и AI.",
+		description: "Термины, сокращения и переводы, используемые SupportOS и AI.",
 	},
 	playground: {
 		title: "Проверка ответа",

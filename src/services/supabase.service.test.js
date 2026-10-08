@@ -183,6 +183,41 @@ it("does not claim successful logout after a network failure", async () => {
 	await expect(service.signOut()).rejects.toThrow("Offline");
 	expect(service.getSession().user.id).toBe("user-a");
 });
+it("uses server-confirmed logout before clearing the SDK session", async () => {
+	await service.initialize();
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	await service.signOut();
+	expect(fetch).toHaveBeenCalledWith(
+		"/api/registration?action=logout",
+		expect.objectContaining({ method: "POST", body: "{}" }),
+	);
+	expect(fixture.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+	expect(service.getSession()).toBeUndefined();
+});
+it("does not silently bypass unavailable server auditing", async () => {
+	await service.initialize();
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 503 })),
+	);
+	await expect(service.signOut()).rejects.toThrow(
+		"Не удалось завершить сессию",
+	);
+	expect(fixture.auth.signOut).not.toHaveBeenCalled();
+	expect(service.getSession().user.id).toBe("user-a");
+});
+it("clears an already expired session without requiring a successful audit request", async () => {
+	await service.initialize();
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 401 })),
+	);
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	await service.signOut();
+	expect(service.getSession()).toBeUndefined();
+});
 it("uses the SDK refreshed access token for API requests", async () => {
 	fixture.auth.getSession.mockResolvedValue({
 		data: { session: { ...session, access_token: "fresh" } },
@@ -190,14 +225,20 @@ it("uses the SDK refreshed access token for API requests", async () => {
 	});
 	expect(await service.getAccessToken()).toBe("fresh");
 });
-it('keeps confirmation on token refresh but resets it for a new Supabase session',async()=>{
- const jwt=id=>'x.'+btoa(JSON.stringify({session_id:id}))+'.sig';
- fixture.auth.getSession.mockResolvedValue({data:{session:{...session,access_token:jwt('first')}},error:null});
- await service.initialize();
- expect(service.getSession().telegramVerified).toBe(true);
- fixture.callback('TOKEN_REFRESHED',{...session,access_token:jwt('first')});
- expect(service.getSession().telegramVerified).toBe(true);
- fixture.callback('SIGNED_IN',{...session,access_token:jwt('second')});
- expect(service.getSession().telegramVerified).toBe(false);
- fixture.callback('SIGNED_OUT',null);
+it("keeps confirmation on token refresh but resets it for a new Supabase session", async () => {
+	const jwt = (id) => "x." + btoa(JSON.stringify({ session_id: id })) + ".sig";
+	fixture.auth.getSession.mockResolvedValue({
+		data: { session: { ...session, access_token: jwt("first") } },
+		error: null,
+	});
+	await service.initialize();
+	expect(service.getSession().telegramVerified).toBe(true);
+	fixture.callback("TOKEN_REFRESHED", {
+		...session,
+		access_token: jwt("first"),
+	});
+	expect(service.getSession().telegramVerified).toBe(true);
+	fixture.callback("SIGNED_IN", { ...session, access_token: jwt("second") });
+	expect(service.getSession().telegramVerified).toBe(false);
+	fixture.callback("SIGNED_OUT", null);
 });

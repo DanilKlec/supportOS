@@ -7,6 +7,32 @@ import { contentApi } from "@/services/shared-content.service";
 import { BindDiff } from "./BindDiff";
 import { bindChange } from "./bind-diff";
 
+interface ImportTranslation {
+	language?: unknown;
+	title?: unknown;
+	content?: unknown;
+}
+interface ImportBind {
+	id?: unknown;
+	slug?: unknown;
+	tags?: unknown;
+	translations?: (ImportTranslation | null)[];
+}
+type ImportPayload = {
+	knowledge?: { binds?: ImportBind[] };
+	binds?: ImportBind[];
+};
+function isFilledTranslation(
+	value: ImportTranslation,
+): value is { language: string; title: string; content: string } {
+	return (
+		typeof value.language === "string" &&
+		typeof value.title === "string" &&
+		Boolean(value.title.trim()) &&
+		typeof value.content === "string"
+	);
+}
+
 export function CommonBindImport() {
 	const client = useQueryClient();
 	const [originals, setOriginals] = useState<Bind[]>([]);
@@ -25,7 +51,7 @@ export function CommonBindImport() {
 		[error, setError] = useState(""),
 		[message, setMessage] = useState("");
 	const preview = async (input: unknown) => {
-		const value = input as any;
+		const value = input as ImportPayload | ImportBind[] | null;
 		const source = Array.isArray(value)
 			? value
 			: (value?.knowledge?.binds ?? value?.binds);
@@ -36,38 +62,32 @@ export function CommonBindImport() {
 		const existing = await sharedBindsService.list();
 		let skippedTranslations = 0;
 		let skippedBinds = 0;
-		const prepared = source.flatMap((r: any, i: number) => {
+		const prepared = source.flatMap((r: ImportBind, i: number) => {
 			if (!r || !Array.isArray(r.translations))
 				throw new Error(`Бинд ${i + 1}: нужен массив переводов translations`);
-			const translations = r.translations.filter((t: any) => {
-				// An empty language slot may still contain a copied title.
-				const absent =
-					!t ||
-					t.language == null ||
-					(typeof t.language === "string" && !t.language.trim()) ||
-					t.content == null ||
-					(typeof t.content === "string" && !t.content.trim());
-				if (absent) skippedTranslations++;
-				return !absent;
-			});
+			const translations = r.translations.filter(
+				(t): t is ImportTranslation => {
+					// An empty language slot may still contain a copied title.
+					const absent =
+						!t ||
+						t.language == null ||
+						(typeof t.language === "string" && !t.language.trim()) ||
+						t.content == null ||
+						(typeof t.content === "string" && !t.content.trim());
+					if (absent) skippedTranslations++;
+					return !absent;
+				},
+			);
 			if (!translations.length) {
 				skippedBinds++;
 				return [];
 			}
-			if (
-				translations.some(
-					(t: any) =>
-						typeof t.language !== "string" ||
-						typeof t.title !== "string" ||
-						!t.title.trim() ||
-						typeof t.content !== "string",
-				)
-			)
+			if (!translations.every(isFilledTranslation))
 				throw new Error(
 					`Бинд ${i + 1}: заполните язык и название непустого перевода`,
 				);
 			if (
-				new Set(translations.map((t: any) => t.language.trim())).size !==
+				new Set(translations.map((t) => t.language.trim())).size !==
 				translations.length
 			)
 				throw new Error(`Бинд ${i + 1}: повторяются языки`);
@@ -85,7 +105,7 @@ export function CommonBindImport() {
 				id: original?.id ?? `shared-${crypto.randomUUID()}`,
 				slug,
 				expected: original?.updatedAt ?? null,
-				translations: translations.map((t: BindTranslation) => ({
+				translations: translations.map((t) => ({
 					language: t.language.trim(),
 					title: t.title.trim(),
 					content: t.content.trim(),

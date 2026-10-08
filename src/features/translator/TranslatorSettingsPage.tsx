@@ -49,7 +49,9 @@ export function TranslatorSettingsPage({
 			setMessage("Подключено. Провайдер перевода готов к работе.");
 		} catch (error) {
 			setStatus("error");
-			setMessage(error instanceof Error ? error.message : "Не удалось подключиться.");
+			setMessage(
+				error instanceof Error ? error.message : "Не удалось подключиться.",
+			);
 		} finally {
 			setChecking(false);
 		}
@@ -82,7 +84,8 @@ export function TranslatorSettingsPage({
 						>
 							<div className="text-sm font-semibold">Умный бесплатный</div>
 							<div className="mt-1 text-xs text-muted">
-								Бесплатный перевод в стиле Google через Lingva. API-ключ не нужен.
+								Бесплатный перевод в стиле Google через Lingva. API-ключ не
+								нужен.
 							</div>
 						</button>
 
@@ -97,7 +100,8 @@ export function TranslatorSettingsPage({
 						>
 							<div className="text-sm font-semibold">MyMemory</div>
 							<div className="mt-1 text-xs text-muted">
-								Простой бесплатный резервный вариант. Email и API-ключ необязательны.
+								Простой бесплатный резервный вариант. Адрес почты и API-ключ
+								необязательны.
 							</div>
 						</button>
 
@@ -121,7 +125,9 @@ export function TranslatorSettingsPage({
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-								<div className="text-sm font-medium">Бесплатная конечная точка</div>
+									<div className="text-sm font-medium">
+										Бесплатная конечная точка
+									</div>
 									<div className="text-xs text-muted">
 										{lingvaEndpoint.trim() || DEFAULT_LINGVA_ENDPOINT}
 									</div>
@@ -142,7 +148,9 @@ export function TranslatorSettingsPage({
 							</div>
 
 							<label className="ui-field ">
-								<span className="text-sm font-medium">Конечная точка Lingva</span>
+								<span className="text-sm font-medium">
+									Конечная точка Lingva
+								</span>
 								<input
 									value={lingvaEndpoint}
 									onChange={(event) => setLingvaEndpoint(event.target.value)}
@@ -160,7 +168,7 @@ export function TranslatorSettingsPage({
 					) : provider === "mymemory" ? (
 						<div className="space-y-4">
 							<label className="ui-field ">
-								<span className="text-sm font-medium">Контактный email</span>
+								<span className="text-sm font-medium">Контактная почта</span>
 								<input
 									type="email"
 									value={email}
@@ -182,17 +190,22 @@ export function TranslatorSettingsPage({
 							</label>
 
 							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								Анонимное использование MyMemory ограничено. Добавление контактного
-								email увеличивает бесплатный дневной лимит символов их API.
+								Анонимное использование MyMemory ограничено. Добавление
+								контактного адреса почты увеличивает бесплатный дневной лимит
+								символов их API.
 							</div>
 						</div>
 					) : (
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-								<div className="text-sm font-medium">Режим конечной точки</div>
+									<div className="text-sm font-medium">
+										Режим конечной точки
+									</div>
 									<div className="text-xs text-muted">
-										{isBuiltIn ? "Встроенная конечная точка" : "Собственная конечная точка"}
+										{isBuiltIn
+											? "Встроенная конечная точка"
+											: "Собственная конечная точка"}
 									</div>
 								</div>
 

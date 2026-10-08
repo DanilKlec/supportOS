@@ -17,7 +17,14 @@ export async function db(env, path, body, method = body === undefined ? 'GET' : 
   method, headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},
   body:body === undefined ? undefined : JSON.stringify(body), signal:AbortSignal.timeout(15000)
  });
- if(!response.ok) throw Object.assign(new Error(`Ошибка хранилища (${response.status}). Проверьте миграцию agent-monitor.sql.`),{status:502});
+ if(!response.ok) {
+  const failure=await response.json().catch(()=>null);
+  const storageCode=typeof failure?.code==='string'&&/^[A-Z0-9]{5,10}$/.test(failure.code)?failure.code:undefined;
+  const hint=response.status===404&&['PGRST205','PGRST202'].includes(storageCode)
+   ?'Не применены необходимые миграции серверной БД.'
+   :response.status===401||response.status===403?'Проверьте серверную конфигурацию и права доступа к хранилищу.':'Не удалось выполнить запрос к серверному хранилищу.';
+  throw Object.assign(new Error(`Ошибка хранилища (${response.status}). ${hint}`),{status:502,storageStatus:response.status,storageCode});
+ }
  const text = await response.text(); return text ? JSON.parse(text) : null;
 }
 export async function live(env, action, body = {}, area='agent') {

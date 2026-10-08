@@ -4,6 +4,7 @@ import {can} from '../../shared/access.js';
 import {changeAccess} from '../_rbac.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
 import {displayIdentity} from '../../shared/login-identity.js';
+import {criticalAction,executeCritical} from '../telegram-critical.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export function adminClient(env=process.env) {
  const resolved=config(env);
@@ -23,6 +24,59 @@ export default async function handler(req,res) {
   const actor=await requireUser(req,{permission:null});
   if(req.method==='GET'&&action==='me')return send(200,{id:actor.id,access:actor.access});
   const env=config();
+  if(action==='critical') {
+   if(req.method!=='POST')throw fail('Используйте POST',405);
+   return send(200,await criticalAction(req,actor,typeof req.body==='string'?JSON.parse(req.body):req.body??{},env));
+  }
+  if(['revoke-other-sessions','telegram-unlink','telegram-change'].includes(action)) {
+   if(req.method!=='POST')throw fail('Используйте POST',405);
+   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
+   const operation=action==='revoke-other-sessions'?'sessions.revoke_others':action==='telegram-unlink'?'telegram.unlink':'telegram.change';
+   await executeCritical(actor,operation,{},body.confirmation,env);
+   if(operation==='sessions.revoke_others') {
+    // Never use the default global scope: the verified current session must survive.
+    const {error}=await adminClient(env).signOut(req.headers.authorization.slice(7),'others');
+    if(error)throw fail('Не удалось завершить другие сессии. Создайте новое подтверждение и повторите попытку.',503);
+    const result=await db(env,'rpc/supportos_critical_sessions_completed',{actor:actor.id,sid:actor.sessionId,request_id:body.confirmation.id});
+    if(!result?.ok)throw fail('Не удалось подтвердить завершение всех других сессий. Обновите список.',503);
+   }
+   return send(200,{ok:true});
+  }
+  if(req.method==='GET'&&action==='login-history') {
+   const target=url.searchParams.get('target')??actor.id;
+   if(!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(target))throw fail('Некорректный пользователь');
+   if(target!==actor.id&&!can(actor.access,'users.manage')||target===actor.id&&!can(actor.access,'work')&&!can(actor.access,'users.manage'))throw fail('Нет доступа к истории входов',403);
+   if(!actor.sessionId)throw fail('Сессия недействительна. Войдите снова.',401);
+   const before=url.searchParams.get('before');
+   if(before!==null&&(!/^[1-9][0-9]{0,18}$/.test(before)||BigInt(before)>9223372036854775807n))throw fail('Некорректный курсор');
+   const result=await db(env,'rpc/supportos_login_history',{actor:actor.id,actor_session:actor.sessionId,target,before_id:before??null});
+   if(result?.error==='invalid_session')throw fail('Сессия недействительна. Войдите снова.',401);
+   if(result?.error==='forbidden')throw fail('Нет доступа к истории входов',403);
+   if(!Array.isArray(result?.events))throw fail('Не удалось загрузить историю входов',502);
+   const optionalText=value=>typeof value==='string'?value:null;
+   return send(200,{events:result.events.map(event=>({
+    id:String(event.id),user_id:target,session_id:optionalText(event.session_id),event_type:event.event_type,
+    created_at:optionalText(event.created_at),ip_hash:typeof event.ip_hash==='string'&&/^[a-f0-9]{64}$/.test(event.ip_hash)?event.ip_hash:null,
+    browser:optionalText(event.browser),os:optionalText(event.os),telegram_result:optionalText(event.telegram_result),
+   })),nextCursor:optionalText(result.nextCursor)});
+  }
+  if(req.method==='GET'&&action==='sessions') {
+   if(!can(actor.access,'work'))throw fail('Недостаточно прав',403);
+   if(!actor.sessionId)throw fail('Сессия недействительна. Войдите снова.',401);
+   // Never accept subject/session overrides from query parameters or the body.
+   const result=await db(env,'rpc/supportos_list_own_sessions',{subject:actor.id,sid:actor.sessionId});
+   if(result?.error==='invalid_session')throw fail('Сессия недействительна. Войдите снова.',401);
+   if(!Array.isArray(result?.sessions))throw fail('Не удалось загрузить активные сессии',502);
+   const optionalText=value=>typeof value==='string'?value:null;
+   return send(200,{sessions:result.sessions.map(session=>({
+    id:session.id,
+    created_at:optionalText(session.created_at),
+    updated_at:optionalText(session.updated_at),
+    refreshed_at:optionalText(session.refreshed_at),
+    user_agent:typeof session.user_agent==='string'?session.user_agent.slice(0,512)||null:null,
+    is_current:session.id===actor.sessionId,
+   }))});
+  }
   if(action==='telegram-links') {
    if(!can(actor.access,'users.manage'))throw fail('Недостаточно прав',403);
    if(req.method==='GET') {
@@ -70,7 +124,10 @@ export default async function handler(req,res) {
    if(!Array.isArray(body.roles)||!body.roles.length||body.roles.length>30||body.roles.some(r=>typeof r!=='string'))throw fail('Выберите роли');
    const data=await catalog(env);const owner=actor.access.roles.some(r=>r.id==='creator');
    if(body.roles.some(id=>{const role=data.roles.find(r=>r.id===id);return !role||(!owner&&(id==='creator'||role.permissions.some(p=>!actor.access.permissions.includes(p))));}))throw fail('Нельзя назначить эти роли',403);
-   const result=await adminClient().createUser({email:body.email.trim(),password:body.password,email_confirm:true});
+   await executeCritical(actor,'user.create',body,body.confirmation,env);
+   // Non-secret, server-controlled reference: the identity-sync transaction
+   // writes user.create audit before Auth commits (also when role setup fails).
+   const result=await adminClient().createUser({email:body.email.trim(),password:body.password,email_confirm:true,app_metadata:{supportos_creation_request:body.confirmation.id}});
    if(result.error)throw fail('Не удалось создать аккаунт. Проверьте почту и требования к паролю');
    const id=result.data.user.id;
    try{await changeAccess(actor.id,'user.update',{id,roles:body.roles,status:'active',display_name:typeof body.display_name==='string'?body.display_name.slice(0,120):'',version:1});}
@@ -78,6 +135,6 @@ export default async function handler(req,res) {
    return send(201,{id});
   }
   if(!['user.update','role.save','role.delete'].includes(body.action))throw fail('Неизвестное действие');
-  return send(200,await changeAccess(actor.id,body.action,body.payload));
+  return send(200,await executeCritical(actor,body.action,body.payload,body.confirmation,env));
  }catch(error){return send(error.status??500,{error:error.status?error.message:'Ошибка управления доступами',code:error.code});}
 }

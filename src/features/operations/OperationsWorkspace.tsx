@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
 export type WorkspaceSection = {
@@ -40,12 +41,18 @@ export function OperationsWorkspace({
 					← Рабочее пространство
 				</Link>
 				<div className="ops-workspace-title">
-					<p>{area === "admin" ? "Рабочее пространство платформы" : "Контроль качества"}</p>
-					<h1>{area === "admin" ? "Администрирование" : "Контроль качества"}</h1>
+					<p>
+						{area === "admin"
+							? "Рабочее пространство платформы"
+							: "Контроль качества"}
+					</p>
+					<h1>
+						{area === "admin" ? "Администрирование" : "Контроль качества"}
+					</h1>
 				</div>
 				<nav
 					aria-label={
-					area === "admin" ? "Администрирование" : "Контроль качества"
+						area === "admin" ? "Администрирование" : "Контроль качества"
 					}
 				>
 					{[...new Set(navigation.map((s) => s.group))].map((group) => (
@@ -106,7 +113,10 @@ export function OperationsWorkspace({
 							{children}
 						</>
 					) : (
-						<p role="alert">Нет доступа к этому разделу.</p>
+						<ErrorState
+							title="Раздел недоступен"
+							description="У вашей учётной записи нет доступа к этому разделу."
+						/>
 					)}
 				</div>
 			</div>
@@ -159,25 +169,35 @@ export function Unavailable({
 }: {
 	message?: string;
 }) {
-	return <p className="ops-empty">{message}</p>;
+	return <EmptyState title={message} className="ops-empty" />;
 }
 export function QueryState({
 	query,
+	loadingMessage = "Загружаем данные…",
+	errorTitle = "Не удалось загрузить данные.",
 }: {
-	query: { isPending: boolean; error: Error | null; refetch: () => unknown };
+	query: {
+		isPending: boolean;
+		isFetching?: boolean;
+		error: Error | null;
+		refetch: () => unknown;
+	};
+	loadingMessage?: string;
+	errorTitle?: string;
 }) {
 	return query.error ? (
-		<p role="alert" className="ops-empty">
-			{/[а-яё]/i.test(query.error.message)?query.error.message:'Не удалось загрузить данные. Повторите попытку.'}{" "}
-			<button
-				className="ui-button"
-				type="button"
-				onClick={() => void query.refetch()}
-			>
-				Повторить
-			</button>
-		</p>
+		<ErrorState
+			title={errorTitle}
+			description={
+				/[а-яё]/i.test(query.error.message)
+					? query.error.message
+					: "Проверьте подключение и повторите попытку."
+			}
+			onRetry={() => void query.refetch()}
+			retrying={query.isFetching}
+			className="ops-empty"
+		/>
 	) : query.isPending ? (
-		<output className="ops-empty block">Загрузка…</output>
+		<LoadingState message={loadingMessage} className="ops-empty" />
 	) : null;
 }

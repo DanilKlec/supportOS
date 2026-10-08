@@ -15,11 +15,16 @@ export function Field({
 	children: ReactNode;
 }) {
 	return (
+		// biome-ignore lint/a11y/noLabelWithoutControl: Field implicitly labels the native control supplied through children; covered by the UI-kit behavior test.
 		<label className={classNames("ui-field", className)}>
 			{label && <span>{label}</span>}
 			{children}
 			{description && <span className="ui-help text-muted">{description}</span>}
-			{error && <span className="ui-help text-red-400" role="alert">{error}</span>}
+			{error && (
+				<span className="ui-help text-red-400" role="alert">
+					{error}
+				</span>
+			)}
 		</label>
 	);
 }

@@ -15,8 +15,8 @@ import {
 	Row,
 	Unavailable,
 } from "@/features/operations/OperationsWorkspace";
+import { useProjectCatalog } from "@/services/project-catalog.service";
 import { useAuthStore } from "@/store/auth.store";
-import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage, canTrain } from "../../../../shared/access.js";
 
 export function IntegrationsPage() {
@@ -37,11 +37,15 @@ export function IntegrationsPage() {
 	const canReadMonitor = can(user?.access, "monitor.read");
 	const canManageIntegrations = can(user?.access, "technical");
 	const showAI =
-		canReadAI && (ai.isPending || Boolean(ai.error) || Boolean(ai.data?.configured));
+		canReadAI &&
+		(ai.isPending || Boolean(ai.error) || Boolean(ai.data?.configured));
 	const showMonitor =
 		canReadMonitor &&
-		(monitor.isPending || Boolean(monitor.error) || Boolean(monitor.data?.lastSync));
-	if (!showAI && !showMonitor && !configured && !canManageIntegrations) return null;
+		(monitor.isPending ||
+			Boolean(monitor.error) ||
+			Boolean(monitor.data?.lastSync));
+	if (!showAI && !showMonitor && !configured && !canManageIntegrations)
+		return null;
 	return (
 		<Panel title="Подключения">
 			{showAI && (
@@ -52,7 +56,9 @@ export function IntegrationsPage() {
 					<div>
 						<QueryState query={ai} />
 						{ai.data?.configured && (
-							<Badge>{ai.data.provider} · {ai.data.model}</Badge>
+							<Badge>
+								{ai.data.provider} · {ai.data.model}
+							</Badge>
 						)}
 					</div>
 				</Row>
@@ -161,7 +167,8 @@ export function AccessReviewPage({
 					<Panel title="Неиспользуемые пользовательские роли">
 						{catalog.data.roles
 							.filter(
-								(r) => !r.is_system && !users.some((u) => u.roles.includes(r.id)),
+								(r) =>
+									!r.is_system && !users.some((u) => u.roles.includes(r.id)),
 							)
 							.map((r) => (
 								<Row key={r.id} title={r.name}>
@@ -174,17 +181,17 @@ export function AccessReviewPage({
 	);
 }
 export function ProjectsPage() {
-	const projects = useBonusStore((s) => s.projects);
-	if (!projects.length) return null;
+	const projects = useProjectCatalog();
+	if (!projects.data?.length) return null;
 	return (
 		<Panel title="Проекты справочника">
 			<p className="ops-note">
-				Загруженные проекты справочника бонусов. Это не реестр доступа
-				сотрудников и не AI-инструкции проектов.
+				Единый каталог проектов для почт, бонусов и AI-инструкций.
 			</p>
-			{projects.map((p) => (
+			<QueryState query={projects} />
+			{projects.data.map((p) => (
 				<Row key={p.id} title={p.name} detail={p.id}>
-					<Badge>Проект справочника</Badge>
+					<Badge>{p.slug}</Badge>
 				</Row>
 			))}
 		</Panel>
@@ -286,7 +293,10 @@ export function DashboardPage({
 				<div className="ops-metrics">
 					{[
 						["Аккаунты", accounts.data.total],
-						["Активные в выборке", rows.filter((u) => u.status === "active").length],
+						[
+							"Активные в выборке",
+							rows.filter((u) => u.status === "active").length,
+						],
 					].map(([label, value]) => (
 						<div key={label}>
 							<span>{label}</span>
@@ -324,7 +334,7 @@ export function DashboardPage({
 							<button
 								className="ui-button"
 								type="button"
-							onClick={() => onSection("access")}
+								onClick={() => onSection("access")}
 							>
 								Роли и доступы
 							</button>

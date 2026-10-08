@@ -99,3 +99,52 @@ it("paginates the common library and never selects private versions", async () =
 		"/api/binds?action=shared&limit=500&offset=500",
 	]);
 });
+
+it("adapts branch rows and history snapshots without dropping response metadata", async () => {
+	const row = {
+		id: "base",
+		owner_id: null,
+		slug: "base",
+		category_id: "shared",
+		translations: null,
+		tags: null,
+		created_at: "created",
+		updated_at: "updated",
+	};
+	mock.request.mockResolvedValueOnce(
+		Response.json({
+			choices: { base: "branch" },
+			outgoing: [],
+			serverField: "retained",
+			incoming: [{ id: "branch", sourceId: "base", sender: "sender", row }],
+		}),
+	);
+	const branches = await sharedBindsService.branches();
+	expect(branches).toMatchObject({ serverField: "retained" });
+	expect(branches.incoming[0]).toMatchObject({
+		row,
+		bind: {
+			id: "base",
+			tags: [],
+			translations: [],
+			favorite: false,
+			archived: false,
+		},
+	});
+	mock.request.mockResolvedValueOnce(
+		Response.json([
+			{
+				id: 1,
+				owner_id: null,
+				created_at: "stamp",
+				operation: "save",
+				snapshot: row,
+				extra: "retained",
+			},
+		]),
+	);
+	expect((await sharedBindsService.history("base"))[0]).toMatchObject({
+		extra: "retained",
+		snapshot: { id: "base", createdAt: "created", updatedAt: "updated" },
+	});
+});

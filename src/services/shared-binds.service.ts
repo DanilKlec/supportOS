@@ -61,6 +61,20 @@ export interface BindBranches {
 		email: string;
 	}[];
 }
+interface BindBranchesResponse extends Omit<BindBranches, "incoming"> {
+	incoming: {
+		id: string;
+		sourceId: string;
+		sender: string;
+		row: BindRow;
+	}[];
+}
+type BindRevisionResponse = Omit<BindRevision, "snapshot"> & {
+	snapshot: BindRow;
+};
+interface BindRowsResponse {
+	rows: BindRow[];
+}
 export interface BindProposal {
 	id: string;
 	source_id: string;
@@ -80,7 +94,7 @@ export interface BindRevision {
 }
 export const SHARED_CATEGORY = "supportos-shared";
 
-async function api(path: string, body?: unknown) {
+async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
 	const response = await authenticatedFetch(
 		`/api/binds${path}`,
 		body
@@ -91,12 +105,15 @@ async function api(path: string, body?: unknown) {
 				}
 			: undefined,
 	);
-	const data = await response.json();
+	const data: unknown = await response.json();
 	if (!response.ok)
-		throw Object.assign(new Error(data.error ?? "Ошибка сохранения биндов"), {
-			status: response.status,
-		});
-	return data;
+		throw Object.assign(
+			new Error(
+				(data as { error?: string }).error ?? "Ошибка сохранения биндов",
+			),
+			{ status: response.status },
+		);
+	return data as T;
 }
 export interface ProposalResult {
 	id: string;
@@ -107,13 +124,13 @@ export interface ProposalResult {
 }
 export const sharedBindsService = {
 	async proposalResults(): Promise<ProposalResult[]> {
-		return api("?action=proposal-results");
+		return api<ProposalResult[]>("?action=proposal-results");
 	},
 	async branches(): Promise<BindBranches> {
-		const data = await api("?action=branches");
+		const data = await api<BindBranchesResponse>("?action=branches");
 		return {
 			...data,
-			incoming: data.incoming.map((entry: any) => ({
+			incoming: data.incoming.map((entry) => ({
 				...entry,
 				bind: fromBindRow(entry.row),
 			})),
@@ -123,16 +140,16 @@ export const sharedBindsService = {
 		return api("", { ...payload, action });
 	},
 	async history(sourceId: string): Promise<BindRevision[]> {
-		const data = await api(
+		const data = await api<BindRevisionResponse[]>(
 			`?action=history&source_id=${encodeURIComponent(sourceId)}`,
 		);
-		return data.map((entry: any) => ({
+		return data.map((entry) => ({
 			...entry,
 			snapshot: fromBindRow(entry.snapshot),
 		}));
 	},
 	async proposals(sourceId?: string): Promise<BindProposal[]> {
-		return api(
+		return api<BindProposal[]>(
 			`?action=proposals${sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""}`,
 		);
 	},
@@ -140,10 +157,15 @@ export const sharedBindsService = {
 		total: number;
 		users: { id: string; email: string; display_name: string }[];
 	}> {
-		return api(`?action=users&search=${encodeURIComponent(search)}`);
+		return api<{
+			total: number;
+			users: { id: string; email: string; display_name: string }[];
+		}>(`?action=users&search=${encodeURIComponent(search)}`);
 	},
 	async personal(userId: string): Promise<Bind[]> {
-		const data = await api(`?user_id=${encodeURIComponent(userId)}`);
+		const data = await api<BindRowsResponse>(
+			`?user_id=${encodeURIComponent(userId)}`,
+		);
 		return data.rows.map(fromBindRow);
 	},
 	async savePersonal(input: {
@@ -161,7 +183,7 @@ export const sharedBindsService = {
 				content: t.content.trim(),
 				updatedAt: new Date().toISOString(),
 			}));
-		const row = await api("", {
+		const row = await api<BindRow>("", {
 			action: "save",
 			userId: input.userId,
 			sourceId: input.source.id,
@@ -186,9 +208,9 @@ export const sharedBindsService = {
 		const result: Bind[] = [];
 		// Explicit API paging avoids truncating the shared library at the DB row limit.
 		for (let offset = 0; ; offset += 500) {
-			const data = (await api(`?action=shared&limit=500&offset=${offset}`)) as {
-				rows: BindRow[];
-			};
+			const data = await api<BindRowsResponse>(
+				`?action=shared&limit=500&offset=${offset}`,
+			);
 			const rows = data.rows;
 			if (account !== supabaseService.getSession()?.user.id)
 				throw new Error("Аккаунт изменился");
@@ -224,13 +246,13 @@ export const sharedBindsService = {
 		)
 			throw new Error("Языки переводов не должны повторяться");
 		const original = input.original;
-		const saved = (await api("", {
+		const saved = await api<BindRow | null>("", {
 			action: "shared-save",
 			id: original?.id,
 			expected: original?.updatedAt,
 			translations,
 			tags: [...new Set(input.tags.map((t) => t.trim()).filter(Boolean))],
-		})) as BindRow | null;
+		});
 		if (!saved)
 			throw new Error(
 				"Сервер не подтвердил сохранение. Обновите список перед повторной попыткой.",

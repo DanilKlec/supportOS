@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
 	fireEvent,
@@ -19,10 +20,26 @@ import { useSharedPublication } from "./SharedPublication";
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	window.localStorage.clear();
 });
-function Screen() {
+function renderPublication(node: React.ReactNode) {
+	return render(
+		<QueryClientProvider
+			client={
+				new QueryClient({ defaultOptions: { queries: { retry: false } } })
+			}
+		>
+			{node}
+		</QueryClientProvider>,
+	);
+}
+function Screen({
+	dataset = "emails",
+}: {
+	dataset?: "emails" | "bonuses" | "bonus-tools";
+}) {
 	const [data, setData] = useState<any[]>([{ id: "local" }]);
-	const p = useSharedPublication("emails", data, setData);
+	const p = useSharedPublication(dataset, data, setData);
 	return (
 		<>
 			{p.banner}
@@ -63,12 +80,61 @@ it("loads published data for support and disables editing", async () => {
 		version: 1,
 		updated_at: "2026-09-11",
 	});
-	render(<Screen />);
+	renderPublication(<Screen />);
 	await waitFor(() =>
 		expect(screen.getByRole("status").textContent).toContain("shared"),
 	);
 	expect((screen.getByText("Edit") as HTMLButtonElement).disabled).toBe(true);
 	expect(screen.queryByText("Сохранить для всех")).toBeNull();
+});
+it("clears legacy email storage only after published data loads", async () => {
+	auth(["projects.read"]);
+	window.localStorage.setItem("supportos:project-emails:v1", "legacy");
+	mock.api.mockResolvedValue({
+		data: [{ id: "shared" }],
+		version: 1,
+		updated_at: "2026-09-11",
+	});
+	renderPublication(<Screen />);
+	await waitFor(() =>
+		expect(
+			window.localStorage.getItem("supportos:project-emails:v1"),
+		).toBeNull(),
+	);
+});
+it("keeps legacy email storage when the server load fails", async () => {
+	auth(["projects.read"]);
+	window.localStorage.setItem("supportos:project-emails:v1", "legacy");
+	mock.api.mockRejectedValue(new Error("offline"));
+	renderPublication(<Screen />);
+	await screen.findByRole("alert");
+	expect(window.localStorage.getItem("supportos:project-emails:v1")).toBe(
+		"legacy",
+	);
+});
+it("clears legacy bonus records only after their published data loads", async () => {
+	auth(["bonuses.read", "bonuses.write"]);
+	window.localStorage.setItem("supportos:deposit-bonuses:v1", "legacy");
+	window.localStorage.setItem("supportos:bonus-tools:v1", "legacy");
+	mock.api.mockResolvedValue({
+		data: [{ id: "shared" }],
+		version: 1,
+		updated_at: "2026-09-11",
+	});
+	renderPublication(<Screen dataset="bonuses" />);
+	await waitFor(() =>
+		expect(
+			window.localStorage.getItem("supportos:deposit-bonuses:v1"),
+		).toBeNull(),
+	);
+	expect(window.localStorage.getItem("supportos:bonus-tools:v1")).toBe(
+		"legacy",
+	);
+	cleanup();
+	renderPublication(<Screen dataset="bonus-tools" />);
+	await waitFor(() =>
+		expect(window.localStorage.getItem("supportos:bonus-tools:v1")).toBeNull(),
+	);
 });
 it("publishes a draft with expected version and ignores JSON property ordering", async () => {
 	auth(["projects.read", "projects.write"]);
@@ -79,7 +145,7 @@ it("publishes a draft with expected version and ignores JSON property ordering",
 			version: 4,
 			updated_at: "2026-09-11",
 		});
-	render(<Screen />);
+	renderPublication(<Screen />);
 	await waitFor(() =>
 		expect((screen.getByText("Edit") as HTMLButtonElement).disabled).toBe(
 			false,
@@ -105,7 +171,7 @@ it("keeps drafts when the server reports a conflict", async () => {
 	mock.api
 		.mockResolvedValueOnce({ data: [], version: 3, updated_at: "2026-09-11" })
 		.mockRejectedValueOnce(new Error("Версия уже изменена"));
-	render(<Screen />);
+	renderPublication(<Screen />);
 	await waitFor(() =>
 		expect((screen.getByText("Edit") as HTMLButtonElement).disabled).toBe(
 			false,
@@ -143,7 +209,7 @@ it("lets Support save only personal bonus data without publishing controls", asy
 				? null
 				: { data: [{ id: "team" }], version: 7, updated_at: "2026-09-11" },
 	);
-	render(<PersonalScreen />);
+	renderPublication(<PersonalScreen />);
 	await waitFor(() =>
 		expect(
 			(screen.getByText("Edit personal") as HTMLButtonElement).disabled,

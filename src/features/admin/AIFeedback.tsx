@@ -3,9 +3,13 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 export function AIFeedback({
 	project,
 	language,
+	answer,
+	sourceIds,
 }: {
 	project?: string;
 	language: string;
+	answer?: string;
+	sourceIds?: string[];
 }) {
 	const [negative, setNegative] = useState(false),
 		[reason, setReason] = useState("Неверная информация"),
@@ -25,6 +29,9 @@ export function AIFeedback({
 					reason,
 					project,
 					language,
+					...(rating === "negative"
+						? { answer, sourceIds: sourceIds?.slice(0, 5) ?? [] }
+						: {}),
 				}),
 			});
 			if (!response.ok) throw new Error("Не удалось отправить оценку");
@@ -91,7 +98,8 @@ export function AIFeedback({
 						Отправить
 					</button>
 					<p className="text-xs text-muted">
-						Текст переписки не отправляется вместе с оценкой.
+						Текст ответа не сохраняется: для QC остаётся только его
+						hash-reference.
 					</p>
 				</div>
 			)}

@@ -1,5 +1,6 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { config, db } from './agent-monitor/_server.js';
+import { securityMetadata } from './security-metadata.js';
 
 export const digest = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status=400, code) => Object.assign(new Error(message), {status,code});
@@ -34,11 +35,11 @@ export async function twoFactorAction(req,user,action,body,env=process.env) {
   return {...safeState(state),...(state.send?{telegramUrl:`https://t.me/${env.TELEGRAM_BOT_USERNAME}?start=link_${token}`}:{})};
  }
  if(action!=='begin')throw fail('Неизвестное действие');
- const agent=String(req.headers['user-agent']??'').slice(0,300);
+ const metadata=securityMetadata(req,env);
+ const agent=metadata.agent.slice(0,300);
  const browser=/Edg\//.test(agent)?'Edge':/Firefox\//.test(agent)?'Firefox':/Chrome\//.test(agent)?'Chrome':/Safari\//.test(agent)?'Safari':'Не определён';
  const os=/Android/.test(agent)?'Android':/iPhone|iPad/.test(agent)?'iOS':/Windows/.test(agent)?'Windows':/Macintosh/.test(agent)?'macOS':/Linux/.test(agent)?'Linux':'Не определена';
- const ip=String(env.VERCEL==='1'?req.headers['x-vercel-forwarded-for']??'unknown':req.socket?.remoteAddress??'unknown');
- const state=await db(env,'rpc/supportos_tg_login_begin',{subject:user.id,sid:user.sessionId,request_id:randomUUID(),digest:digest(token),agent,ip_digest:createHmac('sha256',env.TELEGRAM_WEBHOOK_SECRET).update(ip).digest('hex'),resend:body.resend===true});
+ const state=await db(env,'rpc/supportos_tg_login_begin',{subject:user.id,sid:user.sessionId,request_id:randomUUID(),digest:digest(token),agent,ip_digest:metadata.ipHash,resend:body.resend===true});
  if(state.error)throw fail('Повторная отправка доступна через минуту. Лимит — 10 запросов в час.',429);
  if(state.send) {
   try { await telegram(env,'sendMessage',{chat_id:state.telegramId,text:`🔐 Вход в SupportOS\n\nОбнаружена попытка входа в ваш аккаунт.\nВремя: ${new Date().toISOString()} (UTC)\nБраузер: ${browser}\nОС: ${os}\nПодключение: веб-сайт SupportOS\n\nПодтверждайте только свой вход. Запрос действует 5 минут.`,reply_markup:{inline_keyboard:[[{text:'✅ Подтвердить вход',callback_data:`login_approve:${token}`}],[{text:'❌ Отклонить',callback_data:`login_reject:${token}`}]]}}); }

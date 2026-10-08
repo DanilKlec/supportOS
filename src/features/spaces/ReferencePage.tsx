@@ -1,9 +1,25 @@
 import { useRouterState } from "@tanstack/react-router";
-import { BonusToolsPage } from "@/features/bonuses/BonusToolsPage";
-import { DepositBonusesPage } from "@/features/bonuses/DepositBonusesPage";
-import { ProjectEmailsPage } from "@/features/project-emails/ProjectEmailsPage";
+import { lazy, Suspense } from "react";
+import { LoadingState } from "@/components/ui";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
+
+const BonusToolsPage = lazy(() =>
+	import("@/features/bonuses/BonusToolsPage").then((module) => ({
+		default: module.BonusToolsPage,
+	})),
+);
+const DepositBonusesPage = lazy(() =>
+	import("@/features/bonuses/DepositBonusesPage").then((module) => ({
+		default: module.DepositBonusesPage,
+	})),
+);
+const ProjectEmailsPage = lazy(() =>
+	import("@/features/project-emails/ProjectEmailsPage").then((module) => ({
+		default: module.ProjectEmailsPage,
+	})),
+);
+
 export function ReferencePage() {
 	const { pathname: rawPath, hash } = useRouterState({
 		select: (s) => s.location,
@@ -31,7 +47,9 @@ export function ReferencePage() {
 					</a>
 				</div>
 			)}
-			<Page key={`${pathname}-${calculator}`} management={false} />
+			<Suspense fallback={<LoadingState message="Загружаем материалы…" />}>
+				<Page key={`${pathname}-${calculator}`} management={false} />
+			</Suspense>
 		</div>
 	);
 }

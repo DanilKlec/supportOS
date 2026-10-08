@@ -1,5 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ContentOverview } from "@/features/spaces/ContentOverview";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { canonicalPage } from "@/features/spaces/navigation";
 export const Route = createFileRoute("/content")({
-	component: ContentOverview,
+	beforeLoad: ({ location }) => {
+		throw redirect({
+			...canonicalPage("/content", location.hash),
+			replace: true,
+		});
+	},
 });

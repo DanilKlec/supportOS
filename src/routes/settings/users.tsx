@@ -1,4 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { canonicalPage } from "@/features/spaces/navigation";
 export const Route = createFileRoute("/settings/users")({
-	component: () => null,
+	beforeLoad: ({ location }) => {
+		throw redirect({
+			...canonicalPage("/settings/users", location.hash),
+			replace: true,
+		});
+	},
 });

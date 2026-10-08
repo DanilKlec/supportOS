@@ -4,6 +4,7 @@ import {config,db} from '../agent-monitor/_server.js';
 import {validContent} from './validation.js';
 
 const NORMALIZED_DATASETS=new Set(['emails','bonuses','bonus-tools']);
+const missingTable=error=>error?.storageStatus===404&&error?.storageCode==='PGRST205';
 
 async function rows(env,path) {
  const result=[];
@@ -15,6 +16,13 @@ async function rows(env,path) {
   if(page.length<1000)return result;
   if(result.length>=200000)throw Object.assign(new Error('Слишком большой справочник.'),{status:413});
  }
+}
+
+// Transition reads tolerate only a missing primary normalized table, never
+// permissions/network failures or missing dependencies of existing rows.
+async function transitionRows(env,path,revision) {
+ try {return await rows(env,path);}
+ catch(error) {if(!revision&&missingTable(error))return null;throw error;}
 }
 
 const optional=(key,value)=>value===null||value===undefined?{}:{[key]:value};
@@ -30,24 +38,26 @@ function publication(kind,data,revision,timestamps=[]) {
 }
 
 async function readEmails(env,revision) {
- const emailRows=await rows(env,'supportos_project_emails?select=id,project_id,type,email,note,sort_order,updated_at&order=project_id.asc,sort_order.asc,id.asc');
+ const emailRows=await transitionRows(env,'supportos_project_emails?select=id,project_id,type,email,note,sort_order,updated_at&order=project_id.asc,sort_order.asc,id.asc',revision);
+ if(emailRows===null)return null;
  if(!revision&&!emailRows.length)return null;
  const projects=await rows(env,'supportos_projects?select=id,name,slug,source_hash,updated_at&order=name.asc,id.asc');
  const byProject=new Map();
  for(const email of emailRows) {
   const list=byProject.get(email.project_id)??[];
-  list.push({id:email.id,type:email.type,email:email.email,...optional('note',email.note)});
+  list.push({id:email.id,type:email.type,email:email.email,order:email.sort_order,...optional('note',email.note)});
   byProject.set(email.project_id,list);
  }
  const data=projects.filter(project=>byProject.has(project.id)).map(project=>normalizeProjectEmail({
-  id:project.id,projectName:project.name,slug:project.slug,emails:byProject.get(project.id),
+  id:project.id,projectName:project.name,slug:project.slug,addresses:byProject.get(project.id),
   sourceHash:project.source_hash??undefined,updatedAt:project.updated_at,
  }));
  return publication('emails',data,revision,[...projects.map(row=>row.updated_at),...emailRows.map(row=>row.updated_at)]);
 }
 
 async function readBonuses(env,revision) {
- const bonusRows=await rows(env,'supportos_welcome_bonuses?select=*&order=project_id.asc,sort_order.asc,id.asc');
+ const bonusRows=await transitionRows(env,'supportos_welcome_bonuses?select=*&order=project_id.asc,sort_order.asc,id.asc',revision);
+ if(bonusRows===null)return null;
  if(!revision&&!bonusRows.length)return null;
  const [projects,translations]=await Promise.all([
   rows(env,'supportos_projects?select=id,name,slug,sheet_id,source_url,source_hash,updated_at&order=name.asc,id.asc'),
@@ -84,9 +94,13 @@ async function readBonuses(env,revision) {
 
 async function readBonusTools(env,revision) {
  const [ruleRows,tableRows]=await Promise.all([
-  rows(env,'supportos_bonus_rules?select=*&order=sort_order.asc,id.asc'),
-  rows(env,'supportos_currency_tables?select=*&order=sort_order.asc,id.asc'),
+  transitionRows(env,'supportos_bonus_rules?select=*&order=sort_order.asc,id.asc',revision),
+  transitionRows(env,'supportos_currency_tables?select=*&order=sort_order.asc,id.asc',revision),
  ]);
+ if(ruleRows===null||tableRows===null) {
+  if(ruleRows?.length||tableRows?.length)throw Object.assign(new Error('Не завершена миграция серверного справочника бонусов.'),{status:502});
+  return null;
+ }
  if(!revision&&!ruleRows.length&&!tableRows.length)return null;
  const [projects,currencyRows,currencyValues]=await Promise.all([
   rows(env,'supportos_projects?select=id,name,source_url,updated_at&order=id.asc'),
@@ -95,7 +109,7 @@ async function readBonusTools(env,revision) {
  ]);
  const projectsById=new Map(projects.map(project=>[project.id,project]));
  const rules=ruleRows.map(row=>{
-  const rule={id:row.id,group:row.group_name,site:projectsById.get(row.project_id)?.name??'',welcomeWager:row.welcome_wager,welcomeMaxWin:row.welcome_max_win,noDeposit:row.no_deposit,retentionWager:row.retention_wager,retentionMaxWin:row.retention_max_win,events:row.events,map:row.map,note:row.note};
+  const rule={id:row.id,projectId:row.project_id,group:row.group_name,site:projectsById.get(row.project_id)?.name??'',welcomeWager:row.welcome_wager,welcomeMaxWin:row.welcome_max_win,noDeposit:row.no_deposit,retentionWager:row.retention_wager,retentionMaxWin:row.retention_max_win,events:row.events,map:row.map,note:row.note};
   return {...rule,searchText:searchText(rule)};
  });
  const valuesByRow=new Map();
@@ -121,7 +135,9 @@ async function readBonusTools(env,revision) {
 }
 
 async function readShared(env,kind) {
- const revisions=await rows(env,`supportos_content_revisions?id=eq.${kind}&select=*`);
+ let revisions;
+ try {revisions=await rows(env,`supportos_content_revisions?id=eq.${kind}&select=*`);}
+ catch(error) {if(!missingTable(error))throw error;revisions=[];}
  const revision=revisions[0];
  const normalized=kind==='emails'?await readEmails(env,revision):kind==='bonuses'?await readBonuses(env,revision):await readBonusTools(env,revision);
  if(normalized)return normalized;

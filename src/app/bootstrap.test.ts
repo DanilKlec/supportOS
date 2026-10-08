@@ -2,9 +2,16 @@ import { expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	events: [] as string[],
-	state: { session: undefined as
-		| undefined
-		| { user: { id: string; access: { status: string; permissions: string[] } } } },
+	state: {
+		session: undefined as
+			| undefined
+			| {
+					user: {
+						id: string;
+						access: { status: string; permissions: string[] };
+					};
+			  },
+	},
 }));
 
 vi.mock("@/store/auth.store", () => ({
@@ -42,10 +49,5 @@ import { bootstrapApp } from "./bootstrap";
 it("initializes auth and access before loading database knowledge", async () => {
 	await bootstrapApp();
 
-	expect(mocks.events).toEqual([
-		"auth",
-		"knowledge",
-		"other-runtime-data",
-	]);
+	expect(mocks.events).toEqual(["auth", "knowledge", "other-runtime-data"]);
 });
-

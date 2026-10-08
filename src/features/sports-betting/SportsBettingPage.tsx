@@ -54,7 +54,7 @@ const SPORT_SOURCE_OPTIONS = [
 	},
 	{
 		id: "mixed-upcoming",
-		label: "Mixed / Upcoming",
+		label: "Смешанные / Предстоящие",
 		sports: "upcoming",
 	},
 ];
@@ -93,7 +93,7 @@ function formatDateTime(value?: string) {
 
 	if (Number.isNaN(date.getTime())) return value;
 
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("ru-RU", {
 		month: "short",
 		day: "2-digit",
 		hour: "2-digit",
@@ -108,7 +108,7 @@ function formatTime(value?: string) {
 
 	if (Number.isNaN(date.getTime())) return value;
 
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("ru-RU", {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit",
@@ -126,10 +126,10 @@ function formatDurationMs(value: number) {
 	const minutes = Math.max(1, Math.round(value / 60_000));
 
 	if (minutes >= 60 && minutes % 60 === 0) {
-		return `${minutes / 60}h`;
+		return `${minutes / 60} ч`;
 	}
 
-	return `${minutes}m`;
+	return `${minutes} мин`;
 }
 
 function formatOutcomeLabel(outcome: SportsBettingOutcome) {
@@ -138,6 +138,16 @@ function formatOutcomeLabel(outcome: SportsBettingOutcome) {
 	const point = outcome.point > 0 ? `+${outcome.point}` : outcome.point;
 
 	return `${outcome.name} ${point}`;
+}
+
+function getStatusLabel(status: SportsBettingEvent["status"]) {
+	return (
+		{
+			Live: "В эфире",
+			Upcoming: "Предстоит",
+			Settling: "Расчёт",
+		}[status] ?? status
+	);
 }
 
 function getStatusClass(status: SportsBettingEvent["status"]) {
@@ -156,11 +166,11 @@ function getMovementClass(movement?: Movement) {
 }
 
 function getMovementLabel(movement?: Movement) {
-	if (movement === "up") return "Up";
-	if (movement === "down") return "Down";
-	if (movement === "new") return "New";
+	if (movement === "up") return "Рост";
+	if (movement === "down") return "Снижение";
+	if (movement === "new") return "Новый";
 
-	return "Flat";
+	return "Без изменений";
 }
 
 function buildEventSearchText(event: SportsBettingEvent) {
@@ -197,10 +207,10 @@ function buildEventSummary(event: SportsBettingEvent) {
 
 	return [
 		`${event.sportTitle} | ${event.matchup}`,
-		`Starts: ${formatDateTime(event.commenceTime)}`,
-		`Status: ${event.status}`,
-		`Bookmakers: ${event.bookmakerCount}`,
-		"Best odds:",
+		`Начало: ${formatDateTime(event.commenceTime)}`,
+		`Статус: ${getStatusLabel(event.status)}`,
+		`Букмекеры: ${event.bookmakerCount}`,
+		"Лучшие коэффициенты:",
 		odds || "-",
 	].join("\n");
 }
@@ -305,7 +315,7 @@ export function SportsBettingPage() {
 	);
 	const marketOptions = useMemo(
 		() => [
-			ALL_FILTER,
+			[ALL_FILTER, "Все рынки"] as const,
 			...Array.from(
 				new Map(
 					(feed?.events ?? []).flatMap((event) =>
@@ -381,8 +391,8 @@ export function SportsBettingPage() {
 							Спортивные ставки
 						</h1>
 						<p className="mt-1 max-w-3xl text-sm text-muted">
-							Коэффициенты в реальном времени для футбольных турниров, крупных лиг,
-							букмекеров и быстрого копирования для поддержки.
+							Коэффициенты в реальном времени для футбольных турниров, крупных
+							лиг, букмекеров и быстрого копирования для поддержки.
 						</p>
 					</div>
 
@@ -435,8 +445,8 @@ export function SportsBettingPage() {
 								<div className="mt-1">{error}</div>
 								{error.includes("SPORTS_BETTING_API_KEY") && (
 									<div className="mt-2 text-red-100/80">
-										Add `SPORTS_BETTING_API_KEY` or `THE_ODDS_API_KEY` to the
-										server environment.
+										Добавьте `SPORTS_BETTING_API_KEY` или `THE_ODDS_API_KEY` в
+										переменные окружения сервера.
 									</div>
 								)}
 							</div>
@@ -452,8 +462,9 @@ export function SportsBettingPage() {
 						<div className="min-w-0 flex-1">
 							<div className="font-semibold">Правила ответственной игры</div>
 							<div className="mt-0.5 text-muted">
-								Указывайте возраст 18+, требования региона, лимиты, самоисключение
-								и предупреждения о рисках в промоматериалах и ответах поддержки.
+								Указывайте возраст 18+, требования региона, лимиты,
+								самоисключение и предупреждения о рисках в промоматериалах и
+								ответах поддержки.
 							</div>
 						</div>
 					</div>
@@ -513,7 +524,7 @@ export function SportsBettingPage() {
 					>
 						{sportOptions.map((sport) => (
 							<option key={sport} value={sport}>
-								{sport}
+								{sport === ALL_FILTER ? "Все виды спорта" : sport}
 							</option>
 						))}
 					</select>
@@ -541,14 +552,14 @@ export function SportsBettingPage() {
 								</div>
 							</div>
 							<div className="rounded-lg border border-border px-2 py-1 text-xs text-muted">
-								{feed?.provider ?? "Live API"}
+								{feed?.provider ?? "Данные API"}
 							</div>
 						</div>
 
 						<div className="divide-y divide-border">
 							{loading && !feed ? (
 								<div className="px-4 py-12 text-center text-sm text-muted">
-								Загрузка данных спортивных ставок…
+									Загрузка данных спортивных ставок…
 								</div>
 							) : visibleEvents.length > 0 ? (
 								visibleEvents.map((event) => (
@@ -564,19 +575,19 @@ export function SportsBettingPage() {
 															event.status,
 														)}`}
 													>
-														{event.status}
+														{getStatusLabel(event.status)}
 													</span>
 													<span className="rounded-lg border border-border px-2 py-0.5 text-xs text-muted">
-														{event.bookmakerCount} books
+														Букмекеры: {event.bookmakerCount}
 													</span>
 												</div>
 												<h2 className="mt-2 text-lg font-semibold">
 													{event.matchup}
 												</h2>
 												<div className="mt-1 text-sm text-muted">
-															Начало: {formatDateTime(event.commenceTime)}
+													Начало: {formatDateTime(event.commenceTime)}
 													{event.lastUpdate
-																? ` — коэффициенты ${formatDateTime(event.lastUpdate)}`
+														? ` — коэффициенты ${formatDateTime(event.lastUpdate)}`
 														: ""}
 												</div>
 											</div>
@@ -586,7 +597,7 @@ export function SportsBettingPage() {
 												onClick={() =>
 													void copyText(
 														buildEventSummary(event),
-																"Сводка события скопирована",
+														"Сводка события скопирована",
 													)
 												}
 												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
@@ -609,7 +620,7 @@ export function SportsBettingPage() {
 															void copyText(
 																`${event.matchup}: ${outcome.marketLabel} ${formatOutcomeLabel(
 																	outcome,
-																)} ${formatPrice(outcome.price)} at ${
+																)} ${formatPrice(outcome.price)} у ${
 																	outcome.bookmakerTitle
 																}`,
 																"Коэффициент скопирован",
@@ -650,8 +661,8 @@ export function SportsBettingPage() {
 								))
 							) : (
 								<div className="px-4 py-12 text-center text-sm text-muted">
-									Нет событий для {selectedSource.label}. Попробуйте другую футбольную
-									лигу или вариант «Смешанные / Предстоящие».
+									Нет событий для {selectedSource.label}. Попробуйте другую
+									футбольную лигу или вариант «Смешанные / Предстоящие».
 								</div>
 							)}
 						</div>
@@ -660,27 +671,27 @@ export function SportsBettingPage() {
 					<div className="space-y-4">
 						<section className="rounded-xl border border-border bg-surface">
 							<div className="border-b border-border px-4 py-3 font-semibold">
-													Источник данных
+								Источник данных
 							</div>
 							<div className="space-y-3 p-4 text-sm">
 								<div className="flex justify-between gap-3">
-								<span className="text-muted">Провайдер</span>
+									<span className="text-muted">Провайдер</span>
 									<span className="font-medium">{feed?.provider ?? "-"}</span>
 								</div>
 								<div className="flex justify-between gap-3">
-								<span className="text-muted">Виды спорта</span>
+									<span className="text-muted">Виды спорта</span>
 									<span className="max-w-44 truncate text-right font-medium">
 										{feed?.config.sports.join(", ") ?? "-"}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-								<span className="text-muted">Выбрано</span>
+									<span className="text-muted">Выбрано</span>
 									<span className="max-w-44 truncate text-right font-medium">
 										{selectedSource.label}
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-								<span className="text-muted">Рынки</span>
+									<span className="text-muted">Рынки</span>
 									<span className="font-medium">
 										{feed?.config.markets ?? "-"}
 									</span>
@@ -694,7 +705,7 @@ export function SportsBettingPage() {
 									</span>
 								</div>
 								<div className="flex justify-between gap-3">
-								<span className="text-muted">Осталось запросов</span>
+									<span className="text-muted">Осталось запросов</span>
 									<span className="font-medium">
 										{feed?.quota?.requestsRemaining ?? "-"}
 									</span>
@@ -717,7 +728,10 @@ export function SportsBettingPage() {
 										key={snippet.title}
 										type="button"
 										onClick={() =>
-											void copyText(snippet.text, `${snippet.title} скопировано`)
+											void copyText(
+												snippet.text,
+												`${snippet.title} скопировано`,
+											)
 										}
 										className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-background px-3 py-2 text-left text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
 									>

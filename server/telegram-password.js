@@ -4,6 +4,7 @@ import {adminClient} from './accounts/index.js';
 import {requireUser} from './_auth.js';
 import {digest,telegram} from './telegram-2fa.js';
 import {loginEmail} from '../shared/login-identity.js';
+import {securityMetadata} from './security-metadata.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{43}$/.test(value);
 const random=()=>randomBytes(32).toString('base64url');
@@ -17,9 +18,9 @@ export async function passwordAction(req,action,body,env) {
    try{email=loginEmail(body.login).toLowerCase();}catch{throw fail('Введите корректный логин или email');}
   }
   const browserToken=random(),challengeToken=random();
-  const ip=env.VERCEL==='1'?req.headers['x-vercel-forwarded-for']:req.socket?.remoteAddress;
+  const metadata=securityMetadata(req,env);
   const hmac=value=>createHmac('sha256',env.TELEGRAM_WEBHOOK_SECRET).update(value).digest('hex');
-  const result=await db(env,'rpc/supportos_password_begin',{request_id:randomUUID(),subject:user?.id??null,sid:user?.sessionId??null,identity_email:email,identity_digest:hmac(user?.id??email),ip_digest:hmac(String(ip??'unknown')),browser_digest:digest(browserToken),challenge_digest:digest(challengeToken)});
+  const result=await db(env,'rpc/supportos_password_begin',{request_id:randomUUID(),subject:user?.id??null,sid:user?.sessionId??null,identity_email:email,identity_digest:hmac(user?.id??email),ip_digest:metadata.ipHash,browser_digest:digest(browserToken),challenge_digest:digest(challengeToken),agent:metadata.agent});
   if(result.error)throw fail('Слишком много запросов. Подождите минуту; лимит — 5 запросов в час на аккаунт.',429);
   return {...result,browserToken,telegramUrl:`https://t.me/${env.TELEGRAM_BOT_USERNAME}?start=pw_${challengeToken}`};
  }

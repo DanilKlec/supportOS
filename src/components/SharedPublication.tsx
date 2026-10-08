@@ -1,30 +1,39 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { contentApi } from "@/services/shared-content.service";
+import { projectCatalogQueryKey } from "@/services/project-catalog.service";
+import {
+	contentApi,
+	type Publication,
+} from "@/services/shared-content.service";
 import { useAuthStore } from "@/store/auth.store";
+import { clearLegacyBonusRecords } from "@/store/bonus.store";
+import { clearLegacyBonusToolsRecords } from "@/store/bonus-tools.store";
+import { clearLegacyProjectEmailRecords } from "@/store/project-email.store";
 import { can } from "../../shared/access.js";
 
 const serialize = (value: unknown): string =>
-	JSON.stringify(value, (_key, item) =>
+	JSON.stringify(value, (_key, item: unknown) =>
 		item && typeof item === "object" && !Array.isArray(item)
 			? Object.fromEntries(
 					Object.keys(item)
 						.sort()
-						.map((key) => [key, item[key]]),
+						.map((key) => [key, (item as Record<string, unknown>)[key]]),
 				)
 			: item,
 	);
 const drafts = new Map<
 	string,
-	{ data: any[]; base: string; version: number; stamp: string }
+	{ data: unknown[]; base: string; version: number; stamp: string }
 >();
 
-export function useSharedPublication(
+export function useSharedPublication<Row>(
 	dataset: "emails" | "bonuses" | "bonus-tools",
-	data: any[],
-	replace: (rows: any[]) => void,
+	data: Row[],
+	replace: (rows: Row[]) => void,
 	management = true,
 ) {
 	const user = useAuthStore((s) => s.session?.user);
+	const queryClient = useQueryClient();
 	const writable = management
 		? can(
 				user?.access,
@@ -43,67 +52,82 @@ export function useSharedPublication(
 	const latest = useRef({ current, base, ready, replace });
 	latest.current = { current, base, ready, replace };
 	const generation = useRef(0);
-	const writes = useRef(0);
 	const loadDocument = useCallback(async () => {
-		if (management || dataset === "emails") return contentApi(dataset);
+		if (management || dataset === "emails")
+			return contentApi<typeof dataset, Row>(dataset);
 		const [shared, personal] = await Promise.all([
-			contentApi(dataset),
-			contentApi(dataset, undefined, undefined, "personal"),
+			contentApi<typeof dataset, Row>(dataset),
+			contentApi<typeof dataset, Row>(
+				dataset,
+				undefined,
+				undefined,
+				"personal",
+			),
 		]);
 		return personal ?? (shared ? { ...shared, version: 0 } : null);
 	}, [management, dataset]);
-	const apply = useCallback((row: Awaited<ReturnType<typeof contentApi>>) => {
-		const values = row?.data ?? [];
-		latest.current.replace(values);
-		setBase(serialize(values));
-		setVersion(row?.version ?? 0);
-		setStamp(row?.updated_at ?? "");
-		setReady(true);
-		setError("");
-	}, []);
+	const apply = useCallback(
+		(row: Publication<Row> | null | undefined) => {
+			const values = row?.data ?? [];
+			latest.current.replace(values);
+			setBase(serialize(values));
+			setVersion(row?.version ?? 0);
+			setStamp(row?.updated_at ?? "");
+			setReady(true);
+			setError("");
+			if (!row) return;
+			if (dataset === "emails") clearLegacyProjectEmailRecords();
+			if (dataset === "bonuses") clearLegacyBonusRecords();
+			if (dataset === "bonus-tools") clearLegacyBonusToolsRecords();
+		},
+		[dataset],
+	);
+	const query = useQuery({
+		queryKey: [
+			"shared-publication",
+			user?.id,
+			dataset,
+			management ? "shared" : "personal",
+		],
+		queryFn: loadDocument,
+		enabled: Boolean(user?.id),
+		refetchInterval: 30000,
+		refetchOnWindowFocus: true,
+		retry: false,
+	});
 	useEffect(() => {
-		const run = ++generation.current;
-		setReady(false);
-		setError("");
-		let fetching = false;
-		const load = async () => {
-			if (fetching) return;
-			fetching = true;
-			const write = writes.current;
-			try {
-				const row = await loadDocument();
-				if (run !== generation.current || write !== writes.current) return;
-				const state = latest.current;
-				const draft =
-					!state.ready && writable ? drafts.get(draftKey) : undefined;
-				if (draft) {
-					state.replace(draft.data);
-					setBase(draft.base);
-					setVersion(draft.version);
-					setStamp(draft.stamp);
-					setReady(true);
-					setError("");
-				} else if (!state.ready || state.current === state.base) apply(row);
-			} catch (e) {
-				if (run === generation.current) setError((e as Error).message);
-			} finally {
-				fetching = false;
-			}
-		};
-		void load();
-		const timer = setInterval(load, 30000);
-		window.addEventListener("focus", load);
 		return () => {
 			generation.current++;
-			clearInterval(timer);
-			window.removeEventListener("focus", load);
 		};
-	}, [draftKey, writable, loadDocument, apply]);
+	}, []);
+	useEffect(() => {
+		if (!query.isSuccess) return;
+		const state = latest.current;
+		const draft = !state.ready && writable ? drafts.get(draftKey) : undefined;
+		if (draft) {
+			state.replace(draft.data as Row[]);
+			setBase(draft.base);
+			setVersion(draft.version);
+			setStamp(draft.stamp);
+			setReady(true);
+			setError("");
+		} else if (!state.ready || state.current === state.base) {
+			apply(query.data);
+		}
+	}, [apply, draftKey, query.data, query.isSuccess, writable]);
+	useEffect(() => {
+		if (query.error) setError(query.error.message);
+	}, [query.error]);
 	const dirty = ready && current !== base;
 	useEffect(() => {
 		if (!ready) return;
 		if (dirty && writable)
-			drafts.set(draftKey, { data: JSON.parse(current), base, version, stamp });
+			drafts.set(draftKey, {
+				data: JSON.parse(current) as unknown[],
+				base,
+				version,
+				stamp,
+			});
 		else drafts.delete(draftKey);
 	}, [draftKey, ready, dirty, writable, current, base, version, stamp]);
 	useEffect(() => {
@@ -118,19 +142,28 @@ export function useSharedPublication(
 	}, [dirty]);
 	const publish = async () => {
 		if (!writable || !ready || busy) return;
-		writes.current++;
 		const run = generation.current;
-		const snapshot = JSON.parse(current);
+		const snapshot = JSON.parse(current) as Row[];
 		setBusy(true);
 		setError("");
 		try {
 			const row = management
-				? await contentApi(dataset, snapshot, version)
-				: await contentApi(dataset, snapshot, version, "personal");
+				? await contentApi<typeof dataset, Row>(dataset, snapshot, version)
+				: await contentApi<typeof dataset, Row>(
+						dataset,
+						snapshot,
+						version,
+						"personal",
+					);
 			if (run === generation.current && row) {
 				setBase(serialize(row.data));
 				setVersion(row.version);
 				setStamp(row.updated_at);
+				if (dataset === "emails" || dataset === "bonuses") {
+					void queryClient.invalidateQueries({
+						queryKey: projectCatalogQueryKey(user?.id),
+					});
+				}
 			}
 		} catch (e) {
 			if (run === generation.current) setError((e as Error).message);
@@ -149,8 +182,8 @@ export function useSharedPublication(
 		const run = generation.current;
 		setBusy(true);
 		try {
-			const row = await loadDocument();
-			if (run === generation.current) apply(row);
+			const result = await query.refetch({ throwOnError: true });
+			if (run === generation.current) apply(result.data);
 		} catch (e) {
 			setError((e as Error).message);
 		} finally {

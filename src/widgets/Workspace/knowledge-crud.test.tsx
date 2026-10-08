@@ -31,9 +31,6 @@ vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("@/services/supabase.service", () => ({
 	supabaseService: { getSession: () => mock.session },
 }));
-vi.mock("@/services/cloud-knowledge.service", () => ({
-	cloudKnowledgeService: new Proxy({}, { get: () => vi.fn() }),
-}));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));

@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { useAuthStore } from "@/store/auth.store";
+
+interface ShareRecipientsResponse {
+	users: { id: string; display_name: string; email: string }[];
+	hasMore: boolean;
+}
 export function ShareRecipientPicker({
 	value,
 	onChange,
@@ -31,13 +36,13 @@ export function ShareRecipientPicker({
 				`/api/accounts?action=users&purpose=share&page=${page}&search=${encodeURIComponent(query)}`,
 				{ signal },
 			);
-			const data = await response.json();
+			const data: unknown = await response.json();
 			if (!response.ok)
-				throw new Error(data.error ?? "Не удалось загрузить сотрудников");
-			return data as {
-				users: { id: string; display_name: string; email: string }[];
-				hasMore: boolean;
-			};
+				throw new Error(
+					(data as { error?: string }).error ??
+						"Не удалось загрузить сотрудников",
+				);
+			return data as ShareRecipientsResponse;
 		},
 		staleTime: 30000,
 		refetchOnMount: "always",

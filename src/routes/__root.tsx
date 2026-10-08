@@ -1,6 +1,8 @@
 import { requireAppAuth } from "@/app/auth-guard";
 import { PendingApproval } from "@/features/auth/PendingApproval";
 import { TelegramTwoFactor } from "@/features/auth/TelegramTwoFactor";
+import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
+import { ProjectEmailServerCache } from "@/features/project-emails/ProjectEmailServerCache";
 import { supabaseService } from "@/services/supabase.service";
 import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
@@ -160,6 +162,8 @@ function RootComponent() {
 					</div>
 				)}
 
+				{accessGranted && <ProjectEmailServerCache />}
+				{accessGranted && <BonusServerCache />}
 				{accessGranted && <ModalRoot />}
 
 				<ToastContainer />

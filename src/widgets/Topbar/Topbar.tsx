@@ -16,7 +16,7 @@ import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
 import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
 import { Inbox } from "@/features/shared-binds/Inbox";
-import { SharedBindEditor } from "@/features/shared-binds/SharedBindsPage";
+import { SharedBindEditor } from "@/features/shared-binds/SharedBindEditor";
 import { ComposerLauncher } from "@/features/spaces/ComposerLauncher";
 import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
@@ -27,11 +27,13 @@ import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { isKeyboardCode } from "@/shared/lib/keyboard";
 import { BaseModal } from "@/shared/modals/BaseModal";
+import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage } from "../../../shared/access.js";
 import { type CatalogResult, catalogResults } from "./search-catalog";
+import { type SearchCommand, searchCommands } from "./search-commands";
 import { ToolsMenu } from "./ToolsMenu";
 
 interface TopbarProps {
@@ -137,6 +139,7 @@ function SearchResults({
 	categories,
 	folders,
 	activeIndex,
+	hasNavigationResults,
 	onActiveIndexChange,
 	onOpen,
 }: {
@@ -146,18 +149,20 @@ function SearchResults({
 	categories: KnowledgeCategory[];
 	folders: KnowledgeFolder[];
 	activeIndex: number;
+	hasNavigationResults: boolean;
 	onActiveIndexChange: (index: number) => void;
 	onOpen: (bind: CatalogResult) => void;
 }) {
 	if (!query.trim()) {
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
-				Введите название, проект, почту или текст ответа.
+				Введите команду, название, проект, почту или текст ответа.
 			</div>
 		);
 	}
 
 	if (results.length === 0) {
+		if (hasNavigationResults) return null;
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
 				Ничего не найдено по запросу «{query.trim()}».
@@ -166,7 +171,8 @@ function SearchResults({
 	}
 
 	return (
-		<div role="listbox" aria-label="Результаты поиска" className="py-1">
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div role="group" aria-label="Материалы" className="py-1">
 			{results.map((bind, index) => {
 				const category = categories.find((item) => item.id === bind.categoryId);
 				const folderPath = getFolderPath(bind.folderId, folders);
@@ -184,6 +190,7 @@ function SearchResults({
 						key={bind.id}
 						type="button"
 						role="option"
+						aria-label={`${title}, ${location}${resultLanguage ? `, ${resultLanguage}` : ""}`}
 						aria-selected={active}
 						onMouseEnter={() => onActiveIndexChange(index)}
 						onClick={() => onOpen(bind)}
@@ -230,6 +237,8 @@ export function Topbar({
 	const [activeResultIndex, setActiveResultIndex] = useState(0);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+	const desktopResultsRef = useRef<HTMLDivElement>(null);
+	const mobileResultsRef = useRef<HTMLDivElement>(null);
 	const { showToast } = useToast();
 
 	const authConfigured = useAuthStore((s) => s.configured);
@@ -310,31 +319,83 @@ export function Topbar({
 			(i) =>
 				canAccessPage(access, i.to, i.hash) &&
 				searchValue.trim() &&
-				(i.label + " " + i.group + " " + i.to + " " + (i.hash ?? ""))
+				`${i.label} ${i.group} ${i.to} ${i.hash ?? ""}`
 					.toLowerCase()
 					.includes(searchValue.trim().toLowerCase()),
 		);
-	const resultCount = sectionResults.length + searchResults.length;
+	const commands = searchCommands(access, searchValue);
+	const contentOffset = commands.length + sectionResults.length;
+	const resultCount = contentOffset + searchResults.length;
+	const activeIndex = Math.min(activeResultIndex, Math.max(0, resultCount - 1));
+	const openCommand = (command: SearchCommand) => {
+		const allowed = searchCommands(
+			useAuthStore.getState().session?.user.access,
+		).find((item) => item.id === command.id);
+		if (!allowed) return;
+		setSearchFocused(false);
+		setMobileSearchOpen(false);
+		if (allowed.action.type === "create-bind") {
+			const { selectedCategory, selectedFolder } = useKnowledgeStore.getState();
+			modalManager.open("createBind", {
+				categoryId: selectedCategory,
+				folderId: selectedFolder,
+			});
+		} else {
+			void navigate({ to: allowed.action.to, hash: allowed.action.hash });
+		}
+	};
+	const commandSearch = commands.length > 0 && (
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div
+			role="group"
+			aria-label="Команды"
+			className="border-b border-border py-1"
+		>
+			<div className="px-4 py-2 text-xs font-semibold text-muted">Команды</div>
+			{commands.map((command, index) => (
+				<button
+					key={command.id}
+					type="button"
+					role="option"
+					aria-label={command.label}
+					aria-selected={index === activeIndex}
+					onMouseDown={(event) => event.preventDefault()}
+					onMouseEnter={() => setActiveResultIndex(index)}
+					onClick={() => openCommand(command)}
+					className={`flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left text-sm hover:bg-surface-elevated ${index === activeIndex ? "bg-accent/10" : ""}`}
+				>
+					<span className="font-semibold">
+						<Highlight text={command.label} query={searchValue} />
+					</span>
+					<span className="text-xs text-muted">{command.description}</span>
+				</button>
+			))}
+		</div>
+	);
 	const openSection = (item: SpaceItem) => {
 		void navigate({ to: item.to, hash: item.hash ?? "" });
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
-	const sectionSearch = (
-		<>
+	const sectionSearch = sectionResults.length > 0 && (
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div role="group" aria-label="Разделы">
 			{sectionResults.map((i, index) => (
 				<button
 					type="button"
+					role="option"
+					aria-selected={commands.length + index === activeIndex}
 					key={i.to + (i.hash ?? "")}
-					className={`flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated ${index === activeResultIndex ? "bg-accent/10" : ""}`}
+					className={`flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated ${commands.length + index === activeIndex ? "bg-accent/10" : ""}`}
 					onMouseDown={(e) => e.preventDefault()}
+					onMouseEnter={() => setActiveResultIndex(commands.length + index)}
 					onClick={() => openSection(i)}
 				>
 					{i.label}
 					<span className="text-xs text-muted">{i.group}</span>
 				</button>
 			))}
-		</>
+		</div>
 	);
 	const searchFilters = (
 		<div className="border-b border-border p-2">
@@ -377,17 +438,19 @@ export function Topbar({
 				(can(access, "bonuses.read") && bonuses.error)) && (
 				<p role="alert" className="p-2 text-xs text-red-400">
 					Часть справочников недоступна.{" "}
-					<button
+					<Button
 						type="button"
 						onMouseDown={(e) => e.preventDefault()}
 						onClick={() => {
 							if (can(access, "projects.read")) void emails.refetch();
 							if (can(access, "bonuses.read")) void bonuses.refetch();
 						}}
+						variant="ghost"
+						size="small"
 						className="underline"
 					>
 						Повторить
-					</button>
+					</Button>
 				</p>
 			)}
 		</div>
@@ -406,10 +469,11 @@ export function Topbar({
 			return;
 		}
 		await knowledgeService.loadKnowledge();
-		showToast("Signed out");
+		showToast("Вы вышли из аккаунта");
 	};
 
 	const openGlobalSearch = useCallback(() => {
+		setActiveResultIndex(0);
 		const mobile = window.matchMedia("(max-width: 767px)").matches;
 
 		if (mobile) {
@@ -418,6 +482,7 @@ export function Topbar({
 			return;
 		}
 
+		setSearchFocused(true);
 		searchInputRef.current?.focus();
 		searchInputRef.current?.select();
 	}, []);
@@ -436,23 +501,25 @@ export function Topbar({
 	const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
-			setActiveResultIndex((index) =>
-				resultCount === 0 ? 0 : (index + 1) % resultCount,
+			setActiveResultIndex(
+				resultCount === 0 ? 0 : (activeIndex + 1) % resultCount,
 			);
 		}
 
 		if (event.key === "ArrowUp") {
 			event.preventDefault();
-			setActiveResultIndex((index) =>
-				resultCount === 0 ? 0 : (index - 1 + resultCount) % resultCount,
+			setActiveResultIndex(
+				resultCount === 0 ? 0 : (activeIndex - 1 + resultCount) % resultCount,
 			);
 		}
 
 		if (event.key === "Enter" && resultCount) {
 			event.preventDefault();
-			const section = sectionResults[activeResultIndex];
-			const result = searchResults[activeResultIndex - sectionResults.length];
-			if (section) openSection(section);
+			const command = commands[activeIndex];
+			const section = sectionResults[activeIndex - commands.length];
+			const result = searchResults[activeIndex - contentOffset];
+			if (command) openCommand(command);
+			else if (section) openSection(section);
 			else if (result) openSearchResult(result);
 		}
 
@@ -464,6 +531,16 @@ export function Topbar({
 			mobileSearchInputRef.current?.blur();
 		}
 	};
+
+	useEffect(() => {
+		if (!enabled || resultCount === 0) return;
+		const list = mobileSearchOpen
+			? mobileResultsRef.current
+			: desktopResultsRef.current;
+		list
+			?.querySelectorAll('[role="option"]')
+			[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+	}, [activeIndex, enabled, mobileSearchOpen, resultCount]);
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
@@ -593,9 +670,9 @@ export function Topbar({
 
 				<nav className="product-spaces" aria-label="Пространства">
 					{[
-						{ to: "/", label: "Workspace" },
+						{ to: "/", label: "Бинды" },
 						{ to: "/qc", label: "QC" },
-						{ to: "/admin", label: "Admin" },
+						{ to: "/admin", label: "Администрирование" },
 					]
 						.filter((item) => canAccessPage(access, item.to))
 						.map((item) => (
@@ -631,6 +708,7 @@ export function Topbar({
 						/>
 						<Input
 							ref={searchInputRef}
+							aria-label="Глобальный поиск"
 							value={searchValue}
 							onChange={(event) => {
 								setSearch(event.target.value);
@@ -642,28 +720,36 @@ export function Topbar({
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
 							className="w-full pl-10 pr-20 outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Бинды, почты, бонусы…"
+							placeholder="Команды, бинды, почты, бонусы…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
 							{shortcutLabel}
 						</kbd>
 
-						{searchFocused && (
-							<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+						{searchFocused && !mobileSearchOpen && (
+							<div className="supportos-scroll absolute left-0 right-0 top-12 z-50 max-h-[70dvh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl">
 								{searchFilters}
-								{sectionSearch}
-								<SearchResults
-									results={searchResults}
-									query={searchValue}
-									language={language}
-									categories={categories}
-									folders={folders}
-									activeIndex={activeResultIndex - sectionResults.length}
-									onActiveIndexChange={(index) =>
-										setActiveResultIndex(index + sectionResults.length)
-									}
-									onOpen={openSearchResult}
-								/>
+								<div
+									role="listbox"
+									aria-label="Результаты поиска"
+									ref={desktopResultsRef}
+								>
+									{commandSearch}
+									{sectionSearch}
+									<SearchResults
+										results={searchResults}
+										query={searchValue}
+										language={language}
+										categories={categories}
+										folders={folders}
+										activeIndex={activeIndex - contentOffset}
+										hasNavigationResults={contentOffset > 0}
+										onActiveIndexChange={(index) =>
+											setActiveResultIndex(index + contentOffset)
+										}
+										onOpen={openSearchResult}
+									/>
+								</div>
 							</div>
 						)}
 					</div>
@@ -697,14 +783,14 @@ export function Topbar({
 								<LogOut size={16} />
 							</Button>
 						) : (
-							<Button
+							<IconButton
 								type="button"
-								title="Войти в облако"
+								label="Войти в облако"
 								onClick={() => void navigate({ to: "/login" })}
 								variant="ghost"
 							>
 								<LogIn size={16} />
-							</Button>
+							</IconButton>
 						))}
 					{showKnowledgeControls && <ComposerLauncher />}
 					<Inbox />
@@ -722,13 +808,14 @@ export function Topbar({
 							<Search size={18} className="shrink-0 text-muted" />
 							<Input
 								ref={mobileSearchInputRef}
+								aria-label="Глобальный поиск"
 								value={searchValue}
 								onChange={(event) => {
 									setSearch(event.target.value);
 									setActiveResultIndex(0);
 								}}
 								onKeyDown={handleSearchKeyDown}
-								placeholder="Найти бинд…"
+								placeholder="Команды и материалы…"
 								className="min-w-0 flex-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							/>
 							<IconButton
@@ -742,19 +829,27 @@ export function Topbar({
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 							{searchFilters}
-							{sectionSearch}
-							<SearchResults
-								results={searchResults}
-								query={searchValue}
-								language={language}
-								categories={categories}
-								folders={folders}
-								activeIndex={activeResultIndex - sectionResults.length}
-								onActiveIndexChange={(index) =>
-									setActiveResultIndex(index + sectionResults.length)
-								}
-								onOpen={openSearchResult}
-							/>
+							<div
+								role="listbox"
+								aria-label="Результаты поиска"
+								ref={mobileResultsRef}
+							>
+								{commandSearch}
+								{sectionSearch}
+								<SearchResults
+									results={searchResults}
+									query={searchValue}
+									language={language}
+									categories={categories}
+									folders={folders}
+									activeIndex={activeIndex - contentOffset}
+									hasNavigationResults={contentOffset > 0}
+									onActiveIndexChange={(index) =>
+										setActiveResultIndex(index + contentOffset)
+									}
+									onOpen={openSearchResult}
+								/>
+							</div>
 						</div>
 					</div>
 				)}

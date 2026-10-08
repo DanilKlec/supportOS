@@ -16,8 +16,8 @@ import {
 	AmbientMotionButton,
 } from "@/components/brand/AmbientBackground";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
-import { TelegramRegistration } from "@/features/auth/TelegramRegistration";
 import { TelegramPassword } from "@/features/auth/TelegramPassword";
+import { TelegramRegistration } from "@/features/auth/TelegramRegistration";
 import { supabaseService } from "@/services/supabase.service";
 import {
 	readTelegramChallenge,

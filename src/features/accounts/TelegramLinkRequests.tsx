@@ -8,6 +8,7 @@ type Request = {
 	telegram_username?: string;
 	user?: { email: string; display_name: string };
 };
+type TelegramLinksResponse = { requests?: Request[]; error?: string };
 export function TelegramLinkRequests() {
 	const [rows, setRows] = useState<Request[]>([]),
 		[error, setError] = useState(""),
@@ -15,7 +16,7 @@ export function TelegramLinkRequests() {
 	const load = useCallback(async () => {
 		try {
 			const r = await authenticatedFetch("/api/accounts?action=telegram-links");
-			const d = await r.json();
+			const d = (await r.json()) as TelegramLinksResponse;
 			if (!r.ok) throw new Error(d.error);
 			setRows(d.requests ?? []);
 		} catch (e) {
@@ -43,7 +44,7 @@ export function TelegramLinkRequests() {
 					body: JSON.stringify({ id: row.id, approve }),
 				},
 			);
-			const d = await r.json();
+			const d = (await r.json()) as TelegramLinksResponse;
 			if (!r.ok) throw new Error(d.error);
 			await load();
 		} catch (e) {

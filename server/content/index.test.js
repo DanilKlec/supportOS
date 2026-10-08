@@ -19,13 +19,59 @@ it('allows readers and returns an unpublished document as null',async()=>{
 it('builds the legacy frontend shape from normalized rows without reading legacy data',async()=>{
  mocks.db.mockImplementation(async(_env,path)=>{
   if(path.startsWith('supportos_content_revisions'))return [{id:'emails',version:7,updated_at:'2026-09-25T10:00:00Z',updated_by:'editor'}];
-  if(path.startsWith('supportos_project_emails'))return [{id:'mail-1',project_id:'project-1',type:'Support',email:'help@example.com',note:null,sort_order:0,updated_at:'2026-09-25T09:00:00Z'}];
+ if(path.startsWith('supportos_project_emails'))return [{id:'mail-1',project_id:'project-1',type:'Support',email:'help@example.com',note:null,sort_order:2,updated_at:'2026-09-25T09:00:00Z'}];
   if(path.startsWith('supportos_projects'))return [{id:'project-1',name:'Example',slug:'example',source_hash:'hash',updated_at:'2026-09-25T09:00:00Z'}];
   throw new Error(`Unexpected path: ${path}`);
  });
  const response=await run({});
  expect(response.data).toMatchObject({id:'emails',version:7,data:[{id:'project-1',projectName:'Example',supportEmail:'help@example.com'}]});
+ expect(response.data.data[0].addresses).toEqual([{id:'mail-1',type:'Support',email:'help@example.com',order:0}]);
  expect(mocks.db.mock.calls.some(([,path])=>path.startsWith('supportos_shared_content'))).toBe(false);
+});
+it.each(['emails','bonuses','bonus-tools'])('reads the DB transition document for %s only when normalized tables are missing',async(dataset)=>{
+ const legacy={id:dataset,version:3,data:[],updated_at:'2026-10-08T00:00:00Z'};
+ mocks.db.mockImplementation(async(_env,path)=>{
+  if(path.startsWith('supportos_shared_content'))return [legacy];
+  throw Object.assign(new Error('Missing table'),{status:502,storageStatus:404,storageCode:'PGRST205'});
+ });
+ expect(await run({url:`/api/content?dataset=${dataset}`})).toEqual({status:200,data:legacy});
+ expect(mocks.db.mock.calls.every(([,path])=>!path.startsWith('rpc/'))).toBe(true);
+});
+it.each([401,403,429,500])('does not hide storage status %s with a legacy fallback',async(storageStatus)=>{
+ mocks.db.mockRejectedValue(Object.assign(new Error('Storage unavailable'),{status:502,storageStatus,storageCode:'42501'}));
+ expect((await run({})).status).toBe(502);
+ expect(mocks.db.mock.calls.some(([,path])=>path.startsWith('supportos_shared_content'))).toBe(false);
+});
+it('never falls back over existing normalized data when its dependencies are missing',async()=>{
+ mocks.db.mockImplementation(async(_env,path)=>{
+  if(path.startsWith('supportos_content_revisions'))return [];
+  if(path.startsWith('supportos_project_emails'))return [{id:'normalized',project_id:'project-1'}];
+  throw Object.assign(new Error('Missing dependency'),{status:502,storageStatus:404,storageCode:'PGRST205'});
+ });
+ expect((await run({})).status).toBe(502);
+ expect(mocks.db.mock.calls.some(([,path])=>path.startsWith('supportos_shared_content'))).toBe(false);
+});
+it('keeps normalized rows authoritative even before the revision migration',async()=>{
+ mocks.db.mockImplementation(async(_env,path)=>{
+  if(path.startsWith('supportos_content_revisions'))throw Object.assign(new Error('Missing revision table'),{status:502,storageStatus:404,storageCode:'PGRST205'});
+  if(path.startsWith('supportos_project_emails'))return [{id:'mail-1',project_id:'project-1',type:'Support',email:'help@example.com',sort_order:0}];
+  if(path.startsWith('supportos_projects'))return [{id:'project-1',name:'Example',slug:'example'}];
+  throw new Error('Unexpected legacy access');
+ });
+ expect((await run({})).data.data[0].addresses[0].id).toBe('mail-1');
+ expect(mocks.db.mock.calls.some(([,path])=>path.startsWith('supportos_shared_content'))).toBe(false);
+});
+it('adapts ordered addresses to the existing normalized publish RPC',async()=>{
+ const fetch=vi.fn(async()=>new Response(JSON.stringify({version:1})));vi.stubGlobal('fetch',fetch);
+ const record={id:'project-1',slug:'example',projectName:'Example',addresses:[
+  {id:'second',type:'Complaints',email:'complaints@example.com',order:1},
+  {id:'first',type:'Support',email:'help@example.com',order:0},
+ ]};
+ expect((await run({method:'POST',body:{dataset:'emails',data:[record],expected:0}})).status).toBe(200);
+ const payload=JSON.parse(fetch.mock.calls[0][1].body).payload[0];
+ expect(payload.addresses.map(row=>row.id)).toEqual(['first','second']);
+ expect(payload.emails.map(row=>row.id)).toEqual(['first','second']);
+ expect(payload.supportEmail).toBe('help@example.com');
 });
 it('isolates personal reads and writes using only the verified account',async()=>{
  mocks.db.mockResolvedValue([]);

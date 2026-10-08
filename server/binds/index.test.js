@@ -83,3 +83,52 @@ it('persists knowledge through the server and never accepts a forged owner',asyn
  expect(saved[0]).toMatchObject({id:'mine',owner_id:actor,name:'Личное'});
  expect((await run({method:'POST',body:{action:'knowledge-save',categories:[{id:'shared',ownerId:null,name:'Общее',order:1}]}})).status).toBe(403);
 });
+
+const backup={app:'SupportOS',version:3,knowledge:{categories:[{id:'shared',ownerId:null,name:'Общее',order:1},{id:'new',ownerId:null,name:'Новое',order:2}],folders:[],binds:[]}};
+function allowBackup(){mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories')?[{id:'shared',owner_id:null,name:'Сервер',order_index:1}]:[]);mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories?select=id')?[{id:'shared',owner_id:null,updated_at:'2026-01-01'}]:[]);}
+it('exports only the authorized server snapshot, not browser state',async()=>{
+ allowBackup();const result=await run({url:'/api/binds?action=backup-export'});
+ expect(result.status).toBe(200);expect(result.data).toMatchObject({app:'SupportOS',version:3,scope:'authorized-knowledge',knowledge:{categories:[{id:'shared',name:'Сервер'}],folders:[],binds:[]}});
+ expect(mocks.allRows.mock.calls.every(([,path])=>path.includes(`owner_id.eq.${actor}`))).toBe(true);
+});
+it('includes shared binds even when a personal branch shadows them in the runtime cache',async()=>{
+ allowBackup();mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_binds')?[
+  {id:'base',owner_id:null,slug:'base',category_id:'shared',tags:[],translations:[],created_at:'2026-01-01',updated_at:'2026-01-01'},
+  {id:'branch',owner_id:actor,source_bind_id:'base',slug:'branch',category_id:'shared',tags:[],translations:[],created_at:'2026-01-01',updated_at:'2026-01-01'},
+ ]:[]);
+ const result=await run({url:'/api/binds?action=backup-export'});
+ expect(result.data.knowledge.binds.map(item=>item.id)).toEqual(['base','branch']);
+ expect(result.data.knowledge.binds[0]).not.toHaveProperty('history');
+});
+it('previews merge/upsert counts and never writes during preview',async()=>{
+ allowBackup();const result=await run({method:'POST',body:{action:'backup-preview',payload:backup}});
+ expect(result.status).toBe(200);expect(result.data.counts.categories).toEqual({add:1,existing:1});expect(result.data.token).toMatch(/^[a-f0-9]{64}$/);expect(mocks.db.mock.calls.every(([,path])=>!path.includes('on_conflict'))).toBe(true);
+});
+it('requires a fresh preview and writes only missing records in merge mode',async()=>{
+ allowBackup();const preview=await run({method:'POST',body:{action:'backup-preview',payload:backup}});
+ expect((await run({method:'POST',body:{action:'backup-apply',payload:backup,mode:'merge',token:'stale'}})).status).toBe(409);
+ const fetch=vi.fn(async()=>new Response('',{status:201}));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'backup-apply',payload:backup,mode:'merge',token:preview.data.token}});
+ expect(result.status).toBe(200);expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject([{id:'new',name:'Новое'}]);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).not.toContainEqual(expect.objectContaining({id:'shared'}));
+});
+it('rejects import without write permission or with an incomplete parent reference',async()=>{
+ const denied=await run({method:'POST',body:{action:'backup-preview',payload:backup}});expect(denied.status).toBe(403);
+ allowBackup();const invalid={app:'SupportOS',version:3,knowledge:{categories:[],folders:[{id:'orphan',categoryId:'missing',name:'Папка',order:1}],binds:[]}};
+ expect((await run({method:'POST',body:{action:'backup-preview',payload:invalid}})).status).toBe(400);
+});
+it('upserts existing IDs only after explicit preview and rejects stale DB state',async()=>{
+ allowBackup();const preview=await run({method:'POST',body:{action:'backup-preview',payload:backup}});
+ mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories?select=id')?[{id:'shared',owner_id:null,updated_at:'2026-02-01'}]:[]);
+ expect((await run({method:'POST',body:{action:'backup-apply',payload:backup,mode:'upsert',token:preview.data.token}})).status).toBe(409);
+ allowBackup();const fetch=vi.fn(async()=>new Response('',{status:201}));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'backup-apply',payload:backup,mode:'upsert',token:preview.data.token}})).status).toBe(200);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toHaveLength(2);
+});
+it('keeps ownerless legacy records personal instead of publishing them to the team',async()=>{
+ allowBackup();const legacy={categories:[{id:'legacy',name:'Личное',order:1}],folders:[],binds:[]};
+ const preview=await run({method:'POST',body:{action:'backup-preview',payload:legacy}});
+ const fetch=vi.fn(async()=>new Response('',{status:201}));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'backup-apply',payload:legacy,mode:'merge',token:preview.data.token}})).status).toBe(200);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)[0].owner_id).toBe(actor);
+});

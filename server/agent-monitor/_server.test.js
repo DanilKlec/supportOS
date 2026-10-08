@@ -1,7 +1,7 @@
 vi.mock('../telegram-2fa.js',()=>({requireTelegram:async()=>{}}));
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../_rbac.js',()=>({loadAccess:async(id)=>({status:'active',roles:[],permissions:id==='ordinary'?[]:['work','monitor.read','monitor.write']})}));
-import { normalizeStatus, collect, config } from './_server.js';
+import { normalizeStatus, collect, config, db } from './_server.js';
 import handler from './index.js';
 const env = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'test-public', SUPABASE_SERVICE_ROLE_KEY: 'test-service', LIVECHAT_AUTHORIZATION: 'Basic test', LIVECHAT_ORGANIZATION_ID: 'org', LIVECHAT_WEBHOOK_SECRET: 'webhook-test', MONITOR_COLLECTOR_SECRET: 'collector-test' };
 const response = () => ({ headers: {}, setHeader(k,v) { this.headers[k]=v; }, end(value) { this.body=JSON.parse(value); } });
@@ -10,6 +10,12 @@ const request = (extra = {}) => ({ method:'GET', url:'/?day=2026-09-08', headers
 beforeEach(() => { for (const [key,value] of Object.entries(env)) vi.stubEnv(key,value); });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe('monitor server security', () => {
+ it('identifies missing storage without blaming the monitor migration or leaking DB details',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:'PGRST205',message:'private database details',details:'synthetic secret'}),{status:404})));
+  await expect(db(env,'supportos_welcome_bonuses?select=*')).rejects.toMatchObject({status:502,storageStatus:404,storageCode:'PGRST205'});
+  await expect(db(env,'supportos_welcome_bonuses?select=*')).rejects.toThrow('миграции серверной БД');
+  try {await db(env,'supportos_welcome_bonuses?select=*');}catch(error){expect(error.message).not.toMatch(/agent-monitor|private|secret/);}
+ });
  it('imports with verified actor and rejects unknown agents before saving',async()=>{
   const payload={month:'2026-09',people:['work@example.com'],records:[],username:'forged'};
   const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({id:'verified',app_metadata:{role:'supervisor'}}))).mockResolvedValueOnce(new Response('[{"id":"work@example.com"}]')).mockResolvedValueOnce(new Response('{"added":0,"removed":1}'));

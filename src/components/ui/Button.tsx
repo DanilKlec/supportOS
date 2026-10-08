@@ -1,7 +1,13 @@
-import { forwardRef, type ComponentPropsWithoutRef } from "react";
+import { type ComponentPropsWithoutRef, forwardRef } from "react";
 import { classNames } from "./classNames";
 
-type ButtonVariant = "default" | "primary" | "secondary" | "ghost" | "danger" | "danger-quiet";
+type ButtonVariant =
+	| "default"
+	| "primary"
+	| "secondary"
+	| "ghost"
+	| "danger"
+	| "danger-quiet";
 type ButtonSize = "default" | "small";
 
 export type ButtonProps = ComponentPropsWithoutRef<"button"> & {
@@ -11,7 +17,18 @@ export type ButtonProps = ComponentPropsWithoutRef<"button"> & {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-	({ className, variant = "default", size = "default", loading = false, disabled, children, ...props }, ref) => (
+	(
+		{
+			className,
+			variant = "default",
+			size = "default",
+			loading = false,
+			disabled,
+			children,
+			...props
+		},
+		ref,
+	) => (
 		<button
 			ref={ref}
 			type="button"

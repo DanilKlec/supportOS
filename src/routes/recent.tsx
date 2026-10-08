@@ -21,15 +21,15 @@ function RecentPage() {
 					<div className="flex items-center gap-3 mb-6">
 						<Clock size={28} className="text-accent" />
 						<div>
-							<h1 className="text-3xl font-bold text-foreground">Recent</h1>
+							<h1 className="text-3xl font-bold text-foreground">Недавние</h1>
 							<p className="text-sm text-muted mt-1">
-								Binds you recently copied
+								Бинды, которые вы недавно копировали
 							</p>
 						</div>
 					</div>
 					<BindList
 						binds={recentBinds}
-						emptyMessage="No recently copied binds"
+						emptyMessage="Недавно скопированных биндов пока нет"
 					/>
 				</div>
 			</main>

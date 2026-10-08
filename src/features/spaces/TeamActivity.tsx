@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { accessApi } from "@/features/accounts/AccountsPanel";
+import { accessApi } from "@/features/accounts/access-api";
 import { workDay } from "@/features/agent-monitor/live-model";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";

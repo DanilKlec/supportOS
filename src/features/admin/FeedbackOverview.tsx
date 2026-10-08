@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 export type FeedbackRecord = {
 	rating: string;
@@ -8,11 +9,22 @@ export type FeedbackRecord = {
 };
 export function FeedbackOverview({
 	feedback,
+	reviews = [],
 	projects,
 	onCreate,
 	kinds,
 }: {
 	feedback: FeedbackRecord[];
+	reviews?: Array<{
+		id: string;
+		project_id: string;
+		source_ids: string[];
+		comment: string;
+		answer_ref: string;
+		actor_id: string;
+		created_at: string;
+		status: string;
+	}>;
 	projects: { id: string; name: string }[];
 	onCreate: (
 		kind: "knowledge" | "rules" | "tests",
@@ -109,6 +121,40 @@ export function FeedbackOverview({
 					операторами.
 				</p>
 			)}
+			{reviews.length > 0 && (
+				<section className="space-y-3" aria-label="Отзывы для проверки QC">
+					<h3 className="font-semibold">Отзывы для проверки QC</h3>
+					{reviews.map((review) => (
+						<article
+							key={review.id}
+							className="rounded-xl border border-border bg-surface p-4 space-y-2"
+						>
+							<p className="text-sm">
+								<strong>Проблема:</strong> {review.comment} ·{" "}
+								{name(review.project_id)}
+							</p>
+							<p className="text-xs text-muted">
+								{review.created_at} · reference:{" "}
+								{review.answer_ref.slice(0, 12)}
+							</p>
+							{review.source_ids.length > 0 && (
+								<div className="ui-actions flex flex-wrap gap-2">
+									{review.source_ids.map((id) => (
+										<Link
+											key={id}
+											to="/"
+											hash={`bind=${encodeURIComponent(id)}`}
+											className="ui-button ui-button--secondary ui-button--small"
+										>
+											Открыть источник
+										</Link>
+									))}
+								</div>
+							)}
+						</article>
+					))}
+				</section>
+			)}
 			{[...scoped]
 				.reverse()
 				.filter((item) => rating === "all" || item.rating === rating)
@@ -118,8 +164,10 @@ export function FeedbackOverview({
 						className="rounded-xl border border-border bg-surface p-4 space-y-3"
 					>
 						<p className="text-sm">
-							{item.rating === "positive" ? "Положительная оценка" : `Отрицательная оценка${item.reason ? `: ${item.reason}` : ""}`} ·{" "}
-							{name(item.project)} · {item.language}
+							{item.rating === "positive"
+								? "Положительная оценка"
+								: `Отрицательная оценка${item.reason ? `: ${item.reason}` : ""}`}{" "}
+							· {name(item.project)} · {item.language}
 						</p>
 						<p className="text-xs text-muted">{item.createdAt}</p>
 						{item.rating === "negative" && (

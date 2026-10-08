@@ -15,11 +15,12 @@ import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
+import type { LanguageCode } from "@/store/knowledge.store";
 import { can } from "../../../shared/access.js";
 import { BindLinkEditor } from "./BindLinkEditor";
 import { BindProposals } from "./BindProposals";
 import { reconcileBindLinks } from "./bind-links";
-import { SharedBindEditor } from "./SharedBindsPage";
+import { SharedBindEditor } from "./SharedBindEditor";
 import { ShareRecipientPicker } from "./ShareRecipientPicker";
 
 export function useWorkspaceSharedBinds() {
@@ -287,7 +288,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 	);
 	return (
 		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-5 sm:p-8">
-			<div className="mx-auto max-w-5xl space-y-5">
+			<div className="mx-auto min-w-0 max-w-5xl space-y-5 [overflow-wrap:anywhere]">
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div className="min-w-0 basis-full sm:flex-1">
 						<div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted">
@@ -440,7 +441,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					</p>
 				)}
 				<div className="flex flex-wrap items-start justify-between gap-4">
-					<div>
+					<div className="min-w-0">
 						<p className="mb-2 text-xs text-muted">
 							{selected.label}
 							{incoming.some((s) => s.id === selected.branch)
@@ -481,7 +482,9 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							type="button"
 							key={t.language}
 							onClick={() =>
-								useKnowledgeStore.getState().setLanguage(t.language as any)
+								useKnowledgeStore
+									.getState()
+									.setLanguage(t.language as LanguageCode)
 							}
 							aria-pressed={translation?.language === t.language}
 							className="ui-button ui-button--secondary border border-border uppercase aria-pressed:bg-surface-elevated"
@@ -511,12 +514,21 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					<div className="bind-answer-heading">
 						<span>Готовый ответ</span>
 					</div>
-					<ReactMarkdown remarkPlugins={[remarkGfm]}>
+					<ReactMarkdown
+						remarkPlugins={[remarkGfm]}
+						components={{
+							table: ({ children }) => (
+								<div className="supportos-scroll min-w-0 max-w-full overflow-x-auto">
+									<table>{children}</table>
+								</div>
+							),
+						}}
+					>
 						{translation?.content ?? ""}
 					</ReactMarkdown>
 				</article>
 				{compare && (
-					<section className="grid gap-3 md:grid-cols-2">
+					<section className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
 						<div className="rounded-xl border border-border bg-surface p-4">
 							<h2 className="mb-3 text-sm font-semibold">
 								Основная · {translation?.language}

@@ -218,8 +218,10 @@ export function RegressionPanel({
 								output && (
 									<div key={mode}>
 										<h5 className="text-sm font-medium">
-											{mode === "production" ? "Опубликованная версия" : "Черновики"} ·{" "}
-											{output.evaluation.passed ? "Пройдено" : "Не пройдено"}
+											{mode === "production"
+												? "Опубликованная версия"
+												: "Черновики"}{" "}
+											· {output.evaluation.passed ? "Пройдено" : "Не пройдено"}
 										</h5>
 										<p className="whitespace-pre-wrap text-sm my-2">
 											{output.text || "Пустой ответ"}

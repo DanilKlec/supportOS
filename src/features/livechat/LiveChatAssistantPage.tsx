@@ -15,7 +15,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Bind, BindTranslation } from "@/entities/bind";
-import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { searchBinds } from "@/shared/lib/bind-search";
 import {
@@ -23,6 +22,14 @@ import {
 	extractTemplateVariables,
 } from "@/shared/lib/template-variables";
 import { useKnowledgeStore } from "@/store";
+
+const LANGUAGE_LABELS: Record<string, string> = {
+	ru: "Русский",
+	en: "Английский",
+	de: "Немецкий",
+	pt: "Португальский",
+	el: "Греческий",
+};
 
 function isInsideIframe() {
 	try {
@@ -153,7 +160,7 @@ export function LiveChatAssistantPage() {
 	useEffect(() => {
 		if (!isInsideIframe()) {
 			setConnectionError(
-				"Режим предпросмотра. Добавьте этот URL как виджет LiveChat Details, чтобы вставлять ответы.",
+				"Режим предпросмотра. Добавьте этот URL как виджет панели сведений LiveChat, чтобы вставлять ответы.",
 			);
 			return undefined;
 		}
@@ -249,7 +256,8 @@ export function LiveChatAssistantPage() {
 				<div className="mt-2 truncate text-xs text-muted">
 					{profile
 						? `${profile.name || "Клиент"}${profile.email ? ` · ${profile.email}` : ""}`
-						: connectionError || "Откройте чат, чтобы загрузить профиль клиента."}
+						: connectionError ||
+							"Откройте чат, чтобы загрузить профиль клиента."}
 				</div>
 			</header>
 
@@ -310,7 +318,7 @@ export function LiveChatAssistantPage() {
 										</span>
 										{query && index === 0 ? (
 											<span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-accent">
-														Лучший результат
+												Лучший результат
 											</span>
 										) : null}
 									</div>
@@ -326,7 +334,9 @@ export function LiveChatAssistantPage() {
 						))
 					) : (
 						<div className="px-5 py-8 text-center text-xs text-muted">
-							<div className="font-medium text-foreground">Ничего не найдено</div>
+							<div className="font-medium text-foreground">
+								Ничего не найдено
+							</div>
 							<div className="mt-1 leading-4">
 								Попробуйте ввести меньше слов, тег или часть текста ответа.
 							</div>
@@ -362,8 +372,7 @@ export function LiveChatAssistantPage() {
 						>
 							{availableLanguages.map((code) => (
 								<option key={code} value={code}>
-									{languages.find((item) => item.code === code)?.name ??
-										code.toUpperCase()}
+									{LANGUAGE_LABELS[code] ?? code.toUpperCase()}
 								</option>
 							))}
 						</select>
@@ -398,7 +407,7 @@ export function LiveChatAssistantPage() {
 											}));
 											setInserted(false);
 										}}
-						placeholder={`Значение для ${variable}`}
+										placeholder={`Значение для ${variable}`}
 										className="ui-input border border-border bg-surface outline-none focus:border-accent"
 									/>
 								</label>

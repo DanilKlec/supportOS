@@ -1,5 +1,4 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Button, IconButton, Input } from "@/components/ui";
 import {
 	Archive,
 	Check,
@@ -15,6 +14,7 @@ import {
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
 import { usePreference } from "@/features/productivity/preferences";
@@ -186,8 +186,8 @@ export function Sidebar({
 
 		showToast(
 			favorite
-				? `${changed.length} bind(s) added to favorites`
-				: `${changed.length} bind(s) removed from favorites`,
+				? `Добавлено в избранное: ${changed.length}`
+				: `Удалено из избранного: ${changed.length}`,
 		);
 	};
 	const setSelectedPinned = () => {
@@ -200,8 +200,8 @@ export function Sidebar({
 
 		showToast(
 			pinned
-				? `${changed.length} bind(s) pinned`
-				: `${changed.length} bind(s) unpinned`,
+				? `Закреплено биндов: ${changed.length}`
+				: `Снято закрепление: ${changed.length}`,
 		);
 	};
 	const archiveSelected = () => {
@@ -211,12 +211,12 @@ export function Sidebar({
 		const archived = knowledgeService.archiveManyBinds(ids);
 
 		setSelectedBindIds([]);
-		showToast(`${archived.length} bind(s) archived`, {
+		showToast(`Архивировано биндов: ${archived.length}`, {
 			action: {
 				label: "Отменить",
 				onClick: () => {
 					knowledgeService.updateManyBinds(ids, { archived: false });
-					showToast("Archive undone");
+					showToast("Архивирование отменено");
 				},
 			},
 			duration: 7000,
@@ -286,7 +286,7 @@ export function Sidebar({
 		anchor.download = `supportos-selected-${new Date().toISOString().slice(0, 10)}.json`;
 		anchor.click();
 		URL.revokeObjectURL(url);
-		showToast("Selected binds exported");
+		showToast("Выбранные бинды экспортированы");
 	};
 
 	const renderBindShortcut = (bind: Bind) => (
@@ -389,14 +389,14 @@ export function Sidebar({
 							Категории
 						</div>
 
-				<IconButton
-					label="Добавить категорию"
+						<IconButton
+							label="Добавить категорию"
 							onClick={createCategory}
-					size="small"
-					className="text-muted hover:bg-surface-elevated hover:text-foreground"
+							size="small"
+							className="text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
-				</IconButton>
+						</IconButton>
 					</div>
 
 					<div className="relative">
@@ -409,20 +409,21 @@ export function Sidebar({
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Поиск в папках…"
-							className="w-full bg-surface pl-9 pr-8 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+							className="w-full bg-surface pl-9 pr-10 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
-							<button
+							<IconButton
 								type="button"
-								aria-label="Очистить поиск"
+								label="Очистить поиск"
+								size="small"
 								onClick={() => {
 									setTreeSearch("");
 									setSelectedTag("");
 								}}
-								className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="absolute right-1 top-1/2 -translate-y-1/2 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={14} />
-							</button>
+							</IconButton>
 						)}
 					</div>
 
@@ -461,31 +462,34 @@ export function Sidebar({
 									</span>{" "}
 									выбрано — перетащите или выберите действие
 								</span>
-								<button
+								<IconButton
 									type="button"
 									onClick={() => setSelectedBindIds([])}
-									className="ui-button ui-button--icon ui-button--small text-foreground hover:bg-accent/15"
-									title="Снять выделение"
+									size="small"
+									className="text-foreground hover:bg-accent/15"
+									label="Снять выделение"
 								>
 									<X size={13} />
-								</button>
+								</IconButton>
 							</div>
 
 							<div className="ui-actions sidebar-bulk-actions">
-								<button
+								<Button
 									type="button"
-									className="ui-button ui-button--small sidebar-bulk-move border-accent/25 bg-background text-foreground"
+									size="small"
+									className="sidebar-bulk-move border-accent/25 bg-background text-foreground"
 									onClick={() =>
 										modalManager.open("moveBind", { bindIds: selectedBindIds })
 									}
 								>
 									Переместить выбранные
-								</button>
-								<button
+								</Button>
+								<IconButton
 									type="button"
 									onClick={setSelectedFavorite}
-									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
-									title={
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label={
 										allSelectedFavorite ? "Убрать из избранного" : "В избранное"
 									}
 								>
@@ -493,12 +497,13 @@ export function Sidebar({
 										size={14}
 										fill={allSelectedFavorite ? "currentColor" : "none"}
 									/>
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={setSelectedPinned}
-									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
-									title={
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label={
 										allSelectedPinned
 											? "Открепить выбранные"
 											: "Закрепить выбранные"
@@ -508,31 +513,34 @@ export function Sidebar({
 										size={14}
 										fill={allSelectedPinned ? "currentColor" : "none"}
 									/>
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
-									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
-									title="Добавить тег"
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label="Добавить тег"
 								>
 									<Tag size={14} />
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={exportSelected}
-									className="ui-button ui-button--icon ui-button--small border-accent/25 bg-background text-foreground hover:bg-accent/15"
-									title="Экспортировать выбранные"
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label="Экспортировать выбранные"
 								>
 									<Download size={14} />
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={archiveSelected}
-									className="ui-button ui-button--icon ui-button--small border-red-500/30 bg-background text-red-300 hover:bg-red-500/10"
-									title="Архивировать выбранные"
+									size="small"
+									className="border-red-500/30 bg-background text-red-300 hover:bg-red-500/10"
+									label="Архивировать выбранные"
 								>
 									<Archive size={14} />
-								</button>
+								</IconButton>
 							</div>
 
 							{bulkTagOpen && (

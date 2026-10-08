@@ -55,7 +55,7 @@ cp .env.example .env
 
 ### Supabase Auth
 
-Для входа нужны `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY`; старые переменные временного доступа не используются. Облачная синхронизация управляется отдельно: `VITE_SUPPORTOS_CLOUD_SYNC=false` по умолчанию.
+Для входа нужны `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY`; бизнес-данные загружаются и сохраняются через server API и базу данных.
 
 [Настройка аккаунтов, ролей, серверной проверки и ограничения](docs/auth.md). [Мониторинг LiveChat и оставшиеся шаги активации](docs/agent-monitor.md).
 

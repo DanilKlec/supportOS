@@ -12,11 +12,18 @@ import {
 	Star,
 	Trash2,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ActionMenuPortal } from "@/components/ActionMenuPortal";
-import { Button, IconButton, Select } from "@/components/ui";
+import { Button, IconButton, Select, Textarea } from "@/components/ui";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import type { KnowledgeFolder } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
@@ -24,11 +31,9 @@ import {
 	answerAssistantService,
 	type CheckIssue,
 } from "@/services/answer-assistant.service";
-import {
-	type CurrencyTable,
-	loadStoredBonusToolsData,
-} from "@/services/bonus-tools.service";
+import type { CurrencyTable } from "@/services/bonus-tools.service";
 import { knowledgeService } from "@/services/knowledge.service";
+import { getTeamGlossary } from "@/services/team-glossary.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
@@ -36,6 +41,7 @@ import { extractTemplateVariables } from "@/shared/lib/template-variables";
 import { modalManager } from "@/shared/modals/modal.store";
 import {
 	type LanguageCode,
+	useBonusToolsStore,
 	useKnowledgeStore,
 	useWorkspaceStore,
 } from "@/store";
@@ -57,7 +63,14 @@ function getTranslation(bind: Bind, language: string): BindTranslation {
 }
 
 function getLanguageName(code: string) {
-	return languages.find((language) => language.code === code)?.name ?? code;
+	const names: Record<string, string> = {
+		ru: "Русский",
+		en: "Английский",
+		de: "Немецкий",
+		pt: "Португальский",
+		el: "Греческий",
+	};
+	return names[code] ?? code;
 }
 
 function getFolderPath(folder: KnowledgeFolder, folders: KnowledgeFolder[]) {
@@ -98,7 +111,7 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 
 	if (missingLanguages.length > 0) {
 		issues.push(
-			`Missing ${missingLanguages.map((code) => code.toUpperCase()).join(", ")}`,
+			`Нет переводов: ${missingLanguages.map((code) => code.toUpperCase()).join(", ")}`,
 		);
 	}
 
@@ -109,7 +122,7 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 	if (
 		bind.translations.some((translation) => translation.content.length > 1200)
 	) {
-		issues.push("Long text");
+		issues.push("Длинный текст");
 	}
 
 	if (
@@ -124,14 +137,14 @@ function getQualityIssues(bind: Bind, binds: Bind[]) {
 				),
 		)
 	) {
-		issues.push("Possible duplicate");
+		issues.push("Возможный дубликат");
 	}
 
 	return issues;
 }
 
 function formatDate(value?: string) {
-	if (!value) return "Never";
+	if (!value) return "Нет данных";
 
 	return new Date(value).toLocaleString();
 }
@@ -321,23 +334,22 @@ function ViewerMenuItem({
 	danger?: boolean;
 }) {
 	return (
-		<button
+		<Button
 			type="button"
 			role="menuitem"
 			onClick={onClick}
-			className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
-				danger
-					? "text-red-400 hover:bg-red-500/10"
-					: "text-muted hover:bg-surface-elevated hover:text-foreground"
-			}`}
+			variant={danger ? "danger-quiet" : "ghost"}
+			className="w-full"
+			style={{ justifyContent: "flex-start", textAlign: "left" }}
 		>
 			<span className="shrink-0">{icon}</span>
 			<span className="truncate">{label}</span>
-		</button>
+		</Button>
 	);
 }
 
 export function BindViewer() {
+	const mapControlId = useId();
 	const activeTab = useKnowledgeStore((state) => state.activeTab);
 	const contentWidth = useWorkspaceStore((state) => state.layout.contentWidth);
 	const bind = useKnowledgeStore((state) =>
@@ -369,7 +381,7 @@ export function BindViewer() {
 		(item) => item.language === language,
 	);
 	const title = translation?.title || bind?.slug || "";
-	const bonusToolsData = useMemo(() => loadStoredBonusToolsData(), []);
+	const bonusToolsData = useBonusToolsStore((state) => state.data);
 	const mapCurrencyTables = bonusToolsData?.currencyTables ?? [];
 	const activeMapCurrencyTable =
 		mapCurrencyTables.find((table) => table.name === mapTableName) ??
@@ -438,12 +450,14 @@ export function BindViewer() {
 			return;
 		}
 
-		const assistantData = answerAssistantService.load();
+		const glossary = (await getTeamGlossary().catch(() => [])).filter(
+			(term) => !term.projectId,
+		);
 		const copyWarnings = getCopyWarnings(
 			answerAssistantService.checkAnswer({
 				answer: contentToCopy,
 				customerMessage: title,
-				glossary: assistantData.glossary,
+				glossary,
 				language: item.language,
 			}),
 		);
@@ -458,7 +472,7 @@ export function BindViewer() {
 			copyTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
 		}
 		if (copyWarnings.length > 0) {
-			showToast(`Copy check: ${copyWarnings[0]?.title}`);
+			showToast(`Проверка перед копированием: ${copyWarnings[0]?.title}`);
 		}
 		showToast(ok ? "Скопировано в буфер" : "Не удалось скопировать");
 	};
@@ -479,7 +493,7 @@ export function BindViewer() {
 
 		const favorite = knowledgeService.toggleFavorite(bind.id);
 
-		showToast(favorite ? "Added to favorites" : "Removed from favorites");
+		showToast(favorite ? "Добавлено в избранное" : "Удалено из избранного");
 	};
 
 	const togglePinned = () => {
@@ -487,7 +501,7 @@ export function BindViewer() {
 
 		const pinned = knowledgeService.togglePinnedBind(bind.id);
 
-		showToast(pinned ? "Pinned in folder" : "Unpinned");
+		showToast(pinned ? "Закреплено в папке" : "Закрепление снято");
 	};
 
 	const editBind = () => {
@@ -697,7 +711,7 @@ export function BindViewer() {
 				>
 					<div className="bind-context">
 						<nav
-							aria-label="Breadcrumbs"
+							aria-label="Расположение материала"
 							className="mb-4 flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted"
 						>
 							<span className="truncate">
@@ -720,7 +734,7 @@ export function BindViewer() {
 									{bind.pinned && (
 										<span className="mt-1 inline-flex h-6 items-center gap-1 rounded-full bg-accent/10 px-2 text-xs font-medium text-accent">
 											<Pin size={12} fill="currentColor" />
-											Pinned
+											Закреплено
 										</span>
 									)}
 								</div>
@@ -754,7 +768,7 @@ export function BindViewer() {
 												title={
 													exists
 														? getLanguageName(code)
-														: `${getLanguageName(code)} missing`
+														: `${getLanguageName(code)} — перевод отсутствует`
 												}
 												className={`h-8 rounded-lg px-2.5 text-xs font-semibold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
 													language === code
@@ -776,8 +790,8 @@ export function BindViewer() {
 										onChange={(event) =>
 											setLanguage(event.target.value as LanguageCode)
 										}
-												aria-label="Язык"
-										className="ui-input appearance-none border border-border bg-surface pl-3 pr-9 font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+										aria-label="Язык"
+										className="appearance-none bg-surface pr-10 font-medium uppercase outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									>
 										{languageCodes.map((code) => {
 											const exists = bind.translations.some(
@@ -787,7 +801,7 @@ export function BindViewer() {
 											return (
 												<option key={code} value={code}>
 													{code.toUpperCase()}
-													{exists ? "" : " missing"}
+													{exists ? "" : " — нет перевода"}
 												</option>
 											);
 										})}
@@ -805,7 +819,7 @@ export function BindViewer() {
 									className="hidden font-semibold transition hover:bg-accent/90 sm:inline-flex"
 								>
 									{copied ? <Check size={17} /> : <Copy size={17} />}
-											{copied ? "Скопировано" : "Копировать"}
+									{copied ? "Скопировано" : "Копировать"}
 								</Button>
 
 								<div ref={actionsRef} className="relative shrink-0">
@@ -897,8 +911,8 @@ export function BindViewer() {
 					</div>
 					{!exactTranslation && (
 						<div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
-							{language.toUpperCase()} is missing. Showing{" "}
-							{translation.language.toUpperCase()} instead.
+							Перевод на {language.toUpperCase()} отсутствует. Показан{" "}
+							{translation.language.toUpperCase()}.
 						</div>
 					)}
 
@@ -906,42 +920,51 @@ export function BindViewer() {
 						<section className="mt-5 rounded-xl border border-border bg-surface">
 							<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
 								<div>
-									<div className="text-sm font-semibold">MAP bind</div>
+									<div className="text-sm font-semibold">Бинд MAP</div>
 									<div className="mt-1 text-xs text-muted">
-										Bonus block and currency for this copy.
+										Бонусный блок и валюта для копирования.
 									</div>
 								</div>
-								<button
+								<Button
 									type="button"
 									onClick={() => void copyContent()}
-									className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
+									variant="primary"
+									className="font-semibold hover:bg-accent/90"
 								>
 									<Copy size={15} />
 									Копировать MAP
-								</button>
+								</Button>
 							</div>
 
 							<div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(8rem,10rem)]">
-								<label className="ui-field min-w-0">
+								<label
+									htmlFor={`${mapControlId}-bonus`}
+									className="ui-field min-w-0"
+								>
 									<span className="mb-1 block text-xs font-medium text-muted">
-										Bonus block
+										Бонусный блок
 									</span>
-									<textarea
+									<Textarea
+										id={`${mapControlId}-bonus`}
 										value={mapBonusBlock}
 										onChange={(event) => setMapBonusBlock(event.target.value)}
-										className="ui-input supportos-scroll min-h-24 w-full min-w-0 resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-										placeholder="130% bonus up to €1000 + 100 FS"
+										className="supportos-scroll min-h-24 w-full min-w-0 resize-y outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										placeholder="Бонус 130% до €1000 + 100 FS"
 									/>
 								</label>
 
-								<label className="ui-field min-w-0">
+								<label
+									htmlFor={`${mapControlId}-table`}
+									className="ui-field min-w-0"
+								>
 									<span className="mb-1 block text-xs font-medium text-muted">
-										Currency group
+										Группа валют
 									</span>
-									<select
+									<Select
+										id={`${mapControlId}-table`}
 										value={activeMapCurrencyTable?.name ?? ""}
 										onChange={(event) => setMapTableName(event.target.value)}
-										className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="w-full min-w-0 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{mapCurrencyTables.length > 0 ? (
 											mapCurrencyTables.map((table) => (
@@ -952,29 +975,33 @@ export function BindViewer() {
 										) : (
 											<option value="">Таблицы не загружены</option>
 										)}
-									</select>
+									</Select>
 									{mapCurrencyTables.length === 0 && (
 										<div className="mt-1 text-xs text-muted">
-											Загрузите Bonus Tools для точных значений валюты.
+											Загрузите инструменты бонусов для точных значений валюты.
 										</div>
 									)}
 								</label>
 
-								<label className="ui-field min-w-0">
+								<label
+									htmlFor={`${mapControlId}-currency`}
+									className="ui-field min-w-0"
+								>
 									<span className="mb-1 block text-xs font-medium text-muted">
-										Currency
+										Валюта
 									</span>
-									<select
+									<Select
+										id={`${mapControlId}-currency`}
 										value={mapCurrency}
 										onChange={(event) => setMapCurrency(event.target.value)}
-										className="ui-input w-full min-w-0 border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="w-full min-w-0 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{mapCurrencyOptions.map((currency) => (
 											<option key={currency} value={currency}>
 												{currency}
 											</option>
 										))}
-									</select>
+									</Select>
 								</label>
 							</div>
 						</section>
@@ -999,24 +1026,34 @@ export function BindViewer() {
 									Отправить клиенту
 								</h2>
 							</div>
-							<button
+							<Button
 								type="button"
 								onClick={copyContent}
-								className="ui-button ui-button--primary ui-button--small"
+								variant="primary"
+								size="small"
 							>
 								<Copy size={15} />
 								{copied ? "Скопировано" : "Копировать"}
-							</button>
+							</Button>
 						</div>
 						{displayContent.trim() ? (
 							<div className="prose max-w-none leading-7 dark:prose-invert prose-headings:tracking-normal prose-pre:rounded-xl prose-pre:border prose-pre:border-border prose-pre:bg-background">
-								<ReactMarkdown remarkPlugins={[remarkGfm]}>
+								<ReactMarkdown
+									remarkPlugins={[remarkGfm]}
+									components={{
+										table: ({ children }) => (
+											<div className="supportos-scroll min-w-0 max-w-full overflow-x-auto">
+												<table>{children}</table>
+											</div>
+										),
+									}}
+								>
 									{displayContent}
 								</ReactMarkdown>
 							</div>
 						) : (
 							<div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
-												В этом переводе нет содержимого
+								В этом переводе нет содержимого
 							</div>
 						)}
 						<div className="bind-answer-meta">
@@ -1035,32 +1072,32 @@ export function BindViewer() {
 					<details className="mt-4 rounded-xl border border-border bg-surface">
 						<summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-medium text-muted hover:text-foreground">
 							<Info size={16} />
-							Information
+							Информация
 						</summary>
 
 						<div className="grid gap-5 border-t border-border px-4 py-4 text-sm md:grid-cols-2">
 							<div className="space-y-3">
 								<div>
 									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
-										Slug
+										Идентификатор
 									</div>
 									<div className="mt-1 break-all">{bind.slug}</div>
 								</div>
 
 								<div>
 									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
-										Usage
+										Использование
 									</div>
 									<div className="mt-1 text-muted">
-										{bind.copyCount ?? 0} copies
+										Копирований: {bind.copyCount ?? 0}
 										<span className="mx-2">·</span>
-										Last copied: {formatDate(bind.lastCopiedAt)}
+										Последнее копирование: {formatDate(bind.lastCopiedAt)}
 									</div>
 								</div>
 
 								<div>
 									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
-										Quality
+										Качество
 									</div>
 									<div className="mt-2 flex flex-wrap gap-1.5">
 										{qualityIssues.length > 0 ? (
@@ -1073,7 +1110,7 @@ export function BindViewer() {
 												</span>
 											))
 										) : (
-													<span className="text-muted">Явных проблем нет</span>
+											<span className="text-muted">Явных проблем нет</span>
 										)}
 									</div>
 								</div>
@@ -1082,7 +1119,7 @@ export function BindViewer() {
 							<div className="space-y-3">
 								<div>
 									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
-										Translations
+										Переводы
 									</div>
 									<div className="mt-2 space-y-1">
 										{bind.translations.map((item) => (
@@ -1104,17 +1141,18 @@ export function BindViewer() {
 														{item.title || bind.slug}
 													</span>
 												</button>
-												<button
+												<IconButton
 													type="button"
-													aria-label={`Copy ${item.language.toUpperCase()}`}
+													label={`Копировать перевод: ${item.language.toUpperCase()}`}
+													size="small"
 													onClick={(event) => {
 														event.stopPropagation();
 														void copyTranslation(item);
 													}}
-													className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-background hover:text-foreground"
+													className="shrink-0 text-muted hover:bg-background hover:text-foreground"
 												>
 													<Copy size={14} />
-												</button>
+												</IconButton>
 											</div>
 										))}
 									</div>
@@ -1122,7 +1160,7 @@ export function BindViewer() {
 
 								<div>
 									<div className="text-xs font-semibold uppercase tracking-wide text-muted">
-										Updated
+										Обновлено
 									</div>
 									<div className="mt-1 text-muted">
 										{formatDate(bind.updatedAt)}
@@ -1135,14 +1173,15 @@ export function BindViewer() {
 			</div>
 
 			<div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
-				<button
+				<Button
 					type="button"
 					onClick={() => void copyContent()}
-					className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					variant="primary"
+					className="w-full font-semibold transition hover:bg-accent/90"
 				>
 					{copied ? <Check size={18} /> : <Copy size={18} />}
 					{copied ? "Скопировано" : "Копировать ответ"}
-				</button>
+				</Button>
 			</div>
 		</div>
 	);

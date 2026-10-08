@@ -2,7 +2,8 @@ const optionalDate=v=>v===undefined||v===''||(typeof v==='string'&&/^\d{4}-\d{2}
 const validFreshness=b=>optionalDate(b.validUntil)&&optionalDate(b.reviewDue)&&(b.responsible===undefined||(typeof b.responsible==='string'&&b.responsible.length<=120))&&(b.checkedAt===undefined||b.checkedAt===''||(typeof b.checkedAt==='string'&&b.checkedAt.length<=40&&Number.isFinite(Date.parse(b.checkedAt))));
 const validEmails = r => {
  const validEmail=v=>typeof v==='string'&&v.length<=320&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
- if(r.emails!==undefined)return Array.isArray(r.emails)&&r.emails.length<=100&&new Set(r.emails.map(e=>e?.id)).size===r.emails.length&&r.emails.every(e=>e&&typeof e.id==='string'&&e.id.length>0&&e.id.length<=200&&typeof e.type==='string'&&e.type.trim().length>0&&e.type.length<=100&&validEmail(e.email)&&(e.note===undefined||typeof e.note==='string'&&e.note.length<=2000));
+ const addresses=r.addresses!==undefined?r.addresses:r.emails;
+ if(addresses!==undefined)return Array.isArray(addresses)&&addresses.length<=100&&new Set(addresses.map(e=>e?.id)).size===addresses.length&&new Set(addresses.map((e,index)=>e?.order??index)).size===addresses.length&&addresses.every(e=>e&&typeof e.id==='string'&&e.id.length>0&&e.id.length<=200&&typeof e.type==='string'&&e.type.trim().length>0&&e.type.length<=100&&validEmail(e.email)&&(e.note===undefined||typeof e.note==='string'&&e.note.length<=2000)&&(e.order===undefined||Number.isInteger(e.order)&&e.order>=0));
  return ['supportEmail','kycEmail','vipEmail'].every(k=>typeof r[k]==='string'&&(!r[k]||validEmail(r[k])));
 };
 const text = (v) => typeof v === 'string';

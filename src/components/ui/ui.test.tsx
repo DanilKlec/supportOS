@@ -27,13 +27,21 @@ it("uses the shared button classes and disables actions while loading", () => {
 	expect(button.getAttribute("aria-busy")).toBe("true");
 	expect(button.classList.contains("ui-button")).toBe(true);
 	expect(button.classList.contains("ui-button--primary")).toBe(true);
-	expect(screen.getByRole("button", { name: "Закрыть" }).classList.contains("ui-button--icon")).toBe(true);
+	expect(
+		screen
+			.getByRole("button", { name: "Закрыть" })
+			.classList.contains("ui-button--icon"),
+	).toBe(true);
 });
 
 it("forwards native field behavior and preserves SupportOS classes", () => {
 	render(
 		<>
-			<Field label="Имя" description="Видно в профиле" error="Обязательное поле">
+			<Field
+				label="Имя"
+				description="Видно в профиле"
+				error="Обязательное поле"
+			>
 				<Input aria-label="Имя" disabled />
 			</Field>
 			<Textarea aria-label="Описание" defaultValue="Текст" />
@@ -45,9 +53,15 @@ it("forwards native field behavior and preserves SupportOS classes", () => {
 	const input = screen.getByLabelText("Имя") as HTMLInputElement;
 	expect(input.disabled).toBe(true);
 	expect(input.classList.contains("ui-input")).toBe(true);
-	expect(screen.getByText("Обязательное поле").getAttribute("role")).toBe("alert");
-	expect((screen.getByLabelText("Описание") as HTMLTextAreaElement).value).toBe("Текст");
-	expect((screen.getByLabelText("Роль") as HTMLSelectElement).value).toBe("support");
+	expect(screen.getByText("Обязательное поле").getAttribute("role")).toBe(
+		"alert",
+	);
+	expect((screen.getByLabelText("Описание") as HTMLTextAreaElement).value).toBe(
+		"Текст",
+	);
+	expect((screen.getByLabelText("Роль") as HTMLSelectElement).value).toBe(
+		"support",
+	);
 });
 
 it("reports tab changes and renders panel and badge wrappers", () => {
@@ -69,8 +83,23 @@ it("reports tab changes and renders panel and badge wrappers", () => {
 	);
 	fireEvent.click(screen.getByRole("tab", { name: "Второй" }));
 	expect(onValueChange).toHaveBeenCalledWith("two");
-	expect(screen.getByRole("tab", { name: "Первый" }).getAttribute("aria-selected")).toBe("true");
+	expect(
+		screen.getByRole("tab", { name: "Первый" }).getAttribute("aria-selected"),
+	).toBe("true");
 	expect(screen.getByTestId("panel").classList.contains("border")).toBe(true);
-	expect(screen.getByTestId("panel").classList.contains("bg-surface")).toBe(true);
-	expect(screen.getByText("Новый").classList.contains("rounded-full")).toBe(true);
+	expect(screen.getByTestId("panel").classList.contains("bg-surface")).toBe(
+		true,
+	);
+	expect(screen.getByText("Новый").classList.contains("rounded-full")).toBe(
+		true,
+	);
+});
+
+it("implicitly associates the Field label with its native child control", () => {
+	render(
+		<Field label="Имя сотрудника">
+			<Input />
+		</Field>,
+	);
+	expect(screen.getByLabelText("Имя сотрудника").tagName).toBe("INPUT");
 });
