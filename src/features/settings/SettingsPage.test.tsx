@@ -212,7 +212,7 @@ it("keeps appearance, language and workspace persistence keys and reset behavior
 it("keeps the explicitly selected blue accent after reinitializing Settings", () => {
 	mock.hash = "appearance";
 	const view = render(<SettingsPage />);
-	fireEvent.click(screen.getByRole("button", { name: "Синий", exact: true }));
+	fireEvent.click(screen.getByRole("button", { name: "Синий" }));
 	expect(localStorage.getItem("supportos-accent")).toBe("#3b82f6");
 	expect(
 		document.documentElement.style.getPropertyValue("--color-accent"),

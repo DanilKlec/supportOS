@@ -147,21 +147,15 @@ it("keeps Russian global navigation labels on the existing routes", () => {
 		screen.getByRole("navigation", { name: "Пространства" }),
 	);
 	expect(
-		navigation
-			.getByRole("link", { name: "Бинды", exact: true })
-			.getAttribute("href"),
+		navigation.getByRole("link", { name: "Бинды" }).getAttribute("href"),
 	).toBe("/");
 	expect(
 		navigation
-			.getByRole("link", { name: "Администрирование", exact: true })
+			.getByRole("link", { name: "Администрирование" })
 			.getAttribute("href"),
 	).toBe("/admin");
-	expect(
-		navigation.queryByRole("link", { name: "Workspace", exact: true }),
-	).toBeNull();
-	expect(
-		navigation.queryByRole("link", { name: "Admin", exact: true }),
-	).toBeNull();
+	expect(navigation.queryByRole("link", { name: "Workspace" })).toBeNull();
+	expect(navigation.queryByRole("link", { name: "Admin" })).toBeNull();
 });
 
 it("shows one Commands group above content results in the existing search", () => {
