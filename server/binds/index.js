@@ -48,15 +48,30 @@ async function saveShared(env,actor,body){
  if(JSON.stringify(body).length>3000000)throw fail('Превышен размер бинда');
  const stamp=new Date().toISOString();
  const content=sharedContent(body,stamp);
+ const location={};
+ if(body.categoryId!==undefined||body.folderId!==undefined){
+  if(!validId(body.categoryId)||!Object.hasOwn(body,'folderId')||(body.folderId!=null&&!validId(body.folderId)))throw fail('Выберите раздел и папку общего бинда');
+  const categories=await db(env,`supportos_categories?select=id&id=eq.${encodeURIComponent(body.categoryId)}&owner_id=is.null`);
+  if(!categories.length)throw fail('Общий раздел не найден или недоступен');
+  if(body.folderId!=null){
+   const folders=await db(env,`supportos_folders?select=id&id=eq.${encodeURIComponent(body.folderId)}&category_id=eq.${encodeURIComponent(body.categoryId)}&owner_id=is.null`);
+   if(!folders.length)throw fail('Папка не относится к выбранному общему разделу');
+  }
+  location.category_id=body.categoryId;location.folder_id=body.folderId;
+ }
+ if(body.color!==undefined){
+  if(body.color!==null&&(typeof body.color!=='string'||!/^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(body.color)))throw fail('Укажите цвет в формате HEX или наследование цвета');
+  location.color=body.color;
+ }
  let rows;
  if(body.id!=null){
   if(!validId(body.id)||typeof body.expected!=='string'||body.expected.length>100)throw fail('Некорректная версия общего бинда');
-  rows=await rest(env,`supportos_binds?id=eq.${encodeURIComponent(body.id)}&owner_id=is.null&updated_at=eq.${encodeURIComponent(body.expected)}&select=*`,{method:'PATCH',body:{...content,updated_at:stamp},prefer:'return=representation'});
+  rows=await rest(env,`supportos_binds?id=eq.${encodeURIComponent(body.id)}&owner_id=is.null&updated_at=eq.${encodeURIComponent(body.expected)}&select=*`,{method:'PATCH',body:{...content,...location,updated_at:stamp},prefer:'return=representation'});
   if(!Array.isArray(rows)||!rows.length)throw fail('Бинд изменён другим сотрудником или доступ отозван.',409);
  }else{
   if(body.expected!=null)throw fail('Некорректная версия общего бинда');
   const id=`shared-${globalThis.crypto.randomUUID()}`;
-  rows=await rest(env,'supportos_binds?select=*',{method:'POST',body:{id,owner_id:null,slug:`shared-${globalThis.crypto.randomUUID()}`,category_id:'supportos-shared',...content,favorite:false,archived:false,created_at:stamp,updated_at:stamp},prefer:'return=representation'});
+  rows=await rest(env,'supportos_binds?select=*',{method:'POST',body:{id,owner_id:null,slug:`shared-${globalThis.crypto.randomUUID()}`,category_id:'supportos-shared',...content,...location,favorite:false,archived:false,created_at:stamp,updated_at:stamp},prefer:'return=representation'});
  }
  if(!Array.isArray(rows)||!rows[0])throw fail('Сервер не подтвердил сохранение общего бинда',502);
  return rows[0];

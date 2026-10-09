@@ -77,7 +77,7 @@ export function AssistantSettingsPanel({
 					AI {aiEnabled ? "включён" : "выключен"}
 				</Button>
 			</div>
-			<div className="grid gap-2 sm:grid-cols-3">
+			<div className="grid min-w-0 grid-cols-2 gap-2">
 				<Field label="Язык ответа">
 					<Input
 						list="composer-languages"
@@ -102,7 +102,7 @@ export function AssistantSettingsPanel({
 						))}
 					</Select>
 				</Field>
-				<Field label="Тема обращения">
+				<Field label="Тема обращения" className="col-span-2">
 					<Select
 						value={intent}
 						onChange={(event) =>

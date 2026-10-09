@@ -17,7 +17,10 @@ import { Tree } from "@/widgets/Sidebar/Tree";
 import { BindViewer } from "./BindViewer";
 
 vi.mock("@/features/shared-binds/WorkspaceSharedBinds", () => ({
-	WorkspaceSharedTree: () => null,
+	// The shared branch now owns these nodes, including bulk selection and DnD.
+	WorkspaceSharedTree: (props: React.ComponentProps<typeof Tree>) => (
+		<Tree {...props} nodes={useKnowledgeStore.getState().tree} />
+	),
 }));
 const mock = vi.hoisted(() => ({
 	session: {

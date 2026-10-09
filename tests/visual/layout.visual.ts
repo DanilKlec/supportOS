@@ -65,6 +65,15 @@ test("workspace shell and mobile sidebar", async ({
 				.getByRole("complementary")
 				.getByRole("button", { name: "Закрыть папки" }),
 		).toBeVisible();
+		const panelBackground = await page
+			.getByRole("complementary")
+			.evaluate((element) =>
+				element.parentElement
+					? getComputedStyle(element.parentElement).backgroundColor
+					: null,
+			);
+		expect(panelBackground).not.toBeNull();
+		expect(panelBackground).not.toBe("rgba(0, 0, 0, 0)");
 		await screenshot(page, "workspace-sidebar.png");
 		await page
 			.getByRole("complementary")
@@ -173,6 +182,14 @@ test("open SupportComposer header, settings and actions", async ({ page }) => {
 	await expect(
 		composer.getByRole("textbox", { name: "Сообщение клиента" }),
 	).toBeVisible();
+	const toneWidth = await composer
+		.getByRole("combobox", { name: "Тон", exact: true })
+		.evaluate((element) => element.clientWidth);
+	const topicWidth = await composer
+		.getByRole("combobox", { name: "Тема обращения", exact: true })
+		.evaluate((element) => element.clientWidth);
+	expect(toneWidth).toBeGreaterThanOrEqual(120);
+	expect(topicWidth).toBeGreaterThanOrEqual(240);
 	await screenshot(page, "composer.png");
 	await composer
 		.getByRole("button", { name: "Подготовить ответ", exact: true })

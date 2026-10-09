@@ -54,6 +54,39 @@ it('returns 409 when a shared bind timestamp no longer matches',async()=>{
  expect(result.data.error).toContain('Бинд изменён другим сотрудником');
 });
 
+it('creates shared binds in the selected shared section/folder/color, ignoring a forged owner',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ mocks.db.mockResolvedValue([{id:'allowed'}]);
+ const fetch=vi.fn(async()=>Response.json([{id:'new',owner_id:null,category_id:'chosen',folder_id:'folder',color:'#10B981'}]));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'shared-save',ownerId:other,categoryId:'chosen',folderId:'folder',color:'#10B981',translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:[]}});
+ expect(result.status).toBe(200);
+ expect(mocks.db.mock.calls.map(([,path])=>path)).toEqual(['supportos_categories?select=id&id=eq.chosen&owner_id=is.null','supportos_folders?select=id&id=eq.folder&category_id=eq.chosen&owner_id=is.null']);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({owner_id:null,category_id:'chosen',folder_id:'folder',color:'#10B981'});
+});
+it.each([
+ {categoryId:'private',folderId:null},
+ {categoryId:'shared',folderId:'wrong-folder'},
+ {categoryId:'shared'},
+ {folderId:'folder'},
+ {color:'url(secret)'},
+ {color:'#12345'},
+])('rejects invalid or inaccessible shared locations/colors before any write (%j)',async metadata=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories')&&path.includes('id=eq.shared')?[{id:'shared'}]:[]);
+ const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'shared-save',...metadata,translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:[]}})).status).toBe(400);
+ expect(fetch).not.toHaveBeenCalled();
+});
+it('clears location/color intentionally with null while preserving the optimistic conflict guard',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ mocks.db.mockResolvedValue([{id:'shared'}]);
+ const fetch=vi.fn(async()=>Response.json([]));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'shared-save',id:'common',expected:'old',categoryId:'shared',folderId:null,color:null,translations:[{language:'ru',title:'Ответ',content:'Текст'}],tags:[]}});
+ expect(result.status).toBe(409);
+ expect(fetch.mock.calls[0][0]).toContain('owner_id=is.null&updated_at=eq.old');
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({category_id:'shared',folder_id:null,color:null});
+});
+
 it('loads the runtime knowledge snapshot from server tables and applies personal overrides',async()=>{
  mocks.allRows.mockImplementation(async(_env,path)=>{
   if(path.startsWith('supportos_categories'))return [{id:'shared',owner_id:null,name:'Общее',icon:null,color:null,order_index:1}];

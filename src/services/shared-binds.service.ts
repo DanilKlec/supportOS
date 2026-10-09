@@ -222,6 +222,9 @@ export const sharedBindsService = {
 		original?: Bind;
 		translations: BindTranslation[];
 		tags: string[];
+		categoryId?: string;
+		folderId?: string | null;
+		color?: string | null;
 	}): Promise<Bind> {
 		if (!can(supabaseService.getSession()?.user.access, "knowledge.write"))
 			throw new Error("Нет права редактировать общие бинды");
@@ -250,6 +253,9 @@ export const sharedBindsService = {
 			action: "shared-save",
 			id: original?.id,
 			expected: original?.updatedAt,
+			categoryId: input.categoryId,
+			folderId: input.folderId,
+			color: input.color,
 			translations,
 			tags: [...new Set(input.tags.map((t) => t.trim()).filter(Boolean))],
 		});

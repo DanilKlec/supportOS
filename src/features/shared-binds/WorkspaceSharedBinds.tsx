@@ -1,12 +1,19 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { Copy, FileText, Pencil, RotateCcw } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronRight,
+	Copy,
+	Pencil,
+	RotateCcw,
+	Users,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { LocalBindActions } from "@/components/binds/LocalBindActions";
 import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
+import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import type { BindBranches } from "@/services/shared-binds.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { useToast } from "@/shared/hooks/useToast";
@@ -16,12 +23,14 @@ import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
 import type { LanguageCode } from "@/store/knowledge.store";
+import { Tree } from "@/widgets/Sidebar/Tree";
 import { can } from "../../../shared/access.js";
 import { BindLinkEditor } from "./BindLinkEditor";
 import { BindProposals } from "./BindProposals";
 import { reconcileBindLinks } from "./bind-links";
 import { SharedBindEditor } from "./SharedBindEditor";
 import { ShareRecipientPicker } from "./ShareRecipientPicker";
+import { buildSharedTree } from "./shared-tree";
 
 export function useWorkspaceSharedBinds() {
 	const user = useAuthStore((s) => s.session?.user);
@@ -86,7 +95,11 @@ export function WorkspaceSharedBindsSync() {
 					(b) => b.id === links[base.id] && !b.archived,
 				);
 				return {
-					...resolveBranch(base, own ?? local, branches.data).bind,
+					...resolveBranch(
+						base,
+						own ?? (local?.ownerId === null ? undefined : local),
+						branches.data,
+					).bind,
 					id: local?.id ?? base.id,
 					sourceBindId: base.id,
 				};
@@ -108,27 +121,62 @@ export function WorkspaceSharedBindsSync() {
 
 export function WorkspaceSharedTree({
 	onNavigate,
+	filterNodes = (nodes) => nodes,
+	forceExpanded = false,
+	selectedBindIds,
+	onToggleBindSelection,
+	onClearBindSelection,
 }: {
 	onNavigate?: () => void;
+	filterNodes?: (nodes: KnowledgeTreeNode[]) => KnowledgeTreeNode[];
+	forceExpanded?: boolean;
+	selectedBindIds?: string[];
+	onToggleBindSelection?: (id: string) => void;
+	onClearBindSelection?: () => void;
 }) {
 	const { common, personal } = useWorkspaceSharedBinds();
-	const binds = useKnowledgeStore((s) => s.remoteBinds),
-		language = useKnowledgeStore((s) => s.language),
-		search = useKnowledgeStore((s) => s.search),
-		active = useKnowledgeStore((s) => s.activeTab);
-	const navigate = useNavigate();
 	const locals = useKnowledgeStore((s) => s.binds);
-	const items = binds
-		.filter((b) => !locals.some((local) => local.id === b.id))
-		.filter(
+	const categories = useKnowledgeStore((s) => s.categories);
+	const folders = useKnowledgeStore((s) => s.folders);
+	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const [expanded, setExpanded] = useState(true);
+	// Include newly created runtime binds until the common query refreshes.
+	// Conversely, never hide an existing common bind just because the snapshot contains it.
+	const items = [
+		...(common.data ?? []),
+		...locals.filter(
 			(b) =>
-				!search.trim() ||
-				JSON.stringify(b.translations)
-					.toLowerCase()
-					.includes(search.trim().toLowerCase()),
-		);
+				b.ownerId === null &&
+				!(common.data ?? []).some((base) => base.id === b.id),
+		),
+	];
+	const nodes = filterNodes(
+		buildSharedTree(
+			categories,
+			folders,
+			items.map((base) => ({
+				...base,
+				// Keep existing personal-link tab IDs while retaining the common location.
+				id: remoteBinds.find((b) => b.sourceBindId === base.id)?.id ?? base.id,
+			})),
+		),
+	);
 	return (
-		<div>
+		<section aria-label="Общие бинды">
+			<button
+				type="button"
+				aria-expanded={expanded || forceExpanded}
+				onClick={() => setExpanded((value) => !value)}
+				className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium hover:bg-surface-elevated"
+			>
+				{expanded || forceExpanded ? (
+					<ChevronDown size={14} />
+				) : (
+					<ChevronRight size={14} />
+				)}
+				<Users size={14} />
+				<span>Общие</span>
+			</button>
 			{(common.error || personal.error) && (
 				<p role="alert" className="p-2 text-xs text-red-400">
 					{(common.error ?? personal.error)?.message}
@@ -137,27 +185,17 @@ export function WorkspaceSharedTree({
 			{common.isPending && (
 				<p className="p-2 text-xs text-muted">Загрузка биндов…</p>
 			)}
-			{items.map((bind) => (
-				<button
-					type="button"
-					key={bind.id}
-					onClick={() => {
-						useKnowledgeStore.getState().openBind(bind.id);
-						void navigate({ to: "/" });
-						onNavigate?.();
-					}}
-					className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${active === bind.id ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
-				>
-					<FileText size={14} className="shrink-0" />
-					<span className="truncate">
-						{(
-							bind.translations.find((t) => t.language === language) ??
-							bind.translations[0]
-						)?.title ?? bind.slug}
-					</span>
-				</button>
-			))}
-		</div>
+			{(expanded || forceExpanded) && (
+				<Tree
+					nodes={nodes}
+					forceExpanded={forceExpanded}
+					selectedBindIds={selectedBindIds}
+					onToggleBindSelection={onToggleBindSelection}
+					onClearBindSelection={onClearBindSelection}
+					onOpenItem={onNavigate}
+				/>
+			)}
+		</section>
 	);
 }
 
@@ -166,14 +204,13 @@ export function resolveBranch(
 	own: Bind | undefined,
 	branches: BindBranches | undefined,
 ) {
-	const choice = branches?.choices[base.id] ?? "mine";
+	const choice = branches?.choices[base.id] ?? (own ? "mine" : "main");
 	const received = branches?.incoming.find(
 		(s) => s.sourceId === base.id && s.id === choice,
 	);
 	if (received)
 		return { branch: choice, bind: received.bind, label: received.sender };
-	if (choice === "main")
-		return { branch: "main", bind: base, label: "Основная" };
+	if (choice === "main") return { branch: "main", bind: base, label: "Общая" };
 	return {
 		branch: "mine",
 		bind: own ?? base,
@@ -190,7 +227,8 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 	const locals = useKnowledgeStore((s) => s.binds);
 	const local = locals.find((b) => b.id === links[id] && !b.archived);
 	const [linkOpen, setLinkOpen] = useState(false);
-	const own = savedOwn ?? local;
+	// The shared runtime copy is not a personal branch.
+	const own = savedOwn ?? (local?.ownerId === null ? undefined : local);
 	const [editor, setEditor] = useState<Bind | null>(null),
 		[busy, setBusy] = useState(false),
 		[error, setError] = useState("");

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
+import { useBindLinksStore } from "@/store/bind-links.store";
 
 const mock = vi.hoisted(() => ({
 	accounts: vi.fn(),
@@ -38,6 +39,8 @@ vi.mock("@/shared/hooks/useToast", () => ({
 
 import {
 	matchLocalBind,
+	resolveBranch,
+	WorkspaceSharedBindsSync,
 	WorkspaceSharedBindViewer,
 } from "./WorkspaceSharedBinds";
 
@@ -63,11 +66,14 @@ const base = {
 beforeEach(() => {
 	vi.resetAllMocks();
 	localStorage.clear();
+	useBindLinksStore.setState({ accounts: {} });
 	useKnowledgeStore.setState({
 		binds: [],
 		remoteBinds: [],
 		favorites: [],
 		pinnedTabs: [],
+		categories: [{ id: "shared", ownerId: null, name: "Общее", order: 1 }],
+		folders: [],
 	});
 	useAuthStore.setState({
 		session: {
@@ -109,6 +115,38 @@ function show() {
 	);
 	return client;
 }
+it("opens a common bind on the common branch unless a personal branch or explicit choice exists", () => {
+	expect(resolveBranch(base, undefined, undefined).branch).toBe("main");
+	expect(
+		resolveBranch(base, { ...base, ownerId: "support" }, undefined).branch,
+	).toBe("mine");
+	expect(
+		resolveBranch(base, undefined, {
+			choices: { common: "mine" },
+			incoming: [],
+			outgoing: [],
+		}).branch,
+	).toBe("mine");
+});
+
+it("does not mistake the shared runtime copy for a personal branch", async () => {
+	useKnowledgeStore.setState({ binds: [base] });
+	const client = show();
+	render(
+		<QueryClientProvider client={client}>
+			<WorkspaceSharedBindsSync />
+		</QueryClientProvider>,
+	);
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	expect(
+		screen.getByRole("button", { name: /Общая/ }).getAttribute("aria-pressed"),
+	).toBe("true");
+	expect(screen.queryByText(/Основная ветка обновилась/)).toBeNull();
+	await waitFor(() =>
+		expect(useKnowledgeStore.getState().remoteBinds[0]?.id).toBe(base.id),
+	);
+	expect(useKnowledgeStore.getState().remoteBinds[0]?.ownerId).toBeNull();
+});
 
 it("exposes folder and archive actions for the linked library bind in the shared viewer", async () => {
 	const local = {

@@ -415,7 +415,7 @@ export function SportsBettingPage() {
 					</div>
 				</div>
 
-				<div className="supportos-scroll flex gap-2 overflow-x-auto rounded-xl border border-border bg-surface p-2">
+				<div className="flex min-w-0 flex-wrap gap-2 rounded-xl border border-border bg-surface p-2">
 					{SPORT_SOURCE_OPTIONS.map((source) => {
 						const active = source.id === sourceId;
 

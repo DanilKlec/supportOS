@@ -98,7 +98,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
 							onClick={() => setMobileSidebarOpen(false)}
 							className="absolute inset-0 bg-black/45"
 						/>
-						<div className="absolute inset-y-0 left-0 w-[min(19rem,calc(100vw-2rem))] max-w-full">
+						<div className="absolute inset-y-0 left-0 w-[min(19rem,calc(100vw-2rem))] max-w-full bg-surface">
 							<Sidebar
 								mobile
 								onRequestClose={() => setMobileSidebarOpen(false)}

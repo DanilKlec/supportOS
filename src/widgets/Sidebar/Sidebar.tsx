@@ -18,6 +18,7 @@ import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
 import { usePreference } from "@/features/productivity/preferences";
+import { personalTree } from "@/features/shared-binds/shared-tree";
 import { WorkspaceSharedTree } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
@@ -150,8 +151,13 @@ export function Sidebar({
 		[binds],
 	);
 	const filteredTree = useMemo(
-		() => filterTree(tree, treeSearch, selectedTag),
-		[tree, treeSearch, selectedTag],
+		() =>
+			filterTree(
+				personalTree(tree, categories, folders),
+				treeSearch,
+				selectedTag,
+			),
+		[tree, categories, folders, treeSearch, selectedTag],
 	);
 	const treeSearchActive = treeSearch.trim().length > 0 || Boolean(selectedTag);
 
@@ -572,7 +578,14 @@ export function Sidebar({
 				</div>
 
 				<div className="supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-					<WorkspaceSharedTree onNavigate={onNavigate} />
+					<WorkspaceSharedTree
+						onNavigate={onNavigate}
+						filterNodes={(nodes) => filterTree(nodes, treeSearch, selectedTag)}
+						forceExpanded={treeSearchActive}
+						selectedBindIds={selectedBindIds}
+						onToggleBindSelection={toggleSelectedBind}
+						onClearBindSelection={() => setSelectedBindIds([])}
+					/>
 					<Tree
 						nodes={filteredTree}
 						forceExpanded={treeSearchActive}

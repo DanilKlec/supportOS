@@ -222,6 +222,14 @@ for (const role of ["support", "admin"] as const) {
 				await expect(
 					page.getByRole("heading", { name: heading, exact: true }),
 				).toBeVisible();
+				if (heading === "Инструменты бонусов") {
+					await expect(
+						page.getByRole("button", { name: "Добавить правило", exact: true }),
+					).toHaveCount(0);
+					await expect(
+						page.getByRole("button", { name: "Изменить", exact: true }),
+					).toHaveCount(0);
+				}
 				const scroll = page.locator(".supportos-page-scroll");
 				await expect(scroll.locator(lastSelector).last()).toBeAttached();
 				await assertBoundedPage(page);

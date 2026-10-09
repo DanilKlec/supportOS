@@ -59,7 +59,7 @@ function createDragPreview(label: string, count: number) {
 
 	preview.className =
 		"fixed -top-20 left-0 z-50 rounded-md border border-accent/50 bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-2xl";
-	preview.textContent = count > 1 ? `${count} binds` : label;
+	preview.textContent = count > 1 ? `Биндов: ${count}` : label;
 	document.body.appendChild(preview);
 
 	return preview;
@@ -455,7 +455,7 @@ export function TreeNode({
 				if (movedCount > 0) {
 					showToast(
 						movedCount > 1
-							? `${movedCount} binds reordered`
+							? `Изменён порядок биндов: ${movedCount}`
 							: "Порядок бинда изменён",
 					);
 					onClearBindSelection?.();
@@ -512,7 +512,7 @@ export function TreeNode({
 			if (movedLocations.length > 0) {
 				showToast(
 					movedLocations.length > 1
-						? `${movedLocations.length} binds moved`
+						? `Перемещено биндов: ${movedLocations.length}`
 						: "Бинд перемещён",
 					{
 						action: {

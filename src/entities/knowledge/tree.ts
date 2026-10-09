@@ -72,6 +72,7 @@ export function buildKnowledgeTree(
 				undefined,
 				foldersByParent,
 				bindsByParent,
+				category.color,
 			),
 		}));
 }
@@ -90,7 +91,7 @@ function getBindName(bind: Bind) {
 	);
 }
 
-function bindToNode(bind: Bind): KnowledgeTreeNode {
+function bindToNode(bind: Bind, inheritedColor?: string): KnowledgeTreeNode {
 	return {
 		id: bind.id,
 
@@ -100,7 +101,7 @@ function bindToNode(bind: Bind): KnowledgeTreeNode {
 
 		icon: bind.icon,
 
-		color: bind.color,
+		color: bind.color || inheritedColor,
 
 		bind,
 
@@ -113,6 +114,7 @@ function buildFolderTree(
 	parentId: string | undefined,
 	foldersByParent: Map<string, KnowledgeFolder[]>,
 	bindsByParent: Map<string, Bind[]>,
+	inheritedColor?: string,
 ): KnowledgeTreeNode[] {
 	const result: KnowledgeTreeNode[] = [];
 	const key = getGroupKey(categoryId, parentId);
@@ -129,18 +131,19 @@ function buildFolderTree(
 
 			icon: folder.icon,
 
-			color: folder.color,
+			color: folder.color || inheritedColor,
 
 			children: buildFolderTree(
 				categoryId,
 				folder.id,
 				foldersByParent,
 				bindsByParent,
+				folder.color || inheritedColor,
 			),
 		});
 	}
 
-	result.push(...childBinds.map(bindToNode));
+	result.push(...childBinds.map((bind) => bindToNode(bind, inheritedColor)));
 
 	return result;
 }

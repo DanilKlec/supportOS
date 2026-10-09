@@ -118,7 +118,7 @@ it("keeps a single router and resets the form when the bind payload changes", ()
 	expect((field("Заголовок") as HTMLInputElement).value).toBe(
 		"Название second",
 	);
-	expect(screen.queryByText("Unsaved changes")).toBeNull();
+	expect(screen.queryByText("Есть несохранённые изменения")).toBeNull();
 	expect(screen.getAllByRole("dialog")).toHaveLength(1);
 	fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
 	expect(screen.queryByRole("dialog")).toBeNull();
@@ -146,7 +146,7 @@ it("preserves validation and the multilingual create payload, omitting empty dra
 	fireEvent.click(screen.getByRole("button", { name: "Добавить язык" }));
 	fill("Заголовок", "Resposta");
 	fill("Содержание", "Texto");
-	fireEvent.click(screen.getByText("Metadata"));
+	fireEvent.click(screen.getByText("Раздел, папка и оформление"));
 	fill("Теги", "bonus, kyc, bonus, ");
 	fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 	expect(mocks.service.createBind).toHaveBeenCalledWith({
@@ -207,7 +207,7 @@ it("keeps unsaved-change confirmation and service errors without losing the draf
 		}),
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
-	fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+	fireEvent.click(screen.getByRole("button", { name: "Отменить изменения" }));
 	expect(screen.queryByRole("dialog")).toBeNull();
 });
 

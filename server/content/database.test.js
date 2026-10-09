@@ -58,6 +58,7 @@ it('publishes normalized content atomically without changing the legacy document
   await pg.exec(await readFile(new URL('../../supabase/schema.sql',import.meta.url),'utf8'));
   await pg.exec(await readFile(new URL('../../supabase/migrations/20260925031553_normalized_support_content.sql',import.meta.url),'utf8'));
   await pg.exec(await readFile(new URL('../../supabase/migrations/20260925050000_normalized_content_crud.sql',import.meta.url),'utf8'));
+  await pg.exec(await readFile(new URL('../../supabase/migrations/20261009085144_safe_normalized_content_publication.sql',import.meta.url),'utf8'));
   await pg.exec('set role service_role');
   await expect(pg.query("insert into supportos_shared_content(id,data) values('emails','[]')")).rejects.toThrow('permission denied');
   await pg.exec('reset role');
@@ -79,7 +80,7 @@ it('publishes normalized content atomically without changing the legacy document
    {id:'duplicate',group:'A',site:'Example',welcomeWager:'',welcomeMaxWin:'',noDeposit:'',retentionWager:'',retentionMaxWin:'',events:'',map:'',note:'',searchText:''},
    {id:'duplicate',group:'B',site:'Example',welcomeWager:'',welcomeMaxWin:'',noDeposit:'',retentionWager:'',retentionMaxWin:'',events:'',map:'',note:'',searchText:''},
   ]}];
-  await expect(pg.query("select supportos_publish_normalized_content($1,'bonus-tools',0,$2)",[admin,JSON.stringify(brokenTools)])).rejects.toThrow('duplicate key');
+  await expect(pg.query("select supportos_publish_normalized_content($1,'bonus-tools',0,$2)",[admin,JSON.stringify(brokenTools)])).rejects.toMatchObject({code:'23505'});
   expect((await pg.query('select count(*)::int count from supportos_bonus_rules')).rows[0].count).toBe(0);
   expect((await pg.query("select count(*)::int count from supportos_content_revisions where id='bonus-tools'")).rows[0].count).toBe(0);
   const toolsPayload=[{...brokenTools[0],warnings:['Проверить источник'],rules:[brokenTools[0].rules[0]],currencyTables:[{name:'Currency',currencies:['EUR'],rows:[{base:'10 EUR',baseAmount:10,values:{EUR:'10 EUR'}}]}]}];

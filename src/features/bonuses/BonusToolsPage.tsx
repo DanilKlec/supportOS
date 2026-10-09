@@ -324,7 +324,7 @@ export function BonusToolsPage({
 		},
 		management,
 	);
-	const canEdit = publication.canEdit;
+	const canEdit = management && publication.canEdit;
 	const sourceUrl =
 		storedSourceUrl || data?.sourceUrl || DEFAULT_BONUS_TOOLS_SHEET_URL;
 	const [loading, setLoading] = useState(false);
@@ -560,6 +560,7 @@ export function BonusToolsPage({
 							type="button"
 							disabled={!canEdit}
 							onClick={openCreateRule}
+							hidden={!management}
 							className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90"
 						>
 							<Plus size={16} />
@@ -725,7 +726,7 @@ export function BonusToolsPage({
 							</div>
 
 							<div className="flex flex-wrap items-center gap-2">
-								{selectedRule && (
+								{selectedRule && canEdit && (
 									<button
 										type="button"
 										disabled={!canEdit}
@@ -963,6 +964,7 @@ export function BonusToolsPage({
 														type="button"
 														disabled={!canEdit}
 														onClick={() => openEditRule(rule)}
+														hidden={!canEdit}
 														className="ui-button ui-button--secondary ui-button--small inline-flex items-center gap-2 border border-border text-muted hover:bg-surface-elevated hover:text-foreground"
 													>
 														<Pencil size={13} />

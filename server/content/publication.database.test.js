@@ -48,6 +48,7 @@ beforeAll(async () => {
  await pg.exec(await migration('20261008114523_normalized_content_revisions'));
  expect((await pg.query("select to_regprocedure('public.supportos_publish_normalized_content(uuid,text,integer,jsonb)') missing")).rows[0].missing).toBeNull();
  await pg.exec(await migration('20261009082433_normalized_content_publication_rpc'));
+ await pg.exec(await migration('20261009085144_safe_normalized_content_publication'));
  await pg.exec("insert into public.supportos_content_revisions(id,version) values ('emails',3),('bonuses',3),('bonus-tools',3)");
  await pg.exec("insert into public.supportos_projects(id,name,slug) values ('project-1','Example','example')");
 }, 30000);
@@ -131,4 +132,58 @@ it('saves shared bind imports as service_role and preserves permissions, history
  expect((await query('select tags from public.supportos_binds where id=$1', [bind.id])).rows[0].tags).toEqual(['updated']);
  expect((await query('select count(*)::int n from public.supportos_bind_history where source_id=$1', [bind.id])).rows[0].n).toBe(2);
  await expect(query('select public.supportos_import_common_binds($1,$2)', [support, JSON.stringify([{ ...bind, id: 'denied' }])])).rejects.toMatchObject({ code: '42501' });
+});
+
+it('uses predicate-scoped DELETEs compatible with the Supabase safe-update guard', async () => {
+ const { definition } = (await query("select pg_get_functiondef('public.supportos_publish_normalized_content(uuid,text,integer,jsonb)'::regprocedure) definition")).rows[0];
+ const deletes = definition.match(/delete\s+from\s+[^;]+;/gi) ?? [];
+ expect(deletes.length).toBeGreaterThan(0);
+ for (const statement of deletes) {
+  expect(statement).toMatch(/\bwhere\b/i);
+  expect(statement).not.toMatch(/\bwhere\s+(?:true|1\s*=\s*1)\b/i);
+ }
+ expect(definition).not.toMatch(/safeupdate|truncate/i);
+});
+
+it('updates email IDs in place, removes only omitted addresses and keeps the project catalog', async () => {
+ await publish('emails', emails);
+ const original = (await query("select created_at::text from public.supportos_project_emails where id='email-1'")).rows[0].created_at;
+ const changed = [{ ...emails[0], emails: [{ ...emails[0].emails[0], type: 'Verification', email: 'new@example.com' }] }];
+ await publish('emails', changed, 4);
+ expect((await query('select id,type,email,created_at::text from public.supportos_project_emails')).rows).toEqual([{ id: 'email-1', type: 'Verification', email: 'new@example.com', created_at: original }]);
+ await publish('emails', [], 5);
+ expect((await query('select count(*)::int n from public.supportos_project_emails')).rows[0].n).toBe(0);
+ expect((await query('select id from public.supportos_projects')).rows).toEqual([{ id: 'project-1' }]);
+});
+
+it('preserves bonus identity and removes omitted translations and bonuses', async () => {
+ await publish('bonuses', bonuses);
+ const original = (await query("select created_at::text from public.supportos_welcome_bonuses where id='bonus-1'")).rows[0].created_at;
+ const changed = [{ ...bonuses[0], bonuses: [{ ...bonuses[0].bonuses[0], translations: [{ language: 'ru', content: 'Обновлено' }] }] }];
+ await publish('bonuses', changed, 4);
+ expect((await query('select id,created_at::text from public.supportos_welcome_bonuses')).rows).toEqual([{ id: 'bonus-1', created_at: original }]);
+ expect((await query('select language,content from public.supportos_welcome_bonus_translations')).rows).toEqual([{ language: 'ru', content: 'Обновлено' }]);
+ await publish('bonuses', [], 5);
+ expect((await query('select count(*)::int n from public.supportos_welcome_bonus_translations')).rows[0].n).toBe(0);
+});
+
+it('retains currency table identity, replaces only its rows and removes omitted rules/tables', async () => {
+ await publish('bonus-tools', tools);
+ const original = (await query('select id,created_at::text from public.supportos_currency_tables')).rows[0];
+ await publish('bonus-tools', [{ ...tools[0], rules: [{ ...rule, welcomeWager: 'x20' }] }], 4);
+ expect((await query('select id,created_at::text from public.supportos_currency_tables')).rows).toEqual([original]);
+ expect((await query('select welcome_wager from public.supportos_bonus_rules')).rows).toEqual([{ welcome_wager: 'x20' }]);
+ await publish('bonus-tools', [{ ...tools[0], rules: [], currencyTables: [] }], 5);
+ for (const table of ['supportos_bonus_rules', 'supportos_currency_tables', 'supportos_currency_rows', 'supportos_currency_values'])
+  expect((await query(`select count(*)::int n from public.${table}`)).rows[0].n).toBe(0);
+});
+
+it.each([
+ ['emails', [{ ...emails[0], emails: [emails[0].emails[0], emails[0].emails[0]] }]],
+ ['bonuses', [{ ...bonuses[0], bonuses: [bonuses[0].bonuses[0], bonuses[0].bonuses[0]] }]],
+ ['bonus-tools', [{ ...tools[0], rules: [rule, rule] }]],
+ ['bonus-tools', [{ ...tools[0], currencyTables: [tools[0].currencyTables[0], { ...tools[0].currencyTables[0], name: 'currency' }] }]],
+])('does not silently overwrite duplicate %s identities during reconciliation', async (dataset, payload) => {
+ await expect(publish(dataset, payload)).rejects.toMatchObject({ code: '23505' });
+ expect((await query('select version from public.supportos_content_revisions where id=$1', [dataset])).rows[0].version).toBe(3);
 });

@@ -45,6 +45,60 @@ it("only confirms a shared save after the server returns it", async () => {
 	mock.request.mockRejectedValue(new Error("offline"));
 	await expect(sharedBindsService.save(draft)).rejects.toThrow("offline");
 });
+it("sends explicit location and color without assigning the catch-all category", async () => {
+	mock.request.mockResolvedValue(
+		Response.json({
+			id: "base",
+			owner_id: null,
+			category_id: "chosen",
+			folder_id: "folder",
+			color: "#10B981",
+			translations: draft.translations,
+			tags: [],
+			created_at: "",
+			updated_at: "",
+		}),
+	);
+	const saved = await sharedBindsService.save({
+		...draft,
+		categoryId: "chosen",
+		folderId: "folder",
+		color: "#10B981",
+	});
+	expect(JSON.parse(mock.request.mock.calls[0][1].body)).toMatchObject({
+		categoryId: "chosen",
+		folderId: "folder",
+		color: "#10B981",
+	});
+	expect(saved).toMatchObject({
+		categoryId: "chosen",
+		folderId: "folder",
+		color: "#10B981",
+	});
+});
+it("keeps absent legacy metadata absent and sends null to clear an explicit color/folder", async () => {
+	mock.request.mockImplementation(async () =>
+		Response.json({ id: "base", translations: [], tags: [] }),
+	);
+	await sharedBindsService.save(draft);
+	expect(JSON.parse(mock.request.mock.calls[0][1].body)).not.toHaveProperty(
+		"categoryId",
+	);
+	expect(JSON.parse(mock.request.mock.calls[0][1].body)).not.toHaveProperty(
+		"color",
+	);
+	await sharedBindsService.save({
+		...draft,
+		categoryId: "chosen",
+		folderId: null,
+		color: null,
+	});
+	expect(JSON.parse(mock.request.mock.calls[1][1].body)).toMatchObject({
+		categoryId: "chosen",
+		folderId: null,
+		color: null,
+	});
+});
 it("detects a concurrent shared edit instead of silently overwriting it", async () => {
 	mock.request.mockResolvedValue(
 		new Response(

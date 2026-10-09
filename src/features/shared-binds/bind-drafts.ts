@@ -5,6 +5,9 @@ export interface BindDraft {
 	language: string;
 	baseVersion: string | null;
 	savedAt: string;
+	categoryId?: string;
+	folderId?: string;
+	color?: string;
 }
 function isDraftTranslation(
 	value: unknown,
@@ -39,7 +42,10 @@ export function readDraft(key: string): BindDraft | null {
 			typeof d.tags !== "string" ||
 			typeof d.language !== "string" ||
 			typeof d.savedAt !== "string" ||
-			(d.baseVersion !== null && typeof d.baseVersion !== "string")
+			(d.baseVersion !== null && typeof d.baseVersion !== "string") ||
+			[d.categoryId, d.folderId, d.color].some(
+				(value) => value !== undefined && typeof value !== "string",
+			)
 		)
 			return null;
 		return d as BindDraft;

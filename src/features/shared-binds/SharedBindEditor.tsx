@@ -1,9 +1,13 @@
 import { Check, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button, Field, Select } from "@/components/ui";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import { languages } from "@/entities/language";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
+import { getFolderPath } from "@/shared/modals/knowledge-modal-helpers";
+import { ColorField } from "@/shared/modals/ModalFormHelpers";
+import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { BindDiff } from "./BindDiff";
 import { draftKey, readDraft, removeDraft, writeDraft } from "./bind-drafts";
@@ -85,6 +89,23 @@ export function SharedBindEditor({
 		original?.translations[0]?.language ?? "ru",
 	);
 	const [tags, setTags] = useState(original?.tags.join(", ") ?? "");
+	const categories = useKnowledgeStore((s) => s.categories);
+	const folders = useKnowledgeStore((s) => s.folders);
+	const sharedCategories = categories.filter((c) => c.ownerId === null);
+	const [categoryId, setCategoryId] = useState(original?.categoryId ?? "");
+	const [folderId, setFolderId] = useState(original?.folderId ?? "");
+	const [color, setColor] = useState(original?.color ?? "");
+	const availableFolders = folders.filter(
+		(f) => f.ownerId === null && f.categoryId === categoryId,
+	);
+	const locationName = [
+		sharedCategories.find((c) => c.id === categoryId)?.name,
+		folderId
+			? availableFolders.find((f) => f.id === folderId)?.name
+			: "Без папки",
+	]
+		.filter(Boolean)
+		.join(" / ");
 	const [saving, setSaving] = useState(false);
 	const [reviewed, setReviewed] = useState(false);
 	const reviewDraft = {
@@ -110,6 +131,7 @@ export function SharedBindEditor({
 				tags,
 				language,
 				baseVersion,
+				...(!personal ? { categoryId, folderId, color } : {}),
 				savedAt: new Date().toISOString(),
 			});
 			setDraftStatus("Черновик сохранён в этом браузере");
@@ -118,7 +140,18 @@ export function SharedBindEditor({
 				"Не удалось сохранить черновик. Не закрывайте редактор до сохранения ответа.",
 			);
 		}
-	}, [key, translations, tags, language, baseVersion, recovery]);
+	}, [
+		key,
+		translations,
+		tags,
+		language,
+		baseVersion,
+		recovery,
+		categoryId,
+		folderId,
+		color,
+		personal,
+	]);
 	const initialFocus = useRef<HTMLInputElement>(null);
 	const translation = translations.find((t) => t.language === language);
 	useEffect(() => {
@@ -177,6 +210,22 @@ export function SharedBindEditor({
 				onSubmit={async (e) => {
 					e.preventDefault();
 					if (saving || recovery || conflict || conflictLoading) return;
+					if (
+						!personal &&
+						(!sharedCategories.some((c) => c.id === categoryId) ||
+							(folderId && !availableFolders.some((f) => f.id === folderId)))
+					) {
+						setError("Выберите доступный общий раздел и папку.");
+						return;
+					}
+					if (
+						!personal &&
+						color.trim() &&
+						!/^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(color.trim())
+					) {
+						setError("Укажите цвет в формате HEX, например #3B82F6.");
+						return;
+					}
 					if (!personal && !reviewed) {
 						setReviewed(true);
 						return;
@@ -190,6 +239,9 @@ export function SharedBindEditor({
 							: sharedBindsService.save({
 									original: retryBase ?? original,
 									...draft,
+									categoryId,
+									folderId: folderId || null,
+									color: color.trim() || null,
 								}));
 						dirty.current = false;
 						try {
@@ -269,6 +321,11 @@ export function SharedBindEditor({
 									setTags(recovery.tags);
 									setLanguage(recovery.language);
 									setBaseVersion(recovery.baseVersion);
+									if (recovery.categoryId !== undefined)
+										setCategoryId(recovery.categoryId);
+									if (recovery.folderId !== undefined)
+										setFolderId(recovery.folderId);
+									if (recovery.color !== undefined) setColor(recovery.color);
 									dirty.current = true;
 									setRecovery(null);
 									setReviewed(false);
@@ -321,6 +378,77 @@ export function SharedBindEditor({
 					disabled={saving || !!recovery || !!conflict || conflictLoading}
 					className="space-y-4 disabled:opacity-60"
 				>
+					{!personal && (
+						<section
+							className="min-w-0 space-y-4"
+							aria-label="Расположение общего бинда"
+						>
+							<p className="text-xs text-muted">
+								Общие → раздел → папка. Личные разделы здесь не используются.
+							</p>
+							<div className="grid min-w-0 gap-4 sm:grid-cols-2">
+								<Field label="Раздел">
+									<Select
+										value={categoryId}
+										onChange={(e) => {
+											dirty.current = true;
+											setCategoryId(e.target.value);
+											setFolderId("");
+										}}
+										className="w-full min-w-0"
+									>
+										<option value="">Выберите раздел</option>
+										{sharedCategories.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.name}
+											</option>
+										))}
+									</Select>
+								</Field>
+								<Field label="Папка">
+									<Select
+										value={folderId}
+										disabled={!categoryId}
+										onChange={(e) => {
+											dirty.current = true;
+											setFolderId(e.target.value);
+										}}
+										className="w-full min-w-0"
+									>
+										<option value="">Без папки</option>
+										{availableFolders.map((f) => (
+											<option key={f.id} value={f.id}>
+												{getFolderPath(f, availableFolders)}
+											</option>
+										))}
+									</Select>
+								</Field>
+							</div>
+							<ColorField
+								value={color}
+								disabled={saving}
+								onChange={(value) => {
+									dirty.current = true;
+									setColor(value);
+									setReviewed(false);
+								}}
+							/>
+							<div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+								<Button
+									type="button"
+									size="small"
+									onClick={() => {
+										dirty.current = true;
+										setColor("");
+										setReviewed(false);
+									}}
+								>
+									Использовать цвет папки
+								</Button>
+								{!color && <span>Цвет наследуется автоматически</span>}
+							</div>
+						</section>
+					)}
 					<label className="ui-field text-sm font-medium">
 						Язык перевода
 						<select
@@ -395,6 +523,9 @@ export function SharedBindEditor({
 				{!personal && reviewed && (
 					<section className="rounded-2xl border border-border p-4">
 						<h3 className="mb-3 font-semibold">Проверка перед публикацией</h3>
+						<p className="mb-3 break-words text-sm text-muted">
+							Общие / {locationName} · {color || "Цвет папки / раздела"}
+						</p>
 						<BindDiff
 							before={
 								original

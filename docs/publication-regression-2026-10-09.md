@@ -1,5 +1,70 @@
 # Исправление общей публикации почт и бонусов
 
+## Повторный сбой: обязательный WHERE в Supabase
+
+После доставки отсутствующей RPC пользователь снова получил HTTP 502.
+Read-only диагностика gateway и PostgreSQL logs установила точную причину:
+SQLSTATE `21000`, `DELETE requires a WHERE clause`, строка 51 функции
+`supportos_publish_normalized_content`. Ошибка относится к общей функции
+почт, welcome-бонусов и bonus-tools; это не необходимость снова входить
+в аккаунт или обновлять права.
+
+Первый тест в PGlite проверял SQL/permissions/concurrency, но не моделировал
+server-side safe-update guard. Первое исправление доставило RPC, однако
+безусловные DELETE внутри неё по-прежнему блокировались реальным сервером.
+Механизм guard описан в [pg-safeupdate](https://github.com/eradman/pg-safeupdate).
+
+Новая миграция `20261009085144_safe_normalized_content_publication.sql`
+применена к SupportOS DB. Она заменяет только функцию; старые миграции,
+системный guard, table grants, RBAC и данные при установке не меняются.
+Remote version и локальное имя новой миграции согласованы.
+
+- Почты, бонусы, переводы и правила обновляются через UPSERT.
+- Predicate-scoped DELETE удаляет только идентификаторы, исключённые из
+  полного сохраняемого снимка соответствующего справочника.
+- Валютные таблицы сохраняют ID; строки без client ID заменяются только
+  внутри явно выбранной именованной таблицы через `WHERE currency_table_id`.
+- Существующие `created_at` почт, бонусов и валютных таблиц сохраняются.
+- Повторяющиеся IDs/названия не разрешено незаметно перезаписывать через
+  UPSERT: операция целиком отклоняется с прежним SQLSTATE `23505`.
+- Atomicity, expected version / 409, permission checks и аудит остаются.
+- Нет `WHERE true`, отключения guard, TRUNCATE, записи в legacy archive
+  или прямого browser доступа.
+
+До/после установки fingerprint почт, бонусов, правил и legacy archive
+совпал; версии справочников остались 1. Real publication после установки
+выполнил сам пользователь в своём интерфейсе и подтвердил:
+**«Оба раздела сохранились»**. Ассистент не публиковал пользовательский
+черновик и не делал пробные изменения в реальных данных.
+
+Read-only verification после пользовательского сохранения подтвердила
+emails version 2 и bonuses version 3, а также реальные `content.publish`
+audit events с `storage=normalized` для обоих разделов.
+
+Новые regression tests сначала воспроизвели сбой: отсутствие WHERE,
+пересоздание email/bonus timestamps и currency table IDs. После правки
+проверяются predicates без tautology, обновление существующих записей,
+удаление только исключённых записей/переводов, empty snapshots,
+duplicate rejection и сохранение каталога проектов.
+
+Изменённые файлы этого повторного прохода:
+
+- `supabase/migrations/20261009085144_safe_normalized_content_publication.sql`
+- `server/content/publication.database.test.js`
+- `server/content/database.test.js`
+- `docs/publication-regression-2026-10-09.md`
+
+Security advisors после правки: прежние 37 INFO server-only RLS и 1 WARN
+Leaked Password Protection; новых WARN/ERROR нет.
+
+Финальные проверки повторного прохода: `npm run test` — PASS, 723 tests /
+122 files; `npm run check` — PASS с прежними 61 warnings / 27 infos;
+`npm run build` — PASS, без изменений frontend bundle. UI и стили не менялись;
+visual regression этого повторного SQL-only прохода не перезапускался.
+
+Ниже сохранены результаты первого прохода как история, не доказательство
+успешной real publication до повторного исправления.
+
 ## Причина
 
 В SupportOS DB `exijfprfwmyplggayrpt` существовали normalized tables и

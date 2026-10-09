@@ -154,7 +154,7 @@ export function BindFormModal({
 							onClick={requestClose}
 							className="ui-button ui-button--secondary border border-border hover:bg-surface-elevated"
 						>
-							Close
+							Закрыть
 						</button>
 					</div>
 				</div>
@@ -179,7 +179,7 @@ export function BindFormModal({
 		const code = normalizeLanguageCode(newLanguage);
 
 		if (!isValidLanguageCode(code)) {
-			setAddLanguageError("Use a language code like es or pt-br");
+			setAddLanguageError("Укажите код языка, например es или pt-br");
 			return;
 		}
 
@@ -288,7 +288,7 @@ export function BindFormModal({
 
 				{dirty && (
 					<div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-200">
-						Unsaved changes
+						Есть несохранённые изменения
 					</div>
 				)}
 
@@ -315,6 +315,7 @@ export function BindFormModal({
 						<div className="ui-actions items-center flex min-w-0  gap-2">
 							<div className="min-w-28">
 								<input
+									aria-label="Код нового языка"
 									value={newLanguage}
 									onChange={(event) => {
 										setNewLanguage(event.target.value);
@@ -411,19 +412,19 @@ export function BindFormModal({
 						</div>
 					) : (
 						<div className="rounded-lg border border-border bg-background px-4 py-6 text-center text-sm text-muted">
-							Add at least one language
+							Добавьте хотя бы один язык
 						</div>
 					)}
 				</div>
 
 				<details className="rounded-xl border border-border bg-background">
 					<summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium text-muted hover:text-foreground">
-						Metadata
+						Раздел, папка и оформление
 					</summary>
 
 					<div className="space-y-4 border-t border-border p-4">
 						<div className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr]">
-							<Field label="Slug" error={errors.slug}>
+							<Field label="Идентификатор" error={errors.slug}>
 								<input
 									value={slug}
 									onChange={(event) => setSlug(event.target.value)}
@@ -476,7 +477,7 @@ export function BindFormModal({
 								onChange={(event) => setTags(event.target.value)}
 								disabled={saving}
 								className={`ui-input ${inputClass}`}
-								placeholder="kyc, withdrawal, bonus"
+								placeholder="KYC, вывод, бонус"
 							/>
 							{tagSuggestions.length > 0 && (
 								<div className="mt-2 flex flex-wrap gap-1">
@@ -530,7 +531,7 @@ export function BindFormModal({
 									onClick={onClose}
 									className="min-h-10 rounded-lg bg-red-500 px-4 text-sm font-semibold text-white hover:bg-red-400"
 								>
-									Discard
+									Отменить изменения
 								</button>
 							</div>
 						</div>

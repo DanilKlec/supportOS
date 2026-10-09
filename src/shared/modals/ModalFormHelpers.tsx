@@ -54,6 +54,8 @@ export function ColorField({
 						key={color}
 						type="button"
 						title={color}
+						aria-label={`Цвет ${color}`}
+						aria-pressed={value === color}
 						onClick={() => onChange(value === color ? "" : color)}
 						disabled={disabled}
 						className={`h-8 w-8 rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -64,6 +66,7 @@ export function ColorField({
 				))}
 
 				<input
+					aria-label="Цвет HEX"
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
 					disabled={disabled}
