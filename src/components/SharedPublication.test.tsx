@@ -54,12 +54,12 @@ function Screen({
 		</>
 	);
 }
-function auth(permissions: string[]) {
+function auth(permissions: string[], id = "a") {
 	useAuthStore.setState({
 		session: {
 			accessToken: "token",
 			user: {
-				id: "a",
+				id,
 				email: "a@b.com",
 				role: "admin",
 				access: {
@@ -181,6 +181,51 @@ it("keeps drafts when the server reports a conflict", async () => {
 	fireEvent.click(screen.getByText("Сохранить для всех"));
 	await screen.findByRole("alert");
 	expect(screen.getByRole("status").textContent).toContain("draft");
+});
+
+it.each([
+	"emails",
+	"bonuses",
+	"bonus-tools",
+] as const)("keeps the %s draft after a publication failure and allows retry with the same version", async (dataset) => {
+	auth(
+		["projects.read", "projects.write", "bonuses.read", "bonuses.write"],
+		`retry-${dataset}`,
+	);
+	mock.api
+		.mockResolvedValueOnce({ data: [], version: 3, updated_at: "2026-10-09" })
+		.mockRejectedValueOnce(
+			new Error("Серверная публикация не настроена: требуется миграция БД."),
+		)
+		.mockResolvedValueOnce({
+			data: [{ id: "draft", name: "New" }],
+			version: 4,
+			updated_at: "2026-10-09",
+		});
+	renderPublication(<Screen dataset={dataset} />);
+	await waitFor(() =>
+		expect((screen.getByText("Edit") as HTMLButtonElement).disabled).toBe(
+			false,
+		),
+	);
+	fireEvent.click(screen.getByText("Edit"));
+	fireEvent.click(screen.getByText("Сохранить для всех"));
+	await screen.findByRole("alert");
+	expect(screen.getByRole("status").textContent).toContain("draft");
+	expect(
+		(screen.getByText("Сохранить для всех") as HTMLButtonElement).disabled,
+	).toBe(false);
+	fireEvent.click(screen.getByText("Сохранить для всех"));
+	await waitFor(() =>
+		expect(
+			(screen.getByText("Сохранить для всех") as HTMLButtonElement).disabled,
+		).toBe(true),
+	);
+	expect(screen.queryByRole("alert")).toBeNull();
+	expect(mock.api.mock.calls.slice(1)).toEqual([
+		[dataset, [{ id: "draft", name: "New" }], 3],
+		[dataset, [{ id: "draft", name: "New" }], 3],
+	]);
 });
 
 function PersonalScreen() {

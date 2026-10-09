@@ -93,3 +93,15 @@ it('rejects cross-origin writes, malformed records, revoked rights and conflicts
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:'40001',message:'Conflict'}),{status:400})));
  expect((await run({method:'POST',body:{dataset:'emails',data:[],expected:0}})).status).toBe(409);
 });
+it.each(['emails','bonuses','bonus-tools'])('reports a missing publication migration for %s without exposing storage details',async(dataset)=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:'PGRST202',message:'Internal SQL and payload',details:'private data',hint:'private hint'}),{status:404})));
+ const data=dataset==='bonus-tools'?[{id:'tools',slug:'tools',sourceUrl:'',loadedAt:'',warnings:[],rules:[],currencyTables:[]}]:[];
+ const response=await run({method:'POST',body:{dataset,data,expected:1}});
+ expect(response.status).toBe(502);
+ expect(response.data).toEqual({code:'PGRST202',error:expect.stringContaining('миграци')});
+ expect(JSON.stringify(response)).not.toContain('private');
+});
+it('treats unexpected storage failures as gateway errors, not invalid user data',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:'XX000',message:'Internal sensitive detail'}),{status:500})));
+ expect(await run({method:'POST',body:{dataset:'emails',data:[],expected:1}})).toEqual({status:502,data:{code:'XX000',error:'Не удалось опубликовать данные. Повторите сохранение позже.'}});
+});

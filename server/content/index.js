@@ -167,6 +167,12 @@ export default async function handler(req,res) {
    body:JSON.stringify(personal?{actor:actor.id,dataset:kind,expected:body.expected,payload,operation:body.action??'save'}:kind==='binds'?{actor:actor.id,payload}:{actor:actor.id,dataset:kind,expected:body.expected,payload}),signal:AbortSignal.timeout(20000)
   });
   const result=await response.json();
-  return send(response.ok?200:result.code==='42501'?403:result.code==='40001'?409:400,response.ok?result:{error:['42501','40001','22023'].includes(result.code)?result.message:'Не удалось опубликовать данные'});
+  if(response.ok)return send(200,result);
+  if(['42501','40001','22023'].includes(result.code))
+   return send(result.code==='42501'?403:result.code==='40001'?409:400,{error:result.message});
+  const code=typeof result.code==='string'&&/^[A-Z0-9]{5,10}$/.test(result.code)?result.code:undefined;
+  return send(502,{code,error:['PGRST202','42883'].includes(code)
+   ?'Серверная публикация не настроена: требуется миграция БД. Изменения не опубликованы.'
+   :'Не удалось опубликовать данные. Повторите сохранение позже.'});
  }catch(error){send(error.status??500,{code:error.code,error:error.status?error.message:'Не удалось загрузить общие данные'});}
 }
