@@ -66,6 +66,7 @@ const base = {
 beforeEach(() => {
 	vi.resetAllMocks();
 	localStorage.clear();
+	useModalStore.getState().closeModal();
 	useBindLinksStore.setState({ accounts: {} });
 	useKnowledgeStore.setState({
 		binds: [],
@@ -174,6 +175,126 @@ it("exposes folder and archive actions for the linked library bind in the shared
 	});
 	expect(mock.resetPersonal).not.toHaveBeenCalled();
 });
+it.each([
+	undefined,
+	null,
+	"missing-personal-bind",
+])("keeps library actions after returning to common with an unresolved link=%s", async (link) => {
+	const own = {
+		...base,
+		id: "personal",
+		ownerId: "support",
+		sourceBindId: base.id,
+		translations: [
+			{
+				language: "ru",
+				title: "Личный ответ",
+				content: "Мой текст",
+				updatedAt: base.updatedAt,
+			},
+		],
+	};
+	useKnowledgeStore.setState({ binds: [base, own] });
+	if (link !== undefined)
+		useBindLinksStore.setState({ accounts: { support: { common: link } } });
+	mock.personal.mockResolvedValue([own]);
+	show();
+	await screen.findByRole("heading", { name: "Личный ответ", level: 1 });
+	fireEvent.click(screen.getByRole("button", { name: "Общая" }));
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	await waitFor(() =>
+		expect(mock.branchAction).toHaveBeenCalledWith("choose", {
+			sourceId: base.id,
+			branch: "main",
+		}),
+	);
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	for (const name of ["Дублировать", "В избранное", "Закрепить вкладку"])
+		expect(await screen.findByRole("button", { name })).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "Переместить в папку" }));
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "moveBind",
+		payload: { bindId: base.id },
+	});
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	fireEvent.click(await screen.findByRole("button", { name: "В архив" }));
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "deleteNode",
+		payload: { id: base.id, type: "bind" },
+	});
+	expect(mock.resetPersonal).not.toHaveBeenCalled();
+	expect(mock.save).not.toHaveBeenCalled();
+	if (link !== undefined)
+		expect(useBindLinksStore.getState().accounts.support.common).toBe(link);
+});
+
+it.each([
+	false,
+	true,
+])("does not expose library mutations for a remote-only or archived=%s runtime bind", async (archived) => {
+	useKnowledgeStore.setState({
+		binds: archived ? [{ ...base, archived: true }] : [],
+	});
+	show();
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	await screen.findByRole("button", { name: "Связь версий" });
+	for (const name of ["Переместить в папку", "Дублировать", "В архив"])
+		expect(screen.queryByRole("button", { name })).toBeNull();
+});
+
+it("keeps actions after saving a personal override that replaces the linked runtime record", async () => {
+	const own = {
+		...base,
+		id: "personal",
+		ownerId: "support",
+		sourceBindId: base.id,
+		translations: [
+			{
+				language: "ru",
+				title: "Личный ответ",
+				content: "Мой текст",
+				updatedAt: base.updatedAt,
+			},
+		],
+	};
+	useKnowledgeStore.setState({ binds: [base] });
+	useBindLinksStore.setState({ accounts: { support: { common: base.id } } });
+	mock.savePersonal.mockImplementation(async () => {
+		mock.personal.mockResolvedValue([own]);
+		useKnowledgeStore.setState({ binds: [own] });
+		return own;
+	});
+	show();
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Изменить для себя" }),
+	);
+	fireEvent.change(screen.getByLabelText("Текст ответа"), {
+		target: { value: own.translations[0].content },
+	});
+	fireEvent.click(
+		screen.getByRole("button", { name: "Сохранить личную версию" }),
+	);
+	await screen.findByRole("heading", { name: "Личный ответ", level: 1 });
+	await waitFor(() =>
+		expect(mock.branchAction).toHaveBeenCalledWith("choose", {
+			sourceId: base.id,
+			branch: "mine",
+		}),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Общая" }));
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	fireEvent.click(await screen.findByRole("button", { name: "В архив" }));
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "deleteNode",
+		payload: { id: own.id, type: "bind" },
+	});
+	expect(mock.save).not.toHaveBeenCalled();
+	expect(mock.resetPersonal).not.toHaveBeenCalled();
+	expect(useBindLinksStore.getState().accounts.support.common).toBe(base.id);
+});
+
 it("Support can save a personal version without changing the common original", async () => {
 	mock.savePersonal.mockResolvedValue({
 		...base,
@@ -230,6 +351,7 @@ it("a failed save keeps the draft open and shows an error", async () => {
 });
 
 it("recipient selects a shared branch and can only copy it into their own", async () => {
+	useKnowledgeStore.setState({ binds: [base] });
 	mock.branches.mockResolvedValue({
 		choices: { common: "grant" },
 		incoming: [
@@ -256,6 +378,12 @@ it("recipient selects a shared branch and can only copy it into their own", asyn
 	expect(
 		await screen.findByRole("heading", { name: "Ответ коллеги", level: 1 }),
 	).toBeTruthy();
+	fireEvent.click(screen.getByLabelText("Действия бинда"));
+	fireEvent.click(await screen.findByRole("button", { name: "В архив" }));
+	expect(useModalStore.getState().activeModal).toMatchObject({
+		type: "deleteNode",
+		payload: { id: base.id, type: "bind" },
+	});
 	fireEvent.click(
 		screen.getByRole("button", { name: "Скопировать в мою ветку" }),
 	);

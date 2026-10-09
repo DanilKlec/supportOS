@@ -226,6 +226,13 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 		savedOwn = personal.data?.find((b) => b.sourceBindId === id && !b.archived);
 	const locals = useKnowledgeStore((s) => s.binds);
 	const local = locals.find((b) => b.id === links[id] && !b.archived);
+	// Version links can be separated or point to a record replaced by a personal
+	// override. Library actions still target an existing runtime record, not the
+	// displayed (possibly received/read-only) version.
+	const libraryBind =
+		local ??
+		locals.find((b) => b.id === id && !b.archived) ??
+		locals.find((b) => b.id === savedOwn?.id && !b.archived);
 	const [linkOpen, setLinkOpen] = useState(false);
 	// The shared runtime copy is not a personal branch.
 	const own = savedOwn ?? (local?.ownerId === null ? undefined : local);
@@ -366,7 +373,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 					</div>
 					<div className="ui-actions items-center flex flex-wrap gap-2">
 						<MoreActions>
-							{local && <LocalBindActions bind={local} />}
+							{libraryBind && <LocalBindActions bind={libraryBind} />}
 							{incoming.some((share) => share.id === selected.branch) && (
 								<button
 									type="button"
