@@ -300,3 +300,21 @@ it("does not reload knowledge after a failed sign-out", async () => {
 	);
 	expect(mock.loadKnowledge).not.toHaveBeenCalled();
 });
+
+it.each([
+	[
+		true,
+		"Подключение к серверу настроено. Войдите в аккаунт, чтобы загрузить рабочие данные.",
+	],
+	[false, "Подключение к серверу не настроено. Рабочие данные недоступны."],
+])("describes server data availability without promising local storage (%s)", (configured, message) => {
+	useAuthStore.setState({ configured, session: undefined });
+	render(<SettingsPage />);
+	expect(screen.getByText(message)).toBeTruthy();
+	expect(
+		screen.queryByText(
+			/локального рабочего пространства|Облачная синхронизация/,
+		),
+	).toBeNull();
+	expect(mock.loadKnowledge).not.toHaveBeenCalled();
+});

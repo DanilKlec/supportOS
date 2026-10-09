@@ -15,7 +15,7 @@ export default async function handler(req,res){
   const actor=await requireUser(req,{permission:req.method==='POST'&&action==='feedback'?'composer.use':null});
   if(action!=='feedback'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к знаниям AI'});
   if(req.method==='GET'&&!canTrain(actor.access))return send(403,{error:'Нет доступа к знаниям AI'});
-  if(req.method==='GET'&&new URL(req.url??'http://localhost').searchParams.get('action')==='feedback-reviews')return send(200,{reviews:await db(config(),'supportos_ai_feedback_reviews?select=id,project_id,source_ids,comment,answer_ref,actor_id,status,created_at&order=created_at.desc&limit=100')});
+  if(req.method==='GET'&&new URL(req.url??'/api/ai/knowledge','http://localhost').searchParams.get('action')==='feedback-reviews')return send(200,{reviews:await db(config(),'supportos_ai_feedback_reviews?select=id,project_id,source_ids,comment,answer_ref,actor_id,status,created_at&order=created_at.desc&limit=100')});
   if(req.method==='GET')return send(200,await readGuidance());
   if(action==='feedback'){
    const reasons=['Неверная информация','Не тот язык','Слишком длинно','Не учтена policy','Не найден материал','Другое'];
@@ -58,5 +58,5 @@ export default async function handler(req,res){
   const changed=body.id||document.entries?.at(-1)?.id||'main';
   const kind=document.entries?.find(entry=>entry.id===changed)?.kind??current.document?.entries?.find(entry=>entry.id===changed)?.kind??'instructions';
   await db(config(),'rpc/supportos_save_ai_runtime',{actor:actor.id,expected:body.expected,operation:action,value:{...document,_change:{id:action==='instructions'?'main':changed,kind}}});return send(200,{ok:true});
- }catch(error){return send(error.status??500,{code:error.code,error:error.status?error.message:'Не удалось сохранить AI. Обновите данные и повторите.'});}
+ }catch(error){return send(error.status??500,{code:error.code,error:error.status?error.message:req.method==='GET'?'Не удалось загрузить знания и правила Помощника. Повторите попытку.':'Не удалось сохранить AI. Обновите данные и повторите.'});}
 }

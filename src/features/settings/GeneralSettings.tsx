@@ -58,7 +58,8 @@ export function GeneralSettings() {
 						) : (
 							<div className="flex flex-wrap items-center justify-between gap-3">
 								<div className="text-sm text-muted">
-									Облачная синхронизация настроена, но вы не вошли в аккаунт.
+									Подключение к серверу настроено. Войдите в аккаунт, чтобы
+									загрузить рабочие данные.
 								</div>
 								<Link
 									to="/login"
@@ -71,7 +72,7 @@ export function GeneralSettings() {
 						)
 					) : (
 						<div className="text-sm text-muted">
-							SupportOS работает в режиме локального рабочего пространства.
+							Подключение к серверу не настроено. Рабочие данные недоступны.
 						</div>
 					)}
 				</div>

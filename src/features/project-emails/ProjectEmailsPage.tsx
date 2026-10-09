@@ -11,19 +11,12 @@ import {
 	Upload,
 	X,
 } from "lucide-react";
-import {
-	type FormEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useSharedPublication } from "@/components/SharedPublication";
 import type {
 	ProjectEmailAddress,
 	ProjectEmailRecord,
 } from "@/entities/project-email";
-import { useProjectCatalog } from "@/services/project-catalog.service";
 import {
 	type ProjectEmailImportMode,
 	type ProjectEmailImportPreview,
@@ -32,7 +25,6 @@ import {
 import { useToast } from "@/shared/hooks/useToast";
 import { useViewState } from "@/shared/hooks/useViewState";
 import { copyToClipboard } from "@/shared/lib/clipboard";
-import { useBonusStore } from "@/store/bonus.store";
 import { useProjectEmailStore } from "@/store/project-email.store";
 import {
 	emailAddresses,
@@ -118,36 +110,6 @@ export function ProjectEmailsPage({
 		management,
 	);
 	const canEdit = publication.canEdit;
-	const activeProjectId = useBonusStore((state) => state.activeProjectId);
-	const projectCatalog = useProjectCatalog();
-	const catalogProjects = projectCatalog.data ?? [];
-	const workspaceProject = catalogProjects.find(
-		(project) => project.id === activeProjectId,
-	);
-	const catalogProjectForRecord = useCallback(
-		(record: ProjectEmailRecord) =>
-			catalogProjects.find((project) => project.id === record.id) ??
-			catalogProjects.find(
-				(project) => project.slug.toLowerCase() === record.slug.toLowerCase(),
-			),
-		[catalogProjects],
-	);
-	const [projectFilter, setProjectFilter] = useViewState(
-		`emails:${management}`,
-		"project-filter",
-		management ? "all" : "context",
-	);
-	const selectedProjectId =
-		projectFilter === "context"
-			? workspaceProject?.id
-			: projectFilter === "all"
-				? ""
-				: (catalogProjects.find(
-						(project) =>
-							project.id === projectFilter ||
-							project.name === projectFilter ||
-							project.slug === projectFilter,
-					)?.id ?? projectFilter);
 	const [query, setQuery] = useViewState(`emails:${management}`, "query", "");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 	const [editingId, setEditingId] = useState<string>();
@@ -168,27 +130,20 @@ export function ProjectEmailsPage({
 	const filteredRecords = useMemo(() => {
 		const value = query.trim().toLowerCase();
 
-		return records
-			.filter(
-				(record) =>
-					!selectedProjectId ||
-					catalogProjectForRecord(record)?.id === selectedProjectId ||
-					record.id === selectedProjectId,
-			)
-			.filter((record) =>
-				[
-					record.projectName,
-					...emailAddresses(record).flatMap((row) => [
-						row.type,
-						row.email,
-						row.note || "",
-					]),
-				]
-					.join(" ")
-					.toLowerCase()
-					.includes(value),
-			);
-	}, [catalogProjectForRecord, query, records, selectedProjectId]);
+		return records.filter((record) =>
+			[
+				record.projectName,
+				...emailAddresses(record).flatMap((row) => [
+					row.type,
+					row.email,
+					row.note || "",
+				]),
+			]
+				.join(" ")
+				.toLowerCase()
+				.includes(value),
+		);
+	}, [query, records]);
 
 	const selectedRecord =
 		filteredRecords.find((record) => record.id === selectedId) ??
@@ -336,34 +291,7 @@ export function ProjectEmailsPage({
 	return (
 		<div className="supportos-page-scroll min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
 			{publication.banner}
-			<label className="flex flex-wrap items-center gap-2 px-3 pt-3 text-sm">
-				Проект
-				<select
-					className="ui-input border border-border bg-background"
-					value={projectFilter}
-					onChange={(e) => {
-						setProjectFilter(e.target.value);
-						setSelectedId(undefined);
-					}}
-				>
-					<option value="context">
-						Рабочий проект
-						{workspaceProject ? `: ${workspaceProject.name}` : ": все проекты"}
-					</option>
-					<option value="all">Все проекты</option>
-					{catalogProjects.map((project) => (
-						<option key={project.id} value={project.id}>
-							{project.name}
-						</option>
-					))}
-				</select>
-				{query && (
-					<button type="button" onClick={() => setQuery("")}>
-						Сбросить поиск
-					</button>
-				)}
-			</label>
-			<div className="grid min-h-full min-w-0 w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6">
+			<div className="grid min-h-full min-w-0 w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6 lg:h-full lg:min-h-0 lg:grid-rows-[auto_minmax(0,1fr)]">
 				<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
@@ -404,8 +332,8 @@ export function ProjectEmailsPage({
 				</header>
 
 				<div className="grid min-h-0 min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
-					<aside className="flex min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface lg:min-h-0">
-						<div className="border-b border-border p-3">
+					<aside className="flex h-[min(24rem,45dvh)] min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface lg:h-auto lg:min-h-0">
+						<div className="shrink-0 border-b border-border p-3">
 							<div className="relative">
 								<Search
 									size={16}
@@ -421,6 +349,15 @@ export function ProjectEmailsPage({
 							<div className="mt-2 text-xs text-muted">
 								{filteredRecords.length} из {records.length} проектов
 							</div>
+							{query && (
+								<button
+									type="button"
+									className="ui-button ui-button--secondary ui-button--compact mt-2"
+									onClick={() => setQuery("")}
+								>
+									Сбросить поиск
+								</button>
+							)}
 						</div>
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-auto">
@@ -471,7 +408,7 @@ export function ProjectEmailsPage({
 						</div>
 					</aside>
 
-					<main className="min-w-0 rounded-xl border border-border bg-surface">
+					<main className="min-h-0 min-w-0 rounded-xl border border-border bg-surface lg:overflow-y-auto">
 						{canEdit && workPanel === "editor" && (
 							<ProjectEmailEditor
 								draft={draft}
@@ -598,8 +535,14 @@ export function ProjectEmailsPage({
 							</section>
 						) : (
 							<EmptyState
-								title="Справочник почт пуст"
-								description="После публикации в общей базе здесь появятся почты проектов."
+								title={
+									records.length ? "Ничего не найдено" : "Справочник почт пуст"
+								}
+								description={
+									records.length
+										? "Попробуйте другое название или почту."
+										: "После публикации в общей базе здесь появятся почты проектов."
+								}
 							/>
 						)}
 					</main>

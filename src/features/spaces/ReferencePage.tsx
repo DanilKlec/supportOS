@@ -39,9 +39,9 @@ export function ReferencePage() {
 				? BonusToolsPage
 				: DepositBonusesPage;
 	return (
-		<div className="ops-stack">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">
 			{canManage && (
-				<div className="ops-panel-actions">
+				<div className="ops-panel-actions shrink-0">
 					<a className="ui-button ui-button--secondary" href={managementHref}>
 						Управлять
 					</a>

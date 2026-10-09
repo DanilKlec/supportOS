@@ -65,7 +65,7 @@ export function IntegrationsPanel() {
 				)}
 			</section>
 			<section className="py-4">
-				<h3>Translator</h3>
+				<h3>Переводчик</h3>
 				<p className="text-sm text-muted">
 					Провайдер: {provider}. Доступность проверяется при переводе.
 				</p>
@@ -96,7 +96,7 @@ export function IntegrationsPanel() {
 				)}
 			</section>
 			<section className="py-4">
-				<h3>Sports API</h3>
+				<h3>API спортивных событий</h3>
 				<p className="text-sm text-muted">
 					Доступность проверяется при загрузке событий.
 				</p>

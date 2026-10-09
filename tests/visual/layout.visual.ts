@@ -31,6 +31,11 @@ async function screenshot(page: Page, name: string) {
 	// Keep shell, headers, toolbars and all controls visible. Content comes from
 	// small synthetic fixtures, never live records/timestamps/provider responses.
 	await expect(page).toHaveScreenshot(name);
+	// Retain the current rendering for the UI audit; never replace baselines.
+	await page.screenshot({
+		path: test.info().outputPath(name),
+		animations: "disabled",
+	});
 }
 
 test("workspace shell and mobile sidebar", async ({

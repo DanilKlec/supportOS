@@ -9,6 +9,41 @@ import knowledge from './knowledge.js';
 import generate from './generate.js';
 const res=()=>({setHeader(){},status(code){this.statusCode=code;return this;},json(body){this.body=body;},end(body){this.body=JSON.parse(body);}});
 afterEach(()=>vi.resetAllMocks());
+it('loads guidance using the relative URL supplied by Vercel',async()=>{
+ mock.requireUser.mockResolvedValue({id:'trainer',access:{status:'active',permissions:['ai.train']}});
+ const guidance={version:3,document:{entries:[]}};mock.read.mockResolvedValue(guidance);const response=res();
+ await knowledge({method:'GET',url:'/api/ai/knowledge',headers:{}},response);
+ expect(response.statusCode).toBe(200);expect(response.body).toEqual(guidance);
+ expect(mock.db).not.toHaveBeenCalled();
+});
+it('loads feedback reviews using a relative query URL without reading guidance',async()=>{
+ mock.requireUser.mockResolvedValue({id:'trainer',access:{status:'active',permissions:['ai.train']}});
+ mock.db.mockResolvedValue([]);const response=res();
+ await knowledge({method:'GET',url:'/api/ai/knowledge?action=feedback-reviews',headers:{}},response);
+ expect(response.statusCode).toBe(200);expect(response.body).toEqual({reviews:[]});
+ expect(mock.db).toHaveBeenCalledWith({},expect.stringContaining('supportos_ai_feedback_reviews?select='));
+ expect(mock.db.mock.calls[0]).toHaveLength(2);expect(mock.read).not.toHaveBeenCalled();
+});
+it('denies guidance and feedback reads to Support before accessing storage',async()=>{
+ mock.requireUser.mockResolvedValue({access:{status:'active',permissions:['composer.use']}});
+ for(const url of ['/api/ai/knowledge','/api/ai/knowledge?action=feedback-reviews']){
+  const response=res();await knowledge({method:'GET',url,headers:{}},response);expect(response.statusCode).toBe(403);
+ }
+ expect(mock.read).not.toHaveBeenCalled();expect(mock.db).not.toHaveBeenCalled();
+});
+it('reports a safe loading error rather than a saving error for failed GET',async()=>{
+ mock.requireUser.mockResolvedValue({access:{status:'active',permissions:['ai.train']}});
+ mock.read.mockRejectedValue(new Error('internal synthetic credential'));const response=res();
+ await knowledge({method:'GET',url:'/api/ai/knowledge',headers:{}},response);
+ expect(response.statusCode).toBe(500);expect(response.body.error).toContain('Не удалось загрузить');
+ expect(JSON.stringify(response.body)).not.toContain('internal synthetic credential');
+});
+it('preserves authentication errors without reading knowledge',async()=>{
+ mock.requireUser.mockRejectedValue(Object.assign(new Error('Сессия отозвана'),{status:401}));const response=res();
+ await knowledge({method:'GET',url:'/api/ai/knowledge',headers:{}},response);
+ expect(response.statusCode).toBe(401);expect(response.body.error).toBe('Сессия отозвана');
+ expect(mock.read).not.toHaveBeenCalled();expect(mock.db).not.toHaveBeenCalled();
+});
 it('requires ai.train and saves the verified actor',async()=>{
  mock.requireUser.mockResolvedValue({id:'shift-id',access:{status:'active',permissions:['ai.train','ai.publish']}});mock.read.mockResolvedValue({version:1,document:{entries:[]}});mock.db.mockResolvedValue(null);const response=res();
  await knowledge({method:'POST',headers:{origin:'https://app.test',host:'app.test'},body:{expected:1,content:'Approved facts',updated_by:'forged'}},response);

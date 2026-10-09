@@ -310,7 +310,7 @@ for (const theme of ["dark", "light"]) {
 		await installResponsiveData(context);
 		const screens = [
 			["workspace", "/", "Пространство биндов"],
-			["qc-overview", "/qc#overview", "Обзор"],
+			["qc-overview", "/qc", "Обзор"],
 			["qc-inbox", "/qc#inbox", "Очередь проверки"],
 			["qc-materials", "/qc#materials", "Общие бинды"],
 			["qc-emails", "/qc#emails", "Почты проектов"],
@@ -380,6 +380,17 @@ for (const theme of ["dark", "light"]) {
 					.scrollIntoViewIfNeeded();
 			}
 			await assertLayout(page, screen);
+			if (screen === "settings-integrations") {
+				await expect(
+					page.getByRole("heading", { name: "Переводчик", exact: true }),
+				).toBeVisible();
+				await expect(
+					page.getByRole("heading", {
+						name: "API спортивных событий",
+						exact: true,
+					}),
+				).toBeVisible();
+			}
 			if (screen === "qc-inbox") {
 				await page.locator(".ops-review-item").first().click();
 				await expect(page.locator(".qc-queue-detail")).toBeVisible();

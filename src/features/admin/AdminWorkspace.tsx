@@ -68,7 +68,7 @@ export function AdminWorkspace() {
 			(s) => !s.hiddenFromNavigation && canAccessPage(access, "/admin", s.id),
 		)?.id || "overview";
 	const redirectedHash = hash ? adminHashRedirects[hash] : undefined;
-	const requestedSection = redirectedHash ?? hash ?? fallbackSection;
+	const requestedSection = redirectedHash ?? (hash || fallbackSection);
 	const active = canAccessPage(access, "/admin", requestedSection)
 		? requestedSection
 		: fallbackSection;

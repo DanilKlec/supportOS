@@ -42,7 +42,7 @@ test("admin overview defers the users screen until section navigation", async ({
 	isMobile,
 }) => {
 	const requests = workflowRequests(page);
-	await page.goto("/admin#overview");
+	await page.goto("/admin");
 	await expect(
 		page
 			.locator(".ops-heading")
@@ -62,7 +62,7 @@ test("QC loads only the selected materials workflow, not AI or bonus management"
 	isMobile,
 }) => {
 	const requests = workflowRequests(page);
-	await page.goto("/qc#overview");
+	await page.goto("/qc");
 	await expect(page.locator(".qc-metrics")).toBeVisible();
 	await page.waitForLoadState("networkidle");
 	expect([...requests]).toEqual([]);

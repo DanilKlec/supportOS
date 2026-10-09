@@ -86,13 +86,14 @@ it('rejects an invalid creation reference without committing an account or audit
  expect((await pg.query('select id from auth.users where id=$1',[id])).rows).toHaveLength(0);expect(await audit()).toHaveLength(0);
 });
 it.each([false,true])('audits a claimed Telegram registration, including Auth finishing after expiry (%s)',async(expired)=>{
- const id=randomUUID();
+ // A legitimate UUID may contain the Telegram fixture digits without leaking its ID.
+ const id='00000777-0000-4000-8000-000000000007';
  await pg.query("insert into supportos_telegram_registration(id,login,browser_hash,start_hash,ip_hash,telegram_id,verified_at,claimed_at,expires_at) values($1,'registered',$2,$3,$4,777,now(),now(),now()+$5::interval)",
   [id,hash(id),hash('start:'+id),hash('synthetic-ip'),expired?'-1 second':'5 minutes']);
  await pg.exec('reset role');await pg.query("insert into auth.users(id,email,encrypted_password,raw_app_meta_data) values($1,'registered@supportos.local','synthetic-password-hash',$2)",[id,{telegram_registration:id,telegram_id:'777'}]);
  expect(await audit()).toHaveLength(1);expect((await audit())[0]).toMatchObject({actor_id:id,target_id:id,action:'user.create',
   before_data:null,after_data:{id,status:'pending'},event_ref:'registration:'+id});
- expect(JSON.stringify(await audit())).not.toMatch(/synthetic-|777|password_hash|browser_hash|start_hash/);
+ expect(JSON.stringify(await audit())).not.toMatch(/synthetic-|[":]777[",}]|telegram_id|password_hash|browser_hash|start_hash/);
 });
 it('does not let server registration metadata bypass a missing verified claim',async()=>{
  const id=randomUUID();await pg.exec('reset role;savepoint unclaimed');

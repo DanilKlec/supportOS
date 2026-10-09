@@ -514,7 +514,7 @@ export function DepositBonusesPage({
 
 	if (!publication.ready) return publication.banner;
 	return (
-		<div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
 			{publication.banner}
 			<datalist id="deposit-bonus-currencies">
 				{currencies.map((currency) => (

@@ -84,7 +84,9 @@ export function QCWorkspace() {
 	const isContainer =
 		!normalizedHash || ["materials", "problems"].includes(normalizedHash);
 	const active =
-		isContainer && !tabs.some((t) => t.id === destination.tab)
+		isContainer &&
+		tabs.length > 0 &&
+		!tabs.some((t) => t.id === destination.tab)
 			? tabs[0]?.id
 			: destination.tab;
 	const materialDescription = [

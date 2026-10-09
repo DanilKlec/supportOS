@@ -199,3 +199,29 @@ it("keeps unauthorized direct hashes from rendering protected lazy screens", () 
 	);
 	expect(mocks.aiRendered).not.toHaveBeenCalled();
 });
+
+it.each([
+	["admin", AdminWorkspace],
+	["qc", QCWorkspace],
+] as const)("opens the %s overview without an explicit hash", (area, Component) => {
+	state.hash = "";
+	render(<Component />);
+	expect(screen.getByText(`${area}:overview`)).toBeTruthy();
+	expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("uses the first permitted admin section when the hash is empty", () => {
+	state.hash = "";
+	identity(["technical"]);
+	render(<AdminWorkspace />);
+	expect(screen.getByText("admin:integrations")).toBeTruthy();
+	expect(mocks.accountsRendered).not.toHaveBeenCalled();
+});
+
+it("opens the QC overview without granting protected AI screens", () => {
+	state.hash = "";
+	identity(["knowledge.write"]);
+	render(<QCWorkspace />);
+	expect(screen.getByText("qc:overview")).toBeTruthy();
+	expect(mocks.aiRendered).not.toHaveBeenCalled();
+});
