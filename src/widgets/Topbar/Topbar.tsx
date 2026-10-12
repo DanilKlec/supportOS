@@ -25,7 +25,7 @@ import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { copyToClipboard } from "@/shared/lib/clipboard";
-import { isKeyboardCode } from "@/shared/lib/keyboard";
+import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
@@ -545,14 +545,23 @@ export function Topbar({
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (
-				(!event.ctrlKey && !event.metaKey) ||
-				event.shiftKey ||
-				event.altKey ||
 				event.defaultPrevented ||
+				event.repeat ||
+				event.altKey ||
 				document.querySelector('[aria-modal="true"]')
 			)
 				return;
-			if (isKeyboardCode(event, "KeyK")) {
+			const commandSearch =
+				(event.ctrlKey || event.metaKey) &&
+				!event.shiftKey &&
+				isKeyboardCode(event, "KeyK");
+			const quickSearch =
+				event.key === "/" &&
+				!event.ctrlKey &&
+				!event.metaKey &&
+				!isTypingTarget(event.target) &&
+				!isTypingTarget(document.activeElement);
+			if (commandSearch || quickSearch) {
 				event.preventDefault();
 				openGlobalSearch();
 			}

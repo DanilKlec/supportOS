@@ -1,6 +1,84 @@
 import { accessToken, bindRows, fixedTime, knowledge, userId } from "./data";
 import { expect, test } from "./fixture";
 
+test("bind keyboard copy, edit, search and help work without production writes", async ({
+	page,
+	isMobile,
+}) => {
+	const copies: string[] = [];
+	await page.exposeFunction("captureBindCopy", (text: string) => {
+		copies.push(text);
+	});
+	await page.addInitScript(() => {
+		// Capture only synthetic test answers; do not read or write the OS clipboard.
+		Object.defineProperty(navigator, "clipboard", {
+			configurable: true,
+			value: {
+				writeText: (text: string) =>
+					(window as unknown as {
+						captureBindCopy: (value: string) => Promise<void>;
+					}).captureBindCopy(text),
+			},
+		});
+	});
+	await page.goto("/");
+	if (isMobile)
+		await page
+			.getByRole("button", { name: "Свернуть папки", exact: true })
+			.click();
+	await page
+		.getByRole("region", { name: "Общие бинды", exact: true })
+		.getByRole("button", { name: "Ответ на обращение", exact: true })
+		.click();
+	await expect(
+		page.getByRole("heading", { name: "Ответ на обращение", exact: true }),
+	).toBeVisible();
+	await page.keyboard.press("Control+c");
+	await expect.poll(() => copies).toEqual([
+		knowledge.binds[0].translations[0].content,
+	]);
+	await page.keyboard.press("c");
+	await expect.poll(() => copies.length).toBe(2);
+	await page.keyboard.press("e");
+	const editor = page.getByRole("dialog").filter({
+		has: page.getByRole("heading", { name: "Личная версия ответа", exact: true }),
+	});
+	await expect(editor).toBeVisible();
+	await editor
+		.getByRole("textbox", { name: "Текст ответа", exact: true })
+		.fill("cdefp/ — ввод текста");
+	await expect(editor).toBeVisible();
+	expect(copies).toHaveLength(2);
+	page.once("dialog", async (dialog) => {
+		expect(dialog.message()).toContain("Закрыть редактор?");
+		await dialog.accept();
+	});
+	await editor
+		.getByRole("button", { name: "Отмена", exact: true })
+		.click();
+	await expect(editor).toBeHidden();
+	await page.keyboard.press("/");
+	const search = page.getByRole("textbox", {
+		name: "Глобальный поиск", exact: true,
+	});
+	await expect(search).toBeFocused();
+	await search.press("Escape");
+	await page.keyboard.press("Control+k");
+	await expect(search).toBeFocused();
+	await search.press("Escape");
+	await page
+		.getByRole("button", { name: "Открыть меню пространства", exact: true })
+		.click();
+	await page.getByRole("button", { name: "Быстрые действия", exact: true }).click();
+	await page.getByRole("button", { name: "Горячие клавиши", exact: true }).click();
+	await expect(
+		page.getByRole("heading", { name: "Горячие клавиши", exact: true }),
+	).toBeVisible();
+	await expect(
+		page.getByText("Ctrl / ⌘ C или C", { exact: true }),
+	).toBeVisible();
+});
+
 test("common material location/color survives publication and navigation without production writes", async ({
 	page,
 	context,

@@ -34,9 +34,9 @@ import {
 import type { CurrencyTable } from "@/services/bonus-tools.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { getTeamGlossary } from "@/services/team-glossary.service";
+import { useBindHotkeys } from "@/shared/hooks/useBindHotkeys";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
-import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
 import { extractTemplateVariables } from "@/shared/lib/template-variables";
 import { modalManager } from "@/shared/modals/modal.store";
 import {
@@ -628,71 +628,16 @@ export function BindViewer() {
 		};
 	}, [actionsOpen]);
 
-	useEffect(() => {
-		if (!bind || !translation) return undefined;
-
-		const handler = (event: KeyboardEvent) => {
-			if (
-				isTypingTarget(event.target) ||
-				event.ctrlKey ||
-				event.metaKey ||
-				event.altKey
-			) {
-				return;
-			}
-
-			if (isKeyboardCode(event, "KeyC")) {
-				event.preventDefault();
-				void copyContent();
-			}
-
-			if (isKeyboardCode(event, "KeyE")) {
-				event.preventDefault();
-				editBind();
-			}
-
-			if (isKeyboardCode(event, "KeyD")) {
-				event.preventDefault();
-				duplicateBind();
-			}
-
-			if (isKeyboardCode(event, "KeyF")) {
-				event.preventDefault();
-				toggleFavorite();
-			}
-
-			if (isKeyboardCode(event, "KeyP")) {
-				event.preventDefault();
-				togglePinned();
-			}
-
-			if (
-				isKeyboardCode(event, "ArrowRight") ||
-				isKeyboardCode(event, "ArrowLeft")
-			) {
-				const existingLanguages = bind.translations.map(
-					(item) => item.language,
-				);
-				if (existingLanguages.length === 0) return;
-
-				const currentIndex = existingLanguages.indexOf(language);
-				const direction = isKeyboardCode(event, "ArrowRight") ? 1 : -1;
-				const next =
-					existingLanguages[
-						(currentIndex + direction + existingLanguages.length) %
-							existingLanguages.length
-					];
-
-				if (next) {
-					event.preventDefault();
-					setLanguage(next as LanguageCode);
-				}
-			}
-		};
-
-		window.addEventListener("keydown", handler);
-
-		return () => window.removeEventListener("keydown", handler);
+	useBindHotkeys({
+		enabled: Boolean(bind && translation),
+		copy: copyContent,
+		edit: editBind,
+		duplicate: duplicateBind,
+		favorite: toggleFavorite,
+		pin: togglePinned,
+		languages: bind?.translations.map((item) => item.language) ?? [],
+		language,
+		setLanguage: (next) => setLanguage(next as LanguageCode),
 	});
 
 	if (!bind || !translation) {

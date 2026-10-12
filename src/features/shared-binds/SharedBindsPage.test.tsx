@@ -9,6 +9,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { knowledgeService } from "@/services/knowledge.service";
 import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
@@ -26,6 +27,7 @@ const mock = vi.hoisted(() => ({
 	save: vi.fn(),
 	savePersonal: vi.fn(),
 	resetPersonal: vi.fn(),
+	copy: vi.fn(),
 }));
 vi.mock("@/services/authenticated-fetch", () => ({
 	authenticatedFetch: mock.accounts,
@@ -36,6 +38,7 @@ vi.mock("@/services/shared-binds.service", () => ({
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
+vi.mock("@/shared/lib/clipboard", () => ({ copyToClipboard: mock.copy }));
 
 import {
 	matchLocalBind,
@@ -73,6 +76,7 @@ beforeEach(() => {
 		remoteBinds: [],
 		favorites: [],
 		pinnedTabs: [],
+		language: "ru",
 		categories: [{ id: "shared", ownerId: null, name: "Общее", order: 1 }],
 		folders: [],
 	});
@@ -103,8 +107,12 @@ beforeEach(() => {
 	mock.branchAction.mockResolvedValue({ ok: true });
 	mock.list.mockResolvedValue([base]);
 	mock.personal.mockResolvedValue([]);
+	mock.copy.mockResolvedValue(true);
 });
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
 function show() {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -116,6 +124,116 @@ function show() {
 	);
 	return client;
 }
+
+it("copies the displayed branch and language after switching between mine and common", async () => {
+	const common = {
+		...base,
+		translations: [
+			...base.translations,
+			{
+				language: "en",
+				title: "Common answer",
+				content: "Common text",
+				updatedAt: "",
+			},
+		],
+	};
+	const own = {
+		...common,
+		id: "personal",
+		ownerId: "support",
+		sourceBindId: base.id,
+		translations: [
+			{
+				language: "ru",
+				title: "Личный ответ",
+				content: "Мой текст",
+				updatedAt: "",
+			},
+			{ language: "en", title: "My answer", content: "My text", updatedAt: "" },
+		],
+	};
+	mock.list.mockResolvedValue([common]);
+	mock.personal.mockResolvedValue([own]);
+	show();
+	await screen.findByRole("heading", { name: "Личный ответ", level: 1 });
+	fireEvent.keyDown(window, { code: "KeyC", key: "с", ctrlKey: true });
+	expect(mock.copy).toHaveBeenLastCalledWith("Мой текст");
+	fireEvent.keyDown(window, { code: "ArrowRight" });
+	await screen.findByRole("heading", { name: "My answer", level: 1 });
+	fireEvent.keyDown(window, { code: "KeyC", metaKey: true });
+	expect(mock.copy).toHaveBeenLastCalledWith("My text");
+	fireEvent.click(screen.getByRole("button", { name: "Общая" }));
+	await screen.findByRole("heading", { name: "Common answer", level: 1 });
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "Общая" }).hasAttribute("disabled"),
+		).toBe(false),
+	);
+	fireEvent.keyDown(window, { code: "KeyC", ctrlKey: true });
+	expect(mock.copy).toHaveBeenLastCalledWith("Common text");
+	fireEvent.keyDown(window, { code: "ArrowLeft" });
+	await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+	fireEvent.keyDown(window, { code: "KeyC" });
+	expect(mock.copy).toHaveBeenLastCalledWith("Исходный текст");
+	expect(mock.save).not.toHaveBeenCalled();
+	expect(mock.savePersonal).not.toHaveBeenCalled();
+});
+
+it("runs library hotkeys against the linked record, and E copies a received answer into my editor", async () => {
+	const local = {
+		...base,
+		id: "library",
+		ownerId: "support",
+		sourceBindId: base.id,
+	};
+	useKnowledgeStore.setState({ binds: [local] });
+	mock.branches.mockResolvedValue({
+		choices: { common: "received" },
+		incoming: [
+			{
+				id: "received",
+				sourceId: base.id,
+				sender: "Коллега",
+				bind: {
+					...base,
+					id: "theirs",
+					translations: [
+						{
+							...base.translations[0],
+							title: "Ответ коллеги",
+							content: "Чужой ответ",
+						},
+					],
+				},
+			},
+		],
+		outgoing: [],
+	});
+	const duplicate = vi
+		.spyOn(knowledgeService, "duplicateBind")
+		.mockReturnValue(local);
+	const favorite = vi
+		.spyOn(knowledgeService, "toggleFavorite")
+		.mockReturnValue(true);
+	show();
+	await screen.findByRole("heading", { name: "Ответ коллеги", level: 1 });
+	fireEvent.keyDown(window, { code: "KeyC", ctrlKey: true });
+	expect(mock.copy).toHaveBeenCalledWith("Чужой ответ");
+	fireEvent.keyDown(window, { code: "KeyD" });
+	fireEvent.keyDown(window, { code: "KeyF" });
+	fireEvent.keyDown(window, { code: "KeyP" });
+	expect(duplicate).toHaveBeenCalledWith(local.id);
+	expect(favorite).toHaveBeenCalledWith(local.id);
+	expect(useKnowledgeStore.getState().pinnedTabs).toEqual([local.id]);
+	fireEvent.keyDown(window, { code: "KeyE" });
+	expect(
+		(screen.getByLabelText("Текст ответа") as HTMLTextAreaElement).value,
+	).toBe("Чужой ответ");
+	expect(mock.save).not.toHaveBeenCalled();
+	expect(mock.savePersonal).not.toHaveBeenCalled();
+});
+
 it("opens a common bind on the common branch unless a personal branch or explicit choice exists", () => {
 	expect(resolveBranch(base, undefined, undefined).branch).toBe("main");
 	expect(

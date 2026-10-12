@@ -14,8 +14,10 @@ import { LocalBindActions } from "@/components/binds/LocalBindActions";
 import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
+import { knowledgeService } from "@/services/knowledge.service";
 import type { BindBranches } from "@/services/shared-binds.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
+import { useBindHotkeys } from "@/shared/hooks/useBindHotkeys";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { BaseModal } from "@/shared/modals/BaseModal";
@@ -293,6 +295,54 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 			setBusy(false);
 		}
 	};
+	const selected = base ? resolveBranch(base, own, branches.data) : undefined;
+	const item = selected?.bind;
+	const translation =
+		item?.translations.find((t) => t.language === language) ??
+		item?.translations[0];
+	const copyContent = () =>
+		copyToClipboard(translation?.content ?? "").then((ok) =>
+			showToast(ok ? "Ответ скопирован" : "Не удалось скопировать"),
+		);
+	const libraryAction = (fn: () => unknown) => {
+		try {
+			fn();
+		} catch (error) {
+			showToast(
+				error instanceof Error
+					? error.message
+					: "Не удалось выполнить действие",
+			);
+		}
+	};
+	useBindHotkeys({
+		enabled:
+			Boolean(item && translation) &&
+			!busy &&
+			!common.isPending &&
+			!personal.isPending &&
+			!branches.isPending &&
+			!common.error &&
+			!personal.error &&
+			!branches.error,
+		copy: copyContent,
+		edit: item && user ? () => setEditor(item) : undefined,
+		duplicate: libraryBind
+			? () =>
+					libraryAction(() => knowledgeService.duplicateBind(libraryBind.id))
+			: undefined,
+		favorite: libraryBind
+			? () =>
+					libraryAction(() => knowledgeService.toggleFavorite(libraryBind.id))
+			: undefined,
+		pin: libraryBind
+			? () => useKnowledgeStore.getState().togglePinnedTab(libraryBind.id)
+			: undefined,
+		languages: item?.translations.map((t) => t.language) ?? [],
+		language: translation?.language ?? language,
+		setLanguage: (next) =>
+			useKnowledgeStore.getState().setLanguage(next as LanguageCode),
+	});
 	if (common.isPending || personal.isPending || branches.isPending)
 		return <p className="p-6 text-muted">Открываем ветки бинда…</p>;
 	if (common.error || personal.error || branches.error)
@@ -314,12 +364,8 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 				</button>
 			</div>
 		);
-	if (!base) return <p className="p-6 text-muted">Бинд больше недоступен.</p>;
-	const selected = resolveBranch(base, own, branches.data);
-	const item = selected.bind;
-	const translation =
-		item.translations.find((t) => t.language === language) ??
-		item.translations[0];
+	if (!base || !selected || !item)
+		return <p className="p-6 text-muted">Бинд больше недоступен.</p>;
 	const incoming =
 		branches.data?.incoming.filter((s) => s.sourceId === id) ?? [];
 	const outgoing =
@@ -500,6 +546,7 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 							type="button"
 							disabled={busy}
 							onClick={() => setEditor(item)}
+							aria-keyshortcuts="E"
 							className="ui-button ui-button--secondary flex items-center gap-2 border border-border"
 						>
 							<Pencil size={15} />
@@ -509,11 +556,9 @@ export function WorkspaceSharedBindViewer({ id }: { id: string }) {
 						</button>
 						<button
 							type="button"
-							onClick={() =>
-								void copyToClipboard(translation?.content ?? "").then((ok) =>
-									showToast(ok ? "Ответ скопирован" : "Не удалось скопировать"),
-								)
-							}
+							onClick={() => void copyContent()}
+							title="Копировать (Ctrl+C / ⌘C или C)"
+							aria-keyshortcuts="Control+C Meta+C C"
 							className="ui-button ui-button--primary flex items-center gap-2 bg-accent text-accent-foreground"
 						>
 							<Copy size={16} />

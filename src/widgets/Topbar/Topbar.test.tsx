@@ -304,3 +304,23 @@ it("uses the existing Ctrl+K search entry and Escape close behavior", () => {
 	expect(document.activeElement).toBe(input);
 	expect(screen.getByRole("group", { name: "Команды" })).toBeTruthy();
 });
+
+it("opens the existing search with / without stealing text entry or modal shortcuts", () => {
+	const input = setup(["work", "binds.read"]);
+	fireEvent.keyDown(input, { key: "Escape" });
+	fireEvent.keyDown(window, { key: "/", code: "Slash" });
+	expect(document.activeElement).toBe(input);
+	expect(screen.getByRole("group", { name: "Команды" })).toBeTruthy();
+	fireEvent.keyDown(input, { key: "Escape" });
+	const field = render(<textarea aria-label="Текст клиента" />);
+	const textarea = field.getByRole("textbox", { name: "Текст клиента" });
+	textarea.focus();
+	expect(fireEvent.keyDown(textarea, { key: "/", code: "Slash" })).toBe(true);
+	expect(document.activeElement).toBe(textarea);
+	expect(screen.queryByRole("listbox")).toBeNull();
+	field.unmount();
+	render(<div role="dialog" aria-modal="true" />);
+	fireEvent.keyDown(window, { key: "/", code: "Slash" });
+	fireEvent.keyDown(window, { ctrlKey: true, code: "KeyK" });
+	expect(screen.queryByRole("listbox")).toBeNull();
+});
