@@ -8,6 +8,10 @@ const fixture = vi.hoisted(() => ({
 		signInWithPassword: vi.fn(),
 		signOut: vi.fn(),
 		signUp: vi.fn(),
+		signInWithOAuth: vi.fn(),
+		linkIdentity: vi.fn(),
+		resetPasswordForEmail: vi.fn(),
+		updateUser: vi.fn(),
 	},
 	callback: undefined,
 }));
@@ -56,7 +60,7 @@ beforeEach(async () => {
 	store = (await import("@/store/auth.store")).useAuthStore;
 });
 afterEach(() => vi.unstubAllGlobals());
-it("signs in a Telegram login through its internal identity, preserving legacy email login", async () => {
+it("preserves legacy login identities and existing email login", async () => {
 	fixture.auth.signInWithPassword.mockResolvedValue({
 		data: { session },
 		error: null,
@@ -87,6 +91,86 @@ it("registers without granting access while email confirmation is required", asy
 		options: { emailRedirectTo: "https://app.test/login" },
 	});
 	expect(store.getState().session).toBeUndefined();
+});
+it("uses PKCE Google OAuth with a safe local return URL and no elevated access", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signInWithOAuth.mockResolvedValue({ error: null });
+	await service.signInWithGoogle("//evil.test");
+	expect(fixture.auth.signInWithOAuth).toHaveBeenCalledWith({
+		provider: "google",
+		options: {
+			redirectTo: "https://app.test/login?redirect=%2F",
+			scopes: "openid email profile",
+			queryParams: { prompt: "select_account" },
+		},
+	});
+	expect(store.getState().session).toBeUndefined();
+});
+it("links Google to the signed-in identity instead of creating another account", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.linkIdentity.mockResolvedValue({ error: null });
+	await service.linkGoogle();
+	expect(fixture.auth.linkIdentity).toHaveBeenCalledWith(
+		expect.objectContaining({ provider: "google" }),
+	);
+	expect(fixture.auth.signUp).not.toHaveBeenCalled();
+});
+it("blocks access and requests TOTP when the server requires MFA", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(JSON.stringify({ code: "mfa_required" }), { status: 403 }),
+		),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession().authVerified).toBe(false);
+	expect(service.getSession().mfaRequired).toBe(true);
+	expect(service.getSession().user.access).toBeUndefined();
+});
+it("accepts server-authorized access without MFA and does not show its challenge", async () => {
+	const access = {
+		status: "active",
+		roles: [{ id: "support" }],
+		permissions: ["work"],
+		version: 1,
+	};
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => Response.json({ access, mfaEnabled: false })),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession()).toMatchObject({
+		authVerified: true,
+		mfaEnabled: false,
+		mfaRequired: false,
+	});
+});
+it("does not mistake an access service failure for a request to enroll MFA", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () =>
+			Response.json({ error: "Service unavailable" }, { status: 503 }),
+		),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession()).toMatchObject({
+		authVerified: false,
+		mfaRequired: false,
+	});
+	expect(service.getSession().user.access).toBeUndefined();
 });
 it("loads pending server access after signup with an immediate session", async () => {
 	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
@@ -225,20 +309,52 @@ it("uses the SDK refreshed access token for API requests", async () => {
 	});
 	expect(await service.getAccessToken()).toBe("fresh");
 });
+it("preserves recovery mode when logout after a password update fails", async () => {
+	await service.initialize();
+	store.setState({ passwordRecovery: true });
+	fixture.auth.updateUser.mockResolvedValue({ error: null });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 503 })),
+	);
+	await expect(service.updatePassword("long-password")).rejects.toThrow(
+		"Не удалось завершить сессию",
+	);
+	expect(store.getState().passwordRecovery).toBe(true);
+	expect(fixture.auth.signOut).not.toHaveBeenCalled();
+});
+it("uses audited global logout after changing the password", async () => {
+	await service.initialize();
+	store.setState({ passwordRecovery: true });
+	fixture.auth.updateUser.mockResolvedValue({ error: null });
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	await service.updatePassword("long-password");
+	expect(fixture.auth.updateUser).toHaveBeenCalledWith({
+		password: "long-password",
+	});
+	expect(fetch).toHaveBeenCalledWith(
+		"/api/registration?action=logout-all",
+		expect.objectContaining({ method: "POST", body: "{}" }),
+	);
+	expect(store.getState().session).toBeUndefined();
+	expect(store.getState().passwordRecovery).toBe(false);
+});
 it("keeps confirmation on token refresh but resets it for a new Supabase session", async () => {
-	const jwt = (id) => "x." + btoa(JSON.stringify({ session_id: id })) + ".sig";
+	const jwt = (id) =>
+		"x." + btoa(JSON.stringify({ session_id: id, aal: "aal2" })) + ".sig";
 	fixture.auth.getSession.mockResolvedValue({
 		data: { session: { ...session, access_token: jwt("first") } },
 		error: null,
 	});
 	await service.initialize();
-	expect(service.getSession().telegramVerified).toBe(true);
+	expect(service.getSession().authVerified).toBe(true);
 	fixture.callback("TOKEN_REFRESHED", {
 		...session,
 		access_token: jwt("first"),
 	});
-	expect(service.getSession().telegramVerified).toBe(true);
+	expect(service.getSession().authVerified).toBe(true);
 	fixture.callback("SIGNED_IN", { ...session, access_token: jwt("second") });
-	expect(service.getSession().telegramVerified).toBe(false);
+	expect(service.getSession().authVerified).toBe(false);
 	fixture.callback("SIGNED_OUT", null);
 });

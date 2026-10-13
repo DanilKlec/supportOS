@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import { safeAuthRedirect } from "@/app/auth-redirect";
 import { type AuthSession, useAuthStore } from "@/store/auth.store";
 import { normalizeRole } from "../../shared/access.js";
 import { loginEmail } from "../../shared/login-identity.js";
@@ -18,8 +19,9 @@ class SupabaseService {
 	private accept(session: Session | null) {
 		const previous = this.getSession();
 		let sessionId: string | undefined;
+		let aal: string | undefined;
 		try {
-			sessionId = session
+			const claims = session
 				? JSON.parse(
 						atob(
 							session.access_token
@@ -27,18 +29,28 @@ class SupabaseService {
 								.replace(/-/g, "+")
 								.replace(/_/g, "/"),
 						),
-					).session_id
+					)
 				: undefined;
+			sessionId = claims?.session_id;
+			aal = claims?.aal;
 		} catch {
 			/* Server validates session identity. */
 		}
 		const next: AuthSession | undefined = session
 			? {
 					sessionId,
-					telegramVerified: Boolean(
-						sessionId &&
+					authVerified: Boolean(
+						(!previous?.mfaEnabled || aal === "aal2") &&
+							sessionId &&
 							previous?.sessionId === sessionId &&
-							previous.telegramVerified,
+							previous.authVerified,
+					),
+					mfaEnabled:
+						previous?.user.id === session.user.id && previous.mfaEnabled,
+					mfaRequired: Boolean(
+						previous?.sessionId === sessionId &&
+							previous?.mfaRequired &&
+							aal !== "aal2",
 					),
 					accessToken: session.access_token,
 					refreshToken: session.refresh_token,
@@ -65,13 +77,22 @@ class SupabaseService {
 		return this.initialized;
 	}
 	private async initializeOnce() {
+		if (
+			typeof window !== "undefined" &&
+			new URLSearchParams(window.location.search).get("recovery") === "1"
+		)
+			useAuthStore.setState({ passwordRecovery: true });
 		useAuthStore.setState({ configured: this.isConfigured(), loading: true });
 		if (!supabase) {
 			useAuthStore.setState({ loading: false });
 			return undefined;
 		}
 		// SDK owns refresh, persistence and cross-tab session events. Never trust the old local access store.
-		supabase.auth.onAuthStateChange((_event, session) => {
+		supabase.auth.onAuthStateChange((event, session) => {
+			if (event === "PASSWORD_RECOVERY")
+				useAuthStore.setState({ passwordRecovery: true });
+			if (event === "SIGNED_OUT")
+				useAuthStore.setState({ passwordRecovery: false });
 			this.revision++;
 			this.accept(session);
 			if (session) queueMicrotask(() => void this.refreshIdentity());
@@ -124,18 +145,72 @@ class SupabaseService {
 		if (data.session) await this.refreshIdentity();
 		return this.getSession();
 	}
-	async signOut() {
+	async signInWithGoogle(redirect = "/") {
+		if (!supabase) throw new Error("Вход ещё не настроен");
+		const target = new URL("/login", window.location.origin);
+		target.searchParams.set("redirect", safeAuthRedirect(redirect));
+		const { error } = await supabase.auth.signInWithOAuth({
+			provider: "google",
+			options: {
+				redirectTo: target.href,
+				scopes: "openid email profile",
+				queryParams: { prompt: "select_account" },
+			},
+		});
+		if (error) throw error;
+	}
+	async resetPassword(email: string) {
+		if (!supabase) throw new Error("Вход ещё не настроен");
+		const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+			redirectTo: `${window.location.origin}/login?recovery=1`,
+		});
+		if (error) throw error;
+	}
+	async linkGoogle() {
+		if (!supabase) throw new Error("Вход ещё не настроен");
+		const target = new URL("/login", window.location.origin);
+		target.searchParams.set("redirect", "/settings#security");
+		const { error } = await supabase.auth.linkIdentity({
+			provider: "google",
+			options: {
+				redirectTo: target.href,
+				scopes: "openid email profile",
+				queryParams: { prompt: "select_account" },
+			},
+		});
+		if (error) throw error;
+	}
+	async updatePassword(password: string) {
+		if (!supabase) throw new Error("Вход ещё не настроен");
+		if (password.length < 12 || password.length > 128)
+			throw new Error("Пароль должен содержать от 12 до 128 символов");
+		const { error } = await supabase.auth.updateUser({ password });
+		if (error) throw error;
+		await this.signOut(true);
+		useAuthStore.setState({ passwordRecovery: false });
+	}
+	async refreshSessionIdentity() {
+		if (!supabase) throw new Error("Вход ещё не настроен");
+		const { data, error } = await supabase.auth.getSession();
+		if (error) throw error;
+		this.accept(data.session);
+		await this.refreshIdentity();
+	}
+	async signOut(all = false) {
 		const current = this.getSession();
 		if (current) {
-			const response = await fetch("/api/registration?action=logout", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${current.accessToken}`,
+			const response = await fetch(
+				`/api/registration?action=${all ? "logout-all" : "logout"}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${current.accessToken}`,
+					},
+					body: "{}",
+					signal: AbortSignal.timeout(10000),
 				},
-				body: "{}",
-				signal: AbortSignal.timeout(10000),
-			});
+			);
 			if (!response.ok && response.status !== 401)
 				throw new Error("Не удалось завершить сессию. Повторите попытку.");
 		}
@@ -175,11 +250,13 @@ class SupabaseService {
 				return;
 			}
 			const result = await response.json();
-			if (result.code === "telegram_2fa_required") {
+			if (result.code === "mfa_required") {
 				useAuthStore.setState({
 					session: {
 						...current,
-						telegramVerified: false,
+						authVerified: false,
+						mfaEnabled: true,
+						mfaRequired: true,
 						user: { ...current.user, access: undefined, role: "pending" },
 					},
 					error: undefined,
@@ -204,7 +281,9 @@ class SupabaseService {
 			useAuthStore.setState({
 				session: {
 					...current,
-					telegramVerified: true,
+					authVerified: true,
+					mfaEnabled: result.mfaEnabled !== false,
+					mfaRequired: false,
 					user: {
 						...current.user,
 						access,
@@ -222,7 +301,8 @@ class SupabaseService {
 				useAuthStore.setState({
 					session: {
 						...current,
-						telegramVerified: false,
+						authVerified: false,
+						mfaRequired: false,
 						user: { ...current.user, access: undefined, role: "pending" },
 					},
 					error:

@@ -9,21 +9,21 @@ import generate from '../ai/generate.js';
 import aiStatus from '../ai/status.js';
 import { requireUser } from '../_auth.js';
 
-// No mocks for application identity/Telegram/RBAC/critical guards or SQL RPCs.
-// Only the external Auth/Telegram/PostgREST HTTP boundary is synthetic. Auth
+// No mocks for application identity/TOTP/RBAC/critical guards or SQL RPCs.
+// Only the external Auth/PostgREST HTTP boundary is synthetic. Auth
 // deliberately accepts valid, unexpired JWTs after their session was revoked.
 const pg = new PGlite();
 const actor = randomUUID(), foreign = randomUUID();
 const current = randomUUID(), oldA = randomUUID(), oldB = randomUUID(), foreignSid = randomUUID();
 const env = {
  SUPABASE_URL:'https://integration.supabase.test', SUPABASE_PUBLISHABLE_KEY:'synthetic-publishable',
- SUPABASE_SERVICE_ROLE_KEY:'synthetic-service', TELEGRAM_BOT_TOKEN:'existing-synthetic-bot',
- TELEGRAM_BOT_USERNAME:'GetSupportOSBot', TELEGRAM_WEBHOOK_SECRET:'s'.repeat(40),
+ SUPABASE_SERVICE_ROLE_KEY:'synthetic-service', SECURITY_AUDIT_SECRET:'s'.repeat(40),
 };
 const signingKey = 'synthetic-integration-signing-key';
 const signature = data => createHmac('sha256',signingKey).update(data).digest('base64url');
-function jwt(user,sid) {
- const data=[{alg:'HS256',typ:'JWT'},{sub:user,session_id:sid,exp:Math.floor(Date.now()/1000)+3600}]
+let verifiedAt;
+function jwt(user,sid,at=verifiedAt) {
+ const data=[{alg:'HS256',typ:'JWT'},{sub:user,session_id:sid,aal:'aal2',amr:[{method:'totp',timestamp:at}],exp:Math.floor(Date.now()/1000)+3600}]
   .map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
  return `${data}.${signature(data)}`;
 }
@@ -72,9 +72,14 @@ async function transport(input,init={}) {
   if(url.pathname==='/auth/v1/logout') {
    expect(method).toBe('POST');expect(headers.get('apikey')).toBe(env.SUPABASE_SERVICE_ROLE_KEY);
    logoutCalls.push({actor:claims.sub,sid:claims.session_id,scope:url.searchParams.get('scope')});
-   expect(url.searchParams.get('scope')).toBe('others');
+   expect(['others','local','global']).toContain(url.searchParams.get('scope'));
    if(authMode==='error')return Response.json({message:'Synthetic Auth failure'},{status:500});
-   if(authMode!=='no-op')await pg.query('delete from auth.sessions where user_id=$1 and id<>$2',[claims.sub,claims.session_id]);
+   if(authMode!=='no-op') {
+    const scope=url.searchParams.get('scope');
+    if(scope==='others') await pg.query('delete from auth.sessions where user_id=$1 and id<>$2',[claims.sub,claims.session_id]);
+    else if(scope==='local') await pg.query('delete from auth.sessions where user_id=$1 and id=$2',[claims.sub,claims.session_id]);
+    else await pg.query('delete from auth.sessions where user_id=$1',[claims.sub]);
+   }
    return new Response(null,{status:204});
   }
  }
@@ -89,24 +94,17 @@ async function transport(input,init={}) {
    finally { await pg.exec('reset role'); }
   }
  }
- if(url.origin==='https://api.telegram.org'&&url.pathname.startsWith(`/bot${env.TELEGRAM_BOT_TOKEN}/`)) {
-  expect(method).toBe('POST');
-  if(url.pathname.endsWith('/sendMessage'))botMessages.push(body);
-  else expect(url.pathname.endsWith('/answerCallbackQuery')).toBe(true);
-  return Response.json({ok:true,result:{message_id:1}});
- }
  throw new Error(`Unexpected external request: ${url.origin}${url.pathname}`);
 }
 async function begin(action='sessions.revoke_others',payload={},token=tokens.current) {
+ verifiedAt++;
+ if(token===tokens.current) {tokens.current=jwt(actor,current);token=tokens.current;}
  const res=await call(accounts,'/api/accounts?action=critical',token,{operation:'begin',action,payload});
  expect(res.statusCode).toBe(200);
- return {id:res.body.id,token:res.body.token,callback:botMessages.at(-1).reply_markup.inline_keyboard[0][0].callback_data};
+ return {id:res.body.id,token:res.body.token};
 }
-async function decide(proof,approved=true,tg=333) {
- const req=request('/api/registration?action=webhook',tokens.current,{callback_query:{id:'synthetic-callback',from:{id:tg},
-  message:{chat:{type:'private',id:tg}},data:approved?proof.callback:proof.callback.replace('critical_approve:','critical_reject:')}});
- req.headers['x-telegram-bot-api-secret-token']=env.TELEGRAM_WEBHOOK_SECRET;
- const res=response();await registration(req,res);expect(res.statusCode).toBe(200);
+async function decide(proof,approved=true) {
+ if(!approved) expect((await call(accounts,'/api/accounts?action=critical',tokens.current,{operation:'cancel',id:proof.id})).statusCode).toBe(200);
 }
 const execute=(proof,token=tokens.current,extra={})=>call(accounts,'/api/accounts?action=revoke-other-sessions',token,{confirmation:proof?{id:proof.id,token:proof.token}:undefined,...extra});
 const sessionIds=async()=>(await pg.query('select id from auth.sessions order by id')).rows.map(row=>row.id).sort();
@@ -117,7 +115,8 @@ const revokedAudit=async()=>(await pg.query("select * from supportos_access_audi
 beforeAll(async()=>{
  await pg.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
   create table auth.users(id uuid primary key,email text,encrypted_password text,raw_app_meta_data jsonb,raw_user_meta_data jsonb,is_anonymous boolean default false);
-  create table auth.sessions(id uuid primary key,user_id uuid,not_after timestamptz,created_at timestamptz default now(),updated_at timestamptz,refreshed_at timestamp,user_agent text);
+  create table auth.sessions(id uuid primary key,user_id uuid,not_after timestamptz,aal text default 'aal2',factor_id uuid,created_at timestamptz default now(),updated_at timestamptz,refreshed_at timestamp,user_agent text);
+  create table auth.mfa_factors(id uuid primary key,user_id uuid,factor_type text,status text);
   create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
   create function auth.jwt() returns jsonb language sql as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
   grant usage on schema auth to authenticated;`);
@@ -128,16 +127,17 @@ beforeAll(async()=>{
   'migrations/20260929070633_server_only_supportos_grants.sql',
   'migrations/20261007191041_login_security_history.sql','migrations/20261007194247_telegram_critical_confirmation.sql',
   'migrations/20261007203642_critical_security_access_audit.sql','migrations/20261007204222_audit_registration_claim_completion.sql',
-  'migrations/20261007205438_restrict_access_helper_execute.sql','migrations/20261007210927_harden_all_supportos_relation_grants.sql'])
+  'migrations/20261007205438_restrict_access_helper_execute.sql','migrations/20261007210927_harden_all_supportos_relation_grants.sql','migrations/20261013102133_google_authenticator_auth.sql','migrations/20261013104812_optional_mfa_enrollment.sql'])
   await pg.exec(await readFile(new URL('../../supabase/'+path,import.meta.url),'utf8'));
  await pg.query('insert into auth.sessions(id,user_id) values($1,$5),($2,$5),($3,$5),($4,$6)',[current,oldA,oldB,foreignSid,actor,foreign]);
- await pg.query("insert into supportos_telegram_links(user_id,telegram_id,source) values($1,333,'registration'),($2,444,'registration')",[actor,foreign]);
- // Fixtures represent previously completed login 2FA on each separate device.
- for(const [user,sid,tg,index] of [[actor,current,333,'a'],[actor,oldA,333,'b'],[actor,oldB,333,'c'],[foreign,foreignSid,444,'d']])
-  await pg.query("insert into supportos_telegram_login_challenges(id,user_id,session_id,telegram_id,challenge_hash,status,approved_at) values($1,$2,$3,$4,$5,'approved',now())",[randomUUID(),user,sid,tg,index.repeat(64)]);
+ for(const [user,sid] of [[actor,current],[actor,oldA],[actor,oldB],[foreign,foreignSid]]) {
+  const factor=randomUUID();await pg.query("insert into auth.mfa_factors values($1,$2,'totp','verified')",[factor,user]);
+  await pg.query("update auth.sessions set factor_id=$1 where id=$2",[factor,sid]);
+ }
 },20000);
 beforeEach(async()=>{
  await pg.exec('begin');
+ verifiedAt=Math.floor(Date.now()/1000);
  tokens={current:jwt(actor,current),oldA:jwt(actor,oldA),oldB:jwt(actor,oldB),foreign:jwt(foreign,foreignSid)};
  botMessages=[];logoutCalls=[];databasePaths=[];authMode='normal';
  for(const [key,value] of Object.entries(env))vi.stubEnv(key,value);
@@ -172,7 +172,7 @@ it('revokes others through the real backend + SDK and immediately blocks still-v
  for(const [oldToken,oldSid] of [[tokens.oldA,oldA],[tokens.oldB,oldB]]) {
   // Auth still validates signature/expiry; the DB live-session gate must reject.
   expect((await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers:{Authorization:`Bearer ${oldToken}`}})).status).toBe(200);
-  expect((await pg.query('select status from supportos_telegram_login_challenges where session_id=$1',[oldSid])).rows[0].status).toBe('approved');
+
   await expect(requireUser(request('/api/accounts',oldToken),{permission:'users.manage'})).rejects.toMatchObject({status:401});
   for(const [handler,url,body] of [[accounts,'/api/accounts?action=me'],[accounts,'/api/accounts?action=sessions'],
    [accounts,'/api/accounts?action=login-history'],[accounts,'/api/accounts?action=revoke-other-sessions',{confirmation:{id:proof.id,token:proof.token},session_id:current,actor}],
@@ -180,7 +180,7 @@ it('revokes others through the real backend + SDK and immediately blocks still-v
    const cursor=databasePaths.length;
    const denied=await call(handler,url,oldToken,body);
    expect(denied.statusCode).toBe(401);
-   expect(databasePaths.slice(cursor)).toEqual(['/rest/v1/rpc/supportos_tg_login_state']);
+   expect(databasePaths.slice(cursor)).toEqual(['/rest/v1/rpc/supportos_mfa_session_state']);
   }
  }
  expect(await revokedEvents()).toEqual([{event_ref:'critical:'+proof.id}]);
@@ -188,19 +188,20 @@ it('revokes others through the real backend + SDK and immediately blocks still-v
  const replay=await execute(proof);expect(replay.statusCode).toBe(409);expect(logoutCalls).toHaveLength(1);
  expect(JSON.stringify(result.body)).not.toMatch(/access_token|refresh_token|token|session_id/);
 });
-it('a completed login 2FA or pending critical request alone cannot revoke sessions',async()=>{
+it('requires a fresh TOTP verification and a payload-bound permit',async()=>{
  expect((await execute()).statusCode).toBe(428);
- const proof=await begin();expect((await execute(proof)).statusCode).toBe(428);
- expect(logoutCalls).toHaveLength(0);expect(await sessionIds()).toEqual(expectedSessions);expect(await revokedEvents()).toHaveLength(0);
+ const stale=jwt(actor,current,Math.floor(Date.now()/1000)-120);
+ expect((await call(accounts,'/api/accounts?action=critical',stale,{operation:'begin',action:'sessions.revoke_others',payload:{}})).statusCode).toBe(428);
+ expect(logoutCalls).toHaveLength(0);expect(await sessionIds()).toEqual(expectedSessions);
 });
-it('requires a new Telegram confirmation for another revocation, even when a new session appears',async()=>{
+it('requires a new TOTP confirmation for another revocation, even when a new session appears',async()=>{
  const first=await begin();await decide(first);expect((await execute(first)).statusCode).toBe(200);
  const newlyCreated=randomUUID();await pg.query('insert into auth.sessions(id,user_id) values($1,$2)',[newlyCreated,actor]);
  expect((await execute(first)).statusCode).toBe(409);expect(await sessionIds()).toContain(newlyCreated);
  // Avoid a real wait: age the used fixture's rate-limit timestamp, not its expiry.
  await pg.query("update supportos_telegram_critical_requests set created_at=now()-interval '20 seconds' where id=$1",[first.id]);
  const second=await begin();expect(second.id).not.toBe(first.id);expect(second.token).not.toBe(first.token);
- expect((await execute(second)).statusCode).toBe(428);expect(await sessionIds()).toContain(newlyCreated);
+ expect(await sessionIds()).toContain(newlyCreated);
  await decide(second);expect((await execute(second)).statusCode).toBe(200);
  expect(await sessionIds()).toEqual([current,foreignSid].sort());expect(logoutCalls).toHaveLength(2);
  expect(await revokedEvents()).toHaveLength(2);
@@ -220,13 +221,12 @@ it('binds approval to actor/session/action and ignores target/scope/keep-session
  expect(ok.statusCode).toBe(200);expect(await sessionIds()).toEqual([current,foreignSid].sort());
  expect(logoutCalls).toEqual([{actor,sid:current,scope:'others'}]);
 });
-it('cannot substitute approval for another critical action or an unauthenticated Telegram sender',async()=>{
- const proof=await begin('telegram.unlink');await decide(proof);
- expect((await execute(proof)).statusCode).toBe(409);expect(logoutCalls).toHaveLength(0);
- // Separate fixture reset is unnecessary: age only the synthetic rate-limit row.
- await pg.query("update supportos_telegram_critical_requests set created_at=now()-interval '20 seconds' where id=$1",[proof.id]);
- const revoke=await begin();await decide(revoke,true,444);
- expect((await execute(revoke)).statusCode).toBe(428);expect(await sessionIds()).toEqual(expectedSessions);
+it('cannot substitute approval for another action or reuse the same verified TOTP token',async()=>{
+ const proof=await begin('role.save',{id:'custom',name:'Custom',description:'',permissions:['work'],version:0});
+ expect((await execute(proof)).statusCode).toBe(409);
+ const replay=await call(accounts,'/api/accounts?action=critical',tokens.current,{operation:'begin',action:'sessions.revoke_others',payload:{}});
+ expect(replay.statusCode).toBe(409);expect(replay.body.code).toBe('critical_mfa_reused');
+ expect(logoutCalls).toHaveLength(0);expect(await sessionIds()).toEqual(expectedSessions);
 });
 it.each(['error','no-op'])('fails closed on Auth %s and never records success or replays the consumed proof',async(mode)=>{
  const proof=await begin();await decide(proof);authMode=mode;
@@ -244,6 +244,86 @@ it('cannot keep a revoked access token by swapping its signed session claim to c
  expect((await call(accounts,'/api/accounts?action=me',forged)).statusCode).toBe(401);
  expect(databasePaths).toHaveLength(cursor);
  expect((await call(accounts,'/api/accounts?action=me')).statusCode).toBe(200);
+});
+it('rejects AAL1 tokens and enforces the same TOTP rule in existing RLS helpers',async()=>{
+ const claims={sub:actor,session_id:current,aal:'aal1',exp:Math.floor(Date.now()/1000)+3600};
+ const data=[{alg:'HS256',typ:'JWT'},claims].map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
+ const token=`${data}.${signature(data)}`;
+ const denied=await call(accounts,'/api/accounts?action=me',token);
+ expect(denied.statusCode).toBe(403);expect(denied.body.code).toBe('mfa_required');
+ await pg.query("select set_config('request.jwt.claim.sub',$1,true),set_config('request.jwt.claims',$2,true)",[actor,JSON.stringify(claims)]);
+ await pg.exec('set local role authenticated');
+ expect((await pg.query('select supportos_private.telegram_session_approved() value')).rows[0].value).toBe(false);
+ await pg.exec('reset role');
+ await pg.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({...claims,aal:'aal2'})]);
+ await pg.exec('set local role authenticated');
+ expect((await pg.query('select supportos_private.telegram_session_approved() value')).rows[0].value).toBe(true);
+ await pg.exec('savepoint no_direct_rpc');
+ await expect(pg.query('select public.supportos_mfa_session_state($1,$2)',[actor,current])).rejects.toThrow('permission denied');
+ await pg.exec('rollback to savepoint no_direct_rpc;reset role');
+});
+it('allows ordinary access without MFA but still enforces live sessions, RBAC and critical confirmation',async()=>{
+ await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);
+ await pg.query("update auth.sessions set aal='aal1',factor_id=null where user_id=$1",[actor]);
+ const claims={sub:actor,session_id:current,aal:'aal1',exp:Math.floor(Date.now()/1000)+3600};
+ const data=[{alg:'HS256',typ:'JWT'},claims].map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
+ const token=`${data}.${signature(data)}`;
+ const me=await call(accounts,'/api/accounts?action=me',token);
+ expect(me.statusCode).toBe(200);expect(me.body.mfaEnabled).toBe(false);
+ expect((await call(accounts,'/api/accounts?action=sessions',token)).statusCode).toBe(200);
+ expect((await call(accounts,'/api/accounts?action=critical',token,{operation:'begin',action:'sessions.revoke_others',payload:{}})).statusCode).toBe(428);
+ await pg.query("select set_config('request.jwt.claim.sub',$1,true),set_config('request.jwt.claims',$2,true)",[actor,JSON.stringify(claims)]);
+ await pg.exec('set local role authenticated');
+ expect((await pg.query('select supportos_private.telegram_session_approved() value')).rows[0].value).toBe(true);
+ await pg.exec('reset role');
+ await pg.query("update supportos_users set status='disabled' where id=$1",[actor]);
+ expect((await call(accounts,'/api/accounts?action=sessions',token)).statusCode).toBe(403);
+ await pg.query('delete from auth.sessions where id=$1',[current]);
+ expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(401);
+});
+it('does not enable MFA until QR verification, then rejects existing AAL1 tokens',async()=>{
+ await pg.query("update auth.mfa_factors set status='unverified' where user_id=$1",[actor]);
+ await pg.query("update auth.sessions set aal='aal1' where id=$1",[current]);
+ const claims={sub:actor,session_id:current,aal:'aal1',exp:Math.floor(Date.now()/1000)+3600};
+ const data=[{alg:'HS256',typ:'JWT'},claims].map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
+ const token=`${data}.${signature(data)}`;
+ expect((await call(accounts,'/api/accounts?action=me',token)).body.mfaEnabled).toBe(false);
+ await pg.query("update auth.mfa_factors set status='verified' where id=(select factor_id from auth.sessions where id=$1)",[current]);
+ expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(403);
+ await pg.query("update auth.sessions set aal='aal2' where id=$1",[current]);
+ expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(403);
+ expect((await call(accounts,'/api/accounts?action=me')).body.mfaEnabled).toBe(true);
+});
+it('invalidates a critical permit when all MFA factors are removed',async()=>{
+ const proof=await begin();
+ await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);
+ expect((await call(accounts,'/api/accounts?action=me')).body.mfaEnabled).toBe(false);
+ expect((await execute(proof)).statusCode).toBe(410);
+ expect(logoutCalls).toHaveLength(0);
+ expect(await sessionIds()).toEqual(expectedSessions);
+});
+it('requires a verified TOTP factor even for an AAL2 session and invalidates removed factors',async()=>{
+ await pg.query("update auth.mfa_factors set status='unverified' where id=(select factor_id from auth.sessions where id=$1)",[current]);
+ expect((await call(accounts,'/api/accounts?action=me')).statusCode).toBe(403);
+ await pg.query("update auth.mfa_factors set status='verified',factor_type='phone' where user_id=$1",[actor]);
+ expect((await call(accounts,'/api/accounts?action=me')).statusCode).toBe(403);
+});
+it('keeps new Google identities pending and audits native password changes without any bot permit',async()=>{
+ const id=randomUUID();await pg.query('insert into auth.users(id,email,encrypted_password,raw_app_meta_data) values($1,$2,$3,$4)',[id,'google@example.test','old-hash',{provider:'google'}]);
+ expect((await pg.query('select status from supportos_users where id=$1',[id])).rows[0].status).toBe('pending');
+ expect((await pg.query('select count(*) n from supportos_user_roles where user_id=$1',[id])).rows[0].n).toBe(0);
+ await pg.query('update auth.users set encrypted_password=$1 where id=$2',['new-hash',id]);
+ const events=(await pg.query('select event_type,event_ref from supportos_login_events where user_id=$1',[id])).rows;
+ expect(events).toHaveLength(1);expect(events[0].event_type).toBe('password_changed');
+ expect(events[0].event_ref).toMatch(/^auth-password:/);
+ expect(JSON.stringify((await pg.query('select * from supportos_access_audit where target_id=$1',[id])).rows)).not.toMatch(/old-hash|new-hash/);
+});
+it('supports audited global logout after a password change and blocks all old access tokens',async()=>{
+ const result=await call(registration,'/api/registration?action=logout-all',tokens.current,{});
+ expect(result.statusCode).toBe(200);expect(logoutCalls).toEqual([{actor,sid:current,scope:'global'}]);
+ expect(await sessionIds()).toEqual([foreignSid]);
+ for(const token of [tokens.current,tokens.oldA,tokens.oldB]) expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(401);
+ expect((await revokedEvents()).map(event=>event.event_ref)).toEqual(['logout:'+current]);
 });
 it('does not call Auth or consume approval if the pre-Auth audit cannot be committed',async()=>{
  const proof=await begin();await decide(proof);

@@ -1,3 +1,5 @@
+> Архив: Telegram-бот выведен из приложения. Актуальная настройка — [Google OAuth и Google Authenticator](auth.md). Старые инструкции ниже сохранены как история реализации.
+
 # Критичные действия через существующий Telegram
 
 Миграция: `supabase/migrations/20261007194247_telegram_critical_confirmation.sql`.

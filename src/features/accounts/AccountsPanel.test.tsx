@@ -12,6 +12,14 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
 
+vi.mock("@/features/auth/AuthenticatorForm", () => ({
+	AuthenticatorForm: ({ onVerified }: { onVerified: () => void }) => (
+		<button type="button" onClick={onVerified}>
+			Подтвердить код
+		</button>
+	),
+}));
+
 const mock = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/services/authenticated-fetch", () => ({
 	authenticatedFetch: mock.fetch,
@@ -160,7 +168,7 @@ it("approves a pending registration and assigns selected roles in one request", 
 		},
 	});
 });
-it("keeps the exact edited payload through the Telegram gate and executes only after explicit approval", async () => {
+it("keeps the exact edited payload through the TOTP gate and executes only after explicit approval", async () => {
 	const original = mock.fetch.getMockImplementation()!;
 	const proof = { id: "request-id", token: "one-time-permit" };
 	mock.fetch.mockImplementation(async (url, init) => {
@@ -176,7 +184,7 @@ it("keeps the exact edited payload through the Telegram gate and executes only a
 		if (!body.confirmation)
 			return Response.json(
 				{
-					error: "Подтвердите в Telegram",
+					error: "Подтвердите код",
 					code: "critical_confirmation_required",
 				},
 				{ status: 428 },
@@ -208,9 +216,9 @@ it("keeps the exact edited payload through the Telegram gate and executes only a
 		screen.getByRole("button", { name: "Подтвердить изменения" }),
 	);
 	fireEvent.click(
-		await screen.findByRole("button", { name: "Отправить подтверждение" }),
+		await screen.findByRole("button", { name: "Подтвердить код" }),
 	);
-	await screen.findByText("Подтверждено в Telegram. Можно выполнить действие.");
+	await screen.findByText("Код подтверждён. Можно выполнить действие.");
 	expect(
 		mock.fetch.mock.calls.filter(
 			([, init]) =>

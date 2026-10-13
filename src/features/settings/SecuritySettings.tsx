@@ -1,12 +1,12 @@
 import { ActiveSessionsPanel } from "@/features/accounts/ActiveSessionsPanel";
+import { AuthenticatorPanel } from "@/features/accounts/AuthenticatorPanel";
 import { LoginHistoryPanel } from "@/features/accounts/LoginHistoryPanel";
-import { TelegramLinkPanel } from "@/features/accounts/TelegramLinkPanel";
 
 export function SecuritySettings() {
 	return (
 		<>
 			<ActiveSessionsPanel />
-			<TelegramLinkPanel />
+			<AuthenticatorPanel />
 			<LoginHistoryPanel />
 		</>
 	);

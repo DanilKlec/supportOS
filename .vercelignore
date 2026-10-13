@@ -1,0 +1,14 @@
+.env
+.env.*
+.output
+.nitro
+.tanstack
+.vinxi
+dist
+dist-ssr
+node_modules
+.git
+.codex
+.agents
+test-results
+playwright-report

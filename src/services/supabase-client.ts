@@ -10,6 +10,7 @@ export const supabase =
 	url && key
 		? createClient(url, key, {
 				auth: {
+					flowType: "pkce",
 					persistSession: true,
 					autoRefreshToken: true,
 					detectSessionInUrl: true,

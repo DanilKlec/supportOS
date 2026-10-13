@@ -226,6 +226,8 @@ export default defineConfig({
 			workbox: {
 				cleanupOutdatedCaches: true,
 				navigateFallback: "/index.html",
+				// Login callbacks and API requests must reach the current server.
+				navigateFallbackDenylist: [/^\/login(?:\/|$)/, /^\/api\//],
 				globPatterns: ["**/*.{js,css,html,ico,png,svg,json,webmanifest}"],
 			},
 			devOptions: {

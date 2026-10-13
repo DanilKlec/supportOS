@@ -11,15 +11,19 @@ import { useAuthStore } from "@/store/auth.store";
 
 const mock = vi.hoisted(() => ({
 	signIn: vi.fn(),
+	signUp: vi.fn(),
+	signInWithGoogle: vi.fn(),
+	resetPassword: vi.fn(),
 	navigate: vi.fn(),
-	fetch: vi.fn(),
 }));
 vi.mock("@tanstack/react-router", () => ({
-	createFileRoute: () => () => ({ useSearch: () => ({ redirect: "/" }) }),
+	createFileRoute: () => () => ({
+		useSearch: () => ({ redirect: "/agent-monitor" }),
+	}),
 	useNavigate: () => mock.navigate,
 }));
 vi.mock("@/services/supabase.service", () => ({
-	supabaseService: { isConfigured: () => true, signIn: mock.signIn },
+	supabaseService: { isConfigured: () => true, ...mock },
 }));
 vi.mock("@/components/brand/AmbientBackground", () => ({
 	AmbientBackground: () => null,
@@ -28,40 +32,21 @@ vi.mock("@/components/brand/AmbientBackground", () => ({
 
 import { LoginPage } from "./login";
 
-const challenge = {
-	login: "operator",
-	browserToken: "a".repeat(43),
-	telegramUrl: `https://t.me/GetSupportOSBot?start=${"b".repeat(43)}`,
-	expiresAt: new Date(Date.now() + 1200000).toISOString(),
-};
 beforeEach(() => {
 	vi.resetAllMocks();
-	sessionStorage.clear();
-	useAuthStore.setState({ session: undefined, loading: false });
-	vi.stubGlobal("fetch", mock.fetch);
-	mock.fetch.mockImplementation(
-		async (url) =>
-			new Response(
-				JSON.stringify(
-					String(url).endsWith("begin")
-						? challenge
-						: String(url).endsWith("status")
-							? { verified: false }
-							: { login: "operator" },
-				),
-			),
-	);
-	mock.signIn.mockResolvedValue(undefined);
+	useAuthStore.setState({
+		session: undefined,
+		loading: false,
+		passwordRecovery: false,
+		error: undefined,
+	});
 });
-afterEach(() => {
-	cleanup();
-	vi.unstubAllGlobals();
-});
-function fill(confirmation: string) {
+afterEach(cleanup);
+function register(confirmation = "long-password") {
 	render(<LoginPage />);
 	fireEvent.click(screen.getByRole("button", { name: "Регистрация" }));
-	fireEvent.change(screen.getByLabelText("Логин"), {
-		target: { value: "operator" },
+	fireEvent.change(screen.getByLabelText("Рабочая почта"), {
+		target: { value: "new@example.com" },
 	});
 	fireEvent.change(screen.getByLabelText("Пароль"), {
 		target: { value: "long-password" },
@@ -73,86 +58,61 @@ function fill(confirmation: string) {
 		screen.getByRole("button", { name: "Отправить заявку" }).closest("form")!,
 	);
 }
-it("prevents signup with mismatched passwords", async () => {
-	fill("different-password");
-	expect(await screen.findByRole("alert")).toHaveProperty(
-		"textContent",
-		"Пароли не совпадают",
-	);
-	expect(mock.fetch).not.toHaveBeenCalled();
+it("rejects mismatched passwords without creating an account", async () => {
+	register("different-password");
+	await screen.findByText("Пароли не совпадают");
+	expect(mock.signUp).not.toHaveBeenCalled();
 });
-it("opens Telegram confirmation without sending or persisting the password", async () => {
-	fill("long-password");
-	expect(
-		await screen.findByRole("heading", { name: "Давайте познакомимся." }),
-	).toBeTruthy();
-	expect(
-		screen
-			.getByRole("link", { name: "Подтвердить через Telegram" })
-			.getAttribute("href"),
-	).toBe(challenge.telegramUrl);
-	expect(JSON.parse(mock.fetch.mock.calls[0][1].body)).toEqual({
-		login: "operator",
-	});
-	expect(
-		sessionStorage.getItem("supportos:telegram-registration"),
-	).not.toContain("long-password");
-	fireEvent.click(
-		screen.getByRole("button", { name: "Завершить регистрацию" }),
-	);
-	await screen.findByText(/Откройте бота, нажмите/);
-	expect(mock.signIn).not.toHaveBeenCalled();
-	expect(
-		mock.fetch.mock.calls.some(([url]) => String(url).endsWith("complete")),
-	).toBe(false);
-});
-it("completes only after confirmation and signs in with the chosen login", async () => {
-	fill("long-password");
-	await screen.findByRole("heading", { name: "Давайте познакомимся." });
-	mock.fetch
-		.mockResolvedValueOnce(new Response(JSON.stringify({ verified: true })))
-		.mockResolvedValueOnce(new Response(JSON.stringify({ login: "operator" })));
-	fireEvent.click(
-		screen.getByRole("button", { name: "Завершить регистрацию" }),
-	);
+it("registers by email and waits for email confirmation without claiming access", async () => {
+	mock.signUp.mockResolvedValue(undefined);
+	register();
 	await waitFor(() =>
-		expect(mock.signIn).toHaveBeenCalledWith("operator", "long-password"),
+		expect(mock.signUp).toHaveBeenCalledWith(
+			"new@example.com",
+			"long-password",
+		),
 	);
-	expect(JSON.parse(mock.fetch.mock.calls[2][1].body)).toEqual({
-		browserToken: challenge.browserToken,
-		password: "long-password",
-	});
-	await waitFor(() =>
-		expect(
-			sessionStorage.getItem("supportos:telegram-registration"),
-		).toBeNull(),
-	);
+	await screen.findByText(/Проверьте почту и подтвердите регистрацию/);
+	expect(mock.navigate).not.toHaveBeenCalled();
+	expect(document.body.textContent).not.toContain("Telegram");
 });
-it("restores a challenge after reload but requires password reentry", async () => {
-	sessionStorage.setItem(
-		"supportos:telegram-registration",
-		JSON.stringify(challenge),
-	);
+it("starts Google OAuth with the intended local destination", async () => {
+	mock.signInWithGoogle.mockResolvedValue(undefined);
 	render(<LoginPage />);
-	expect(screen.getByLabelText("Пароль")).toHaveProperty("value", "");
-	fireEvent.click(screen.getByRole("button", { name: "Вернуться ко входу" }));
-	expect(
-		screen.getByRole("button", { name: "Войти в пространство" }),
-	).toBeTruthy();
-	expect(sessionStorage.getItem("supportos:telegram-registration")).toBeNull();
+	fireEvent.click(screen.getByText("Войти через Google"));
+	await waitFor(() =>
+		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/agent-monitor"),
+	);
 });
-it("shows server configuration errors without claiming registration succeeded", async () => {
-	mock.fetch.mockResolvedValueOnce(
-		new Response(JSON.stringify({ error: "Регистрация ещё не настроена" }), {
-			status: 503,
-		}),
+it("shows Google provider errors without granting access", async () => {
+	mock.signInWithGoogle.mockRejectedValue(new Error("Google ещё не настроен"));
+	render(<LoginPage />);
+	fireEvent.click(screen.getByText("Войти через Google"));
+	await screen.findByText("Google ещё не настроен");
+	expect(mock.navigate).not.toHaveBeenCalled();
+});
+it("offers Google registration with the same provider icon", async () => {
+	mock.signInWithGoogle.mockResolvedValue(undefined);
+	render(<LoginPage />);
+	fireEvent.click(screen.getByRole("button", { name: "Регистрация" }));
+	const button = screen.getByRole("button", {
+		name: "Зарегистрироваться через Google",
+	});
+	expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+	fireEvent.click(button);
+	await waitFor(() =>
+		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/agent-monitor"),
 	);
-	fill("long-password");
-	expect(await screen.findByRole("alert")).toHaveProperty(
-		"textContent",
-		"Регистрация ещё не настроена",
+});
+it("uses email recovery without a bot", async () => {
+	mock.resetPassword.mockResolvedValue(undefined);
+	render(<LoginPage />);
+	fireEvent.click(screen.getByText(/Восстановить по почте/));
+	fireEvent.change(screen.getByLabelText("Почта"), {
+		target: { value: "operator@example.com" },
+	});
+	fireEvent.click(screen.getByText("Отправить ссылку"));
+	await waitFor(() =>
+		expect(mock.resetPassword).toHaveBeenCalledWith("operator@example.com"),
 	);
-	expect(
-		screen.queryByRole("heading", { name: "Давайте познакомимся." }),
-	).toBeNull();
 });

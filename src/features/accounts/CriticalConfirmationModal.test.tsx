@@ -10,6 +10,14 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
 
+vi.mock("@/features/auth/AuthenticatorForm", () => ({
+	AuthenticatorForm: ({ onVerified }: { onVerified: () => void }) => (
+		<button type="button" onClick={onVerified}>
+			Подтвердить код
+		</button>
+	),
+}));
+
 const mocks = vi.hoisted(() => ({ begin: vi.fn(), request: vi.fn() }));
 vi.mock("@/services/critical-confirmation.service", () => ({
 	beginCritical: mocks.begin,
@@ -70,10 +78,8 @@ it("does not send or execute automatically; only an explicit click uses approved
 	show();
 	expect(mocks.begin).not.toHaveBeenCalled();
 	expect(execute).not.toHaveBeenCalled();
-	fireEvent.click(
-		screen.getByRole("button", { name: "Отправить подтверждение" }),
-	);
-	await screen.findByText("Подтверждено в Telegram. Можно выполнить действие.");
+	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));
+	await screen.findByText("Код подтверждён. Можно выполнить действие.");
 	expect(mocks.begin).toHaveBeenCalledWith(request);
 	expect(execute).not.toHaveBeenCalled();
 	expect(mocks.request.mock.calls[0][0]).toEqual({
@@ -98,9 +104,7 @@ it.each([
 ])("does not execute %s confirmation", async (status) => {
 	mocks.request.mockResolvedValue(state(status));
 	show();
-	fireEvent.click(
-		screen.getByRole("button", { name: "Отправить подтверждение" }),
-	);
+	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));
 	const button = await screen.findByRole("button", {
 		name: "Выполнить действие",
 	});
@@ -112,10 +116,8 @@ it.each([
 });
 it("cancels the current request on dismissal and never sends a proof in status/cancel requests", async () => {
 	show();
-	fireEvent.click(
-		screen.getByRole("button", { name: "Отправить подтверждение" }),
-	);
-	await screen.findByText("Подтверждено в Telegram. Можно выполнить действие.");
+	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));
+	await screen.findByText("Код подтверждён. Можно выполнить действие.");
 	fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
 	await waitFor(() => expect(close).toHaveBeenCalledOnce());
 	expect(mocks.request).toHaveBeenCalledWith({
@@ -127,10 +129,8 @@ it("cancels the current request on dismissal and never sends a proof in status/c
 it("does not silently retry an action after failure or keep an executable permit", async () => {
 	execute.mockRejectedValue(new Error("Данные изменились"));
 	show();
-	fireEvent.click(
-		screen.getByRole("button", { name: "Отправить подтверждение" }),
-	);
-	await screen.findByText("Подтверждено в Telegram. Можно выполнить действие.");
+	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));
+	await screen.findByText("Код подтверждён. Можно выполнить действие.");
 	fireEvent.click(screen.getByRole("button", { name: "Выполнить действие" }));
 	await screen.findByRole("alert");
 	expect(screen.getByRole("alert").textContent).toBe("Данные изменились");

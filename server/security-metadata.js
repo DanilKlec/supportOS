@@ -7,6 +7,7 @@ export function securityMetadata(req, env) {
  const candidate = env.VERCEL === '1' ? req.headers?.['x-vercel-forwarded-for'] : req.socket?.remoteAddress;
  const ip = typeof candidate === 'string' ? candidate.split(',')[0].trim() : '';
  if (!isIP(ip)) return {agent,ipHash:null};
- if (!env.TELEGRAM_WEBHOOK_SECRET) throw Object.assign(new Error('Не настроен серверный ключ журнала безопасности'),{status:503});
- return {agent,ipHash:createHmac('sha256',env.TELEGRAM_WEBHOOK_SECRET).update(ip).digest('hex')};
+ const secret = env.SECURITY_AUDIT_SECRET || env.SUPABASE_SERVICE_ROLE_KEY;
+ if (!secret) throw Object.assign(new Error('Не настроен серверный ключ журнала безопасности'),{status:503});
+ return {agent,ipHash:createHmac('sha256',secret).update(ip).digest('hex')};
 }

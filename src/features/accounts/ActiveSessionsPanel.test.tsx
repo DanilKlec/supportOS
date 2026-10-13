@@ -11,6 +11,14 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
 
+vi.mock("@/features/auth/AuthenticatorForm", () => ({
+	AuthenticatorForm: ({ onVerified }: { onVerified: () => void }) => (
+		<button type="button" onClick={onVerified}>
+			Подтвердить код
+		</button>
+	),
+}));
+
 const loader = vi.hoisted(() => vi.fn());
 const critical = vi.hoisted(() => ({
 	begin: vi.fn(),
@@ -144,10 +152,8 @@ it("revokes only other sessions through generic confirmation and refreshes the c
 		screen.getByRole("button", { name: "Завершить все остальные сессии" }),
 	);
 	expect(critical.action).not.toHaveBeenCalled();
-	fireEvent.click(
-		screen.getByRole("button", { name: "Отправить подтверждение" }),
-	);
-	await screen.findByText("Подтверждено в Telegram. Можно выполнить действие.");
+	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));
+	await screen.findByText("Код подтверждён. Можно выполнить действие.");
 	expect(critical.begin).toHaveBeenCalledWith({
 		action: "sessions.revoke_others",
 		payload: {},

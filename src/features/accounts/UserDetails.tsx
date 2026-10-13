@@ -373,15 +373,6 @@ function EditUser({
 			}}
 		>
 			<h3 className="break-all font-semibold">Доступ: {user.email}</h3>
-			{user.telegram && (
-				<p className="text-sm text-muted">
-					Telegram подтверждён:{" "}
-					{user.telegram.telegram_username
-						? `@${user.telegram.telegram_username}`
-						: "без username"}{" "}
-					· ID {user.telegram.telegram_id}
-				</p>
-			)}
 			{user.status === "pending" && (
 				<p className="text-sm text-muted">
 					Новая заявка. Выберите роли и подтвердите регистрацию. До

@@ -10,7 +10,7 @@ import registration from '../registration/index.js';
 export function agentMonitorPlugin() {
  return {name:'supportos-agent-monitor',configureServer(server) {
   const env=loadEnv(server.config.mode,server.config.root,'');
-  for(const [key,value] of Object.entries(env)) if(/^(MONITOR_|LIVECHAT_|SUPABASE_|TELEGRAM_)/.test(key)&&process.env[key]===undefined) process.env[key]=value;
+  for(const [key,value] of Object.entries(env)) if(/^(MONITOR_|LIVECHAT_|SUPABASE_|SECURITY_AUDIT_SECRET$)/.test(key)&&process.env[key]===undefined) process.env[key]=value;
   server.middlewares.use(async(req,res,next)=>{
    const path=new URL(req.url??'','http://localhost').pathname;
    if(!['/api/agent-monitor','/api/accounts','/api/ai/knowledge','/api/ai/glossary','/api/binds','/api/content','/api/projects','/api/registration'].includes(path)) return next();

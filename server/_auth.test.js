@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 const rbac=vi.hoisted(()=>({loadAccess:vi.fn()}));
 vi.mock('./_rbac.js',()=>rbac);
-const mfa=vi.hoisted(()=>({requireTelegram:vi.fn(async()=>{})}));
-vi.mock('./telegram-2fa.js',()=>mfa);
+const mfa=vi.hoisted(()=>({requireMfa:vi.fn(async()=>{})}));
+vi.mock('./mfa.js',()=>mfa);
 import { authorize, requireUser } from './_auth.js';
 const env={SUPABASE_URL:'https://project.supabase.co',SUPABASE_PUBLISHABLE_KEY:'public'};
 it('rejects disabled accounts and uses database permissions over legacy admin metadata',async()=>{
@@ -22,9 +22,9 @@ it('returns uncached 401 JSON for protected APIs',async()=>{const res={headers:{
 it('requires the second factor even with valid password and active permissions',async()=>{
  const token='x.'+Buffer.from(JSON.stringify({sub:'u',session_id:'11111111-1111-4111-8111-111111111111'})).toString('base64url')+'.signature';
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({id:'u'}))));
- mfa.requireTelegram.mockRejectedValueOnce(Object.assign(new Error('Telegram 2FA required'),{status:403,code:'telegram_2fa_required'}));
- await expect(requireUser({headers:{authorization:`Bearer ${token}`}},{env})).rejects.toMatchObject({status:403,code:'telegram_2fa_required'});
- expect(mfa.requireTelegram).toHaveBeenLastCalledWith(expect.objectContaining({id:'u',sessionId:'11111111-1111-4111-8111-111111111111'}),env);
+ mfa.requireMfa.mockRejectedValueOnce(Object.assign(new Error('MFA required'),{status:403,code:'mfa_required'}));
+ await expect(requireUser({headers:{authorization:`Bearer ${token}`}},{env})).rejects.toMatchObject({status:403,code:'mfa_required'});
+ expect(mfa.requireMfa).toHaveBeenLastCalledWith(expect.objectContaining({id:'u',sessionId:'11111111-1111-4111-8111-111111111111'}),env);
 });
 it('rejects missing or mismatched session claims after Supabase validates the token',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({id:'u'}))));

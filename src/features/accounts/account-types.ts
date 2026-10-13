@@ -19,11 +19,6 @@ export type User = {
 	status: string;
 	version: number;
 	roles: string[];
-	telegram?: {
-		telegram_id: number;
-		telegram_username: string | null;
-		verified_at: string;
-	} | null;
 };
 export type Audit = {
 	id: number;

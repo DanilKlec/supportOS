@@ -1,6 +1,7 @@
 import { requireAppAuth } from "@/app/auth-guard";
+import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
+import { PasswordForm } from "@/features/auth/PasswordForm";
 import { PendingApproval } from "@/features/auth/PendingApproval";
-import { TelegramTwoFactor } from "@/features/auth/TelegramTwoFactor";
 import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
 import { ProjectEmailServerCache } from "@/features/project-emails/ProjectEmailServerCache";
 import { supabaseService } from "@/services/supabase.service";
@@ -76,11 +77,13 @@ function RootComponent() {
 	const lightweight = isLightweightRoute(pathname);
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
+	const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
+	const authError = useAuthStore((state) => state.error);
 	const isLoginRoute = pathname.replace(/\/+$/, "") === "/login";
 	const accessGranted =
 		!loading &&
 		Boolean(session) &&
-		Boolean(session?.telegramVerified) &&
+		Boolean(session?.authVerified) &&
 		canAccessPage(session?.user.access, pathname, hash);
 	useEffect(() => {
 		if (loading) return;
@@ -127,8 +130,32 @@ function RootComponent() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
-				{!loading && session && !session.telegramVerified ? (
-					<TelegramTwoFactor key={session.sessionId ?? session.user.id} />
+				{!loading && session?.mfaRequired ? (
+					<AuthenticatorGate key={session.sessionId ?? session.user.id} />
+				) : !loading && session && !session.authVerified ? (
+					<div className="min-h-screen bg-background px-6 py-16 text-foreground">
+						<div className="mx-auto max-w-lg space-y-4">
+							<p role="alert">{authError || "Проверяем доступ…"}</p>
+							<button
+								type="button"
+								className="ui-button"
+								onClick={() => void supabaseService.refreshIdentity()}
+							>
+								Повторить проверку
+							</button>
+							<button
+								type="button"
+								className="ui-button"
+								onClick={() => void supabaseService.signOut()}
+							>
+								Выйти
+							</button>
+						</div>
+					</div>
+				) : passwordRecovery && session ? (
+					<div className="min-h-screen bg-background px-6 py-16">
+						<PasswordForm />
+					</div>
 				) : accessGranted || isLoginRoute ? (
 					<MainLayout>
 						<Outlet />

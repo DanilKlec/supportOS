@@ -13,7 +13,9 @@ export interface AuthUser {
 }
 
 export interface AuthSession {
-	telegramVerified?: boolean;
+	authVerified?: boolean;
+	mfaEnabled?: boolean;
+	mfaRequired?: boolean;
 	sessionId?: string;
 	accessToken: string;
 	refreshToken?: string;
@@ -22,6 +24,7 @@ export interface AuthSession {
 }
 
 interface AuthState {
+	passwordRecovery: boolean;
 	configured: boolean;
 	loading: boolean;
 	session?: AuthSession;
@@ -33,6 +36,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+	passwordRecovery: false,
 	configured: false,
 	loading: true,
 	session: undefined,

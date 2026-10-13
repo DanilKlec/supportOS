@@ -1,7 +1,7 @@
 // Verify with Supabase Auth on every request; decoded JWTs and browser stores are not authorization.
 import {can} from '../shared/access.js';
 import {loadAccess} from './_rbac.js';
-import {requireTelegram} from './telegram-2fa.js';
+import {requireMfa} from './mfa.js';
 export async function requireIdentity(request, env = process.env) {
  const header = request.headers.authorization;
  if (typeof header !== 'string' || !/^Bearer \S+$/i.test(header)) throw Object.assign(new Error('Войдите в SupportOS'), { status: 401 });
@@ -21,11 +21,13 @@ export async function requireIdentity(request, env = process.env) {
  let claims; try { claims=JSON.parse(Buffer.from(header.slice(7).split('.')[1],'base64url').toString()); } catch { claims=null; }
  if(claims?.sub!==user.id || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(claims?.session_id??''))throw Object.assign(new Error('Сессия недействительна. Войдите снова.'),{status:401});
  user.sessionId=claims.session_id;
+ user.aal=claims.aal;
+ user.mfaVerifiedAt=Array.isArray(claims.amr)?Math.max(0,...claims.amr.filter(item=>item.method==='totp'&&Number.isSafeInteger(item.timestamp)).map(item=>item.timestamp)):0;
  return user;
 }
 export async function requireUser(request, { supervisor = false, permission = 'work', env = process.env } = {}) {
  const user=await requireIdentity(request,env);
- await requireTelegram(user,env);
+ await requireMfa(user,env);
  user.access=await loadAccess(user.id,env);
  if(permission!==null && !can(user.access,supervisor?'monitor.read':permission)) throw Object.assign(new Error(user.access.status==='disabled'?'Доступ к аккаунту отключён':'Недостаточно прав для этого действия'), { status: 403 });
  return user;

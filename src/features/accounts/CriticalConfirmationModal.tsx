@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { AuthenticatorForm } from "@/features/auth/AuthenticatorForm";
 import {
 	beginCritical,
 	type CriticalProof,
@@ -112,32 +113,27 @@ export function CriticalConfirmationModal({
 	const status = locallyExpired ? "expired" : state.data?.status;
 	return (
 		<BaseModal
-			title="Подтверждение в Telegram"
+			title="Подтверждение действия"
 			onClose={() => void close()}
 			closeDisabled={busy}
 		>
 			<p className="text-sm text-muted">
-				Подтвердите именно это действие в существующем боте SupportOS.
+				Подтвердите именно это действие кодом Google Authenticator.
 				Подтверждение действует 5 минут и используется один раз в текущей
 				сессии.
 			</p>
-			{request.action.startsWith("telegram.") && (
-				<p className="mt-3 text-sm">
-					Текущая привязка и Telegram-подтверждения будут отозваны. Для доступа
-					потребуется новая привязка с одобрением администратора.
-				</p>
-			)}
+			{!proof && <AuthenticatorForm onVerified={start} />}
 			{proof && (
 				<output className="block mt-3 text-sm">
 					{attempted || status === "consumed" || status === "completed"
 						? "Выполнение уже запрошено. Для повторной попытки создайте новое подтверждение."
 						: status === "approved"
-							? "Подтверждено в Telegram. Можно выполнить действие."
+							? "Код подтверждён. Можно выполнить действие."
 							: status === "rejected"
 								? "Действие отклонено."
 								: status === "expired"
 									? "Срок подтверждения истёк."
-									: "Ожидаем подтверждения в Telegram…"}
+									: "Проверяем подтверждение…"}
 				</output>
 			)}
 			{(error || state.error) && (
@@ -146,11 +142,7 @@ export function CriticalConfirmationModal({
 				</p>
 			)}
 			<div className="ui-actions mt-4 gap-2 border-t border-border pt-4">
-				{!proof ? (
-					<Button loading={busy} onClick={() => void start()}>
-						Отправить подтверждение
-					</Button>
-				) : (
+				{proof && (
 					<Button
 						loading={busy}
 						disabled={status !== "approved" || attempted || state.isError}

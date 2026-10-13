@@ -1,3 +1,5 @@
+> Архив: Telegram-бот выведен из приложения. Актуальная настройка — [Google OAuth и Google Authenticator](auth.md). Старые инструкции ниже сохранены как история реализации.
+
 # Telegram password confirmation
 
 Both Settings → Change password and Login → Forgot password use the existing

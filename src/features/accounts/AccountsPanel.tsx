@@ -14,7 +14,6 @@ import type { Audit, ManagedRole, Permission, User } from "./account-types";
 import { CriticalConfirmationModal } from "./CriticalConfirmationModal";
 import { LoginHistoryPanel } from "./LoginHistoryPanel";
 import { RolesPanel } from "./RolesPanel";
-import { TelegramLinkRequests } from "./TelegramLinkRequests";
 import { CreateUser, UserDetails } from "./UserDetails";
 import { UsersTable } from "./UsersTable";
 
@@ -259,7 +258,6 @@ export function AccountsPanel({
 					/>
 				</BaseModal>
 			)}
-			{usersAllowed && <TelegramLinkRequests />}
 			{confirmation && (
 				<BaseModal
 					title="Подтвердить изменения прав"

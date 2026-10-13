@@ -1,4 +1,4 @@
-import { TelegramPassword } from "@/features/auth/TelegramPassword";
+import { PasswordForm } from "@/features/auth/PasswordForm";
 export function PasswordPanel() {
-	return <TelegramPassword mode="change" />;
+	return <PasswordForm />;
 }

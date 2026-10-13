@@ -15,18 +15,11 @@ import {
 	AmbientBackground,
 	AmbientMotionButton,
 } from "@/components/brand/AmbientBackground";
+import { GoogleIcon } from "@/components/brand/GoogleIcon";
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
-import { TelegramPassword } from "@/features/auth/TelegramPassword";
-import { TelegramRegistration } from "@/features/auth/TelegramRegistration";
+import { PasswordForm } from "@/features/auth/PasswordForm";
 import { supabaseService } from "@/services/supabase.service";
-import {
-	readTelegramChallenge,
-	registrationRequest,
-	saveTelegramChallenge,
-	type TelegramChallenge,
-} from "@/services/telegram-registration";
 import { useAuthStore } from "@/store/auth.store";
-import { normalizeLogin } from "../../shared/login-identity.js";
 
 export const Route = createFileRoute("/login")({
 	validateSearch: (search: Record<string, unknown>) => ({
@@ -40,16 +33,15 @@ export function LoginPage() {
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
 	const authError = useAuthStore((state) => state.error);
+	const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
 	useEffect(() => {
-		if (session?.telegramVerified && !loading)
+		if (session?.authVerified && !loading && !passwordRecovery)
 			void navigate({ href: safeAuthRedirect(redirect), replace: true });
-	}, [session, loading, redirect, navigate]);
+	}, [session, loading, redirect, navigate, passwordRecovery]);
 	const [register, setRegister] = useState(false);
 	const [recovery, setRecovery] = useState(false);
 	const [confirmation, setConfirmation] = useState("");
-	const [challenge, setChallenge] = useState<TelegramChallenge | undefined>(
-		readTelegramChallenge,
-	);
+	const [message, setMessage] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
@@ -66,12 +58,13 @@ export function LoginPage() {
 				if (password !== confirmation) throw new Error("Пароли не совпадают");
 				if (password.length < 12 || password.length > 128)
 					throw new Error("Пароль должен содержать от 12 до 128 символов");
-				const next = await registrationRequest<TelegramChallenge>("begin", {
-					login: normalizeLogin(email),
-				});
-				saveTelegramChallenge(next);
-				setChallenge(next);
+				const next = await supabaseService.signUp(email, password);
+				setPassword("");
 				setConfirmation("");
+				if (!next)
+					setMessage(
+						"Проверьте почту и подтвердите регистрацию по ссылке в письме. Роли и доступ назначит администратор.",
+					);
 				return;
 			}
 			await supabaseService.signIn(email, password);
@@ -92,35 +85,9 @@ export function LoginPage() {
 		return (
 			<div className="min-h-screen bg-background p-6 text-foreground">
 				<div className="mx-auto max-w-lg pt-16">
-					<TelegramPassword mode="recovery" onBack={() => setRecovery(false)} />
+					<PasswordForm recovery onBack={() => setRecovery(false)} />
 				</div>
 			</div>
-		);
-	if (challenge)
-		return (
-			<TelegramRegistration
-				challenge={challenge}
-				initialPassword={password}
-				onCancel={() => {
-					saveTelegramChallenge();
-					setChallenge(undefined);
-					setRegister(false);
-					setPassword("");
-					setConfirmation("");
-					setError("");
-				}}
-				onComplete={async (nextPassword) => {
-					const result = await registrationRequest<{ login: string }>(
-						"complete",
-						{ browserToken: challenge.browserToken, password: nextPassword },
-					);
-					await supabaseService.signIn(result.login, nextPassword);
-					saveTelegramChallenge();
-					setChallenge(undefined);
-					setPassword("");
-					await navigate({ href: safeAuthRedirect(redirect), replace: true });
-				}}
-			/>
 		);
 	return (
 		<div className="login-scene auth-surface">
@@ -194,7 +161,7 @@ export function LoginPage() {
 					</h2>
 					<p className="mt-3 text-sm leading-6 text-zinc-400">
 						{register
-							? "Создайте аккаунт и подтвердите заявку через Telegram."
+							? "Создайте аккаунт с рабочей почтой или войдите через Google."
 							: "Войдите в свой аккаунт SupportOS,"}
 						<br />
 						{register
@@ -209,7 +176,7 @@ export function LoginPage() {
 							onClick={() => {
 								setRegister(false);
 								setError("");
-								setChallenge(undefined);
+								setMessage("");
 								setPassword("");
 								setConfirmation("");
 							}}
@@ -223,13 +190,42 @@ export function LoginPage() {
 							onClick={() => {
 								setRegister(true);
 								setError("");
-								setChallenge(undefined);
+								setMessage("");
 								setPassword("");
 							}}
 						>
 							Регистрация
 						</button>
 					</div>
+					<button
+						type="button"
+						className="auth-button mt-6 inline-flex w-full items-center justify-center gap-3 border border-white/20 text-white"
+						disabled={!enabled || busy}
+						onClick={() => {
+							setBusy(true);
+							setError("");
+							void supabaseService
+								.signInWithGoogle(redirect)
+								.catch((e: unknown) =>
+									setError(
+										e instanceof Error
+											? e.message
+											: "Не удалось войти через Google",
+									),
+								)
+								.finally(() => setBusy(false));
+						}}
+					>
+						<GoogleIcon />
+						{register
+							? "Зарегистрироваться через Google"
+							: "Войти через Google"}
+					</button>
+					{message && (
+						<output className="mt-4 block text-sm text-zinc-300">
+							{message}
+						</output>
+					)}
 					<form onSubmit={submit} className="mt-8 space-y-5">
 						{!enabled && (
 							<p
@@ -248,9 +244,9 @@ export function LoginPage() {
 							</p>
 						)}
 						<label className="block text-sm font-medium text-zinc-300">
-							{register ? "Логин" : "Почта или логин"}
+							{register ? "Рабочая почта" : "Почта или логин"}
 							<input
-								type="text"
+								type={register ? "email" : "text"}
 								autoComplete="username"
 								autoCapitalize="none"
 								spellCheck={false}
@@ -259,15 +255,9 @@ export function LoginPage() {
 								onChange={(e) => setEmail(e.target.value)}
 								disabled={!enabled || busy}
 								placeholder={
-									register ? "your_login" : "Логин или name@company.com"
+									register ? "name@company.com" : "Логин или name@company.com"
 								}
-								maxLength={register ? 32 : 320}
-								pattern={register ? "[A-Za-z][A-Za-z0-9_]{3,31}" : undefined}
-								title={
-									register
-										? "4–32 символа: латинские буквы, цифры и подчёркивание"
-										: undefined
-								}
+								maxLength={320}
 								className="login-input mt-2"
 							/>
 						</label>
@@ -350,7 +340,7 @@ export function LoginPage() {
 								setRecovery(true);
 							}}
 						>
-							Забыли пароль? Восстановить через Telegram
+							Забыли пароль? Восстановить по почте
 						</button>
 					</p>
 				</section>

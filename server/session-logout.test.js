@@ -5,7 +5,7 @@ vi.mock('./accounts/index.js',()=>({adminClient:()=>({signOut:mock.signOut})}));
 vi.mock('./agent-monitor/_server.js',()=>({db:mock.db}));
 import { logoutAction } from './session-logout.js';
 import { securityMetadata } from './security-metadata.js';
-const env={TELEGRAM_WEBHOOK_SECRET:'synthetic-key'};
+const env={SECURITY_AUDIT_SECRET:'synthetic-key'};
 const request={headers:{authorization:'Bearer synthetic-access','user-agent':'Mozilla/5.0 (Windows) Chrome/130','x-forwarded-for':'198.51.100.22'},socket:{remoteAddress:'192.0.2.10'}};
 beforeEach(()=>{vi.resetAllMocks();mock.identity.mockResolvedValue({id:'verified',sessionId:'verified-session'});mock.signOut.mockResolvedValue({error:null});mock.db.mockResolvedValue({ok:true});});
 
@@ -42,5 +42,5 @@ it('hashes only trusted IP sources and uses no raw-IP fallback',()=>{
  expect(securityMetadata({...request,headers:{...request.headers,'x-vercel-forwarded-for':'198.51.100.1, 198.51.100.2'}},{...env,VERCEL:'1'}).ipHash).not.toBe(metadata.ipHash);
  expect(securityMetadata({headers:{}},env).ipHash).toBeNull();
  expect(securityMetadata({headers:{},socket:{remoteAddress:'not-an-IP'}},env).ipHash).toBeNull();
- expect(securityMetadata(request,{...env,TELEGRAM_WEBHOOK_SECRET:'rotated-key'}).ipHash).not.toBe(metadata.ipHash);
+ expect(securityMetadata(request,{...env,SECURITY_AUDIT_SECRET:'rotated-key'}).ipHash).not.toBe(metadata.ipHash);
 });

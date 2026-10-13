@@ -19,9 +19,9 @@ it('passes only the verified actor to transactional permission changes',async()=
  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({actor:historyUser,sid:'verified-session',operation:'user.update',payload,request_id:historyOther,permit_digest:expect.any(String)});
 });
 it('lets an unassigned account read only its own access context',async()=>{
- mock.requireUser.mockResolvedValue({id:'pending',access:{status:'pending',roles:[],permissions:[]}});
+ mock.requireUser.mockResolvedValue({id:'pending',sessionId:'verified-session',access:{status:'pending',roles:[],permissions:[]}});
  const res=response();await handler({...req(),method:'GET',url:'/api/accounts?action=me'},res);
- expect(res.statusCode).toBe(200);expect(res.body.id).toBe('pending');expect(mock.db).not.toHaveBeenCalled();
+ expect(res.statusCode).toBe(200);expect(res.body.id).toBe('pending');expect(mock.db).toHaveBeenCalledWith(expect.anything(),'rpc/supportos_record_mfa_login',expect.objectContaining({subject:'pending',sid:'verified-session'}));
  const forbidden=response();await handler({...req(),method:'GET'},forbidden);expect(forbidden.statusCode).toBe(403);
 });
 it('blocks Creator assignment before creating an Auth account',async()=>{
@@ -139,7 +139,7 @@ it('does not revoke sessions with rejected proof or report success after provide
  fetch.mockResolvedValue(Response.json({ok:true}));mock.signOut.mockResolvedValue({error:{status:500}});
  const failed=response();await handler(request,failed);expect(failed.statusCode).toBe(503);expect(mock.db).not.toHaveBeenCalled();
 });
-it('does not create an Auth account or assign initial roles without Telegram confirmation',async()=>{
+it('does not create an Auth account or assign initial roles without TOTP confirmation',async()=>{
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['users.manage','work']}});
  mock.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_roles?')?[{id:'support'}]:path.startsWith('supportos_permissions?')?[{id:'work'}]:[{role_id:'support',permission_id:'work'}]);
  const res=response();await handler(req({action:'create',email:'new@example.test',password:'synthetic-long-password',roles:['support']}),res);

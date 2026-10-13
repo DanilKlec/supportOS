@@ -1,4 +1,4 @@
-vi.mock('../telegram-2fa.js',()=>({requireTelegram:async()=>{}}));
+vi.mock('../mfa.js',()=>({requireMfa:async()=>{}}));
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../_rbac.js',()=>({loadAccess:async(id)=>({status:'active',roles:[],permissions:id==='ordinary'?[]:['work','monitor.read','monitor.write']})}));
 import { normalizeStatus, collect, config, db } from './_server.js';

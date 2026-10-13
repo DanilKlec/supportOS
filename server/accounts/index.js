@@ -4,7 +4,8 @@ import {can} from '../../shared/access.js';
 import {changeAccess} from '../_rbac.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
 import {displayIdentity} from '../../shared/login-identity.js';
-import {criticalAction,executeCritical} from '../telegram-critical.js';
+import {criticalAction,executeCritical} from '../critical-confirmation.js';
+import {securityMetadata} from '../security-metadata.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export function adminClient(env=process.env) {
  const resolved=config(env);
@@ -22,16 +23,20 @@ export default async function handler(req,res) {
   if(req.method==='POST'&&(!req.headers.origin||new URL(req.headers.origin).host!==req.headers.host)) throw fail('Invalid origin',403);
   const url=new URL(req.url,'http://localhost');const action=url.searchParams.get('action')??'users';
   const actor=await requireUser(req,{permission:null});
-  if(req.method==='GET'&&action==='me')return send(200,{id:actor.id,access:actor.access});
+  if(req.method==='GET'&&action==='me') {
+   const metadata=securityMetadata(req,process.env);
+   await db(config(),'rpc/supportos_record_mfa_login',{subject:actor.id,sid:actor.sessionId,ip_digest:metadata.ipHash,agent:metadata.agent});
+   return send(200,{id:actor.id,access:actor.access,mfaEnabled:actor.mfaEnabled===true});
+  }
   const env=config();
   if(action==='critical') {
    if(req.method!=='POST')throw fail('Используйте POST',405);
    return send(200,await criticalAction(req,actor,typeof req.body==='string'?JSON.parse(req.body):req.body??{},env));
   }
-  if(['revoke-other-sessions','telegram-unlink','telegram-change'].includes(action)) {
+  if(action==='revoke-other-sessions') {
    if(req.method!=='POST')throw fail('Используйте POST',405);
    const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
-   const operation=action==='revoke-other-sessions'?'sessions.revoke_others':action==='telegram-unlink'?'telegram.unlink':'telegram.change';
+   const operation='sessions.revoke_others';
    await executeCritical(actor,operation,{},body.confirmation,env);
    if(operation==='sessions.revoke_others') {
     // Never use the default global scope: the verified current session must survive.
@@ -77,17 +82,6 @@ export default async function handler(req,res) {
     is_current:session.id===actor.sessionId,
    }))});
   }
-  if(action==='telegram-links') {
-   if(!can(actor.access,'users.manage'))throw fail('Недостаточно прав',403);
-   if(req.method==='GET') {
-    const requests=await db(env,'supportos_telegram_link_requests?select=id,user_id,telegram_id,telegram_username,verified_at&status=eq.verified&order=verified_at.asc&limit=100');
-    const users=requests.length?await db(env,`supportos_users?select=id,email,display_name&id=in.(${requests.map(r=>r.user_id).join(',')})`):[];
-    return send(200,{requests:requests.map(r=>({...r,user:users.find(u=>u.id===r.user_id)}))});
-   }
-   const data=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
-   if(!/^[a-f0-9-]{36}$/i.test(data.id??'')||typeof data.approve!=='boolean')throw fail('Некорректная заявка');
-   return send(200,{ok:await db(env,'rpc/supportos_tg_link_review',{actor:actor.id,actor_session:actor.sessionId,request_id:data.id,approve:data.approve})});
-  }
   if(req.method==='GET') {
    if(action==='users'&&url.searchParams.get('purpose')==='share') {
     if(!can(actor.access,'binds.read'))throw fail('Нет доступа к биндам',403);
@@ -110,11 +104,7 @@ export default async function handler(req,res) {
     const status=url.searchParams.get('status')??'',role=url.searchParams.get('role')??'';
     if(!['','active','pending','disabled'].includes(status)||role&&!/^[a-z][a-z0-9_]{1,39}$/.test(role))throw fail('Некорректный фильтр');
     const result=await db(env,'rpc/supportos_rbac_list_users',{search_text:(url.searchParams.get('search')??'').slice(0,120),page_number:page,status_filter:status,role_filter:role});
-    if(env.TELEGRAM_BOT_TOKEN && result.users?.length){
-     const ids=result.users.map(user=>user.id).filter(id=>/^[a-f0-9-]{36}$/i.test(id));
-     const identities=ids.length?await db(env,`supportos_telegram_registration?select=id,telegram_id,telegram_username,verified_at&id=in.(${ids.join(',')})&completed_at=not.is.null`):[];
-     result.users=result.users.map(user=>({...user,email:displayIdentity(user.email),telegram:identities.find(identity=>identity.id===user.id)??null}));
-    }
+    if(result.users) result.users=result.users.map(user=>({...user,email:displayIdentity(user.email)}));
     return send(200,result);
   }
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};

@@ -51,8 +51,8 @@ vi.mock("@/features/accounts/PasswordPanel", () => ({
 vi.mock("@/features/accounts/ActiveSessionsPanel", () => ({
 	ActiveSessionsPanel: () => <p>Активные сессии</p>,
 }));
-vi.mock("@/features/accounts/TelegramLinkPanel", () => ({
-	TelegramLinkPanel: () => <p>Привязка Telegram</p>,
+vi.mock("@/features/accounts/AuthenticatorPanel", () => ({
+	AuthenticatorPanel: () => <p>Google Authenticator</p>,
 }));
 vi.mock("@/features/accounts/LoginHistoryPanel", () => ({
 	LoginHistoryPanel: () => <p>История входов</p>,
@@ -132,7 +132,7 @@ it.each([
 	).toBeTruthy();
 	if (hash === "security") {
 		expect(screen.getByText("Активные сессии")).toBeTruthy();
-		expect(screen.getByText("Привязка Telegram")).toBeTruthy();
+		expect(screen.getByText("Google Authenticator")).toBeTruthy();
 		expect(screen.getByText("История входов")).toBeTruthy();
 		expect(screen.queryByText("Форма пароля")).toBeNull();
 	}

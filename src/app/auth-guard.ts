@@ -14,7 +14,7 @@ export async function requireAppAuth({
 	const session = useAuthStore.getState().session;
 	const path = location.pathname.replace(/\/+$/, "") || "/";
 	if (path === "/login") return;
-	if (!session || !session.telegramVerified)
+	if (!session || !session.authVerified)
 		throw redirect({
 			to: "/login",
 			search: { redirect: safeAuthRedirect(location.href) },

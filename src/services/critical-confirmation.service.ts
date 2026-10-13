@@ -28,7 +28,7 @@ export async function criticalRequest(
 	});
 	const data = await response.json();
 	if (!response.ok)
-		throw new Error(data.error ?? "Не удалось получить подтверждение Telegram");
+		throw new Error(data.error ?? "Не удалось получить подтверждение действия");
 	return data as CriticalState & { token?: string };
 }
 export async function beginCritical(request: CriticalRequest) {
