@@ -27,7 +27,16 @@ const mock = vi.hoisted(() => ({
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@tanstack/react-router")>()),
 	useRouterState: () => mock.hash,
-	Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
+	Link: ({
+		to,
+		children,
+		activeOptions: _activeOptions,
+		...props
+	}: {
+		to: string;
+		children: ReactNode;
+		activeOptions?: unknown;
+	}) => (
 		<a href={to} {...props}>
 			{children}
 		</a>
@@ -115,29 +124,27 @@ afterEach(() => {
 });
 
 it.each([
-	["", "Общие"],
-	["unknown", "Общие"],
+	["", "Профиль"],
+	["unknown", "Профиль"],
 	["appearance", "Оформление"],
 	["data", "Данные"],
 	["security", "Безопасность"],
-	["integrations", "Интеграции"],
-	["integrations-ai", "Интеграции"],
-	["integrations-translator", "Интеграции"],
+	["sessions", "Устройства"],
 ])("selects the existing section for hash %s", (hash, title) => {
 	mock.hash = hash;
 	render(<SettingsPage />);
 	expect(screen.getByRole("heading", { name: title })).toBeTruthy();
-	expect(
-		screen.getByText("employee@example.com", { selector: "header div" }),
-	).toBeTruthy();
+	expect(screen.getAllByText("employee@example.com").length).toBeTruthy();
 	if (hash === "security") {
-		expect(screen.getByText("Активные сессии")).toBeTruthy();
+		expect(screen.queryByText("Активные сессии")).toBeNull();
 		expect(screen.getByText("Google Authenticator")).toBeTruthy();
-		expect(screen.getByText("История входов")).toBeTruthy();
+		expect(screen.queryByText("История входов")).toBeNull();
 		expect(screen.queryByText("Форма пароля")).toBeNull();
 	}
-	if (hash.startsWith("integrations"))
-		expect(screen.getByText("Панель интеграций")).toBeTruthy();
+	if (hash === "sessions") {
+		expect(screen.getByText("Активные сессии")).toBeTruthy();
+		expect(screen.getByText("История входов")).toBeTruthy();
+	}
 });
 
 it("initializes appearance on any section and retains it while switching hashes", () => {
@@ -277,7 +284,7 @@ it("exports the server snapshot and releases the temporary download URL", async 
 
 it("keeps sign-out and knowledge reload ordering", async () => {
 	render(<SettingsPage />);
-	expect(screen.getByText("Форма пароля")).toBeTruthy();
+	expect(screen.queryByText("Форма пароля")).toBeNull();
 	fireEvent.click(screen.getByRole("button", { name: "Выйти" }));
 	await waitFor(() =>
 		expect(mock.showToast).toHaveBeenCalledWith("Вы вышли из аккаунта"),
@@ -299,6 +306,35 @@ it("does not reload knowledge after a failed sign-out", async () => {
 		),
 	);
 	expect(mock.loadKnowledge).not.toHaveBeenCalled();
+});
+
+it("keeps integrations out of the personal account even for technical administrators", () => {
+	useAuthStore.setState((state) => ({
+		session: state.session && {
+			...state.session,
+			user: {
+				...state.session.user,
+				access: {
+					...state.session.user.access!,
+					permissions: ["work", "technical", "binds.read"],
+				},
+			},
+		},
+	}));
+	render(<SettingsPage />);
+	expect(
+		screen.getByRole("navigation", { name: "Разделы личного кабинета" }),
+	).toBeTruthy();
+	expect(screen.queryByRole("link", { name: "Интеграции" })).toBeNull();
+	expect(screen.queryByText("Панель интеграций")).toBeNull();
+});
+
+it("opens the password editor on demand in security settings", () => {
+	mock.hash = "security";
+	render(<SettingsPage />);
+	expect(screen.queryByText("Форма пароля")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "Изменить пароль" }));
+	expect(screen.getByText("Форма пароля")).toBeTruthy();
 });
 
 it.each([

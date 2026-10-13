@@ -1,4 +1,5 @@
-import { Shield } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import {
 	createContext,
 	type Dispatch,
@@ -13,6 +14,14 @@ import {
 	getAppearanceSettings,
 } from "@/shared/lib/appearance";
 import { useAuthStore } from "@/store/auth.store";
+import { canAccessPage } from "../../../shared/access.js";
+import { AccountSignOutButton } from "./AccountSignOutButton";
+import {
+	type AccountSection,
+	accountIdentity,
+	accountSections,
+} from "./account-sections";
+import "./account.css";
 
 type SettingsAppearance = {
 	appearance: AppearanceSettings;
@@ -29,10 +38,10 @@ export function useSettingsAppearance() {
 }
 
 export function SettingsLayout({
-	title,
+	section,
 	children,
 }: {
-	title: string;
+	section: AccountSection;
 	children: ReactNode;
 }) {
 	// Keep the original initialization and appearance state across hash-only section changes.
@@ -45,24 +54,88 @@ export function SettingsLayout({
 	});
 
 	const authSession = useAuthStore((state) => state.session);
+	const current =
+		accountSections.find((item) => item.id === section) ?? accountSections[0];
+	const identity = accountIdentity(
+		authSession?.user.email,
+		authSession?.user.access?.display_name,
+	);
+	const visibleSections = accountSections.filter((item) =>
+		canAccessPage(authSession?.user.access, "/settings", item.hash),
+	);
+	const personalSections = visibleSections.filter((item) => item.id !== "data");
+	const workspaceSections = visibleSections.filter(
+		(item) => item.id === "data",
+	);
+	const navigation = (items: typeof visibleSections) =>
+		items.map((item) => (
+			<Link
+				key={item.id}
+				to="/settings"
+				hash={item.hash}
+				activeOptions={{ exact: true, includeHash: true }}
+				className="account-nav-link"
+				aria-current={item.id === section ? "page" : undefined}
+			>
+				<item.icon size={18} aria-hidden="true" />
+				<span>{item.title}</span>
+				{item.id === section && (
+					<ChevronRight
+						size={14}
+						className="account-nav-chevron"
+						aria-hidden="true"
+					/>
+				)}
+			</Link>
+		));
 	return (
 		<SettingsAppearanceContext.Provider value={{ appearance, setAppearance }}>
-			<div className="settings-page h-full min-w-0 overflow-auto bg-background">
-				<div className="mx-auto flex min-w-0 w-full flex-col gap-5 p-4 sm:p-6">
-					<header className="flex flex-wrap items-start justify-between gap-4">
-						<div>
-							<h2 className="text-xl font-semibold text-foreground">{title}</h2>
-						</div>
-
-						<div className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">
-							<Shield size={16} className="shrink-0" />
-							<div className="min-w-0 break-all">
-								{authSession?.user.email ?? "Локальное рабочее пространство"}
+			<div className="settings-page account-page">
+				<div className="account-layout">
+					<aside className="account-sidebar" aria-label="Личный кабинет">
+						<Link to="/" className="account-back">
+							<ArrowLeft size={15} aria-hidden="true" />К рабочему пространству
+						</Link>
+						<div className="account-sidebar-heading">Личный кабинет</div>
+						<div className="account-sidebar-identity">
+							<div className="account-avatar" aria-hidden="true">
+								{identity.initials}
+							</div>
+							<div className="min-w-0">
+								<strong title={identity.name}>{identity.name}</strong>
+								<p title={identity.address}>
+									{identity.address || "Вход не выполнен"}
+								</p>
 							</div>
 						</div>
-					</header>
-
-					{children}
+						<nav aria-label="Разделы личного кабинета">
+							<div className="account-nav-group">Личные настройки</div>
+							<div className="account-nav-items">
+								{navigation(personalSections)}
+							</div>
+							{workspaceSections.length > 0 && (
+								<>
+									<div className="account-nav-group">Рабочее пространство</div>
+									<div className="account-nav-items">
+										{navigation(workspaceSections)}
+									</div>
+								</>
+							)}
+						</nav>
+						{authSession && (
+							<div className="account-sidebar-footer">
+								<AccountSignOutButton />
+							</div>
+						)}
+					</aside>
+					<div className="account-content">
+						<header className="account-page-header">
+							<p className="account-eyebrow">Ваше пространство</p>
+							<h2>{current.title}</h2>
+							<p>{current.description}</p>
+						</header>
+						<div className="account-sections">{children}</div>
+					</div>
 				</div>
 			</div>
 		</SettingsAppearanceContext.Provider>

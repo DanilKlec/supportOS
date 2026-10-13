@@ -69,14 +69,14 @@ const bookmarks = [
 		route: AISettings,
 		path: "/settings/ai",
 		hash: "",
-		to: "/settings",
+		to: "/admin",
 		target: "integrations-ai",
 	},
 	{
 		route: TranslatorSettings,
 		path: "/settings/translator",
 		hash: "",
-		to: "/settings",
+		to: "/admin",
 		target: "integrations-translator",
 	},
 	{

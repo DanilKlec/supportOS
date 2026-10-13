@@ -1,7 +1,10 @@
+import { ShieldCheck, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { GoogleIcon } from "@/components/brand/GoogleIcon";
 import { AuthenticatorForm } from "@/features/auth/AuthenticatorForm";
 import { mfaService } from "@/services/mfa.service";
 import { supabaseService } from "@/services/supabase.service";
+import "@/features/settings/account.css";
 
 export function AuthenticatorPanel() {
 	const [factors, setFactors] = useState<
@@ -26,23 +29,43 @@ export function AuthenticatorPanel() {
 		void load();
 	}, [load]);
 	return (
-		<section className="rounded-xl border border-border bg-surface p-5 space-y-4">
-			<h3 className="text-lg font-semibold">Двухфакторная защита (2FA)</h3>
-			<p className="text-sm text-muted">
-				{!loaded
-					? "Проверяем состояние 2FA…"
-					: factors.length > 0
-						? "2FA включена. При входе нужен код Google Authenticator. Для смены телефона сначала подключите новое устройство и проверьте его код, затем удалите старое."
-						: "2FA не включена. Подключите Google Authenticator, чтобы дополнительно защищать вход шестизначным кодом."}
-			</p>
+		<section className="account-card account-authenticator-card space-y-4">
+			<div className="account-setting-row">
+				<span className="account-row-icon">
+					<ShieldCheck size={20} />
+				</span>
+				<div className="account-row-copy">
+					<h3>Двухфакторная защита (2FA)</h3>
+					<p>
+						{!loaded
+							? "Проверяем состояние 2FA…"
+							: factors.length > 0
+								? "2FA включена. При входе нужен код Google Authenticator."
+								: "2FA не включена. Защитите вход кодом Google Authenticator."}
+					</p>
+				</div>
+				{loaded && (
+					<span
+						className={`account-status ${factors.length > 0 ? "account-status--success" : ""}`}
+					>
+						<span />
+						{factors.length > 0 ? "Включена" : "Не включена"}
+					</span>
+				)}
+			</div>
 			{factors.map((factor, index) => (
-				<div
-					key={factor.id}
-					className="flex items-center justify-between gap-3"
-				>
-					<span>{factor.friendly_name || `Устройство ${index + 1}`}</span>
+				<div key={factor.id} className="account-factor-row">
+					<span>
+						<Smartphone size={16} aria-hidden="true" />
+						{factor.friendly_name || `Устройство ${index + 1}`}
+					</span>
 					<button
-						className="ui-button"
+						className="ui-button ui-button--secondary account-small-button"
+						title={
+							factors.length < 2
+								? "Сначала подключите новое устройство"
+								: undefined
+						}
 						type="button"
 						disabled={busy || factors.length < 2}
 						onClick={() => {
@@ -76,22 +99,24 @@ export function AuthenticatorPanel() {
 			) : (
 				<button
 					type="button"
-					className="ui-button"
+					className="ui-button ui-button--secondary account-small-button"
 					disabled={!loaded}
 					onClick={() => setAdding(true)}
 				>
 					{factors.length > 0 ? "Добавить устройство" : "Включить 2FA"}
 				</button>
 			)}
-			<div className="space-y-3 border-t border-border pt-4">
-				<h4 className="font-medium">Вход через Google</h4>
-				<p className="text-sm text-muted">
-					Привяжите Google к этому аккаунту, чтобы входить с его помощью и
-					сохранить текущие роли и данные.
-				</p>
+			<div className="account-setting-row account-google-row">
+				<span className="account-row-icon">
+					<GoogleIcon />
+				</span>
+				<div className="account-row-copy">
+					<h4>Вход через Google</h4>
+					<p>Привяжите Google, сохранив текущие роли и данные.</p>
+				</div>
 				<button
 					type="button"
-					className="ui-button"
+					className="ui-button ui-button--secondary account-small-button"
 					disabled={busy}
 					onClick={() => {
 						setBusy(true);

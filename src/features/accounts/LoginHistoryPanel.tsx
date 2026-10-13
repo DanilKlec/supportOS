@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { History, RefreshCw } from "lucide-react";
 import { useId } from "react";
 import { Badge, Button, Panel } from "@/components/ui";
 import {
@@ -7,6 +8,7 @@ import {
 } from "@/services/login-history.service";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
+import "@/features/settings/account.css";
 
 const eventLabels: Record<LoginEventType, string> = {
 	login_approved: "Вход подтверждён",
@@ -55,28 +57,24 @@ export function LoginHistoryPanel({
 	const events = history.data?.pages.flatMap((page) => page.events) ?? [];
 	return (
 		<Wrapper
-			className={
-				embedded ? "min-w-0 space-y-3" : "min-w-0 space-y-3 p-4 sm:p-5"
-			}
+			className={embedded ? "min-w-0 space-y-3" : "account-card"}
 			aria-labelledby={headingId}
 		>
-			<div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+			<div className="account-card-header">
 				<div className="min-w-0">
-					<h3 id={headingId} className="text-lg font-semibold">
-						История входов
-					</h3>
-					<p className="mt-1 text-xs text-muted">
-						Подтверждения входа, смена пароля и завершение сессий. Журнал
-						ведётся с момента подключения.
-					</p>
+					<h3 id={headingId}>История входов</h3>
+					<p>Входы и важные изменения в вашем аккаунте.</p>
 				</div>
 				<Button
 					variant="secondary"
+					className="account-icon-button"
+					aria-label="Обновить историю"
+					title="Обновить историю"
 					loading={history.isFetching}
 					disabled={!identity?.sessionId || !permitted}
 					onClick={() => void history.refetch()}
 				>
-					Обновить историю
+					<RefreshCw size={15} aria-hidden="true" />
 				</Button>
 			</div>
 			{!permitted ? (
@@ -92,53 +90,57 @@ export function LoginHistoryPanel({
 			) : !events.length ? (
 				<p className="text-sm text-muted">Событий безопасности пока нет.</p>
 			) : (
-				<ul className="grid min-w-0 gap-3">
+				<ul className="account-event-list">
 					{events.map((event) => (
-						<li
-							key={event.id}
-							className="min-w-0 rounded-lg border border-border p-3 text-sm"
-						>
-							<div className="flex flex-wrap items-center justify-between gap-2">
-								<span className="font-semibold">
-									{eventLabels[event.event_type]}
-								</span>
-								{event.session_id &&
-									event.session_id === identity?.sessionId && (
-										<Badge>Текущая сессия</Badge>
-									)}
-							</div>
-							<p className="mt-1 text-xs text-muted">
-								{Number.isNaN(Date.parse(event.created_at))
-									? "Время не указано"
-									: new Date(event.created_at).toLocaleString("ru")}
-							</p>
-							<dl className="mt-3 grid min-w-0 gap-2 text-xs">
-								<div>
-									<dt className="text-muted">Устройство</dt>
-									<dd>
+						<li key={event.id} className="account-event-row">
+							<span className="account-event-icon">
+								<History size={16} aria-hidden="true" />
+							</span>
+							<div className="account-event-content">
+								<div className="account-event-title">
+									<span className="font-semibold">
+										{eventLabels[event.event_type]}
+									</span>
+									{event.session_id &&
+										event.session_id === identity?.sessionId && (
+											<Badge>Текущая сессия</Badge>
+										)}
+								</div>
+								<div className="account-event-meta">
+									<span>
 										{[event.browser, event.os].filter(Boolean).join(" · ") ||
-											"Не указано"}
-									</dd>
+											"Устройство не указано"}
+									</span>
+									<span>
+										{Number.isNaN(Date.parse(event.created_at))
+											? "Время не указано"
+											: new Date(event.created_at).toLocaleString("ru")}
+									</span>
 								</div>
-								<div className="min-w-0">
-									<dt className="text-muted">ID сессии</dt>
-									<dd className="break-all font-mono">
-										{event.session_id || "Не указано"}
-									</dd>
-								</div>
-								{event.telegram_result && (
-									<div>
-										<dt className="text-muted">Подтверждение Telegram</dt>
-										<dd>{telegramLabels[event.telegram_result]}</dd>
-									</div>
-								)}
-								{event.ip_hash && (
-									<div className="min-w-0">
-										<dt className="text-muted">Отпечаток IP</dt>
-										<dd className="break-all font-mono">{event.ip_hash}</dd>
-									</div>
-								)}
-							</dl>
+								<details className="account-row-details">
+									<summary>Подробности события</summary>
+									<dl className="account-technical-grid">
+										<div className="min-w-0">
+											<dt className="text-muted">ID сессии</dt>
+											<dd className="break-all font-mono">
+												{event.session_id || "Не указано"}
+											</dd>
+										</div>
+										{event.telegram_result && (
+											<div>
+												<dt className="text-muted">Подтверждение Telegram</dt>
+												<dd>{telegramLabels[event.telegram_result]}</dd>
+											</div>
+										)}
+										{event.ip_hash && (
+											<div className="min-w-0">
+												<dt className="text-muted">Отпечаток IP</dt>
+												<dd className="break-all font-mono">{event.ip_hash}</dd>
+											</div>
+										)}
+									</dl>
+								</details>
+							</div>
 						</li>
 					))}
 				</ul>

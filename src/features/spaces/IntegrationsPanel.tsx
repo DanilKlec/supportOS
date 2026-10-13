@@ -25,7 +25,7 @@ export function IntegrationsPanel() {
 	if (hash === "integrations-ai" || hash === "integrations-translator")
 		return (
 			<div className="space-y-4">
-				<Link className="space-tab" to="/settings" hash="integrations">
+				<Link className="space-tab" to="/admin" hash="integrations-settings">
 					← Все интеграции
 				</Link>
 				{hash === "integrations-ai" ? (
@@ -56,7 +56,7 @@ export function IntegrationsPanel() {
 								Повторить
 							</button>
 						)}
-						<Link className="space-tab" to="/settings" hash="integrations-ai">
+						<Link className="space-tab" to="/admin" hash="integrations-ai">
 							Настроить AI →
 						</Link>
 					</>
@@ -72,7 +72,7 @@ export function IntegrationsPanel() {
 				{can(user?.access, "technical") && (
 					<Link
 						className="space-tab"
-						to="/settings"
+						to="/admin"
 						hash="integrations-translator"
 					>
 						Настроить →

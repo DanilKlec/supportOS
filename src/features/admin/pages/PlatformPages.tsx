@@ -84,7 +84,7 @@ export function IntegrationsPage() {
 			)}
 			{canManageIntegrations && (
 				<Row title="Управление подключениями">
-					<Link to="/settings" hash="integrations" className="ui-button">
+					<Link to="/admin" hash="integrations-settings" className="ui-button">
 						Открыть настройки
 					</Link>
 				</Row>

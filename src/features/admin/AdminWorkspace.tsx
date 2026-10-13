@@ -24,6 +24,11 @@ const AccountsPanel = lazy(() =>
 		default: module.AccountsPanel,
 	})),
 );
+const IntegrationSettingsPanel = lazy(() =>
+	import("@/features/spaces/IntegrationsPanel").then((module) => ({
+		default: module.IntegrationsPanel,
+	})),
+);
 
 type RolesTab = "roles" | "access" | "audit";
 
@@ -68,7 +73,9 @@ export function AdminWorkspace() {
 			(s) => !s.hiddenFromNavigation && canAccessPage(access, "/admin", s.id),
 		)?.id || "overview";
 	const redirectedHash = hash ? adminHashRedirects[hash] : undefined;
-	const requestedSection = redirectedHash ?? (hash || fallbackSection);
+	const requestedSection = hash.startsWith("integrations-")
+		? "integrations"
+		: (redirectedHash ?? (hash || fallbackSection));
 	const active = canAccessPage(access, "/admin", requestedSection)
 		? requestedSection
 		: fallbackSection;
@@ -112,7 +119,15 @@ export function AdminWorkspace() {
 				) : active === "system-health" ? (
 					<SystemHealthPage />
 				) : active === "integrations" ? (
-					<IntegrationsPage />
+					[
+						"integrations-settings",
+						"integrations-ai",
+						"integrations-translator",
+					].includes(hash) ? (
+						<IntegrationSettingsPanel />
+					) : (
+						<IntegrationsPage />
+					)
 				) : active === "ai" ? (
 					<AIOverviewPage />
 				) : (

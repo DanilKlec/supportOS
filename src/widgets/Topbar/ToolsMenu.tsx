@@ -189,7 +189,7 @@ export function ToolsMenu() {
 			icon:
 				space.title === "Команда"
 					? Users
-					: space.title === "Настройки"
+					: space.title === "Личный кабинет"
 						? Settings
 						: BookOpen,
 		})),

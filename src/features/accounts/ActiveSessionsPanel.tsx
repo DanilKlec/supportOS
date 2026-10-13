@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { Monitor, RefreshCw, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, Panel } from "@/components/ui";
 import { loadActiveSessions } from "@/services/active-sessions.service";
 import { confirmedAccountAction } from "@/services/critical-confirmation.service";
 import { useAuthStore } from "@/store/auth.store";
 import { CriticalConfirmationModal } from "./CriticalConfirmationModal";
+import "@/features/settings/account.css";
 
 function dateLabel(value: string | null) {
 	if (!value || Number.isNaN(Date.parse(value))) return "Не указано";
@@ -57,10 +59,7 @@ export function ActiveSessionsPanel() {
 	});
 
 	return (
-		<Panel
-			className="min-w-0 p-4 sm:p-5"
-			aria-labelledby="active-sessions-title"
-		>
+		<Panel className="account-card" aria-labelledby="active-sessions-title">
 			{confirm && (
 				<CriticalConfirmationModal
 					request={{ action: "sessions.revoke_others", payload: {} }}
@@ -73,104 +72,122 @@ export function ActiveSessionsPanel() {
 					}}
 				/>
 			)}
-			<div className="mb-3 flex min-w-0 flex-wrap items-start justify-between gap-3">
-				<div className="min-w-0">
-					<h3 id="active-sessions-title" className="text-lg font-semibold">
-						Активные сессии
-					</h3>
-					<p className="mt-1 text-sm text-muted">Входы только в ваш аккаунт.</p>
+			<div className="account-card-header">
+				<div>
+					<h3 id="active-sessions-title">Активные сессии</h3>
+					<p>Устройства, на которых открыт ваш аккаунт.</p>
 				</div>
 				<Button
 					variant="secondary"
+					className="account-icon-button"
+					aria-label="Обновить список"
+					title="Обновить список"
 					loading={sessions.isFetching}
 					disabled={!identity?.sessionId}
 					onClick={() => void sessions.refetch()}
 				>
-					Обновить список
+					<RefreshCw size={15} aria-hidden="true" />
 				</Button>
 			</div>
-			<Button
-				variant="secondary"
-				className="mb-3"
-				disabled={
-					!identity?.sessionId ||
-					sessions.isError ||
-					sessions.isPending ||
-					!sessions.data?.some((session) => !session.is_current)
-				}
-				onClick={() => {
-					setNotice("");
-					setConfirm(true);
-				}}
-			>
-				Завершить все остальные сессии
-			</Button>
 			{notice && <output className="block mb-3 text-sm">{notice}</output>}
-			<p className="mb-4 text-xs text-muted">
-				Время обновления авторизации — это обновление сессии, а не последнее
-				действие в приложении.
-			</p>
 			{!identity?.sessionId ? (
-				<p className="text-sm text-muted">
+				<p className="account-empty">
 					Войдите в аккаунт, чтобы увидеть активные сессии.
 				</p>
 			) : sessions.isPending ? (
-				<output className="block text-sm text-muted">Загрузка сессий…</output>
+				<output className="account-empty">Загрузка сессий…</output>
 			) : sessions.isError ? (
-				<p role="alert" className="text-sm text-muted">
+				<p role="alert" className="account-empty">
 					{sessions.error.message}
 				</p>
 			) : sessions.data.length === 0 ? (
-				<p className="text-sm text-muted">Активные сессии не найдены.</p>
+				<p className="account-empty">Активные сессии не найдены.</p>
 			) : (
-				<ul className="grid min-w-0 gap-3">
-					{sessions.data.map((session) => (
-						<li
-							key={session.id}
-							className="min-w-0 rounded-lg border border-border p-3"
-						>
-							<div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-								<span className="min-w-0 text-sm font-semibold">
-									{deviceLabel(session.user_agent)}
-								</span>
-								{session.is_current && <Badge>Текущая сессия</Badge>}
-							</div>
-							<dl className="mt-3 grid min-w-0 gap-2 text-sm">
-								<div className="min-w-0">
-									<dt className="text-xs text-muted">ID сессии</dt>
-									<dd className="break-all font-mono text-xs">{session.id}</dd>
-								</div>
-								<div>
-									<dt className="text-xs text-muted">Создана</dt>
-									<dd>{dateLabel(session.created_at)}</dd>
-								</div>
-								{session.updated_at && (
-									<div>
-										<dt className="text-xs text-muted">Обновлена</dt>
-										<dd>{dateLabel(session.updated_at)}</dd>
+				<ul className="account-session-list">
+					{[...sessions.data]
+						.sort((a, b) => Number(b.is_current) - Number(a.is_current))
+						.map((session) => {
+							const DeviceIcon = /Android|iPhone|iPad|iPod/.test(
+								session.user_agent ?? "",
+							)
+								? Smartphone
+								: Monitor;
+							return (
+								<li key={session.id} className="account-session-row">
+									<div className="account-session-summary">
+										<span className="account-device-icon">
+											<DeviceIcon size={20} aria-hidden="true" />
+										</span>
+										<div className="account-session-copy">
+											<div className="account-session-title">
+												<strong>{deviceLabel(session.user_agent)}</strong>
+												{session.is_current && (
+													<Badge className="account-current-badge">
+														Текущая сессия
+													</Badge>
+												)}
+											</div>
+											<p>Вход: {dateLabel(session.created_at)}</p>
+										</div>
 									</div>
-								)}
-								{session.refreshed_at && (
-									<div>
-										<dt className="text-xs text-muted">
-											Авторизация обновлена
-										</dt>
-										<dd>{dateLabel(session.refreshed_at)}</dd>
-									</div>
-								)}
-							</dl>
-							{session.user_agent && (
-								<details className="mt-3 min-w-0 text-xs text-muted">
-									<summary className="cursor-pointer">
-										Данные устройства
-									</summary>
-									<p className="mt-2 break-all">{session.user_agent}</p>
-								</details>
-							)}
-						</li>
-					))}
+									<details className="account-row-details">
+										<summary>Подробнее</summary>
+										<dl className="account-technical-grid">
+											<div>
+												<dt>ID сессии</dt>
+												<dd className="break-all font-mono">{session.id}</dd>
+											</div>
+											<div>
+												<dt>Создана</dt>
+												<dd>{dateLabel(session.created_at)}</dd>
+											</div>
+											{session.updated_at && (
+												<div>
+													<dt>Обновлена</dt>
+													<dd>{dateLabel(session.updated_at)}</dd>
+												</div>
+											)}
+											{session.refreshed_at && (
+												<div>
+													<dt>Авторизация обновлена</dt>
+													<dd>{dateLabel(session.refreshed_at)}</dd>
+												</div>
+											)}
+											{session.user_agent && (
+												<div className="account-technical-agent">
+													<dt>Данные устройства</dt>
+													<dd className="break-all">{session.user_agent}</dd>
+												</div>
+											)}
+										</dl>
+									</details>
+								</li>
+							);
+						})}
 				</ul>
 			)}
+			<div className="account-card-footer">
+				<p>Текущая сессия останется активной.</p>
+				<Button
+					variant="secondary"
+					className="account-small-button"
+					disabled={
+						!identity?.sessionId ||
+						sessions.isError ||
+						sessions.isPending ||
+						!sessions.data?.some((session) => !session.is_current)
+					}
+					onClick={() => {
+						setNotice("");
+						setConfirm(true);
+					}}
+				>
+					Завершить все остальные сессии
+				</Button>
+			</div>
+			<p className="account-card-note">
+				Обновление авторизации не означает действие в приложении.
+			</p>
 		</Panel>
 	);
 }

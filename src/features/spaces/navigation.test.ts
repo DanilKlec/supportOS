@@ -16,6 +16,9 @@ describe("role-aware navigation", () => {
 			["/admin", ""],
 			["/settings", "integrations"],
 			["/settings", "integrations-ai"],
+			["/admin", "integrations-settings"],
+			["/admin", "integrations-ai"],
+			["/admin", "integrations-translator"],
 			["/health", ""],
 			["/team", ""],
 			["/bonuses", "manage"],
@@ -26,7 +29,7 @@ describe("role-aware navigation", () => {
 	});
 	it("offers own-session security settings without administrative permissions", () => {
 		const security = spaces
-			.find((space) => space.title === "Настройки")
+			.find((space) => space.title === "Личный кабинет")
 			?.items.find((item) => item.label === "Безопасность");
 		expect(security).toEqual({
 			label: "Безопасность",
@@ -85,9 +88,10 @@ describe("role-aware navigation", () => {
 	it.each([
 		["/settings/users", "roles", "/admin", "roles"],
 		["/ai/knowledge", "", "/qc", "knowledge"],
-		["/settings/ai", "", "/settings", "integrations-ai"],
-		["/settings/translator", "", "/settings", "integrations-translator"],
-		["/admin", "system", "/settings", "integrations"],
+		["/settings/ai", "", "/admin", "integrations-ai"],
+		["/settings/translator", "", "/admin", "integrations-translator"],
+		["/settings", "integrations", "/admin", "integrations-settings"],
+		["/admin", "system", "/admin", "integrations-settings"],
 		["/admin", "qc", "/qc", "proposals"],
 		["/bonus-tools", "manage", "/bonuses", "calculator-manage"],
 	])("redirects duplicate %s#%s", (path, hash, to, targetHash) => {

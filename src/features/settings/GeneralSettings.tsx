@@ -1,82 +1,122 @@
 import { Link } from "@tanstack/react-router";
-import { Cloud, LogIn, LogOut } from "lucide-react";
-import { PasswordPanel } from "@/features/accounts/PasswordPanel";
-import { knowledgeService } from "@/services/knowledge.service";
-import { supabaseService } from "@/services/supabase.service";
-import { useToast } from "@/shared/hooks/useToast";
+import { ArrowUpRight, Check, LogIn, Palette, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
+import { accountIdentity } from "./account-sections";
 
 export function GeneralSettings() {
-	const { showToast } = useToast();
-	const authConfigured = useAuthStore((state) => state.configured);
-	const authSession = useAuthStore((state) => state.session);
-
-	const signOut = async () => {
-		try {
-			await supabaseService.signOut();
-		} catch {
-			showToast("Не удалось выйти. Повторите попытку.");
-			return;
-		}
-		await knowledgeService.loadKnowledge();
-		showToast("Вы вышли из аккаунта");
-	};
-
+	const configured = useAuthStore((state) => state.configured);
+	const session = useAuthStore((state) => state.session);
+	const identity = accountIdentity(
+		session?.user.email,
+		session?.user.access?.display_name,
+	);
+	if (!session)
+		return (
+			<section className="account-card">
+				<h3>Ваш аккаунт</h3>
+				<p className="mt-2 text-sm text-muted">
+					{configured
+						? "Подключение к серверу настроено. Войдите в аккаунт, чтобы загрузить рабочие данные."
+						: "Подключение к серверу не настроено. Рабочие данные недоступны."}
+				</p>
+				{configured && (
+					<Link
+						to="/login"
+						className="ui-button mt-4 inline-flex items-center gap-2"
+					>
+						<LogIn size={16} />
+						Войти
+					</Link>
+				)}
+			</section>
+		);
+	const active = session.user.access?.status === "active";
 	return (
 		<>
-			{authSession && <PasswordPanel />}
-			<section className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
-				<div className="min-w-0 rounded-lg border border-border bg-surface p-5">
-					<div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-						<Cloud size={18} />
-						Аккаунт
+			<section className="account-card account-profile-card">
+				<div className="account-profile-identity">
+					<div
+						className="account-avatar account-avatar--large"
+						aria-hidden="true"
+					>
+						{identity.initials}
 					</div>
-
-					{authConfigured ? (
-						authSession ? (
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<div className="min-w-0 [overflow-wrap:anywhere]">
-									<div className="break-all text-sm font-semibold">
-										{authSession.user.email}
-									</div>
-									<div className="mt-1 text-xs text-muted">
-										Роли:{" "}
-										{authSession.user.access?.roles
-											.map((role) => role.name)
-											.join(", ") || "Без доступа"}
-									</div>
-								</div>
-								<button
-									type="button"
-									onClick={signOut}
-									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
-								>
-									<LogOut size={16} />
-									Выйти
-								</button>
-							</div>
-						) : (
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<div className="text-sm text-muted">
-									Подключение к серверу настроено. Войдите в аккаунт, чтобы
-									загрузить рабочие данные.
-								</div>
-								<Link
-									to="/login"
-									className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
-								>
-									<LogIn size={16} />
-									Войти
-								</Link>
-							</div>
-						)
-					) : (
-						<div className="text-sm text-muted">
-							Подключение к серверу не настроено. Рабочие данные недоступны.
-						</div>
-					)}
+					<div className="min-w-0">
+						<h3>{identity.name}</h3>
+						<p>
+							{session.user.access?.roles
+								.map((role) => role.name)
+								.join(" · ") || "Роли ещё не назначены"}
+						</p>
+					</div>
+					<span
+						className={`account-status ${active ? "account-status--success" : ""}`}
+					>
+						<span />
+						{active
+							? "Аккаунт активен"
+							: session.user.access?.status === "disabled"
+								? "Доступ отключён"
+								: "Ожидает доступа"}
+					</span>
 				</div>
+				<dl className="account-profile-fields">
+					<div>
+						<dt>Имя в команде</dt>
+						<dd>{identity.name}</dd>
+					</div>
+					<div>
+						<dt>{identity.addressLabel}</dt>
+						<dd className="break-all">{identity.address || "Не указана"}</dd>
+					</div>
+				</dl>
+				<div className="account-profile-roles">
+					<span>Роли и доступ</span>
+					<div>
+						{session.user.access?.roles.length ? (
+							session.user.access.roles.map((role) => (
+								<span className="account-role" key={role.id}>
+									<Check size={12} aria-hidden="true" />
+									{role.name}
+								</span>
+							))
+						) : (
+							<span className="text-sm text-muted">Назначит администратор</span>
+						)}
+					</div>
+				</div>
+				<p className="account-card-note">
+					Имя, рабочую почту и роли помогает изменить администратор команды.
+				</p>
 			</section>
+			<div className="account-shortcuts">
+				<Link to="/settings" hash="security" className="account-shortcut">
+					<span
+						className={`account-shortcut-icon ${session.mfaEnabled ? "account-shortcut-icon--success" : ""}`}
+					>
+						<ShieldCheck size={20} />
+					</span>
+					<span>
+						<strong>Защита аккаунта</strong>
+						<small>
+							{session.mfaEnabled
+								? "Двухфакторная защита включена"
+								: "Подключите двухфакторную защиту"}
+						</small>
+					</span>
+					<ArrowUpRight size={17} aria-hidden="true" />
+				</Link>
+				<Link to="/settings" hash="appearance" className="account-shortcut">
+					<span className="account-shortcut-icon">
+						<Palette size={20} />
+					</span>
+					<span>
+						<strong>Ваш интерфейс</strong>
+						<small>Тема, язык и удобный вид приложения</small>
+					</span>
+					<ArrowUpRight size={17} aria-hidden="true" />
+				</Link>
+			</div>
 		</>
 	);
 }

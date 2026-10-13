@@ -38,17 +38,12 @@ export const spaces = [
 		items: [{ label: "Спортивные ставки", to: "/sports-betting" }],
 	},
 	{
-		title: "Настройки",
+		title: "Личный кабинет",
 		items: [
-			{ label: "Общие", to: "/settings" },
+			{ label: "Профиль", to: "/settings" },
 			{ label: "Оформление", to: "/settings", hash: "appearance" },
 			{ label: "Безопасность", to: "/settings", hash: "security" },
-			{
-				label: "Интеграции",
-				to: "/settings",
-				hash: "integrations",
-				permission: "technical",
-			},
+			{ label: "Устройства", to: "/settings", hash: "sessions" },
 			{
 				label: "Данные",
 				to: "/settings",
@@ -92,12 +87,16 @@ export function canonicalPage(path: string, hash = "") {
 			hash: ["roles", "audit"].includes(hash) ? hash : "users",
 		};
 	if (path === "/ai/knowledge") return { to: "/qc", hash: "knowledge" };
-	if (path === "/settings/ai")
-		return { to: "/settings", hash: "integrations-ai" };
+	if (path === "/settings/ai") return { to: "/admin", hash: "integrations-ai" };
 	if (path === "/settings/translator")
-		return { to: "/settings", hash: "integrations-translator" };
+		return { to: "/admin", hash: "integrations-translator" };
+	if (path === "/settings" && hash.startsWith("integrations"))
+		return {
+			to: "/admin",
+			hash: hash === "integrations" ? "integrations-settings" : hash,
+		};
 	if (path === "/admin" && hash === "system")
-		return { to: "/settings", hash: "integrations" };
+		return { to: "/admin", hash: "integrations-settings" };
 	if (path === "/admin" && hash === "qc")
 		return { to: "/qc", hash: "proposals" };
 	if (path === "/bonus-tools")
