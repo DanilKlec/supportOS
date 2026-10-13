@@ -72,9 +72,11 @@ export function parseSchedule(
 		"6.5": ["evening"],
 		"9": ["night"],
 		"13": ["day", "evening"],
+		"8": [], // Work outside the monitored support shifts.
 	};
 	const known = new Map(agents.map((a) => [a.id.toLowerCase(), a.id]));
 	const issues: string[] = [];
+	const skipped: { row: number; name: string }[] = [];
 	const people: string[] = [];
 	const records: ScheduleImport["records"] = [];
 	const preview: { name: string; email: string; shifts: number }[] = [];
@@ -82,6 +84,10 @@ export function parseSchedule(
 		const name = str(row[2]);
 		if (!/\(sup\)/i.test(name)) continue;
 		const matches = [...(emails.get(key(name)) ?? [])];
+		if (!matches.length) {
+			skipped.push({ row: index + 1, name });
+			continue;
+		}
 		if (matches.length !== 1) {
 			issues.push(
 				`Строка ${index + 1}: ${name} — нет однозначной корпоративной почты.`,
@@ -118,6 +124,9 @@ export function parseSchedule(
 		}
 		preview.push({ name, email, shifts: count });
 	}
-	if (!people.length) issues.push("Не найдены сотрудники с пометкой (sup).");
-	return { payload: { month, people, records }, issues, preview };
+	if (!people.length)
+		issues.push(
+			"Не найдены сотрудники с пометкой (sup) и корпоративной почтой для загрузки.",
+		);
+	return { payload: { month, people, records }, issues, skipped, preview };
 }
