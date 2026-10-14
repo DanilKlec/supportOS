@@ -170,7 +170,7 @@ export function LibraryTree({
 													: []),
 												["up", "Выше"],
 												["down", "Ниже"],
-												["delete", "Удалить пустую папку"],
+												["delete", "Удалить папку"],
 											]
 										: [
 												["edit", "Редактировать бинд"],
@@ -180,7 +180,6 @@ export function LibraryTree({
 										<button
 											key={action}
 											type="button"
-											disabled={action === "delete" && node.children.length > 0}
 											onClick={(e) => {
 												e.currentTarget
 													.closest("details")
@@ -189,7 +188,7 @@ export function LibraryTree({
 											}}
 										>
 											{action === "delete" && node.type === "category"
-												? "Удалить пустой раздел"
+												? "Удалить раздел"
 												: label}
 										</button>
 									))}

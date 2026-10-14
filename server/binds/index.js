@@ -255,7 +255,8 @@ export default async function handler(req,res) {
   if(req.method==='POST'&&body.action==='shared-structure') {
    if(!can(actor.access,'knowledge.write'))throw fail('Нет права изменять общую структуру',403);
    if(!['category','folder'].includes(body.entity)||!['save','delete','up','down'].includes(body.operation)||!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload)||JSON.stringify(body.payload).length>8192)throw fail('Некорректное действие со структурой');
-   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/supportos_shared_tree_change`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({actor:actor.id,sid:actor.sessionId,entity:body.entity,operation:body.operation,payload:body.payload}),signal:AbortSignal.timeout(15000)});
+   const rpc=body.operation==='delete'?'supportos_shared_tree_remove':'supportos_shared_tree_change';
+   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/${rpc}`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({actor:actor.id,sid:actor.sessionId,entity:body.entity,...(body.operation==='delete'?{}:{operation:body.operation}),payload:body.payload}),signal:AbortSignal.timeout(15000)});
    const result=await response.json();
    if(!response.ok)throw fail(['42501','40001','P0001'].includes(result.code)?result.message:'Не удалось изменить структуру',result.code==='42501'?403:result.code==='40001'?409:400);
    return send(200,result);

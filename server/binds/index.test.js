@@ -189,3 +189,11 @@ it.each([['42501',403],['40001',409],['P0001',400]])('returns structure error %s
  vi.stubGlobal('fetch',vi.fn(async()=>Response.json({code,message:'Структура изменилась'},{status:400})));
  expect(await run({method:'POST',body:{action:'shared-structure',entity:'folder',operation:'up',payload:{id:'folder',expected:'old'}}})).toEqual({status,data:{error:'Структура изменилась'}});
 });
+
+it('uses the container removal RPC with a verified session and preserves the requested destination',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ const fetch=vi.fn(async()=>Response.json({ok:true,row:null}));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'shared-structure',entity:'category',operation:'delete',actor:other,sid:'forged',payload:{id:'old',expected:'version',strategy:'keep',destinationCategoryId:'new'}}})).status).toBe(200);
+ expect(fetch.mock.calls[0][0]).toContain('/rpc/supportos_shared_tree_remove');
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({actor,sid:'verified-session',entity:'category',payload:{id:'old',expected:'version',strategy:'keep',destinationCategoryId:'new'}});
+});

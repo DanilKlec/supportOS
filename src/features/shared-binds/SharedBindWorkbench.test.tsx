@@ -15,6 +15,7 @@ const mock = vi.hoisted(() => ({
 	save: vi.fn(),
 	load: vi.fn(),
 	change: vi.fn(),
+	loadKnowledge: vi.fn(),
 }));
 vi.mock("@/services/shared-binds.service", () => ({
 	sharedBindsService: mock,
@@ -22,6 +23,7 @@ vi.mock("@/services/shared-binds.service", () => ({
 vi.mock("@/services/shared-library.service", () => ({
 	sharedLibraryService: mock,
 }));
+vi.mock("@/services/knowledge.service", () => ({ knowledgeService: mock }));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
@@ -68,6 +70,7 @@ beforeEach(() => {
 	mock.list.mockResolvedValue([bind]);
 	mock.change.mockResolvedValue({ ok: true, row: { id: "new" } });
 	mock.save.mockResolvedValue({ ...bind, updatedAt: "new" });
+	mock.loadKnowledge.mockResolvedValue({});
 	useAuthStore.setState({
 		session: {
 			accessToken: "synthetic-test",
@@ -184,4 +187,137 @@ it("keeps the loaded content visible when no write permission is present", async
 	await screen.findByRole("tree");
 	expect(screen.queryByRole("button", { name: "Новый бинд" })).toBeNull();
 	expect(screen.queryByRole("button", { name: "Новый раздел" })).toBeNull();
+});
+
+it("creates a new shared section using the visible toolbar", async () => {
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.click(screen.getByRole("button", { name: "Новый раздел" }));
+	const dialog = screen.getByRole("dialog", { name: "Новый раздел" });
+	fireEvent.change(within(dialog).getByLabelText("Название"), {
+		target: { value: "Новые ответы" },
+	});
+	expect(within(dialog).getByText("Общая база / Новые ответы")).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Создать" }));
+	await waitFor(() =>
+		expect(mock.change).toHaveBeenCalledWith(
+			expect.objectContaining({
+				entity: "category",
+				operation: "save",
+				payload: expect.objectContaining({ name: "Новые ответы" }),
+			}),
+		),
+	);
+});
+
+it("creates a folder while a bind is selected instead of accidentally moving the bind", async () => {
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.change(screen.getByLabelText("Поиск в дереве"), {
+		target: { value: "Условия бонуса" },
+	});
+	fireEvent.click(
+		within(screen.getByRole("tree")).getByRole("button", {
+			name: "Условия бонуса",
+		}),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Новая папка" }));
+	const dialog = screen.getByRole("dialog", { name: "Новая папка" });
+	fireEvent.change(within(dialog).getByLabelText("Название"), {
+		target: { value: "Промокоды" },
+	});
+	fireEvent.click(within(dialog).getByRole("button", { name: "Создать" }));
+	await waitFor(() =>
+		expect(mock.change).toHaveBeenCalledWith({
+			entity: "folder",
+			operation: "save",
+			payload: {
+				name: "Промокоды",
+				categoryId: "cat",
+				parentId: "folder",
+				color: "",
+			},
+		}),
+	);
+	expect(mock.save).not.toHaveBeenCalled();
+});
+
+it("confirms removal of a populated folder, preserves binds and refreshes their locations", async () => {
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.click(
+		within(screen.getByRole("tree")).getByRole("button", {
+			name: "Бонусы",
+		}),
+	);
+	fireEvent.click(
+		within(
+			screen.getByRole("group", {
+				name: "Действия выбранной папки или раздела",
+			}),
+		).getByRole("button", { name: "Удалить папку" }),
+	);
+	const dialog = screen.getByRole("dialog", { name: "Удалить папку?" });
+	expect(
+		within(dialog).getByText(/переводы и личные версии сотрудников сохранятся/),
+	).toBeTruthy();
+	expect(mock.change).not.toHaveBeenCalled();
+	mock.load.mockResolvedValue({ categories: [category], folders: [] });
+	mock.list.mockResolvedValue([
+		{ ...bind, folderId: undefined, updatedAt: "new" },
+	]);
+	fireEvent.click(within(dialog).getByRole("button", { name: "Удалить" }));
+	await waitFor(() =>
+		expect(mock.change).toHaveBeenCalledWith({
+			entity: "folder",
+			operation: "delete",
+			payload: { id: "folder", expected: "2026-10-14", strategy: "keep" },
+		}),
+	);
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	expect(screen.getByText("Папка удалена. Содержимое сохранено.")).toBeTruthy();
+	expect(screen.getAllByText("Условия бонуса").length).toBeGreaterThan(0);
+	expect(mock.loadKnowledge).toHaveBeenCalledOnce();
+});
+
+it("requires a destination when deleting a section with content", async () => {
+	mock.load.mockResolvedValue({
+		categories: [category, { ...category, id: "next", name: "Новые ответы" }],
+		folders: [folder],
+	});
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.click(
+		within(screen.getByRole("tree")).getByRole("button", {
+			name: "Общее",
+		}),
+	);
+	fireEvent.click(
+		within(
+			screen.getByRole("group", {
+				name: "Действия выбранной папки или раздела",
+			}),
+		).getByRole("button", { name: "Удалить раздел" }),
+	);
+	const dialog = screen.getByRole("dialog", { name: "Удалить раздел?" });
+	expect(
+		(
+			within(dialog).getByLabelText(
+				"Куда перенести содержимое",
+			) as HTMLSelectElement
+		).value,
+	).toBe("next");
+	fireEvent.click(within(dialog).getByRole("button", { name: "Удалить" }));
+	await waitFor(() =>
+		expect(mock.change).toHaveBeenCalledWith({
+			entity: "category",
+			operation: "delete",
+			payload: {
+				id: "cat",
+				expected: "2026-10-14",
+				strategy: "keep",
+				destinationCategoryId: "next",
+			},
+		}),
+	);
 });

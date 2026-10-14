@@ -16,6 +16,8 @@ export type StructureChange = {
 		categoryId?: string;
 		parentId?: string;
 		color?: string;
+		strategy?: "keep";
+		destinationCategoryId?: string;
 	};
 };
 async function request<T>(

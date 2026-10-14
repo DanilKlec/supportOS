@@ -622,6 +622,15 @@
 	color: var(--color-muted);
 	margin-bottom: 18px;
 }
+.library-preserve-note {
+	padding: 12px 14px;
+	border: 1px solid #34d39940;
+	border-radius: 10px;
+	background: #34d39908;
+	color: var(--color-muted);
+	font-size: 12px;
+	line-height: 1.8;
+}
 .library-location-preview {
 	border: 1px solid var(--color-border);
 	border-radius: 10px;

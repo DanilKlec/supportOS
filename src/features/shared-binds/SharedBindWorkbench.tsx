@@ -16,6 +16,7 @@ import {
 	Search,
 	Upload,
 	Users,
+	Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -25,6 +26,7 @@ import type { Bind } from "@/entities/bind";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
 import { sharedBindsService } from "@/services/shared-binds.service";
+import { knowledgeService } from "@/services/knowledge.service";
 import {
 	sharedLibraryService,
 	type LibraryStructure,
@@ -182,7 +184,7 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 		setNotice("");
 		try {
 			await sharedLibraryService.change(change);
-			const fresh = await metadata.refetch();
+			const [fresh] = await Promise.all([metadata.refetch(), binds.refetch()]);
 			if (fresh.data) {
 				const data = fresh.data;
 				useKnowledgeStore.setState((s) => ({
@@ -196,9 +198,20 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 					],
 				}));
 			}
+			if (change.operation === "delete") {
+				setSelection("");
+				setSearch("");
+				try {
+					await knowledgeService.loadKnowledge();
+				} catch {
+					showToast(
+						"Структура сохранена. Обновите рабочее пространство, если в нём ещё видна старая версия.",
+					);
+				}
+			}
 			setNotice(
 				change.operation === "delete"
-					? "Пустая папка удалена"
+					? `${change.entity === "category" ? "Раздел удалён" : "Папка удалена"}. Содержимое сохранено.`
 					: "Структура сохранена для всей команды",
 			);
 		} finally {
@@ -290,6 +303,22 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 					)}
 					{allowed && (
 						<>
+							<Button
+								variant="secondary"
+								onClick={() => setDialog({ kind: "category" })}
+								disabled={Boolean(problem) || !hasLoaded}
+							>
+								<FolderPlus size={15} />
+								Новый раздел
+							</Button>
+							<Button
+								variant="secondary"
+								onClick={() => setDialog({ kind: "folder", node: selected })}
+								disabled={Boolean(problem) || !structure.categories.length}
+							>
+								<FolderPlus size={15} />
+								Новая папка
+							</Button>
 							<Button variant="secondary" onClick={() => setImportOpen(true)}>
 								<Upload size={15} />
 								Импорт
@@ -358,16 +387,6 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 								>
 									<ArrowLeft size={14} />
 								</Button>
-								{allowed && (
-									<Button
-										size="small"
-										variant="ghost"
-										aria-label="Новый раздел"
-										onClick={() => setDialog({ kind: "category" })}
-									>
-										<FolderPlus size={15} />
-									</Button>
-								)}
 							</div>
 						</div>
 						<div className="library-search">
@@ -607,23 +626,26 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 											материалов · изменения видны всем сотрудникам
 										</p>
 									</div>
-									{allowed && (
-										<div className="ui-actions">
+									{allowed && selected && selected.id !== "__unplaced" && (
+										<div
+											className="ui-actions"
+											role="group"
+											aria-label="Действия выбранной папки или раздела"
+										>
 											<Button
 												variant="secondary"
-												disabled={!location.categoryId}
-												onClick={() =>
-													setDialog({ kind: "folder", node: selected })
-												}
+												onClick={() => action("edit", selected)}
 											>
-												<FolderPlus size={15} />
-												Новая папка
+												<Pencil size={15} />
+												Переименовать
 											</Button>
 											<Button
-												variant="secondary"
-												onClick={() => setDialog({ kind: "category" })}
+												variant="danger"
+												onClick={() => action("delete", selected)}
 											>
-												Новый раздел
+												<Trash2 size={15} />
+												Удалить{" "}
+												{selected.type === "category" ? "раздел" : "папку"}
 											</Button>
 										</div>
 									)}

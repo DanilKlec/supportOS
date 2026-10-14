@@ -46,6 +46,7 @@ export function LibraryStructureDialog({
 			: undefined,
 	);
 	const initial = nodeLocation(state.target ?? node, structure);
+	const movingBind = kind === "move" && node?.type === "bind";
 	const [name, setName] = useState(
 		kind === "category" || kind === "folder" ? "" : (node?.name ?? ""),
 	);
@@ -62,6 +63,8 @@ export function LibraryStructureDialog({
 					: (node?.bind?.folderId ?? ""),
 	);
 	const [color, setColor] = useState(existing?.color ?? "");
+	const destinations = structure.categories.filter((c) => c.id !== node?.id);
+	const [destination, setDestination] = useState(destinations[0]?.id ?? "");
 	const [busy, setBusy] = useState(false),
 		[error, setError] = useState("");
 	const excluded =
@@ -102,7 +105,7 @@ export function LibraryStructureDialog({
 					setBusy(true);
 					setError("");
 					try {
-						if (node?.type === "bind") {
+						if (movingBind && node) {
 							await onMoveBind(node, category, parent || undefined);
 						} else {
 							await onChange({
@@ -113,7 +116,12 @@ export function LibraryStructureDialog({
 										? { id: existing.id, expected: existing.updatedAt }
 										: {}),
 									...(kind === "delete"
-										? {}
+										? {
+												strategy: "keep",
+												...(entity === "category"
+													? { destinationCategoryId: destination }
+													: {}),
+											}
 										: { name, categoryId: category, parentId: parent, color }),
 								},
 							});
@@ -129,13 +137,54 @@ export function LibraryStructureDialog({
 				}}
 			>
 				{kind === "delete" ? (
-					<p className="library-dialog-note">
-						Удалить «{node?.name}»? Удаление доступно только для пустой папки
-						или раздела.
-					</p>
+					<>
+						<p className="library-dialog-note">
+							Удалить «{node?.name}» из структуры общей базы?
+						</p>
+						{entity === "category" ? (
+							destinations.length > 0 ? (
+								<Field label="Куда перенести содержимое">
+									<Select
+										value={destination}
+										onChange={(e) => setDestination(e.target.value)}
+										disabled={busy}
+										required
+									>
+										{destinations.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.name}
+											</option>
+										))}
+									</Select>
+								</Field>
+							) : (
+								<p className="library-dialog-note">
+									Последний раздел можно удалить, если он пуст. Чтобы сохранить
+									его содержимое, сначала создайте новый раздел.
+								</p>
+							)
+						) : (
+							<div className="library-location-preview">
+								<span>Куда переместится содержимое</span>
+								<p>
+									{[
+										structure.categories.find((c) => c.id === category)?.name,
+										...folderPath(parent || undefined, structure),
+									]
+										.filter(Boolean)
+										.join(" / ")}
+								</p>
+							</div>
+						)}
+						<p className="library-preserve-note">
+							Бинды, вложенные папки, переводы и личные версии сотрудников
+							сохранятся. Из структуры исчезнет только{" "}
+							{entity === "category" ? "выбранный раздел" : "выбранная папка"}.
+						</p>
+					</>
 				) : (
 					<>
-						{node?.type !== "bind" && (
+						{!movingBind && (
 							<Field label="Название">
 								<Input
 									required
@@ -166,11 +215,7 @@ export function LibraryStructureDialog({
 									</Select>
 								</Field>
 								<Field
-									label={
-										node?.type === "bind"
-											? "Папка назначения"
-											: "Родительская папка"
-									}
+									label={movingBind ? "Папка назначения" : "Родительская папка"}
 								>
 									<Select
 										value={parent}
@@ -187,7 +232,7 @@ export function LibraryStructureDialog({
 								</Field>
 							</>
 						)}
-						{node?.type !== "bind" && (
+						{!movingBind && (
 							<fieldset className="ui-field">
 								<legend className="mb-3 text-sm">Цвет</legend>
 								<div className="library-color-options">
@@ -217,8 +262,10 @@ export function LibraryStructureDialog({
 						<div className="library-location-preview">
 							<span>Расположение в дереве</span>
 							<p>
-								{path}
-								{node?.type !== "bind" && entity === "folder"
+								{entity === "category"
+									? `Общая база / ${name || "Новый раздел"}`
+									: path}
+								{!movingBind && entity === "folder"
 									? ` / ${name || "Новая папка"}`
 									: ""}
 							</p>
