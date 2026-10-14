@@ -2,20 +2,10 @@ export const materialTabs = [
 	{ id: "binds", label: "Бинды" },
 	{ id: "emails", label: "Почты" },
 	{ id: "bonuses", label: "Welcome-бонусы" },
-	{ id: "knowledge", label: "AI знания" },
-	{ id: "rules", label: "Правила ответов" },
-	{ id: "instructions", label: "Инструкции проектов" },
-	{ id: "glossary", label: "Глоссарий" },
 ];
 export const problemTabs = [
 	{ id: "duplicates", label: "Дубли" },
 	{ id: "languages", label: "Переводы" },
-];
-export const qualityTabs = [
-	{ id: "quality", label: "Обзор" },
-	{ id: "playground", label: "Проверка ответа" },
-	{ id: "tests", label: "Тесты" },
-	{ id: "feedback", label: "Отзывы операторов" },
 ];
 export function qcDestination(hash: string) {
 	const [id, query = ""] = hash.replace(/^#/, "").split("?");
@@ -49,8 +39,6 @@ export function qcDestination(hash: string) {
 			filter,
 			item: "",
 		};
-	if (qualityTabs.some((t) => t.id === id))
-		return { section: "quality", tab: id, filter, item: "" };
 	return {
 		section: id === "history" ? "history" : "overview",
 		tab: id === "history" ? "history" : "overview",

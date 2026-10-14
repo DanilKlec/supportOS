@@ -117,6 +117,9 @@ export function CriticalConfirmationModal({
 			onClose={() => void close()}
 			closeDisabled={busy}
 		>
+			{request.summary && (
+				<p className="mb-3 font-semibold break-words">{request.summary}</p>
+			)}
 			<p className="text-sm text-muted">
 				Подтвердите именно это действие кодом Google Authenticator.
 				Подтверждение действует 5 минут и используется один раз в текущей

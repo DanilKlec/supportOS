@@ -11,6 +11,10 @@ const labels={
  'sessions.revoke_others':'Завершить все остальные сессии',
  'user.update':'Изменить роли / доступ сотрудника',
  'user.create':'Создать сотрудника и назначить роли',
+ 'user.password':'Изменить пароль сотрудника',
+ 'user.delete':'Удалить аккаунт сотрудника',
+ 'user.mfa.reset':'Отключить 2FA сотрудника',
+ 'user.sessions.revoke':'Завершить все сессии сотрудника',
  'role.save':'Сохранить роль и её разрешения',
  'role.delete':'Удалить роль',
 };
@@ -27,9 +31,9 @@ export function criticalSpec(actor,action,payload) {
  if(!actor.sessionId)throw fail('Сессия недействительна. Войдите снова.',401);
  if(!Object.hasOwn(labels,action)||!payload||typeof payload!=='object'||Array.isArray(payload)||Buffer.byteLength(JSON.stringify(payload))>8192)throw fail('Некорректное критичное действие');
  let target=actor.id;
- if(['user.update','user.create'].includes(action)) {
+ if(['user.update','user.create','user.password','user.delete','user.mfa.reset','user.sessions.revoke'].includes(action)) {
   if(!can(actor.access,'users.manage'))throw fail('Нет права управления пользователями',403);
-  if(action==='user.update') {
+  if(action!=='user.create') {
    if(!uuid.test(payload.id??'')||payload.id===actor.id)throw fail('Некорректный сотрудник');
    target=payload.id;
   } else {
@@ -44,6 +48,14 @@ export function criticalSpec(actor,action,payload) {
  else if(Object.keys(payload).length)throw fail('Для этого действия нельзя указать другую сессию или пользователя');
  // Account creation credentials remain in the original transient Auth flow.
  if(action==='user.create')payload={email:payload.email,roles:payload.roles,display_name:payload.display_name??''};
+ if(['user.password','user.delete','user.mfa.reset','user.sessions.revoke'].includes(action)) {
+  if(!Number.isInteger(payload.version)||payload.version<1)throw fail('Обновите карточку сотрудника',409);
+  if(action==='user.password') {
+   const passwordDigest=typeof payload.password==='string'?digest(payload.password):payload.password_digest;
+   if(!/^[a-f0-9]{64}$/.test(passwordDigest??''))throw fail('Некорректный пароль');
+   payload={id:payload.id,version:payload.version,password_digest:passwordDigest};
+  } else payload={id:payload.id,version:payload.version};
+ }
  return {action,payload,target};
 }
 export async function criticalAction(req,actor,body,env=process.env) {

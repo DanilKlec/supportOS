@@ -31,13 +31,14 @@ it("does not infer account management or AI editing from technical or QC access"
 	expect(canAccessPage(access(["knowledge.write"]), "/qc", "glossary")).toBe(
 		false,
 	);
-	expect(canAccessPage(access(["ai.train"]), "/qc", "glossary")).toBe(true);
+	expect(canAccessPage(access(["ai.train"]), "/qc", "glossary")).toBe(false);
+	expect(canAccessPage(access(["ai.train"]), "/admin", "glossary")).toBe(true);
 	expect(canAccessPage(access(["technical"]), "/qc", "unknown")).toBe(false);
 });
 it("preserves old AI and review destinations without duplicating their editors", () => {
 	expect(canonicalPage("/admin", "projects")).toEqual({
-		to: "/qc",
-		hash: "instructions",
+		to: "/admin",
+		hash: "projects",
 	});
 	expect(canonicalPage("/shared-binds", "proposals")).toEqual({
 		to: "/qc",

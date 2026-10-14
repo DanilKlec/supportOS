@@ -1,0 +1,50 @@
+.connection-scene {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  overflow: hidden;
+  padding: 96px 24px 40px;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+.connection-scenery { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #b9a4e212, transparent 65%); }
+.connection-scenery::before { content: ""; position: absolute; inset: 0; opacity: .18; background-image: radial-gradient(var(--color-muted) .65px, transparent .65px); background-size: 28px 28px; mask-image: radial-gradient(ellipse, #000, transparent 75%); }
+.connection-orbit { position: absolute; top: 50%; left: 50%; width: 760px; height: 760px; transform: translate(-50%, -50%); border: 1px dashed color-mix(in srgb, var(--color-muted) 14%, transparent); border-radius: 50%; }
+.connection-orbit--outer { width: 1060px; height: 1060px; }
+.connection-packet { position: absolute; color: color-mix(in srgb, var(--color-muted) 32%, transparent); font: 500 30px monospace; letter-spacing: 6px; transform: rotate(-15deg); }
+.connection-packet--one { top: 24%; left: 17%; }
+.connection-packet--two { right: 13%; bottom: 26%; font-size: 22px; transform: rotate(12deg); }
+.connection-brand { position: absolute; top: 28px; left: 32px; display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.04em; }
+.connection-brand-dot { color: #a78bce; }
+.connection-card { width: 100%; max-width: 480px; padding: 32px 40px 24px; border: 1px solid var(--color-border); border-radius: 24px; background: color-mix(in srgb, var(--color-surface) 94%, transparent); box-shadow: 0 20px 80px #0000000c; text-align: center; }
+.connection-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 100px; color: var(--color-muted); font-size: 11px; font-weight: 500; }
+.connection-status > span { width: 6px; height: 6px; border-radius: 50%; background: #bd9b6d; box-shadow: 0 0 0 3px #bd9b6d14; }
+.connection-courier { display: block; width: 100%; max-width: 340px; margin: 20px auto 0; color: var(--color-muted); }
+.connection-snail { animation: connection-delivery 6s ease-in-out infinite; }
+@keyframes connection-delivery { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+.connection-caption { margin: 4px 0 12px; color: var(--color-muted); font-size: 11px; }
+.connection-card h1 { margin: 0; font-size: clamp(23px, 3vw, 28px); line-height: 1.25; font-weight: 600; letter-spacing: -.045em; text-wrap: balance; }
+.connection-description { max-width: 330px; margin: 14px auto 26px; color: var(--color-muted); font-size: 13px; line-height: 1.7; text-wrap: pretty; }
+.connection-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 12px; }
+.connection-actions > .ui-button { align-self: stretch; min-height: 44px; margin: 0; padding: 10px 14px; white-space: normal; }
+.connection-actions > .ui-button--primary { background: #c4b0e7; color: #292035; }
+.connection-actions > .ui-button--primary:hover:not(:disabled) { background: #d4c4f0; }
+.connection-details { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--color-border); text-align: left; color: var(--color-muted); font-size: 11px; }
+.connection-details summary { cursor: pointer; text-align: center; }
+.connection-details p { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--color-surface-elevated); overflow-wrap: anywhere; font-family: monospace; }
+.connection-error { margin-top: 16px; color: var(--button-danger, #dc2626); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.connection-footnote { margin-top: 24px; color: var(--color-muted); font-size: 11px; }
+@media (max-width: 480px) {
+  .connection-scene { padding: 88px 16px 28px; }
+  .connection-brand { top: 24px; left: 24px; }
+  .connection-card { padding: 24px 20px 22px; border-radius: 20px; }
+  .connection-courier { max-width: 290px; margin-top: 12px; }
+  .connection-actions { gap: 10px; }
+  .connection-actions > .ui-button { padding-inline: 10px; font-size: 12px; }
+  .connection-packet { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .connection-snail { animation: none; } }

@@ -164,6 +164,12 @@ export function AccountsPanel({
 			)
 				diff.push(`Доступ: ${userEdit?.status} → ${change.payload?.status}`);
 			if (change.action === "role.delete") diff.push("Удалить роль");
+			if (!diff.length)
+				diff.push(
+					change.action === "user.update"
+						? "Сохранить изменения профиля"
+						: "Сохранить параметры роли",
+				);
 			if (diff.length) {
 				setConfirmation({ body, diff });
 				return;
@@ -177,9 +183,25 @@ export function AccountsPanel({
 				"users",
 				proof
 					? { ...(body as Record<string, unknown>), confirmation: proof }
-					: body,
+					: confirmed &&
+							["user.update", "role.save", "role.delete"].includes(
+								change.action,
+							)
+						? { ...(body as Record<string, unknown>), confirmed: true }
+						: body,
 			);
-			setNotice(result.warning ?? "Изменения сохранены");
+			setNotice(
+				result.warning ??
+					(change.action === "user.delete"
+						? "Аккаунт удалён"
+						: change.action === "user.password"
+							? "Пароль изменён. Сессии сотрудника завершены."
+							: change.action === "user.mfa.reset"
+								? "2FA отключена. Сессии сотрудника завершены."
+								: change.action === "user.sessions.revoke"
+									? "Все сессии сотрудника завершены."
+									: "Изменения сохранены"),
+			);
 			setCreate(false);
 			setUserEdit(null);
 			setRoleEdit(null);
@@ -196,6 +218,12 @@ export function AccountsPanel({
 					body,
 					request: {
 						action: change.action === "create" ? "user.create" : change.action,
+						summary:
+							change.action === "user.delete"
+								? `Удалить аккаунт ${userEdit?.email}`
+								: change.action === "user.password"
+									? `Изменить пароль: ${userEdit?.email}`
+									: undefined,
 						payload: (change.action === "create"
 							? body
 							: change.payload) as Record<string, unknown>,
@@ -382,6 +410,7 @@ export function AccountsPanel({
 						<BaseModal
 							title="Новый сотрудник"
 							size="lg"
+							className="employee-dialog"
 							onClose={() => setCreate(false)}
 							closeDisabled={busy}
 						>

@@ -9,6 +9,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
 import { accessApi } from "./access-api";
 import type { Audit, ManagedRole, Permission, User } from "./account-types";
+import { UserAccountActions } from "./UserAccountActions";
+import "./employee-dialog.css";
 
 export function UserDetails({
 	user,
@@ -29,11 +31,20 @@ export function UserDetails({
 	onSave: (body: unknown) => Promise<void>;
 	onCancel: () => void;
 }) {
+	const ownId = useAuthStore((state) => state.session?.user.id);
+	const protection =
+		user.id === ownId
+			? "Управляйте своим паролем, 2FA и сессиями в личном кабинете. Админские действия над собственным аккаунтом недоступны."
+			: user.roles.includes("creator")
+				? "Аккаунт Creator защищён от админских действий других пользователей."
+				: editDisabled && !busy
+					? "Для изменения этого аккаунта нужны права не ниже прав сотрудника."
+					: "";
 	return (
 		<BaseModal
 			title="Профиль и доступы сотрудника"
-			placement="right"
 			size="xl"
+			className="employee-dialog"
 			onClose={onCancel}
 			closeDisabled={busy}
 		>
@@ -42,7 +53,20 @@ export function UserDetails({
 					{error}
 				</p>
 			)}
-			<UserDetailsContent key={user.id} user={user}>
+			<UserDetailsContent
+				key={user.id}
+				user={user}
+				security={
+					<>
+						{protection && <p className="employee-info mb-4">{protection}</p>}
+						<UserAccountActions
+							user={user}
+							disabled={editDisabled}
+							onSave={onSave}
+						/>
+					</>
+				}
+			>
 				<EditUser
 					key={`${user.id}-${user.version}`}
 					user={user}
@@ -60,9 +84,11 @@ export function UserDetails({
 function UserDetailsContent({
 	user,
 	children,
+	security,
 }: {
 	user: User;
 	children: ReactNode;
+	security: ReactNode;
 }) {
 	const access = useAuthStore((s) => s.session?.user.access);
 	const [personalBinds, setPersonalBinds] = useState<Bind[]>([]);
@@ -72,7 +98,7 @@ function UserDetailsContent({
 		[error, setError] = useState(""),
 		[loading, setLoading] = useState(false);
 	useEffect(() => {
-		if (tab === "profile" || tab === "projects") return;
+		if (tab === "profile" || tab === "security") return;
 		const abort = new AbortController();
 		setLoading(true);
 		setError("");
@@ -111,15 +137,31 @@ function UserDetailsContent({
 		(a) => a.id.toLowerCase() === user.email.toLowerCase(),
 	);
 	return (
-		<div className="min-w-0 space-y-3">
+		<div className="employee-content">
+			<div className="employee-identity">
+				<div className="employee-avatar" aria-hidden="true">
+					{(user.display_name || user.email).slice(0, 2).toUpperCase()}
+				</div>
+				<div>
+					<h3>{user.display_name || "Новый сотрудник"}</h3>
+					<p>{user.email}</p>
+				</div>
+				<span className={`employee-status employee-status--${user.status}`}>
+					{user.status === "active"
+						? "Активен"
+						: user.status === "disabled"
+							? "Отключён"
+							: "Ожидает доступа"}
+				</span>
+			</div>
 			<Tabs
 				ariaLabel="Карточка сотрудника"
 				value={tab}
 				onValueChange={setTab}
 				items={[
 					{ value: "profile", label: "Профиль, роли и доступ" },
+					{ value: "security", label: "Безопасность" },
 					{ value: "activity", label: "Активность" },
-					{ value: "projects", label: "Проекты" },
 					...(can(access, "binds.manage")
 						? [{ value: "binds", label: "Личные бинды" }]
 						: []),
@@ -131,12 +173,7 @@ function UserDetailsContent({
 			<div className="min-w-0" hidden={tab !== "profile"}>
 				{children}
 			</div>
-			{tab === "projects" && (
-				<p className="ops-empty">
-					Назначения сотрудников на проекты не поддерживаются текущим API.
-					Проекты справочников не означают выданный доступ.
-				</p>
-			)}
+			<div hidden={tab !== "security"}>{security}</div>
 			{tab === "binds" && !loading && !error && (
 				<div>
 					{personalBinds.length ? (
@@ -260,25 +297,20 @@ export function CreateUser({
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [name, setName] = useState("");
+	const [confirmCreate, setConfirmCreate] = useState(false);
 	const [selected, setSelected] = useState<string[]>(
 		roles.some((r) => r.id === "support") ? ["support"] : [],
 	);
 	return (
 		<form
-			className="employee-access-form min-w-0 space-y-5"
+			className="employee-access-form employee-create-form"
 			onSubmit={(e) => {
 				e.preventDefault();
-				void onSave({
-					action: "create",
-					email,
-					password,
-					display_name: name,
-					roles: selected,
-				});
+				setConfirmCreate(true);
 			}}
 		>
 			<h3 className="font-semibold">Новый личный аккаунт</h3>
-			<div className="flex flex-wrap gap-2">
+			<div className="employee-fields">
 				<Input
 					aria-label="Имя нового сотрудника"
 					placeholder="Имя"
@@ -325,6 +357,53 @@ export function CreateUser({
 			<Button type="button" disabled={busy} onClick={onCancel}>
 				Отмена
 			</Button>
+			{confirmCreate && (
+				<BaseModal
+					title="Создать аккаунт?"
+					size="sm"
+					onClose={() => setConfirmCreate(false)}
+					closeDisabled={busy}
+				>
+					<p className="text-sm leading-7">
+						Вы уверены, что хотите создать аккаунт{" "}
+						<strong className="break-all">{email}</strong>?
+					</p>
+					<p className="mt-3 text-xs leading-6 text-muted">
+						Роли:{" "}
+						{roles
+							.filter((role) => selected.includes(role.id))
+							.map((role) => role.name)
+							.join(", ")}
+						. Пароль передайте сотруднику лично.
+					</p>
+					<div className="ui-actions justify-end gap-2 mt-5">
+						<Button
+							variant="secondary"
+							disabled={busy}
+							onClick={() => setConfirmCreate(false)}
+						>
+							Отмена
+						</Button>
+						<Button
+							variant="primary"
+							disabled={busy}
+							onClick={() => {
+								setConfirmCreate(false);
+								void onSave({
+									action: "create",
+									confirmed: true,
+									email,
+									password,
+									display_name: name,
+									roles: selected,
+								});
+							}}
+						>
+							Да, создать аккаунт
+						</Button>
+					</div>
+				</BaseModal>
+			)}
 		</form>
 	);
 }
@@ -357,7 +436,7 @@ function EditUser({
 	];
 	return (
 		<form
-			className="employee-access-form min-w-0 space-y-5"
+			className="employee-access-form"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void onSave({
@@ -372,7 +451,6 @@ function EditUser({
 				});
 			}}
 		>
-			<h3 className="break-all font-semibold">Доступ: {user.email}</h3>
 			{user.status === "pending" && (
 				<p className="text-sm text-muted">
 					Новая заявка. Выберите роли и подтвердите регистрацию. До
@@ -380,40 +458,62 @@ function EditUser({
 					«Отключён».
 				</p>
 			)}
-			<Input
-				aria-label="Имя сотрудника"
-				value={name}
-				maxLength={120}
-				onChange={(e) => setName(e.target.value)}
-				disabled={busy}
-			/>
-			<Select
-				aria-label="Статус аккаунта"
-				value={status}
-				onChange={(e) => setStatus(e.target.value)}
-				disabled={busy}
-			>
-				<option value="active">Активен</option>
-				<option value="disabled">Отключён</option>
-				<option value="pending">Ожидает доступа</option>
-			</Select>
-			<RolesChoice
-				roles={roles}
-				selected={selected}
-				onChange={setSelected}
-				disabled={busy}
-			/>
-			<p className="text-sm">
-				Доступ после сохранения:{" "}
-				{status !== "active"
-					? "закрыт"
-					: effective
-							.map((id) => permissions.find((p) => p.id === id)?.name ?? id)
-							.join(", ") || "нет разрешений"}
-				.
-			</p>
+			<div className="employee-card">
+				<div className="employee-section-heading">
+					<h3>Личные данные</h3>
+					<p>Имя в команде и состояние аккаунта.</p>
+				</div>
+				<div className="employee-fields">
+					<label className="employee-field">
+						<span>Имя сотрудника</span>
+						<Input
+							aria-label="Имя сотрудника"
+							value={name}
+							maxLength={120}
+							onChange={(e) => setName(e.target.value)}
+							disabled={busy}
+						/>
+					</label>
+					<label className="employee-field">
+						<span>Статус аккаунта</span>
+						<Select
+							aria-label="Статус аккаунта"
+							value={status}
+							onChange={(e) => setStatus(e.target.value)}
+							disabled={busy}
+						>
+							<option value="active">Активен</option>
+							<option value="disabled">Отключён</option>
+							<option value="pending">Ожидает доступа</option>
+						</Select>
+					</label>
+				</div>
+			</div>
+			<div className="employee-card">
+				<RolesChoice
+					roles={roles}
+					selected={selected}
+					onChange={setSelected}
+					disabled={busy}
+				/>
+				<details className="employee-permissions">
+					<summary>
+						Доступ после сохранения ·{" "}
+						{status === "active" ? effective.length : 0} разрешений
+					</summary>
+					<p>
+						{status !== "active"
+							? "закрыт"
+							: effective
+									.map((id) => permissions.find((p) => p.id === id)?.name ?? id)
+									.join(", ") || "нет разрешений"}
+						.
+					</p>
+				</details>
+			</div>
 			<div className="ui-actions employee-access-footer">
 				<Button
+					variant="primary"
 					type="submit"
 					disabled={busy || (status === "active" && !selected.length)}
 				>

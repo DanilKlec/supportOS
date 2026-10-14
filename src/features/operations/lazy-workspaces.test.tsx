@@ -57,7 +57,6 @@ vi.mock("@/features/admin/AIControlCenter", () => {
 vi.mock("@/features/qc/QualityPages", () => ({
 	QCOverview: () => <div>qc:overview</div>,
 	ReviewInbox: () => <div>qc:inbox</div>,
-	AIQuality: () => null,
 	DuplicateKnowledge: () => null,
 	KnowledgeHistory: () => null,
 	LanguageQuality: () => null,
@@ -153,7 +152,7 @@ it("loads the existing AccountsPanel only for users/roles/audit and preserves it
 	expect(mocks.accountsLoaded).toHaveBeenCalledTimes(1);
 });
 
-it("loads only the selected QC workflow, reusing management pages and project instructions", async () => {
+it("loads only working materials in QC without loading AI workflows", async () => {
 	const view = render(<QCWorkspace />);
 	expect(screen.getByText("qc:overview")).toBeTruthy();
 	for (const load of [
@@ -180,6 +179,14 @@ it("loads only the selected QC workflow, reusing management pages and project in
 	expect(mocks.aiLoaded).not.toHaveBeenCalled();
 	state.hash = "instructions";
 	view.rerender(<QCWorkspace />);
+	expect(screen.getByText("qc:overview")).toBeTruthy();
+	expect(mocks.aiLoaded).not.toHaveBeenCalled();
+});
+
+it("loads project instructions in administration with the existing AI permission", async () => {
+	identity(["ai.train"]);
+	state.hash = "projects";
+	render(<AdminWorkspace />);
 	expect(await screen.findByText("ai:projects")).toBeTruthy();
 	expect(mocks.aiLoaded).toHaveBeenCalledTimes(1);
 });
@@ -191,12 +198,15 @@ it("keeps unauthorized direct hashes from rendering protected lazy screens", () 
 	expect(screen.getByText("admin:integrations")).toBeTruthy();
 	expect(mocks.accountsRendered).not.toHaveBeenCalled();
 	admin.unmount();
+	state.hash = "knowledge";
+	const protectedAI = render(<AdminWorkspace />);
+	expect(screen.getByText("admin:integrations")).toBeTruthy();
+	expect(mocks.aiRendered).not.toHaveBeenCalled();
+	protectedAI.unmount();
 	identity(["knowledge.write"]);
 	state.hash = "knowledge";
 	render(<QCWorkspace />);
-	expect(screen.getByRole("alert").textContent).toBe(
-		"Нет доступа к этому инструменту.",
-	);
+	expect(screen.getByText("qc:overview")).toBeTruthy();
 	expect(mocks.aiRendered).not.toHaveBeenCalled();
 });
 

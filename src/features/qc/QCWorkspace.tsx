@@ -1,19 +1,12 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
 import { LoadingState } from "@/components/ui";
-import type { AISection } from "@/features/admin/AIControlCenter";
 import { OperationsWorkspace } from "@/features/operations/OperationsWorkspace";
 import { qcHashRedirects, qcSections } from "@/features/operations/sections";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
+import { materialTabs, problemTabs, qcDestination } from "./navigation";
 import {
-	materialTabs,
-	problemTabs,
-	qcDestination,
-	qualityTabs,
-} from "./navigation";
-import {
-	AIQuality,
 	DuplicateKnowledge,
 	KnowledgeHistory,
 	LanguageQuality,
@@ -22,11 +15,6 @@ import {
 } from "./QualityPages";
 
 // Keep related QC overview/review pages together; defer only whole workflows.
-const AIControlCenter = lazy(() =>
-	import("@/features/admin/AIControlCenter").then((module) => ({
-		default: module.AIControlCenter,
-	})),
-);
 const SharedBindsPage = lazy(() =>
 	import("@/features/shared-binds/SharedBindsPage").then((module) => ({
 		default: module.SharedBindsPage,
@@ -43,15 +31,6 @@ const DepositBonusesPage = lazy(() =>
 	})),
 );
 
-const aiSections: Record<string, AISection> = {
-	knowledge: "knowledge",
-	rules: "rules",
-	instructions: "projects",
-	glossary: "glossary",
-	playground: "playground",
-	tests: "tests",
-	feedback: "feedback",
-};
 export function QCWorkspace() {
 	const access = useAuthStore((s) => s.session?.user.access);
 	const hash = useRouterState({ select: (s) => s.location.hash });
@@ -77,9 +56,7 @@ export function QCWorkspace() {
 			? materialTabs
 			: destination.section === "problems"
 				? problemTabs
-				: destination.section === "quality"
-					? qualityTabs
-					: []
+				: []
 	).filter((t) => canAccessPage(access, "/qc", t.id));
 	const isContainer =
 		!normalizedHash || ["materials", "problems"].includes(normalizedHash);
@@ -89,24 +66,9 @@ export function QCWorkspace() {
 		!tabs.some((t) => t.id === destination.tab)
 			? tabs[0]?.id
 			: destination.tab;
-	const materialDescription = [
-		"knowledge",
-		"rules",
-		"instructions",
-		"glossary",
-	].includes(active ?? "")
-		? "AI знания, правила ответов и инструкции проектов — дополнительные управляющие знания для Помощника. Не дублируйте здесь всю библиотеку рабочих материалов."
-		: "Материалы — фактические рабочие источники команды: бинды, почты и welcome-бонусы.";
 	let content: React.ReactNode;
 	if (!active || !canAccessPage(access, "/qc", active))
 		content = <p role="alert">Нет доступа к этому инструменту.</p>;
-	else if (aiSections[active])
-		content = (
-			<AIControlCenter
-				section={aiSections[active]}
-				onSection={(id) => select(id === "projects" ? "instructions" : id)}
-			/>
-		);
 	else if (destination.section === "overview")
 		content = <QCOverview onSelect={select} />;
 	else if (destination.section === "inbox")
@@ -122,7 +84,6 @@ export function QCWorkspace() {
 	else if (active === "bonuses") content = <DepositBonusesPage management />;
 	else if (active === "duplicates") content = <DuplicateKnowledge />;
 	else if (active === "languages") content = <LanguageQuality />;
-	else if (active === "quality") content = <AIQuality />;
 	else if (active === "history") content = <KnowledgeHistory />;
 	return (
 		<OperationsWorkspace
@@ -160,9 +121,6 @@ export function QCWorkspace() {
 							))}
 						</select>
 					</label>
-					{destination.section === "materials" && (
-						<p className="text-sm text-muted">{materialDescription}</p>
-					)}
 				</>
 			)}
 			<Suspense fallback={<LoadingState message="Загружаем раздел…" />}>

@@ -1,5 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
 import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
+import { AuthConnectionScreen } from "@/features/auth/AuthConnectionScreen";
 import { PasswordForm } from "@/features/auth/PasswordForm";
 import { PendingApproval } from "@/features/auth/PendingApproval";
 import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
@@ -133,25 +134,11 @@ function RootComponent() {
 				{!loading && session?.mfaRequired ? (
 					<AuthenticatorGate key={session.sessionId ?? session.user.id} />
 				) : !loading && session && !session.authVerified ? (
-					<div className="min-h-screen bg-background px-6 py-16 text-foreground">
-						<div className="mx-auto max-w-lg space-y-4">
-							<p role="alert">{authError || "Проверяем доступ…"}</p>
-							<button
-								type="button"
-								className="ui-button"
-								onClick={() => void supabaseService.refreshIdentity()}
-							>
-								Повторить проверку
-							</button>
-							<button
-								type="button"
-								className="ui-button"
-								onClick={() => void supabaseService.signOut()}
-							>
-								Выйти
-							</button>
-						</div>
-					</div>
+					<AuthConnectionScreen
+						error={authError}
+						onRetry={() => supabaseService.refreshIdentity()}
+						onSignOut={() => supabaseService.signOut()}
+					/>
 				) : passwordRecovery && session ? (
 					<div className="min-h-screen bg-background px-6 py-16">
 						<PasswordForm />

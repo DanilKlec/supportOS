@@ -183,19 +183,21 @@ export function UsersTable({
 									</span>
 								</td>
 								<td data-label="Действия">
-									<Button
-										variant="secondary"
-										disabled={busy}
-										onClick={() => onHistory(u)}
-									>
-										История входов
-									</Button>
-									<Button
-										disabled={isEditDisabled(u)}
-										onClick={() => onEdit(u)}
-									>
-										Изменить
-									</Button>
+									<div className="ui-actions user-registry-actions">
+										<Button
+											variant="secondary"
+											disabled={busy}
+											onClick={() => onHistory(u)}
+										>
+											История входов
+										</Button>
+										<Button
+											disabled={isEditDisabled(u)}
+											onClick={() => onEdit(u)}
+										>
+											Изменить
+										</Button>
+									</div>
 								</td>
 							</tr>
 						))}

@@ -10,13 +10,13 @@ const req=(body)=>({method:'POST',url:'/api/accounts',headers:{origin:'https://a
 const historyUser='11111111-1111-4111-8111-111111111111',historyOther='22222222-2222-4222-8222-222222222222';
 beforeEach(()=>{vi.resetAllMocks();mock.requireUser.mockResolvedValue({id:'verified',access:{status:'active',roles:[{id:'admin',name:'Admin'}],permissions:['work','users.manage','roles.manage']}});});
 afterEach(()=>vi.unstubAllGlobals());
-it('passes only the verified actor to transactional permission changes',async()=>{
+it('passes only the verified actor to transactional permission changes after ordinary confirmation',async()=>{
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['users.manage']}});
- vi.stubGlobal('fetch',vi.fn(async()=>Response.json({ok:true})));
+ mock.db.mockResolvedValue({ok:true,result:{ok:true}});
  const res=response(),payload={id:historyOther,roles:['support'],status:'active',version:1},confirmation={id:historyOther,token:'a'.repeat(43)};
- await handler(req({action:'user.update',payload,actor:'forged',session_id:'forged',confirmation}),res);
+ await handler(req({action:'user.update',confirmed:true,payload,actor:'forged',session_id:'forged',confirmation}),res);
  expect(mock.changeAccess).not.toHaveBeenCalled();expect(res.statusCode).toBe(200);
- expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({actor:historyUser,sid:'verified-session',operation:'user.update',payload,request_id:historyOther,permit_digest:expect.any(String)});
+ expect(mock.db).toHaveBeenCalledWith(expect.anything(),'rpc/supportos_prepare_account_action',expect.objectContaining({actor:historyUser,sid:'verified-session',operation:'user.update',payload,request_id:expect.any(String)}));
 });
 it('lets an unassigned account read only its own access context',async()=>{
  mock.requireUser.mockResolvedValue({id:'pending',sessionId:'verified-session',access:{status:'pending',roles:[],permissions:[]}});
@@ -32,14 +32,16 @@ it('blocks Creator assignment before creating an Auth account',async()=>{
 it('attaches only the verified creation reference to Auth metadata, preserving partial role-setup failures',async()=>{
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['users.manage']}});
  mock.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_roles?')?[{id:'support',name:'Support'}]:[]);
- vi.stubGlobal('fetch',vi.fn(async()=>Response.json({ok:true})));
+ mock.db.mockResolvedValue({ok:true});
  mock.createUser.mockResolvedValue({data:{user:{id:historyOther}},error:null});mock.changeAccess.mockRejectedValue(new Error('synthetic role failure'));
  const confirmation={id:historyOther,token:'a'.repeat(43)},res=response();
- await handler(req({action:'create',email:'created@example.test',password:'synthetic-long-password',roles:['support'],confirmation,
+ await handler(req({action:'create',confirmed:true,email:'created@example.test',password:'synthetic-long-password',roles:['support'],confirmation,
   actor:'forged',app_metadata:{supportos_creation_request:'forged',secret:'synthetic-secret'}}),res);
  expect(res.statusCode).toBe(201);expect(res.body).toMatchObject({id:historyOther,warning:expect.any(String)});
  expect(mock.createUser).toHaveBeenCalledWith({email:'created@example.test',password:'synthetic-long-password',email_confirm:true,
-  app_metadata:{supportos_creation_request:confirmation.id}});
+  app_metadata:{supportos_creation_request:expect.any(String)}});
+ expect(mock.createUser.mock.calls[0][0].app_metadata.supportos_creation_request).not.toBe(confirmation.id);
+ expect(mock.db).toHaveBeenCalledWith(expect.anything(),'rpc/supportos_prepare_account_action',expect.objectContaining({actor:historyUser,sid:'verified-session',operation:'user.create',payload:{email:'created@example.test',roles:['support'],display_name:''}}));
  expect(mock.changeAccess).toHaveBeenCalledWith(historyUser,'user.update',expect.objectContaining({id:historyOther}));
 });
 it('rejects cross-origin writes before authentication or database access',async()=>{
@@ -117,10 +119,10 @@ it.each([['invalid_session',401],['forbidden',403]])('honors the history RPC %s 
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['work']}});mock.db.mockResolvedValue({error});
  const res=response();await handler({...req(),method:'GET',url:'/api/accounts?action=login-history'},res);expect(res.statusCode).toBe(status);
 });
-it('requires generic confirmation for role changes and disabling an account, without falling back to unguarded RBAC',async()=>{
+it('requires ordinary confirmation for role changes and disabling an account, without falling back to unguarded RBAC',async()=>{
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['users.manage','roles.manage']}});
  for(const body of [{action:'user.update',payload:{id:historyOther,roles:['support'],status:'disabled',version:1}},{action:'role.save',payload:{id:'custom',permissions:['work']}},{action:'role.delete',payload:{id:'custom'}}]) {
-  const res=response();await handler(req(body),res);expect(res.statusCode).toBe(428);expect(res.body.code).toBe('critical_confirmation_required');
+  const res=response();await handler(req(body),res);expect(res.statusCode).toBe(400);
  }
  expect(mock.changeAccess).not.toHaveBeenCalled();expect(mock.db).not.toHaveBeenCalled();
 });
@@ -139,9 +141,9 @@ it('does not revoke sessions with rejected proof or report success after provide
  fetch.mockResolvedValue(Response.json({ok:true}));mock.signOut.mockResolvedValue({error:{status:500}});
  const failed=response();await handler(request,failed);expect(failed.statusCode).toBe(503);expect(mock.db).not.toHaveBeenCalled();
 });
-it('does not create an Auth account or assign initial roles without TOTP confirmation',async()=>{
+it('does not create an Auth account or assign initial roles without the dialog confirmation',async()=>{
  mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[],permissions:['users.manage','work']}});
  mock.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_roles?')?[{id:'support'}]:path.startsWith('supportos_permissions?')?[{id:'work'}]:[{role_id:'support',permission_id:'work'}]);
  const res=response();await handler(req({action:'create',email:'new@example.test',password:'synthetic-long-password',roles:['support']}),res);
- expect(res.statusCode).toBe(428);expect(mock.createUser).not.toHaveBeenCalled();expect(mock.changeAccess).not.toHaveBeenCalled();
+ expect(res.statusCode).toBe(400);expect(mock.createUser).not.toHaveBeenCalled();expect(mock.changeAccess).not.toHaveBeenCalled();
 });

@@ -87,7 +87,16 @@ describe("role-aware navigation", () => {
 	});
 	it.each([
 		["/settings/users", "roles", "/admin", "roles"],
-		["/ai/knowledge", "", "/qc", "knowledge"],
+		["/ai/knowledge", "", "/admin", "knowledge"],
+		["/qc", "knowledge", "/admin", "knowledge"],
+		["/qc", "rules", "/admin", "rules"],
+		["/qc", "instructions", "/admin", "projects"],
+		["/qc", "glossary", "/admin", "glossary"],
+		["/qc", "playground", "/admin", "playground"],
+		["/qc", "tests", "/admin", "tests"],
+		["/qc", "feedback", "/admin", "feedback"],
+		["/qc", "quality", "/admin", "ai"],
+		["/admin", "projects", "/admin", "projects"],
 		["/settings/ai", "", "/admin", "integrations-ai"],
 		["/settings/translator", "", "/admin", "integrations-translator"],
 		["/settings", "integrations", "/admin", "integrations-settings"],

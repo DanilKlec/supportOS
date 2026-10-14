@@ -9,6 +9,7 @@ interface BaseModalProps {
 	closeDisabled?: boolean;
 	size?: "sm" | "md" | "lg" | "xl";
 	placement?: "center" | "right";
+	className?: string;
 }
 
 const widths = {
@@ -26,6 +27,7 @@ export function BaseModal({
 	closeDisabled = false,
 	size = "md",
 	placement = "center",
+	className = "",
 }: BaseModalProps) {
 	const titleId = useId();
 	const dialog = useRef<HTMLElement>(null);
@@ -114,7 +116,7 @@ export function BaseModal({
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={titleId}
-				className={`modal-dialog ${widths[size]} animate-slide-up shadow-2xl`}
+				className={`modal-dialog ${widths[size]} animate-slide-up shadow-2xl ${className}`}
 			>
 				<div className="modal-header">
 					<h2 id={titleId} className="text-lg font-semibold text-foreground">

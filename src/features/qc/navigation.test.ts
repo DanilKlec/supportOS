@@ -1,38 +1,18 @@
 import { expect, it } from "vitest";
 import { qcSections } from "@/features/operations/sections";
 import { canAccessPage } from "../../../shared/access.js";
-import {
-	materialTabs,
-	problemTabs,
-	qcDestination,
-	qualityTabs,
-} from "./navigation";
+import { materialTabs, problemTabs, qcDestination } from "./navigation";
 
-it("has six main destinations and nests all working tools", () => {
+it("keeps QC focused on working materials without AI tools", () => {
 	expect(qcSections.map((s) => s.label)).toEqual([
 		"Обзор",
 		"Очередь проверки",
 		"Материалы",
 		"Проблемы материалов",
-		"Проверка AI",
 		"История",
 	]);
-	expect(materialTabs.map((s) => s.id)).toEqual([
-		"binds",
-		"emails",
-		"bonuses",
-		"knowledge",
-		"rules",
-		"instructions",
-		"glossary",
-	]);
+	expect(materialTabs.map((s) => s.id)).toEqual(["binds", "emails", "bonuses"]);
 	expect(problemTabs.map((s) => s.id)).toEqual(["duplicates", "languages"]);
-	expect(qualityTabs.map((s) => s.id)).toEqual([
-		"quality",
-		"playground",
-		"tests",
-		"feedback",
-	]);
 });
 it("preserves legacy hashes and queue selection", () => {
 	for (const [hash, section, tab] of [
@@ -40,12 +20,6 @@ it("preserves legacy hashes and queue selection", () => {
 		["gaps", "inbox", "inbox"],
 		["duplicates", "problems", "duplicates"],
 		["languages", "problems", "languages"],
-		["knowledge", "materials", "knowledge"],
-		["rules", "materials", "rules"],
-		["instructions", "materials", "instructions"],
-		["playground", "quality", "playground"],
-		["tests", "quality", "tests"],
-		["feedback", "quality", "feedback"],
 	])
 		expect(qcDestination(hash)).toMatchObject({ section, tab });
 	expect(qcDestination("proposals")).toMatchObject({ filter: "proposal" });
@@ -59,12 +33,9 @@ it("keeps Support outside QC and respects each nested tool permission", () => {
 		status: "active",
 		permissions: ["work", "binds.read", "projects.read", "bonuses.read"],
 	};
-	for (const id of [
-		...qcSections,
-		...materialTabs,
-		...problemTabs,
-		...qualityTabs,
-	].map((s) => s.id))
+	for (const id of [...qcSections, ...materialTabs, ...problemTabs].map(
+		(s) => s.id,
+	))
 		expect(canAccessPage(support, "/qc", id)).toBe(false);
 	expect(
 		canAccessPage(
@@ -72,7 +43,7 @@ it("keeps Support outside QC and respects each nested tool permission", () => {
 			"/qc",
 			"materials",
 		),
-	).toBe(true);
+	).toBe(false);
 	expect(
 		canAccessPage(
 			{ status: "active", permissions: ["ai.rules"] },

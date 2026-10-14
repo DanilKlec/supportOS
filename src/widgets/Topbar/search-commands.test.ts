@@ -97,13 +97,13 @@ describe("global search commands", () => {
 		).toBe(false);
 	});
 
-	it("uses the shared QC Materials permission gate including guidance-only access", () => {
+	it("keeps AI-only permissions outside the QC Materials command", () => {
 		expect(
 			searchCommands(access(["ai.train"])).map((command) => command.id),
-		).toEqual(["materials"]);
+		).toEqual([]);
 		expect(
 			searchCommands(access(["ai.rules"])).map((command) => command.id),
-		).toEqual(["materials"]);
+		).toEqual([]);
 		expect(searchCommands(access(["ai.playground"]))).toEqual([]);
 	});
 

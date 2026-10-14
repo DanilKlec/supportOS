@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from "vitest";
+import { createHash, webcrypto } from "node:crypto";
 
 const fetcher = vi.hoisted(() => vi.fn());
 vi.mock("./authenticated-fetch", () => ({ authenticatedFetch: fetcher }));
@@ -55,4 +56,29 @@ it("propagates denial instead of returning success", async () => {
 			token: "one-use",
 		}),
 	).rejects.toThrow("Подтверждение истекло");
+});
+it("binds password changes to a digest without sending the password to generic confirmation", async () => {
+	vi.stubGlobal("crypto", webcrypto);
+	try {
+		await beginCritical({
+			action: "user.password",
+			payload: {
+				id: "employee",
+				version: 4,
+				password: "synthetic-new-password",
+			},
+		});
+		expect(JSON.parse(fetcher.mock.calls[0][1].body).payload).toEqual({
+			id: "employee",
+			version: 4,
+			password_digest: createHash("sha256")
+				.update("synthetic-new-password")
+				.digest("hex"),
+		});
+		expect(fetcher.mock.calls[0][1].body).not.toContain(
+			"synthetic-new-password",
+		);
+	} finally {
+		vi.unstubAllGlobals();
+	}
 });

@@ -159,6 +159,7 @@ it("approves a pending registration and assigns selected roles in one request", 
 	expect(requests).toHaveLength(1);
 	expect(JSON.parse(requests[0][1].body)).toEqual({
 		action: "user.update",
+		confirmed: true,
 		payload: {
 			id: "new",
 			display_name: "",
@@ -168,7 +169,7 @@ it("approves a pending registration and assigns selected roles in one request", 
 		},
 	});
 });
-it("keeps the exact edited payload through the TOTP gate and executes only after explicit approval", async () => {
+it("keeps the exact edited payload and executes after ordinary approval without requesting TOTP", async () => {
 	const original = mock.fetch.getMockImplementation()!;
 	const proof = { id: "request-id", token: "one-time-permit" };
 	mock.fetch.mockImplementation(async (url, init) => {
@@ -181,13 +182,12 @@ it("keeps the exact edited payload through the TOTP gate and executes only after
 				status: body.operation === "begin" ? "pending" : "approved",
 				expiresAt: new Date(Date.now() + 300000).toISOString(),
 			});
-		if (!body.confirmation)
+		if (!body.confirmed)
 			return Response.json(
 				{
-					error: "Подтвердите код",
-					code: "critical_confirmation_required",
+					error: "Подтвердите действие",
 				},
-				{ status: 428 },
+				{ status: 400 },
 			);
 		return Response.json({ ok: true });
 	});
@@ -215,26 +215,25 @@ it("keeps the exact edited payload through the TOTP gate and executes only after
 	fireEvent.click(
 		screen.getByRole("button", { name: "Подтвердить изменения" }),
 	);
-	fireEvent.click(
-		await screen.findByRole("button", { name: "Подтвердить код" }),
-	);
-	await screen.findByText("Код подтверждён. Можно выполнить действие.");
-	expect(
-		mock.fetch.mock.calls.filter(
-			([, init]) =>
-				init?.method === "POST" && JSON.parse(init.body).confirmation,
-		),
-	).toHaveLength(0);
-	fireEvent.click(screen.getByRole("button", { name: "Выполнить действие" }));
 	await screen.findByText("Изменения сохранены");
+	expect(
+		mock.fetch.mock.calls.some(([url]) =>
+			String(url).includes("action=critical"),
+		),
+	).toBe(false);
+	expect(screen.queryByRole("button", { name: "Подтвердить код" })).toBeNull();
 	const changes = mock.fetch.mock.calls
 		.filter(
 			([url, init]) =>
 				String(url).includes("action=users") && init?.method === "POST",
 		)
 		.map(([, init]) => JSON.parse(init.body));
-	expect(changes).toHaveLength(2);
-	expect(changes[1]).toEqual({ ...changes[0], confirmation: proof });
+	expect(changes).toHaveLength(1);
+	expect(changes[0]).toMatchObject({
+		action: "user.update",
+		confirmed: true,
+		payload: { id: "new", roles: ["support"], status: "active", version: 1 },
+	});
 	client.clear();
 });
 
@@ -270,6 +269,7 @@ it("preserves unsaved profile fields when switching the employee drawer tabs", a
 	);
 	expect(JSON.parse(request![1].body)).toEqual({
 		action: "user.update",
+		confirmed: true,
 		payload: {
 			id: "user",
 			version: 4,
@@ -471,6 +471,7 @@ it("assigns multiple roles with the profile version and shows success only after
 	);
 	expect(JSON.parse(request![1].body)).toEqual({
 		action: "user.update",
+		confirmed: true,
 		payload: {
 			id: "user",
 			version: 4,

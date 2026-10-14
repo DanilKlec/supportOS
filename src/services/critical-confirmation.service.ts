@@ -4,6 +4,7 @@ export type CriticalProof = { id: string; token: string };
 export type CriticalRequest = {
 	action: string;
 	payload: Record<string, unknown>;
+	summary?: string;
 };
 export type CriticalState = {
 	id: string;
@@ -33,7 +34,7 @@ export async function criticalRequest(
 }
 export async function beginCritical(request: CriticalRequest) {
 	// Passwords never enter the generic confirmation request, even transiently.
-	const payload =
+	let payload =
 		request.action === "user.create"
 			? {
 					email: request.payload.email,
@@ -41,6 +42,19 @@ export async function beginCritical(request: CriticalRequest) {
 					display_name: request.payload.display_name ?? "",
 				}
 			: request.payload;
+	if (request.action === "user.password") {
+		const digest = await crypto.subtle.digest(
+			"SHA-256",
+			new TextEncoder().encode(String(request.payload.password ?? "")),
+		);
+		payload = {
+			id: request.payload.id,
+			version: request.payload.version,
+			password_digest: Array.from(new Uint8Array(digest), (byte) =>
+				byte.toString(16).padStart(2, "0"),
+			).join(""),
+		};
+	}
 	return criticalRequest({
 		operation: "begin",
 		action: request.action,

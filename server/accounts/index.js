@@ -4,7 +4,8 @@ import {can} from '../../shared/access.js';
 import {changeAccess} from '../_rbac.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
 import {displayIdentity} from '../../shared/login-identity.js';
-import {criticalAction,executeCritical} from '../critical-confirmation.js';
+import {criticalAction,criticalSpec,executeCritical} from '../critical-confirmation.js';
+import {randomUUID} from 'node:crypto';
 import {securityMetadata} from '../security-metadata.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export function adminClient(env=process.env) {
@@ -114,17 +115,51 @@ export default async function handler(req,res) {
    if(!Array.isArray(body.roles)||!body.roles.length||body.roles.length>30||body.roles.some(r=>typeof r!=='string'))throw fail('Выберите роли');
    const data=await catalog(env);const owner=actor.access.roles.some(r=>r.id==='creator');
    if(body.roles.some(id=>{const role=data.roles.find(r=>r.id===id);return !role||(!owner&&(id==='creator'||role.permissions.some(p=>!actor.access.permissions.includes(p))));}))throw fail('Нельзя назначить эти роли',403);
-   await executeCritical(actor,'user.create',body,body.confirmation,env);
+   if(body.confirmed!==true)throw fail('Подтвердите создание аккаунта во всплывающем окне',400);
+   const requestId=randomUUID(),metadata=securityMetadata(req,env);
+   const prepared=await db(env,'rpc/supportos_prepare_account_action',{actor:actor.id,sid:actor.sessionId,operation:'user.create',payload:criticalSpec(actor,'user.create',body).payload,request_id:requestId,ip_digest:metadata.ipHash,agent:metadata.agent});
+   if(!prepared?.ok)throw fail('Нет права создавать аккаунт с этими ролями',403);
    // Non-secret, server-controlled reference: the identity-sync transaction
    // writes user.create audit before Auth commits (also when role setup fails).
-   const result=await adminClient().createUser({email:body.email.trim(),password:body.password,email_confirm:true,app_metadata:{supportos_creation_request:body.confirmation.id}});
+   const result=await adminClient().createUser({email:body.email.trim(),password:body.password,email_confirm:true,app_metadata:{supportos_creation_request:requestId}});
    if(result.error)throw fail('Не удалось создать аккаунт. Проверьте почту и требования к паролю');
    const id=result.data.user.id;
    try{await changeAccess(actor.id,'user.update',{id,roles:body.roles,status:'active',display_name:typeof body.display_name==='string'?body.display_name.slice(0,120):'',version:1});}
    catch{ return send(201,{id,warning:'Аккаунт создан без доступа. Найдите его в списке и назначьте роли.'});}
    return send(201,{id});
   }
+  if(['user.password','user.delete','user.mfa.reset','user.sessions.revoke'].includes(body.action)) {
+   if(!can(actor.access,'users.manage'))throw fail('Нет права управления пользователями',403);
+   if(body.action==='user.password'&&(typeof body.payload?.password!=='string'||body.payload.password.length<12||body.payload.password.length>128))throw fail('Пароль должен содержать от 12 до 128 символов');
+   if(body.confirmed!==true)throw fail('Подтвердите действие во всплывающем окне',400);
+   const requestId=randomUUID(),metadata=securityMetadata(req,env);
+   const prepared=await db(env,'rpc/supportos_prepare_account_action',{actor:actor.id,sid:actor.sessionId,operation:body.action,payload:criticalSpec(actor,body.action,body.payload).payload,request_id:requestId,ip_digest:metadata.ipHash,agent:metadata.agent});
+   if(!prepared?.ok)throw fail(prepared?.error==='conflict'?'Данные изменились. Обновите список':'Нет права выполнить это действие',prepared?.error==='conflict'?409:403);
+   if(body.action==='user.mfa.reset') {
+    const admin=adminClient(env);
+    const {data,error}=await admin.mfa.listFactors({userId:body.payload.id});
+    if(error||!Array.isArray(data?.factors))throw fail('Не удалось получить настройки 2FA. Сессии сотрудника завершены. Обновите карточку и повторите попытку.',502);
+    for(const factor of data.factors) {
+     const removed=await admin.mfa.deleteFactor({userId:body.payload.id,id:factor.id});
+     if(removed.error)throw fail('Не удалось полностью отключить 2FA. Сессии сотрудника завершены. Обновите карточку и повторите попытку.',502);
+    }
+   } else if(body.action!=='user.sessions.revoke') {
+    const admin=adminClient(env);
+    const result=body.action==='user.password'
+     ? await admin.updateUserById(body.payload.id,{password:body.payload.password})
+     : await admin.deleteUser(body.payload.id);
+    if(result.error)throw fail(body.action==='user.password'?'Не удалось изменить пароль. Проверьте требования к паролю, обновите список и повторите попытку. Сессии сотрудника завершены.':'Не удалось удалить аккаунт. Сессии сотрудника завершены. Обновите список и повторите попытку.',502);
+   }
+   const completed=await db(env,'rpc/supportos_account_action_completed',{actor:actor.id,sid:actor.sessionId,request_id:requestId});
+   if(!completed?.ok&&['user.mfa.reset','user.sessions.revoke'].includes(body.action))throw fail('Не удалось подтвердить завершение действия. Обновите карточку и проверьте журнал перед повторной попыткой.',502);
+   if(!completed?.ok)return send(200,{ok:true,warning:'Действие выполнено, но журнал не подтвердил завершение. Обновите список и проверьте историю.'});
+   return send(200,{ok:true});
+  }
   if(!['user.update','role.save','role.delete'].includes(body.action))throw fail('Неизвестное действие');
-  return send(200,await executeCritical(actor,body.action,body.payload,body.confirmation,env));
+  if(body.confirmed!==true)throw fail('Подтвердите изменение доступов во всплывающем окне',400);
+  const requestId=randomUUID(),metadata=securityMetadata(req,env);
+  const prepared=await db(env,'rpc/supportos_prepare_account_action',{actor:actor.id,sid:actor.sessionId,operation:body.action,payload:criticalSpec(actor,body.action,body.payload).payload,request_id:requestId,ip_digest:metadata.ipHash,agent:metadata.agent});
+  if(!prepared?.ok)throw fail(prepared?.error==='conflict'?'Данные изменились. Обновите список':prepared?.error==='invalid'?'Проверьте данные пользователя или роли':'Нет права изменять эти доступы',prepared?.error==='conflict'?409:prepared?.error==='invalid'?400:403);
+  return send(200,prepared.result);
  }catch(error){return send(error.status??500,{error:error.status?error.message:'Ошибка управления доступами',code:error.code});}
 }

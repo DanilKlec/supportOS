@@ -66,14 +66,16 @@ export function canonicalPage(path: string, hash = "") {
 	const legacyAI: Record<string, string> = {
 		knowledge: "knowledge",
 		rules: "rules",
-		projects: "instructions",
+		instructions: "projects",
 		glossary: "glossary",
 		playground: "playground",
 		tests: "tests",
 		feedback: "feedback",
+		quality: "ai",
 	};
-	if (path === "/admin" && legacyAI[hash])
-		return { to: "/qc", hash: legacyAI[hash] };
+	const legacyAISection = hash.split("?")[0];
+	if (path === "/qc" && Object.hasOwn(legacyAI, legacyAISection))
+		return { to: "/admin", hash: legacyAI[legacyAISection] };
 	if (path === "/content") return { to: "/qc", hash: "overview" };
 	if (path === "/shared-binds")
 		return {
@@ -86,7 +88,7 @@ export function canonicalPage(path: string, hash = "") {
 			to: "/admin",
 			hash: ["roles", "audit"].includes(hash) ? hash : "users",
 		};
-	if (path === "/ai/knowledge") return { to: "/qc", hash: "knowledge" };
+	if (path === "/ai/knowledge") return { to: "/admin", hash: "knowledge" };
 	if (path === "/settings/ai") return { to: "/admin", hash: "integrations-ai" };
 	if (path === "/settings/translator")
 		return { to: "/admin", hash: "integrations-translator" };

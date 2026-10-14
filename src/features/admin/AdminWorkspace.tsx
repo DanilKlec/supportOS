@@ -9,6 +9,8 @@ import {
 } from "@/features/operations/sections";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
+import type { AISection } from "./AIControlCenter";
+import { sectionDescriptions } from "./section-descriptions";
 import {
 	AccessReviewPage,
 	AIOverviewPage,
@@ -22,6 +24,11 @@ import {
 const AccountsPanel = lazy(() =>
 	import("@/features/accounts/AccountsPanel").then((module) => ({
 		default: module.AccountsPanel,
+	})),
+);
+const AIControlCenter = lazy(() =>
+	import("./AIControlCenter").then((module) => ({
+		default: module.AIControlCenter,
 	})),
 );
 const IntegrationSettingsPanel = lazy(() =>
@@ -128,6 +135,8 @@ export function AdminWorkspace() {
 					) : (
 						<IntegrationsPage />
 					)
+				) : Object.hasOwn(sectionDescriptions, active) ? (
+					<AIControlCenter section={active as AISection} onSection={select} />
 				) : active === "ai" ? (
 					<AIOverviewPage />
 				) : (

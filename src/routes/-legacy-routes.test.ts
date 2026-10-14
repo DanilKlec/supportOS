@@ -90,7 +90,7 @@ const bookmarks = [
 		route: Knowledge,
 		path: "/ai/knowledge",
 		hash: "",
-		to: "/qc",
+		to: "/admin",
 		target: "knowledge",
 	},
 	{

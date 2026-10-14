@@ -22,8 +22,8 @@ const env = {
 const signingKey = 'synthetic-integration-signing-key';
 const signature = data => createHmac('sha256',signingKey).update(data).digest('base64url');
 let verifiedAt;
-function jwt(user,sid,at=verifiedAt) {
- const data=[{alg:'HS256',typ:'JWT'},{sub:user,session_id:sid,aal:'aal2',amr:[{method:'totp',timestamp:at}],exp:Math.floor(Date.now()/1000)+3600}]
+function jwt(user,sid,at=verifiedAt,aal='aal2') {
+ const data=[{alg:'HS256',typ:'JWT'},{sub:user,session_id:sid,aal,amr:[{method:'totp',timestamp:at}],exp:Math.floor(Date.now()/1000)+3600}]
   .map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.');
  return `${data}.${signature(data)}`;
 }
@@ -36,7 +36,7 @@ function verifiedClaims(bearer) {
  try { const claims=JSON.parse(Buffer.from(payload,'base64url').toString()); return claims.exp>Date.now()/1000?claims:null; }
  catch { return null; }
 }
-let tokens, botMessages, logoutCalls, databasePaths, authMode;
+let tokens, botMessages, logoutCalls, databasePaths, authMode, accountCalls;
 const response = () => ({headers:{},setHeader(key,value){this.headers[key]=value;},end(text){this.body=JSON.parse(text);},
  status(code){this.statusCode=code;return this;},json(body){this.body=body;return this;}});
 function request(url,token=tokens.current,body) {
@@ -64,6 +64,39 @@ async function transport(input,init={}) {
  const headers=new Headers(init.headers),method=init.method??'GET';
  const body=init.body?JSON.parse(init.body):undefined;
  if(url.origin===env.SUPABASE_URL&&url.pathname.startsWith('/auth/v1/')) {
+  if(url.pathname==='/auth/v1/admin/users'&&method==='POST'&&headers.get('Authorization')===`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`) {
+   const subject=randomUUID();accountCalls.push({subject,method});
+   await pg.query('insert into auth.users(id,email,encrypted_password,raw_app_meta_data) values($1,$2,$3,$4)',[subject,body.email,'synthetic-created-hash',body.app_metadata]);
+   return Response.json({id:subject,email:body.email});
+  }
+  const factorPath=url.pathname.match(/^\/auth\/v1\/admin\/users\/([^/]+)\/factors(?:\/([^/]+))?$/);
+  if(factorPath&&headers.get('Authorization')===`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`) {
+   const [,subject,factorId]=factorPath;accountCalls.push({subject,method,...(factorId?{factorId}:{})});
+   if(method==='GET') {
+    if(authMode==='mfa-list-error')return Response.json({message:'Synthetic MFA failure'},{status:500});
+    return Response.json((await pg.query('select * from auth.mfa_factors where user_id=$1',[subject])).rows);
+   }
+   if(method==='DELETE'&&factorId) {
+    if(authMode==='mfa-delete-error')return Response.json({message:'Synthetic MFA failure'},{status:500});
+    if(authMode!=='mfa-no-op')await pg.query('delete from auth.mfa_factors where user_id=$1 and id=$2',[subject,factorId]);
+    if(authMode==='mfa-concurrent-session')await pg.query('insert into auth.sessions(id,user_id) values($1,$2)',[randomUUID(),subject]);
+    if(authMode==='mfa-concurrent-factor')await pg.query("insert into auth.mfa_factors values($1,$2,'totp','verified')",[randomUUID(),subject]);
+    return Response.json({id:factorId});
+   }
+   throw new Error('Unexpected MFA request');
+  }
+  if(url.pathname.startsWith('/auth/v1/admin/users/')&&headers.get('Authorization')===`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`) {
+   const subject=url.pathname.split('/').at(-1);
+   accountCalls.push({subject,method});
+   if(authMode==='error')return Response.json({message:'Synthetic Auth failure'},{status:500});
+   if(method==='PUT'){
+    await pg.query('update auth.users set encrypted_password=$1 where id=$2',['synthetic-updated-hash',subject]);
+    if(authMode==='concurrent-session')await pg.query('insert into auth.sessions(id,user_id) values($1,$2)',[randomUUID(),subject]);
+   }
+   else if(method==='DELETE')await pg.query('delete from auth.users where id=$1',[subject]);
+   else throw new Error('Unexpected account action');
+   return Response.json({id:subject,email:'foreign@example.test'});
+  }
   const claims=verifiedClaims(headers.get('Authorization'));
   if(!claims)return Response.json({message:'Invalid JWT'},{status:401});
   const user=(await pg.query('select id,email from auth.users where id=$1',[claims.sub])).rows[0];
@@ -88,6 +121,8 @@ async function transport(input,init={}) {
   expect(headers.get('Authorization')).toBe(`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`);
   databasePaths.push(url.pathname);
   if(url.pathname.startsWith('/rest/v1/rpc/'))return sqlRpc(url.pathname.split('/').at(-1),body);
+  const catalogTables={'/rest/v1/supportos_roles':'supportos_roles','/rest/v1/supportos_permissions':'supportos_permissions','/rest/v1/supportos_role_permissions':'supportos_role_permissions'};
+  if(method==='GET'&&catalogTables[url.pathname])return Response.json((await pg.query(`select * from public.${catalogTables[url.pathname]} order by 1 limit 1000 offset $1`,[Number(url.searchParams.get('offset')??0)])).rows);
   if(url.pathname==='/rest/v1/supportos_binds'&&method==='GET'&&url.searchParams.get('owner_id')==='is.null') {
    await pg.exec('set local role service_role');
    try { return Response.json((await pg.query('select * from public.supportos_binds where owner_id is null order by id limit 500')).rows); }
@@ -129,6 +164,14 @@ beforeAll(async()=>{
   'migrations/20261007203642_critical_security_access_audit.sql','migrations/20261007204222_audit_registration_claim_completion.sql',
   'migrations/20261007205438_restrict_access_helper_execute.sql','migrations/20261007210927_harden_all_supportos_relation_grants.sql','migrations/20261013102133_google_authenticator_auth.sql','migrations/20261013104812_optional_mfa_enrollment.sql'])
   await pg.exec(await readFile(new URL('../../supabase/'+path,import.meta.url),'utf8'));
+ await pg.exec('create table public.supportos_content_revisions(id text primary key,updated_by uuid references public.supportos_users(id));');
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261006214000_ai_feedback_reviews.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014111330_admin_account_management.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014112108_admin_password_session_completion.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014112652_admin_account_confirmation_dialog.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014114417_admin_create_confirmation_dialog.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014114917_admin_access_confirmation_dialog.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../../supabase/migrations/20261014122016_admin_user_security.sql',import.meta.url),'utf8'));
  await pg.query('insert into auth.sessions(id,user_id) values($1,$5),($2,$5),($3,$5),($4,$6)',[current,oldA,oldB,foreignSid,actor,foreign]);
  for(const [user,sid] of [[actor,current],[actor,oldA],[actor,oldB],[foreign,foreignSid]]) {
   const factor=randomUUID();await pg.query("insert into auth.mfa_factors values($1,$2,'totp','verified')",[factor,user]);
@@ -139,7 +182,7 @@ beforeEach(async()=>{
  await pg.exec('begin');
  verifiedAt=Math.floor(Date.now()/1000);
  tokens={current:jwt(actor,current),oldA:jwt(actor,oldA),oldB:jwt(actor,oldB),foreign:jwt(foreign,foreignSid)};
- botMessages=[];logoutCalls=[];databasePaths=[];authMode='normal';
+ botMessages=[];logoutCalls=[];databasePaths=[];authMode='normal';accountCalls=[];
  for(const [key,value] of Object.entries(env))vi.stubEnv(key,value);
  vi.stubGlobal('fetch',vi.fn(transport));
 });
@@ -333,4 +376,172 @@ it('does not call Auth or consume approval if the pre-Auth audit cannot be commi
  expect(logoutCalls).toHaveLength(0);expect(await sessionIds()).toEqual(expectedSessions);
  expect(await revokedEvents()).toHaveLength(0);expect(await revokedAudit()).toHaveLength(0);
  expect((await pg.query('select status from supportos_telegram_critical_requests where id=$1',[proof.id])).rows[0].status).toBe('approved');
+});
+
+it('changes a password after the dialog confirmation without another TOTP and revokes old JWTs',async()=>{
+ const payload={id:foreign,version:1,password:'synthetic-new-password'};
+ const denied=await call(accounts,'/api/accounts',tokens.current,{action:'user.password',payload});
+ expect(denied.statusCode).toBe(400);expect(accountCalls).toEqual([]);
+ const staleTotpToken=jwt(actor,current,verifiedAt-600);
+ const success=await call(accounts,'/api/accounts',staleTotpToken,{action:'user.password',payload,confirmed:true});
+ expect(success.statusCode).toBe(200);expect(accountCalls).toEqual([{subject:foreign,method:'PUT'}]);
+ expect((await call(accounts,'/api/accounts?action=me',tokens.foreign)).statusCode).toBe(401);
+ expect((await call(accounts,'/api/accounts?action=me')).statusCode).toBe(200);
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.password',payload,confirmed:true})).statusCode).toBe(409);
+ const audit=(await pg.query("select * from supportos_access_audit where action like 'user.password%'")).rows;
+ expect(audit.map(row=>row.action).sort()).toEqual(['user.password','user.password.requested']);
+ expect(audit.every(row=>row.actor_id===actor&&row.target_id===foreign)).toBe(true);
+ expect(JSON.stringify(audit)).not.toMatch(/synthetic-new-password|password_digest|encrypted_password/);
+});
+it('deletes the account through Auth while preserving shared content, reviews and the admin audit',async()=>{
+ await pg.query("update supportos_ai_guidance set updated_by=$1 where id='main'",[foreign]);
+ await pg.query("insert into supportos_content_revisions(id,updated_by) values('fixture',$1)",[foreign]);
+ await pg.query("insert into supportos_ai_feedback_reviews(id,comment,answer_ref,actor_id) values('fixture','Feedback','hash',$1)",[foreign]);
+ const payload={id:foreign,version:1};
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.delete',payload,confirmed:true})).statusCode).toBe(200);
+ expect(accountCalls).toEqual([{subject:foreign,method:'DELETE'}]);
+ expect((await pg.query('select id from supportos_users where id=$1',[foreign])).rows).toHaveLength(0);
+ expect((await call(accounts,'/api/accounts?action=me',tokens.foreign)).statusCode).toBe(401);
+ expect((await pg.query("select updated_by from supportos_ai_guidance where id='main'")).rows[0].updated_by).toBeNull();
+ expect((await pg.query("select updated_by from supportos_content_revisions where id='fixture'")).rows[0].updated_by).toBeNull();
+ expect((await pg.query("select actor_id from supportos_ai_feedback_reviews where id='fixture'")).rows[0].actor_id).toBeNull();
+ expect((await pg.query("select actor_id,before_data from supportos_access_audit where action='user.delete'")).rows[0]).toMatchObject({actor_id:actor,before_data:{email:'foreign@example.test'}});
+});
+it.each(['user.password','user.delete','user.mfa.reset','user.sessions.revoke'])('protects own/Creator/higher-privilege accounts for %s',async(action)=>{
+ const payload={id:actor,version:1,password:'synthetic-new-password'};
+ expect((await call(accounts,'/api/accounts',tokens.current,{action,payload,confirmed:true})).statusCode).toBe(400);
+ await pg.query("insert into supportos_user_roles(user_id,role_id) values($1,'creator')",[foreign]);
+ expect((await call(accounts,'/api/accounts',tokens.current,{action,payload:{...payload,id:foreign},confirmed:true})).statusCode).toBe(403);
+ await pg.query("delete from supportos_user_roles where user_id=$1 and role_id='creator'",[foreign]);
+ await pg.query("insert into supportos_role_permissions(role_id,permission_id) values('support','technical') on conflict do nothing");
+ expect((await call(accounts,'/api/accounts',tokens.current,{action,payload:{...payload,id:foreign},confirmed:true})).statusCode).toBe(403);
+ expect(accountCalls).toHaveLength(0);
+});
+it('rejects stale employee versions without recording an operation or revoking sessions',async()=>{
+ const payload={id:foreign,version:999};
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.delete',payload,confirmed:true})).statusCode).toBe(409);
+ expect(await sessionIds()).toEqual(expectedSessions);expect(accountCalls).toEqual([]);
+ expect((await pg.query("select id from supportos_telegram_critical_requests where action='user.delete'")).rows).toHaveLength(0);
+});
+it('does not report success or completion when Auth rejects a password update',async()=>{
+ const payload={id:foreign,version:1,password:'synthetic-new-password'};authMode='error';
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.password',payload,confirmed:true})).statusCode).toBe(502);
+ expect((await pg.query("select id from supportos_access_audit where action='user.password'")).rows).toHaveLength(0);
+ expect((await pg.query('select encrypted_password from auth.users where id=$1',[foreign])).rows[0].encrypted_password).toBe('synthetic-hash');
+});
+it('denies direct client access to the account session bridge and completion RPC',async()=>{
+ await pg.exec('set local role authenticated;savepoint forbidden_function');
+ await expect(pg.query('select supportos_private.revoke_account_sessions($1,$2,$3,$4)',[actor,current,foreign,randomUUID()])).rejects.toThrow('permission denied');
+ await pg.exec('rollback to savepoint forbidden_function');
+ await expect(pg.query('select public.supportos_account_action_completed($1,$2,$3)',[actor,current,randomUUID()])).rejects.toThrow('permission denied');
+ await pg.exec('rollback to savepoint forbidden_function;reset role');
+});
+it('also closes employee sessions created during the external password update',async()=>{
+ const payload={id:foreign,version:1,password:'synthetic-new-password'};authMode='concurrent-session';
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.password',payload,confirmed:true})).statusCode).toBe(200);
+ expect((await pg.query('select id from auth.sessions where user_id=$1',[foreign])).rows).toHaveLength(0);
+});
+it.each(['user.password','user.delete'])('allows %s for a live administrator who has not enabled MFA',async(action)=>{
+ await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);
+ await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);
+ const token=jwt(actor,current,verifiedAt-600,'aal1');
+ expect((await call(accounts,'/api/accounts',token,{action,confirmed:true,payload:{id:foreign,version:1,password:'synthetic-new-password'}})).statusCode).toBe(200);
+ expect(accountCalls).toHaveLength(1);
+});
+it.each([false,true])('creates an employee without another TOTP, including an unenrolled administrator (%s)',async(unenrolled)=>{
+ if(unenrolled){await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);}
+ const token=jwt(actor,current,verifiedAt-600,unenrolled?'aal1':'aal2');
+ const body={action:'create',confirmed:true,email:'created@example.test',password:'synthetic-new-password',display_name:'Created',roles:['support']};
+ const result=await call(accounts,'/api/accounts',token,body);
+ expect(result.statusCode).toBe(201);expect(result.body.warning).toBeUndefined();expect(accountCalls).toHaveLength(1);
+ expect((await pg.query('select status,display_name from supportos_users where id=$1',[result.body.id])).rows[0]).toEqual({status:'active',display_name:'Created'});
+ expect((await pg.query('select role_id from supportos_user_roles where user_id=$1',[result.body.id])).rows).toEqual([{role_id:'support'}]);
+ const audit=(await pg.query("select * from supportos_access_audit where action='user.create' and target_id=$1",[result.body.id])).rows;
+ expect(audit).toHaveLength(1);expect(audit[0].actor_id).toBe(actor);expect(JSON.stringify(audit)).not.toContain('synthetic-new-password');
+});
+it.each([false,true])('changes employee roles/status after ordinary confirmation, including unenrolled admin (%s)',async(unenrolled)=>{
+ if(unenrolled){await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);}
+ const token=jwt(actor,current,verifiedAt-600,unenrolled?'aal1':'aal2');
+ const payload={id:foreign,version:1,status:'active',roles:['qc'],display_name:'Employee'};
+ expect((await call(accounts,'/api/accounts',token,{action:'user.update',payload})).statusCode).toBe(400);
+ const result=await call(accounts,'/api/accounts',token,{action:'user.update',confirmed:true,payload});
+ expect(result.statusCode).toBe(200);expect(result.body.permissions).toContain('monitor.read');expect(result.body.version).toBe(2);
+ expect((await call(accounts,'/api/accounts',token,{action:'user.update',confirmed:true,payload:{...payload,status:'disabled',version:2}})).statusCode).toBe(200);
+ expect((await call(binds,'/api/binds?action=shared',tokens.foreign)).statusCode).toBe(403);
+ expect((await pg.query("select actor_id from supportos_access_audit where action='user.update' and target_id=$1",[foreign])).rows).toEqual([{actor_id:actor},{actor_id:actor}]);
+});
+it.each([false,true])('edits role permissions through ordinary confirmation, including unenrolled admin (%s)',async(unenrolled)=>{
+ if(unenrolled){await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);}
+ const token=jwt(actor,current,verifiedAt-600,unenrolled?'aal1':'aal2');
+ const payload={id:'fixture_role',version:0,name:'Fixture',description:'',permissions:['work']};
+ expect((await call(accounts,'/api/accounts',token,{action:'role.save',confirmed:true,payload})).statusCode).toBe(200);
+ expect((await call(accounts,'/api/accounts',token,{action:'role.save',confirmed:true,payload:{...payload,version:1,permissions:['work','monitor.read']}})).statusCode).toBe(200);
+ expect((await pg.query("select permission_id from supportos_role_permissions where role_id='fixture_role' order by permission_id")).rows).toEqual([{permission_id:'monitor.read'},{permission_id:'work'}]);
+ expect((await call(accounts,'/api/accounts',token,{action:'role.delete',confirmed:true,payload:{id:'fixture_role',version:2}})).statusCode).toBe(200);
+ expect((await pg.query("select id from supportos_roles where id='fixture_role'")).rows).toHaveLength(0);
+});
+it('preserves account and role privilege guards without a separate TOTP challenge',async()=>{
+ const payload={id:actor,version:1,status:'disabled',roles:['support'],display_name:''};
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.update',confirmed:true,payload})).statusCode).toBe(400);
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'role.delete',confirmed:true,payload:{id:'creator',version:1}})).statusCode).toBe(400);
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.update',confirmed:true,payload:{...payload,id:foreign,roles:['creator']}})).statusCode).toBe(403);
+});
+it.each([false,true])('resets all employee MFA factors and sessions after ordinary confirmation (unenrolled admin: %s)',async(unenrolled)=>{
+ if(unenrolled){await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);}
+ const token=jwt(actor,current,verifiedAt-600,unenrolled?'aal1':'aal2');
+ await pg.query("insert into auth.mfa_factors values($1,$2,'totp','unverified')",[randomUUID(),foreign]);
+ const payload={id:foreign,version:1};
+ expect((await call(accounts,'/api/accounts',token,{action:'user.mfa.reset',payload})).statusCode).toBe(400);
+ expect(accountCalls).toHaveLength(0);expect(await sessionIds()).toEqual(expectedSessions);
+ const result=await call(accounts,'/api/accounts',token,{action:'user.mfa.reset',payload,confirmed:true,actor:foreign});
+ expect(result.statusCode).toBe(200);
+ expect(accountCalls.filter(row=>row.method==='DELETE')).toHaveLength(2);
+ expect(accountCalls.every(row=>row.subject===foreign)).toBe(true);
+ expect((await pg.query('select id from auth.mfa_factors where user_id=$1',[foreign])).rows).toHaveLength(0);
+ expect((await call(accounts,'/api/accounts?action=me',tokens.foreign)).statusCode).toBe(401);
+ expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(200);
+ const audit=(await pg.query("select * from supportos_access_audit where action='user.mfa.reset'")).rows;
+ expect(audit).toHaveLength(1);expect(audit[0]).toMatchObject({actor_id:actor,target_id:foreign,before_data:{mfa_enabled:true,mfa_factors:2,sessions:1},after_data:{mfa_enabled:false,mfa_factors:0,sessions:0,sessions_revoked:true}});
+ expect((await call(accounts,'/api/accounts',token,{action:'user.mfa.reset',payload,confirmed:true})).statusCode).toBe(409);
+ // The reset account can sign in again without inheriting any of its old JWTs.
+ const freshSid=randomUUID();await pg.query("insert into auth.sessions(id,user_id,aal) values($1,$2,'aal1')",[freshSid,foreign]);
+ expect((await call(accounts,'/api/accounts?action=me',jwt(foreign,freshSid,verifiedAt,'aal1'))).statusCode).toBe(200);
+});
+it.each([false,true])('revokes only the selected employee sessions while preserving password/MFA (unenrolled admin: %s)',async(unenrolled)=>{
+ if(unenrolled){await pg.query('delete from auth.mfa_factors where user_id=$1',[actor]);await pg.query("update auth.sessions set aal='aal1' where user_id=$1",[actor]);}
+ const token=jwt(actor,current,verifiedAt-600,unenrolled?'aal1':'aal2');
+ const extra=randomUUID();await pg.query('insert into auth.sessions(id,user_id) values($1,$2)',[extra,foreign]);
+ const payload={id:foreign,version:1};
+ expect((await call(accounts,'/api/accounts',token,{action:'user.sessions.revoke',payload})).statusCode).toBe(400);
+ expect((await call(accounts,'/api/accounts',token,{action:'user.sessions.revoke',payload,confirmed:true})).statusCode).toBe(200);
+ expect(accountCalls).toHaveLength(0);expect(logoutCalls).toHaveLength(0);
+ expect((await pg.query('select id from auth.sessions where user_id=$1',[foreign])).rows).toHaveLength(0);
+ expect((await call(accounts,'/api/accounts?action=me',tokens.foreign)).statusCode).toBe(401);
+ expect((await call(accounts,'/api/accounts?action=me',token)).statusCode).toBe(200);
+ expect((await pg.query('select encrypted_password from auth.users where id=$1',[foreign])).rows[0].encrypted_password).toBe('synthetic-hash');
+ expect((await pg.query('select id from auth.mfa_factors where user_id=$1',[foreign])).rows).toHaveLength(1);
+ expect((await pg.query("select after_data from supportos_access_audit where action='user.sessions.revoke'")).rows[0].after_data).toMatchObject({sessions:0,mfa_enabled:true,sessions_revoked:true});
+});
+it.each(['user.mfa.reset','user.sessions.revoke'])('rejects stale versions and missing permission without touching %s',async(action)=>{
+ expect((await call(accounts,'/api/accounts',tokens.current,{action,confirmed:true,payload:{id:foreign,version:999}})).statusCode).toBe(409);
+ expect(await sessionIds()).toEqual(expectedSessions);expect(accountCalls).toHaveLength(0);
+ await pg.query("delete from supportos_role_permissions where role_id='admin' and permission_id='users.manage'");
+ expect((await call(accounts,'/api/accounts',tokens.current,{action,confirmed:true,payload:{id:foreign,version:1}})).statusCode).toBe(403);
+ expect(await sessionIds()).toEqual(expectedSessions);expect(accountCalls).toHaveLength(0);
+});
+it.each(['mfa-list-error','mfa-delete-error','mfa-no-op','mfa-concurrent-factor'])('never reports a completed reset after %s',async(mode)=>{
+ authMode=mode;
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.mfa.reset',confirmed:true,payload:{id:foreign,version:1}})).statusCode).toBe(502);
+ expect((await pg.query("select id from supportos_access_audit where action='user.mfa.reset'")).rows).toHaveLength(0);
+ expect((await call(accounts,'/api/accounts?action=me',tokens.foreign)).statusCode).toBe(401);
+});
+it('revokes sessions created while Auth removes the MFA factors',async()=>{
+ authMode='mfa-concurrent-session';
+ expect((await call(accounts,'/api/accounts',tokens.current,{action:'user.mfa.reset',confirmed:true,payload:{id:foreign,version:1}})).statusCode).toBe(200);
+ expect((await pg.query('select id from auth.sessions where user_id=$1',[foreign])).rows).toHaveLength(0);
+});
+it('blocks direct client access to the MFA snapshot helper',async()=>{
+ await pg.exec('set local role authenticated;savepoint forbidden_snapshot');
+ await expect(pg.query('select supportos_private.account_security_snapshot($1,$2,$3,$4)',[actor,current,foreign,randomUUID()])).rejects.toThrow('permission denied');
+ await pg.exec('rollback to savepoint forbidden_snapshot;reset role');
 });

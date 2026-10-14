@@ -30,6 +30,14 @@ export function AuditPanel({
 							"bind.save": "Изменена личная версия бинда",
 							"bind.reset": "Сброс личной версии бинда",
 							"user.update": "Изменение пользователя",
+							"user.password": "Пароль изменён администратором",
+							"user.delete": "Аккаунт удалён",
+							"user.password.requested": "Запрошена смена пароля",
+							"user.delete.requested": "Запрошено удаление аккаунта",
+							"user.mfa.reset": "2FA отключена администратором",
+							"user.mfa.reset.requested": "Запрошено отключение 2FA",
+							"user.sessions.revoke": "Сессии завершены администратором",
+							"user.sessions.revoke.requested": "Запрошено завершение сессий",
 							"role.save": "Сохранение роли",
 							"role.delete": "Удаление роли",
 						}[row.action] ?? row.action}{" "}
@@ -85,6 +93,12 @@ function AuditState({
 				<>
 					<p>{value.display_name ?? value.name ?? ""}</p>
 					{value.version != null && <p>Версия: {value.version}</p>}
+					{typeof value.mfa_enabled === "boolean" && (
+						<p>2FA: {value.mfa_enabled ? "включена" : "отключена"}</p>
+					)}
+					{typeof value.sessions === "number" && (
+						<p>Активных сессий: {value.sessions}</p>
+					)}
 					{value.records != null && <p>Записей: {value.records}</p>}
 					{value.source_bind_id && (
 						<p className="text-xs text-muted">

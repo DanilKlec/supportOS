@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { languages } from "@/entities/language";
 import {
-	useAIRuntime,
 	useMaterials,
 	useProposals,
 	useSignals,
@@ -24,7 +23,7 @@ import { sharedBindsService } from "@/services/shared-binds.service";
 import { useViewState } from "@/shared/hooks/useViewState";
 import { getDuplicateGroups } from "@/shared/lib/knowledge-health";
 import { useAuthStore } from "@/store/auth.store";
-import { can, canAccessPage, canTrain } from "../../../shared/access.js";
+import { can } from "../../../shared/access.js";
 import { reviewItems } from "./review-model";
 
 export const kindLabels: Record<string, string> = {
@@ -538,62 +537,6 @@ export function LanguageQuality() {
 					}
 				/>
 			)}
-		</Panel>
-	);
-}
-export function AIQuality() {
-	const runtime = useAIRuntime();
-	const access = useAuthStore((s) => s.session?.user.access);
-	return (
-		<Panel title="Оценки операторов">
-			<p className="ops-note">
-				Оценки операторов в доступной выборке. Они помогают найти проблемы, но
-				не измеряют общее качество AI.
-			</p>
-			{canTrain(access) ? (
-				<>
-					<QueryState query={runtime} />
-					{runtime.data && (
-						<div className="qc-metrics">
-							{[
-								["Оценок получено", runtime.data.document.feedback.length],
-								[
-									"Положительных",
-									runtime.data.document.feedback.filter(
-										(f) => f.rating === "positive",
-									).length,
-								],
-								[
-									"Отрицательных",
-									runtime.data.document.feedback.filter(
-										(f) => f.rating === "negative",
-									).length,
-								],
-							].map(([label, value]) => (
-								<div key={label}>
-									<span>{label}</span>
-									<strong>{value}</strong>
-								</div>
-							))}
-						</div>
-					)}
-				</>
-			) : (
-				<Unavailable message="У вашей роли нет доступа к оценкам операторов. Доступные проверки находятся во вкладках выше." />
-			)}
-			<div className="ops-panel-actions">
-				{[
-					["playground", "Проверить ответ"],
-					["tests", "Открыть тесты"],
-					["feedback", "Отзывы операторов"],
-				]
-					.filter(([id]) => canAccessPage(access, "/qc", id))
-					.map(([id, label]) => (
-						<Link key={id} to="/qc" hash={id} className="ui-button">
-							{label}
-						</Link>
-					))}
-			</div>
 		</Panel>
 	);
 }
