@@ -30,7 +30,10 @@ const mock = vi.hoisted(() => ({
 		},
 	},
 }));
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
+vi.mock("@tanstack/react-router", () => ({
+	useNavigate: () => vi.fn(),
+	useRouterState: () => "/",
+}));
 vi.mock("@/services/supabase.service", () => ({
 	supabaseService: { getSession: () => mock.session },
 }));

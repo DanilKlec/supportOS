@@ -4,6 +4,7 @@ import {
 	FileText,
 	Folder,
 	FolderOpen,
+	GripVertical,
 	MoreHorizontal,
 	UserRound,
 } from "lucide-react";
@@ -45,6 +46,15 @@ export function LibraryTree({
 }) {
 	const root = useRef<HTMLUListElement>(null);
 	const [drop, setDrop] = useState("");
+	const [dragging, setDragging] = useState("");
+	const hover = useRef<{
+		id: string;
+		timer: ReturnType<typeof setTimeout>;
+	} | null>(null);
+	function clearHover() {
+		if (hover.current) clearTimeout(hover.current.timer);
+		hover.current = null;
+	}
 	useEffect(() => {
 		const openMenus = () =>
 			root.current?.querySelectorAll<HTMLDetailsElement>(
@@ -67,6 +77,7 @@ export function LibraryTree({
 		document.addEventListener("focusin", outside);
 		document.addEventListener("keydown", escape);
 		return () => {
+			clearHover();
 			document.removeEventListener("pointerdown", outside, true);
 			document.removeEventListener("focusin", outside);
 			document.removeEventListener("keydown", escape);
@@ -128,14 +139,26 @@ export function LibraryTree({
 					onKeyDown={(e) => keyboard(e, node, open)}
 				>
 					<div
-						className={`library-tree-row${active ? " is-selected" : ""}${drop === key ? " is-drop-target" : ""}`}
+						className={`library-tree-row${active ? " is-selected" : ""}${drop === key ? " is-drop-target" : ""}${dragging === key ? " is-dragging" : ""}`}
+						data-library-node={key}
 						style={{ paddingLeft: 8 + (level - 1) * 16 }}
 						draggable={canEdit && node.type !== "category"}
 						onDragStart={(e) => {
+							if (!canEdit || node.type === "category") {
+								e.preventDefault();
+								return;
+							}
 							e.dataTransfer.setData("application/supportos-library-node", key);
+							e.dataTransfer.setData("text/plain", node.name);
 							e.dataTransfer.effectAllowed = "move";
+							setDragging(key);
 						}}
-						onDragOver={(e) => {
+						onDragEnd={() => {
+							clearHover();
+							setDragging("");
+							setDrop("");
+						}}
+						onDragEnter={(e) => {
 							if (
 								canEdit &&
 								node.type !== "bind" &&
@@ -148,10 +171,44 @@ export function LibraryTree({
 								setDrop(key);
 							}
 						}}
-						onDragLeave={() => setDrop("")}
+						onDragOver={(e) => {
+							if (
+								canEdit &&
+								node.type !== "bind" &&
+								e.dataTransfer.types.includes(
+									"application/supportos-library-node",
+								)
+							) {
+								e.preventDefault();
+								e.dataTransfer.dropEffect = "move";
+								setDrop(key);
+								if (!open && hover.current?.id !== key) {
+									clearHover();
+									hover.current = {
+										id: key,
+										timer: setTimeout(() => {
+											hover.current = null;
+											onExpand(node.id);
+										}, 500),
+									};
+								}
+							}
+						}}
+						onDragLeave={(e) => {
+							if (
+								e.relatedTarget instanceof Node &&
+								e.currentTarget.contains(e.relatedTarget)
+							)
+								return;
+							clearHover();
+							setDrop("");
+						}}
 						onDrop={(e) => {
 							e.preventDefault();
+							clearHover();
+							setDragging("");
 							setDrop("");
+							if (!canEdit || node.type === "bind") return;
 							const source = e.dataTransfer.getData(
 								"application/supportos-library-node",
 							);
@@ -173,6 +230,7 @@ export function LibraryTree({
 						)}
 						<button
 							type="button"
+							draggable={canEdit && node.type !== "category"}
 							tabIndex={-1}
 							className="library-tree-label"
 							aria-label={node.name}
@@ -210,46 +268,57 @@ export function LibraryTree({
 							{node.type !== "bind" && <small>{bindCount(node)}</small>}
 						</button>
 						{canEdit && node.id !== "__unplaced" && (
-							<details className="library-node-menu">
-								<summary aria-label={`Действия: ${node.name}`}>
-									<MoreHorizontal size={15} />
-								</summary>
-								<div className="library-node-menu-popup">
-									{(node.type !== "bind"
-										? [
-												["folder", "Новая вложенная папка"],
-												["bind", "Новый бинд здесь"],
-												["edit", "Переименовать и настроить"],
-												...(node.type === "folder"
-													? [["move", "Переместить папку"]]
-													: []),
-												["up", "Выше"],
-												["down", "Ниже"],
-												["delete", "Удалить папку"],
-											]
-										: [
-												["edit", "Редактировать бинд"],
-												["move", "Переместить бинд"],
-												["delete", "Удалить бинд"],
-											]
-									).map(([action, label]) => (
-										<button
-											key={action}
-											type="button"
-											onClick={(e) => {
-												e.currentTarget
-													.closest("details")
-													?.removeAttribute("open");
-												onAction(action as LibraryNodeAction, node);
-											}}
-										>
-											{action === "delete" && node.type === "category"
-												? "Удалить раздел"
-												: label}
-										</button>
-									))}
-								</div>
-							</details>
+							<>
+								{node.type !== "category" && (
+									<span
+										className="library-node-drag"
+										draggable
+										title={`Перетащить: ${node.name}`}
+									>
+										<GripVertical size={13} />
+									</span>
+								)}
+								<details className="library-node-menu">
+									<summary aria-label={`Действия: ${node.name}`}>
+										<MoreHorizontal size={15} />
+									</summary>
+									<div className="library-node-menu-popup">
+										{(node.type !== "bind"
+											? [
+													["folder", "Новая вложенная папка"],
+													["bind", "Новый бинд здесь"],
+													["edit", "Переименовать и настроить"],
+													...(node.type === "folder"
+														? [["move", "Переместить папку"]]
+														: []),
+													["up", "Выше"],
+													["down", "Ниже"],
+													["delete", "Удалить папку"],
+												]
+											: [
+													["edit", "Редактировать бинд"],
+													["move", "Переместить бинд"],
+													["delete", "Удалить бинд"],
+												]
+										).map(([action, label]) => (
+											<button
+												key={action}
+												type="button"
+												onClick={(e) => {
+													e.currentTarget
+														.closest("details")
+														?.removeAttribute("open");
+													onAction(action as LibraryNodeAction, node);
+												}}
+											>
+												{action === "delete" && node.type === "category"
+													? "Удалить раздел"
+													: label}
+											</button>
+										))}
+									</div>
+								</details>
+							</>
 						)}
 					</div>
 					{open && (

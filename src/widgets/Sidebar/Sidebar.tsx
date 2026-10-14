@@ -1,16 +1,20 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
 	Archive,
 	Check,
 	Download,
 	FileText,
 	Folder,
+	Layers3,
+	ListTree,
+	ChevronsLeft,
 	PanelLeftClose,
 	Pin,
 	Plus,
 	Search,
 	Star,
 	Tag,
+	UserRound,
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -27,6 +31,8 @@ import { scoreTextSearch } from "@/shared/lib/bind-search";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { Tree } from "./Tree";
+import { countTreeBinds } from "./tree-utils";
+import "./workspace-tree.css";
 
 function getBindTitle(bind: Bind, language: string) {
 	return (
@@ -117,6 +123,7 @@ export function Sidebar({
 	onNavigate,
 }: SidebarProps) {
 	const navigate = useNavigate();
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const [sidebarPixels] = usePreference("sidebar-pixels", 290);
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
@@ -332,9 +339,10 @@ export function Sidebar({
 					? undefined
 					: { width: Math.min(480, Math.max(240, sidebarPixels)) }
 			}
-			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface/40 pb-[env(safe-area-inset-bottom)]`}
+			aria-label="Библиотека материалов"
+			className={`workspace-library flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border pb-[env(safe-area-inset-bottom)]`}
 		>
-			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">
+			<div className="workspace-library-heading">
 				<div className="min-w-0 px-1">
 					<div className="truncate text-sm font-semibold">Материалы</div>
 					<div className="text-xs text-muted">
@@ -370,7 +378,7 @@ export function Sidebar({
 				)}
 
 			<div className="flex min-h-0 flex-1 flex-col">
-				<nav aria-label="Библиотека" className="flex gap-1 p-2">
+				<nav aria-label="Библиотека" className="workspace-library-tabs">
 					{[
 						["/", "Все"],
 						["/favorites", "Избранное"],
@@ -380,6 +388,15 @@ export function Sidebar({
 							key={to}
 							type="button"
 							className="space-tab sidebar-tab"
+							aria-current={
+								(
+									to === "/"
+										? ["/", "/binds"].includes(pathname)
+										: pathname === to
+								)
+									? "page"
+									: undefined
+							}
 							onClick={() => {
 								void navigate({ to });
 								onNavigate?.();
@@ -389,23 +406,49 @@ export function Sidebar({
 						</button>
 					))}
 				</nav>
-				<div className="shrink-0 border-b border-border/80 px-3 py-3">
-					<div className="mb-3 flex items-center justify-between px-2">
-						<div className="text-xs font-semibold uppercase text-muted">
-							Категории
+				<div className="workspace-library-controls">
+					<div className="workspace-library-structure-heading">
+						<strong>Структура</strong>
+						<div className="ui-actions">
+							<IconButton
+								label="Раскрыть все папки"
+								size="small"
+								variant="ghost"
+								onClick={() =>
+									useKnowledgeStore.setState({
+										expandedFolders: [
+											...new Set([
+												...categories.map((c) => c.id),
+												...folders.map((f) => f.id),
+											]),
+										],
+									})
+								}
+							>
+								<Layers3 size={14} />
+							</IconButton>
+							<IconButton
+								label="Свернуть все папки"
+								size="small"
+								variant="ghost"
+								onClick={() =>
+									useKnowledgeStore.setState({ expandedFolders: [] })
+								}
+							>
+								<ChevronsLeft size={14} />
+							</IconButton>
+							<IconButton
+								label="Добавить категорию"
+								onClick={createCategory}
+								size="small"
+								className="text-muted hover:bg-surface-elevated hover:text-foreground"
+							>
+								<Plus size={15} />
+							</IconButton>
 						</div>
-
-						<IconButton
-							label="Добавить категорию"
-							onClick={createCategory}
-							size="small"
-							className="text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							<Plus size={15} />
-						</IconButton>
 					</div>
 
-					<div className="relative">
+					<div className="workspace-library-search">
 						<Search
 							size={14}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -415,6 +458,7 @@ export function Sidebar({
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
 							placeholder="Поиск в папках…"
+							aria-label="Поиск в дереве материалов"
 							className="w-full bg-surface pl-9 pr-10 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
@@ -577,7 +621,7 @@ export function Sidebar({
 					)}
 				</div>
 
-				<div className="supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+				<div className="workspace-library-scroll supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
 					<WorkspaceSharedTree
 						onNavigate={onNavigate}
 						filterNodes={(nodes) => filterTree(nodes, treeSearch, selectedTag)}
@@ -586,15 +630,32 @@ export function Sidebar({
 						onToggleBindSelection={toggleSelectedBind}
 						onClearBindSelection={() => setSelectedBindIds([])}
 					/>
-					<Tree
-						nodes={filteredTree}
-						forceExpanded={treeSearchActive}
-						selectedBindIds={selectedBindIds}
-						onToggleBindSelection={toggleSelectedBind}
-						onClearBindSelection={() => setSelectedBindIds([])}
-						onOpenItem={onNavigate}
-					/>
+					{filteredTree.length > 0 && (
+						<section
+							className="workspace-tree-section"
+							aria-label="Личные материалы"
+						>
+							<div className="workspace-tree-section-heading">
+								<UserRound size={14} />
+								<span>Личные</span>
+								<small>{countTreeBinds(filteredTree)}</small>
+							</div>
+							<Tree
+								nodes={filteredTree}
+								label="Дерево личных материалов"
+								forceExpanded={treeSearchActive}
+								selectedBindIds={selectedBindIds}
+								onToggleBindSelection={toggleSelectedBind}
+								onClearBindSelection={() => setSelectedBindIds([])}
+								onOpenItem={onNavigate}
+							/>
+						</section>
+					)}
 				</div>
+				<footer className="workspace-library-footer">
+					<ListTree size={13} />
+					<span>Папки и бинды можно перетаскивать</span>
+				</footer>
 			</div>
 		</aside>
 	);

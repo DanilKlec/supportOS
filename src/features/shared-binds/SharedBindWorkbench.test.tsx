@@ -105,6 +105,90 @@ function mount() {
 	);
 	return client;
 }
+it("previews a drag destination in QC before moving the exact bind revision", async () => {
+	const destination = { ...folder, id: "destination", name: "Новая папка" };
+	mock.load.mockResolvedValue({
+		categories: [category],
+		folders: [folder, destination],
+	});
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.click(screen.getByRole("button", { name: "Раскрыть Бонусы" }));
+	const values = new Map<string, string>();
+	const dataTransfer = {
+		setData: (type: string, value: string) => values.set(type, value),
+		getData: (type: string) => values.get(type) ?? "",
+		get types() {
+			return [...values.keys()];
+		},
+		effectAllowed: "",
+		dropEffect: "",
+	};
+	fireEvent.dragStart(
+		screen
+			.getByRole("treeitem", { name: "Условия бонуса" })
+			.querySelector(".library-tree-row")!,
+		{ dataTransfer },
+	);
+	const target = screen
+		.getByRole("treeitem", { name: "Новая папка" })
+		.querySelector(".library-tree-row")!;
+	fireEvent.dragOver(target, { dataTransfer });
+	expect(target.classList.contains("is-drop-target")).toBe(true);
+	fireEvent.drop(target, { dataTransfer });
+	const dialog = screen.getByRole("dialog", { name: "Переместить бинд" });
+	expect(mock.save).not.toHaveBeenCalled();
+	expect(
+		(within(dialog).getByLabelText("Папка назначения") as HTMLSelectElement)
+			.value,
+	).toBe("destination");
+	fireEvent.click(within(dialog).getByRole("button", { name: "Переместить" }));
+	await waitFor(() =>
+		expect(mock.save).toHaveBeenCalledWith({
+			original: bind,
+			translations: bind.translations,
+			tags: bind.tags,
+			categoryId: "cat",
+			folderId: "destination",
+		}),
+	);
+});
+it("moves folders in QC with a preview of their new parent", async () => {
+	const destination = { ...folder, id: "destination", name: "Новая папка" };
+	mock.load.mockResolvedValue({
+		categories: [category],
+		folders: [folder, destination],
+	});
+	mount();
+	await screen.findByRole("tree");
+	const dataTransfer = {
+		getData: () => "folder:folder",
+		types: ["application/supportos-library-node"],
+		dropEffect: "",
+	};
+	fireEvent.drop(
+		screen
+			.getByRole("treeitem", { name: "Новая папка" })
+			.querySelector(".library-tree-row")!,
+		{ dataTransfer },
+	);
+	const dialog = screen.getByRole("dialog", { name: "Переместить папку" });
+	expect(mock.change).not.toHaveBeenCalled();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Переместить" }));
+	await waitFor(() =>
+		expect(mock.change).toHaveBeenCalledWith(
+			expect.objectContaining({
+				entity: "folder",
+				operation: "save",
+				payload: expect.objectContaining({
+					id: "folder",
+					expected: folder.updatedAt,
+					parentId: "destination",
+				}),
+			}),
+		),
+	);
+});
 it("closes folder and bind menus on outside pointer, focus and Escape", async () => {
 	mount();
 	await screen.findByRole("tree");

@@ -430,6 +430,48 @@
 	background: #a78bfa18;
 	outline: 1px dashed #a78bfa;
 }
+.library-tree-row.is-dragging {
+	opacity: 0.45;
+}
+.library-tree-row[draggable="true"] {
+	cursor: grab;
+}
+.library-tree-row[draggable="true"] .library-tree-label {
+	cursor: grab;
+}
+.library-tree-row[draggable="true"]:active {
+	cursor: grabbing;
+}
+.library-node-drag {
+	display: flex;
+	align-items: center;
+	color: var(--color-muted);
+	opacity: 0;
+	flex: none;
+	cursor: grab;
+}
+.library-tree-row:hover .library-node-drag,
+.library-tree-row:focus-within .library-node-drag {
+	opacity: 0.65;
+}
+.library-tree-row.is-drop-target::after {
+	content: "Переместить сюда";
+	position: absolute;
+	right: 5px;
+	top: -13px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-size: 9px;
+	color: #c4b5fd;
+	background: var(--color-surface-elevated);
+	z-index: 2;
+	pointer-events: none;
+}
+@media (pointer: coarse) {
+	.library-node-drag {
+		opacity: 0.65;
+	}
+}
 .library-tree-toggle,
 .library-tree-spacer {
 	width: 14px;

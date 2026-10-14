@@ -33,6 +33,7 @@ import { reconcileBindLinks } from "./bind-links";
 import { SharedBindEditor } from "./SharedBindEditor";
 import { ShareRecipientPicker } from "./ShareRecipientPicker";
 import { buildSharedTree } from "./shared-tree";
+import { countTreeBinds } from "@/widgets/Sidebar/tree-utils";
 
 export function useWorkspaceSharedBinds() {
 	const user = useAuthStore((s) => s.session?.user);
@@ -164,12 +165,12 @@ export function WorkspaceSharedTree({
 		),
 	);
 	return (
-		<section aria-label="Общие бинды">
+		<section aria-label="Общие бинды" className="workspace-tree-section">
 			<button
 				type="button"
 				aria-expanded={expanded || forceExpanded}
 				onClick={() => setExpanded((value) => !value)}
-				className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium hover:bg-surface-elevated"
+				className="workspace-tree-section-toggle"
 			>
 				{expanded || forceExpanded ? (
 					<ChevronDown size={14} />
@@ -178,6 +179,7 @@ export function WorkspaceSharedTree({
 				)}
 				<Users size={14} />
 				<span>Общие</span>
+				<small>{countTreeBinds(nodes)}</small>
 			</button>
 			{(common.error || personal.error) && (
 				<p role="alert" className="p-2 text-xs text-red-400">
@@ -190,6 +192,7 @@ export function WorkspaceSharedTree({
 			{(expanded || forceExpanded) && (
 				<Tree
 					nodes={nodes}
+					label="Дерево общих материалов"
 					forceExpanded={forceExpanded}
 					selectedBindIds={selectedBindIds}
 					onToggleBindSelection={onToggleBindSelection}
@@ -197,6 +200,14 @@ export function WorkspaceSharedTree({
 					onOpenItem={onNavigate}
 				/>
 			)}
+			{(expanded || forceExpanded) &&
+				!nodes.length &&
+				!common.isPending &&
+				!common.error && (
+					<p className="workspace-tree-empty">
+						{forceExpanded ? "Ничего не найдено" : "В общей базе пока пусто"}
+					</p>
+				)}
 		</section>
 	);
 }

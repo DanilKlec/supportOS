@@ -8,9 +8,9 @@ import {
 	Edit3,
 	FileText,
 	Folder,
+	FolderOpen,
 	FolderInput,
 	FolderPlus,
-	GripVertical,
 	MoreHorizontal,
 	Plus,
 	Star,
@@ -39,6 +39,7 @@ import {
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
+import { countTreeBinds } from "./tree-utils";
 
 interface Props {
 	node: KnowledgeTreeNode;
@@ -106,6 +107,7 @@ export function TreeNode({
 }: Props) {
 	const navigate = useNavigate();
 	const actionsRef = useRef<HTMLDivElement>(null);
+	const menuContentRef = useRef<HTMLDivElement>(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [dragging, setDragging] = useState(false);
 	const [dragOver, setDragOver] = useState(false);
@@ -120,6 +122,10 @@ export function TreeNode({
 	const selectedBind = useKnowledgeStore((s) => s.selectedBind);
 	const selectedCategory = useKnowledgeStore((s) => s.selectedCategory);
 	const selectedFolder = useKnowledgeStore((s) => s.selectedFolder);
+	const language = useKnowledgeStore((s) => s.language);
+	const name =
+		node.bind?.translations.find((t) => t.language === language)?.title ||
+		node.name;
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const toggle = useKnowledgeStore((s) => s.toggleFolder);
@@ -142,7 +148,6 @@ export function TreeNode({
 		node.type === "bind" ? node.bind?.categoryId : categoryId;
 	const dropFolderId =
 		node.type === "bind" ? node.bind?.folderId : targetFolderId;
-	const hasChildren = node.children.length > 0;
 	const nodeColor = node.color ?? node.bind?.color;
 	const nodeColorStyle = nodeColor ? { color: nodeColor } : undefined;
 	const siblingIds =
@@ -166,35 +171,40 @@ export function TreeNode({
 		siblingIndex < siblingIds.length - 1;
 	const selected =
 		(node.type === "bind" && selectedBind === node.id) ||
-		(node.type === "category" && selectedCategory === node.id) ||
-		(node.type === "folder" && selectedFolder === node.id);
+		(!selectedBind &&
+			node.type === "category" &&
+			!selectedFolder &&
+			selectedCategory === node.id) ||
+		(!selectedBind && node.type === "folder" && selectedFolder === node.id);
 	const bindSelected = selectedBindIds.includes(node.id);
 	const folderFavorite = favoriteFolders.includes(node.id);
 
 	useEffect(() => {
 		if (!actionsOpen) return undefined;
 
-		const closeOnOutsideClick = (event: PointerEvent) => {
+		const closeOnOutsideClick = (event: Event) => {
 			if (
-				event.target instanceof Element &&
-				event.target.closest("[data-workspace-actions]")
+				actionsRef.current?.contains(event.target as Node) ||
+				menuContentRef.current?.contains(event.target as Node)
 			)
 				return;
-			if (actionsRef.current?.contains(event.target as Node)) return;
 
 			setActionsOpen(false);
 		};
 		const closeOnEscape = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
 				setActionsOpen(false);
+				actionsRef.current?.querySelector("button")?.focus();
 			}
 		};
 
 		window.addEventListener("pointerdown", closeOnOutsideClick);
+		window.addEventListener("focusin", closeOnOutsideClick);
 		window.addEventListener("keydown", closeOnEscape);
 
 		return () => {
 			window.removeEventListener("pointerdown", closeOnOutsideClick);
+			window.removeEventListener("focusin", closeOnOutsideClick);
 			window.removeEventListener("keydown", closeOnEscape);
 		};
 	}, [actionsOpen]);
@@ -551,325 +561,279 @@ export function TreeNode({
 	);
 
 	return (
-		<div>
+		<div
+			role="treeitem"
+			aria-label={name}
+			aria-level={level + 1}
+			aria-selected={selected}
+			aria-expanded={node.type !== "bind" ? expanded : undefined}
+		>
 			<div
-				className={`
-          group
-          relative
-          mx-1
-          my-0.5
-          flex
-          items-center
-          gap-1.5
-          border-l-2
-          rounded-lg
-          pr-2
-          transition
-          ${
-						dragOver
-							? "bg-accent/15 text-foreground shadow-[inset_0_0_0_1px_rgba(59,130,246,0.35)]"
-							: selected
-								? "bg-accent/10 text-foreground"
-								: "hover:bg-surface-elevated"
-					}
-          ${dragging ? "scale-[0.99] opacity-45" : ""}
-          ${node.type !== "category" ? "cursor-grab active:cursor-grabbing" : ""}
-        `}
-				style={{
-					borderLeftColor: nodeColor ?? "transparent",
-				}}
+				className={`workspace-tree-row${selected ? " is-selected" : ""}${bindSelected ? " is-checked" : ""}${dragging ? " is-dragging" : ""}${dragOver ? " is-drop-target" : ""}`}
+				style={{ paddingLeft: 8 + level * 16 }}
+				onDragEnter={handleDragEnter}
+				onDragOver={handleDragOver}
+				onDragLeave={handleDragLeave}
+				onDrop={handleDrop}
 			>
-				{node.type === "bind" && (
-					<div
-						className="items-center flex shrink-0"
-						style={{
-							paddingLeft: 12 + level * 18,
-						}}
-					>
+				{node.type === "bind" ? (
+					<div className="workspace-tree-gutter">
 						<button
 							type="button"
 							aria-pressed={bindSelected}
+							aria-label={`${bindSelected ? "Снять выделение" : "Выделить"}: ${name}`}
 							title={bindSelected ? "Снять выделение бинда" : "Выделить бинд"}
 							onClick={() => onToggleBindSelection?.(node.id)}
-							className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-								bindSelected
-									? "border-accent bg-accent text-accent-foreground opacity-100"
-									: "border-border text-muted opacity-60 hover:border-accent hover:bg-accent/10 hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100"
-							}`}
+							className="workspace-tree-check"
 						>
-							{bindSelected ? (
-								<Check size={12} strokeWidth={3} />
-							) : (
-								<span className="h-1.5 w-1.5 rounded-full bg-current" />
-							)}
+							{bindSelected && <Check size={10} strokeWidth={3} />}
 						</button>
 					</div>
+				) : (
+					<button
+						type="button"
+						data-tree-toggle
+						className="workspace-tree-toggle"
+						aria-label={`${expanded ? "Свернуть" : "Раскрыть"} ${name}`}
+						onClick={() => toggle(node.id)}
+					>
+						{expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+					</button>
 				)}
 
 				<button
 					type="button"
+					data-tree-open
+					aria-label={name}
+					title={name}
 					onClick={handleOpen}
 					draggable={node.type !== "category"}
 					onDragStart={handleDragStart}
 					onDragEnd={handleDragEnd}
-					onDragEnter={handleDragEnter}
-					onDragOver={handleDragOver}
-					onDragLeave={handleDragLeave}
-					onDrop={handleDrop}
-					className="
-            flex
-            min-w-0
-            flex-1
-            items-center
-            gap-2
-            py-2
-            text-left
-          "
-					style={{
-						paddingLeft: node.type === "bind" ? 0 : 12 + level * 18,
-					}}
+					className="workspace-tree-label"
 				>
-					{hasChildren ? (
-						expanded ? (
-							<ChevronDown size={15} />
-						) : (
-							<ChevronRight size={15} />
-						)
-					) : (
-						<div className="w-[15px]" />
-					)}
-
-					<span
-						className="h-2 w-2 shrink-0 rounded-full"
-						style={{
-							backgroundColor: nodeColor ?? "transparent",
-						}}
-					/>
-
 					{node.type === "bind" ? (
-						<>
-							<GripVertical
-								size={14}
-								className="shrink-0 text-muted opacity-0 transition group-hover:opacity-60"
-							/>
-							<FileText size={16} className="shrink-0" style={nodeColorStyle} />
-						</>
+						<FileText size={15} style={nodeColorStyle} />
+					) : expanded ? (
+						<FolderOpen size={15} style={nodeColorStyle} />
 					) : (
-						<>
-							{node.type === "folder" && manageStructure && (
-								<GripVertical
-									size={14}
-									className="shrink-0 text-muted opacity-0 transition group-hover:opacity-60"
-								/>
-							)}
-							<Folder size={16} className="shrink-0" style={nodeColorStyle} />
-						</>
+						<Folder size={15} style={nodeColorStyle} />
 					)}
 
-					<span className="truncate text-sm">{node.name}</span>
+					<span>{name}</span>
 				</button>
+				{node.type !== "bind" && (
+					<small
+						className="workspace-tree-count"
+						aria-label={`Материалов: ${countTreeBinds(node.children)}`}
+					>
+						{countTreeBinds(node.children)}
+					</small>
+				)}
 
 				{dragOver && (
-					<div className="pointer-events-none shrink-0 rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
-						{node.type === "bind" ? "Поместить сюда" : "Переместить сюда"}
+					<div className="workspace-tree-drop-note">
+						{node.type === "bind" ? "Перед биндом" : "В эту папку"}
 					</div>
 				)}
 
-				<div ref={actionsRef} className="relative shrink-0">
+				<div ref={actionsRef} className="workspace-tree-actions">
 					<button
 						type="button"
-						aria-label={`Действия: ${node.name}`}
+						aria-label={`Действия: ${name}`}
 						aria-haspopup="menu"
 						aria-expanded={actionsOpen}
 						title="Действия"
 						onClick={() => setActionsOpen((open) => !open)}
-						className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100 ${
-							actionsOpen || selected ? "opacity-100" : "opacity-60"
-						}`}
+						className={`workspace-tree-more${actionsOpen ? " is-open" : ""}`}
 					>
 						<MoreHorizontal size={15} />
 					</button>
 
 					{actionsOpen && (
 						<ActionMenuPortal anchor={actionsRef}>
-							{node.type === "folder" && manageStructure && (
-								<ActionMenuItem
-									icon={<FolderInput size={14} />}
-									label="Переместить"
-									onClick={() => {
-										modalManager.open("moveBind", {
-											moveFolderId: node.id,
-											categoryId,
-											folderId: folder?.parentId,
-										});
-										setActionsOpen(false);
-									}}
-								/>
-							)}
-							{node.type === "bind" && (
-								<>
-									<ActionMenuItem
-										icon={<Edit3 size={14} />}
-										label="Редактировать"
-										onClick={() => {
-											modalManager.open("editBind", { bindId: node.id });
-											setActionsOpen(false);
-										}}
-									/>
+							<div ref={menuContentRef} className="workspace-tree-menu">
+								{node.type === "folder" && manageStructure && (
 									<ActionMenuItem
 										icon={<FolderInput size={14} />}
 										label="Переместить"
 										onClick={() => {
 											modalManager.open("moveBind", {
-												bindId: node.id,
-												categoryId: node.bind?.categoryId,
-												folderId: node.bind?.folderId,
+												moveFolderId: node.id,
+												categoryId,
+												folderId: folder?.parentId,
 											});
 											setActionsOpen(false);
 										}}
 									/>
-								</>
-							)}
-							{node.type !== "bind" && (
-								<>
-									<ActionMenuItem
-										icon={<ArrowUp size={14} />}
-										label="Выше"
-										disabled={!canMoveUp || !manageStructure}
-										onClick={() => moveNode("up")}
-									/>
-									<ActionMenuItem
-										icon={<ArrowDown size={14} />}
-										label="Ниже"
-										disabled={!canMoveDown || !manageStructure}
-										onClick={() => moveNode("down")}
-									/>
-									{node.type === "folder" && (
+								)}
+								{node.type === "bind" && (
+									<>
 										<ActionMenuItem
-											icon={
-												<Star
-													size={14}
-													fill={folderFavorite ? "currentColor" : "none"}
-												/>
-											}
-											label={
-												folderFavorite ? "Убрать из избранного" : "В избранное"
-											}
-											onClick={toggleFolderFavorite}
+											icon={<Edit3 size={14} />}
+											label="Редактировать"
+											onClick={() => {
+												modalManager.open("editBind", { bindId: node.id });
+												setActionsOpen(false);
+											}}
 										/>
-									)}
-
-									<div className="my-1 border-t border-border/80" />
-
-									<ActionMenuItem
-										icon={<Plus size={14} />}
-										label="Новый бинд"
-										onClick={createBind}
-									/>
-									<ActionMenuItem
-										icon={<FolderInput size={14} />}
-										label="Добавить существующий бинд"
-										onClick={moveBindHere}
-									/>
-									<ActionMenuItem
-										icon={<FolderPlus size={14} />}
-										label="Новая папка"
-										onClick={createFolder}
-									/>
-
-									<div className="my-1 border-t border-border/80" />
-								</>
-							)}
-							{node.type === "bind" && (
-								<>
-									<ActionMenuItem
-										icon={<FileText size={14} />}
-										label="Копировать заголовок"
-										onClick={() =>
-											bindAction(() => {
-												void copyToClipboard(node.name);
-											})
-										}
-									/>
-									<ActionMenuItem
-										icon={<Plus size={14} />}
-										label="Дублировать"
-										onClick={() =>
-											bindAction(() => {
-												const copy = knowledgeService.duplicateBind(node.id);
-												selectBind(copy.id);
-											})
-										}
-									/>
-									<ActionMenuItem
-										icon={<Star size={14} />}
-										label={
-											node.bind?.favorite
-												? "Убрать из избранного"
-												: "В избранное"
-										}
-										onClick={() =>
-											bindAction(() => {
-												knowledgeService.toggleFavorite(node.id);
-											})
-										}
-									/>
-									<ActionMenuItem
-										icon={<FileText size={14} />}
-										label={node.bind?.pinned ? "Открепить" : "Закрепить"}
-										onClick={() =>
-											bindAction(() => {
-												knowledgeService.updateBind(node.id, {
-													pinned: !node.bind?.pinned,
-												});
-											})
-										}
-									/>
-									<ActionMenuItem
-										icon={<FileText size={14} />}
-										label="История"
-										onClick={() =>
-											bindAction(() =>
-												modalManager.open("bindHistory", { bindId: node.id }),
-											)
-										}
-									/>
-									<ActionMenuItem
-										icon={<FileText size={14} />}
-										label="Найти дубликаты"
-										onClick={() =>
-											bindAction(() =>
-												modalManager.open("findDuplicates", {
+										<ActionMenuItem
+											icon={<FolderInput size={14} />}
+											label="Переместить"
+											onClick={() => {
+												modalManager.open("moveBind", {
 													bindId: node.id,
-												}),
-											)
-										}
-									/>
-								</>
-							)}
+													categoryId: node.bind?.categoryId,
+													folderId: node.bind?.folderId,
+												});
+												setActionsOpen(false);
+											}}
+										/>
+									</>
+								)}
+								{node.type !== "bind" && (
+									<>
+										<ActionMenuItem
+											icon={<ArrowUp size={14} />}
+											label="Выше"
+											disabled={!canMoveUp || !manageStructure}
+											onClick={() => moveNode("up")}
+										/>
+										<ActionMenuItem
+											icon={<ArrowDown size={14} />}
+											label="Ниже"
+											disabled={!canMoveDown || !manageStructure}
+											onClick={() => moveNode("down")}
+										/>
+										{node.type === "folder" && (
+											<ActionMenuItem
+												icon={
+													<Star
+														size={14}
+														fill={folderFavorite ? "currentColor" : "none"}
+													/>
+												}
+												label={
+													folderFavorite
+														? "Убрать из избранного"
+														: "В избранное"
+												}
+												onClick={toggleFolderFavorite}
+											/>
+										)}
 
-							{node.type !== "bind" && manageStructure && (
-								<ActionMenuItem
-									icon={<Edit3 size={14} />}
-									label="Переименовать"
-									onClick={renameNode}
-								/>
-							)}
-							{manageStructure && (
-								<ActionMenuItem
-									icon={<Trash2 size={14} />}
-									label={node.type === "bind" ? "Архивировать" : "Удалить"}
-									danger
-									onClick={deleteNode}
-								/>
-							)}
+										<div className="my-1 border-t border-border/80" />
+
+										<ActionMenuItem
+											icon={<Plus size={14} />}
+											label="Новый бинд"
+											onClick={createBind}
+										/>
+										<ActionMenuItem
+											icon={<FolderInput size={14} />}
+											label="Добавить существующий бинд"
+											onClick={moveBindHere}
+										/>
+										<ActionMenuItem
+											icon={<FolderPlus size={14} />}
+											label="Новая папка"
+											onClick={createFolder}
+										/>
+
+										<div className="my-1 border-t border-border/80" />
+									</>
+								)}
+								{node.type === "bind" && (
+									<>
+										<ActionMenuItem
+											icon={<FileText size={14} />}
+											label="Копировать заголовок"
+											onClick={() =>
+												bindAction(() => {
+													void copyToClipboard(node.name);
+												})
+											}
+										/>
+										<ActionMenuItem
+											icon={<Plus size={14} />}
+											label="Дублировать"
+											onClick={() =>
+												bindAction(() => {
+													const copy = knowledgeService.duplicateBind(node.id);
+													selectBind(copy.id);
+												})
+											}
+										/>
+										<ActionMenuItem
+											icon={<Star size={14} />}
+											label={
+												node.bind?.favorite
+													? "Убрать из избранного"
+													: "В избранное"
+											}
+											onClick={() =>
+												bindAction(() => {
+													knowledgeService.toggleFavorite(node.id);
+												})
+											}
+										/>
+										<ActionMenuItem
+											icon={<FileText size={14} />}
+											label={node.bind?.pinned ? "Открепить" : "Закрепить"}
+											onClick={() =>
+												bindAction(() => {
+													knowledgeService.updateBind(node.id, {
+														pinned: !node.bind?.pinned,
+													});
+												})
+											}
+										/>
+										<ActionMenuItem
+											icon={<FileText size={14} />}
+											label="История"
+											onClick={() =>
+												bindAction(() =>
+													modalManager.open("bindHistory", { bindId: node.id }),
+												)
+											}
+										/>
+										<ActionMenuItem
+											icon={<FileText size={14} />}
+											label="Найти дубликаты"
+											onClick={() =>
+												bindAction(() =>
+													modalManager.open("findDuplicates", {
+														bindId: node.id,
+													}),
+												)
+											}
+										/>
+									</>
+								)}
+
+								{node.type !== "bind" && manageStructure && (
+									<ActionMenuItem
+										icon={<Edit3 size={14} />}
+										label="Переименовать"
+										onClick={renameNode}
+									/>
+								)}
+								{manageStructure && (
+									<ActionMenuItem
+										icon={<Trash2 size={14} />}
+										label={node.type === "bind" ? "Архивировать" : "Удалить"}
+										danger
+										onClick={deleteNode}
+									/>
+								)}
+							</div>
 						</ActionMenuPortal>
 					)}
 				</div>
 			</div>
 
-			{expanded && (
-				<>
+			{expanded && node.type !== "bind" && (
+				<div role="group">
 					{visibleChildren.map((child) => (
 						<TreeNode
 							key={child.id}
@@ -891,13 +855,21 @@ export function TreeNode({
 							}
 							className="w-full px-2 py-2 text-left text-xs text-muted hover:bg-accent/10 hover:text-foreground"
 							style={{
-								paddingLeft: 12 + (level + 1) * 18,
+								paddingLeft: 30 + (level + 1) * 16,
 							}}
 						>
-							Show more ({hiddenChildrenCount})
+							Показать ещё ({hiddenChildrenCount})
 						</button>
 					)}
-				</>
+					{node.children.length === 0 && (
+						<p
+							className="workspace-tree-empty"
+							style={{ paddingLeft: 30 + level * 16 }}
+						>
+							Пока пусто
+						</p>
+					)}
+				</div>
 			)}
 		</div>
 	);
