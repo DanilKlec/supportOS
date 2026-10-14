@@ -23,13 +23,27 @@ import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
 import { CommonBindImport } from "./CommonBindImport";
 import { SharedBindEditor } from "./SharedBindEditor";
+import { SharedBindWorkbench } from "./SharedBindWorkbench";
 
 const inputClass = "w-full";
 export function SharedBindsPage() {
 	const user = useAuthStore((s) => s.session?.user);
+	const [employees, setEmployees] = useState(false);
+	return employees && can(user?.access, "binds.manage") ? (
+		<EmployeeBindsPage onCommon={() => setEmployees(false)} />
+	) : (
+		<SharedBindWorkbench
+			onManage={
+				can(user?.access, "binds.manage") ? () => setEmployees(true) : undefined
+			}
+		/>
+	);
+}
+function EmployeeBindsPage({ onCommon }: { onCommon: () => void }) {
+	const user = useAuthStore((s) => s.session?.user);
 	const canEdit = can(user?.access, "knowledge.write");
 	const canManage = can(user?.access, "binds.manage");
-	const [mode, setMode] = useState<"personal" | "common" | "manage">("common");
+	const [mode, setMode] = useState<"personal" | "common" | "manage">("manage");
 	const [target, setTarget] = useState("");
 	const [userSearch, setUserSearch] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -56,6 +70,7 @@ export function SharedBindsPage() {
 	const queryKey = ["shared-binds", user?.id];
 	const query = useQuery({
 		queryKey,
+		enabled: mode !== "common",
 		queryFn: () => sharedBindsService.list(),
 		refetchInterval: 30000,
 		refetchOnWindowFocus: true,
@@ -184,6 +199,10 @@ export function SharedBindsPage() {
 							aria-pressed={mode === item.id}
 							onClick={() => {
 								setMode(item.id);
+								if (item.id === "common") {
+									onCommon();
+									return;
+								}
 								setSelected(undefined);
 							}}
 							className={`rounded-xl px-4 py-2.5 text-sm font-medium ${mode === item.id ? "bg-accent/10 text-accent ring-1 ring-accent/25" : "text-muted hover:bg-surface-elevated"}`}

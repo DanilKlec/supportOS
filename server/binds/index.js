@@ -248,6 +248,18 @@ export default async function handler(req,res) {
   const url=new URL(req.url,'http://localhost');
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
   if(req.method==='GET'&&url.searchParams.get('action')==='shared')return send(200,await sharedPage(env,url));
+  if(req.method==='GET'&&url.searchParams.get('action')==='shared-structure') {
+   const [categories,folders]=await Promise.all([allRows(env,'supportos_categories?select=*&owner_id=is.null&order=order_index.asc,id.asc'),allRows(env,'supportos_folders?select=*&owner_id=is.null&order=order_index.asc,id.asc')]);
+   return send(200,{categories:categories.map(row=>({...categoryFromRow(row),updatedAt:row.updated_at})),folders:folders.map(row=>({...folderFromRow(row),updatedAt:row.updated_at}))});
+  }
+  if(req.method==='POST'&&body.action==='shared-structure') {
+   if(!can(actor.access,'knowledge.write'))throw fail('Нет права изменять общую структуру',403);
+   if(!['category','folder'].includes(body.entity)||!['save','delete','up','down'].includes(body.operation)||!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload)||JSON.stringify(body.payload).length>8192)throw fail('Некорректное действие со структурой');
+   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/supportos_shared_tree_change`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({actor:actor.id,sid:actor.sessionId,entity:body.entity,operation:body.operation,payload:body.payload}),signal:AbortSignal.timeout(15000)});
+   const result=await response.json();
+   if(!response.ok)throw fail(['42501','40001','P0001'].includes(result.code)?result.message:'Не удалось изменить структуру',result.code==='42501'?403:result.code==='40001'?409:400);
+   return send(200,result);
+  }
   if(req.method==='GET'&&url.searchParams.get('action')==='backup-export'){
    const snapshot=await knowledgeSnapshot(env,actor,{includeShadowedShared:true});
    return send(200,{app:'SupportOS',version:3,exportedAt:new Date().toISOString(),scope:'authorized-knowledge',knowledge:{...snapshot,binds:snapshot.binds.map(({history,...bind})=>bind)}});

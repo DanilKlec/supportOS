@@ -88,6 +88,7 @@ export function QCWorkspace() {
 	return (
 		<OperationsWorkspace
 			area="qc"
+			wide={active === "binds"}
 			sections={qcSections}
 			active={destination.section}
 			onSelect={select}

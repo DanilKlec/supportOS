@@ -165,3 +165,27 @@ it('keeps ownerless legacy records personal instead of publishing them to the te
  expect((await run({method:'POST',body:{action:'backup-apply',payload:legacy,mode:'merge',token:preview.data.token}})).status).toBe(200);
  expect(JSON.parse(fetch.mock.calls[0][1].body)[0].owner_id).toBe(actor);
 });
+
+it('loads only shared structure and returns versions for conflict checks',async()=>{
+ mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories')?[{id:'shared',owner_id:null,name:'Общее',order_index:1,updated_at:'version'}]:[{id:'folder',owner_id:null,category_id:'shared',parent_id:null,name:'Папка',order_index:2,updated_at:'folder-version'}]);
+ const result=await run({url:'/api/binds?action=shared-structure'});
+ expect(result).toMatchObject({status:200,data:{categories:[{id:'shared',ownerId:null,updatedAt:'version'}],folders:[{id:'folder',categoryId:'shared',updatedAt:'folder-version'}]}});
+ expect(mocks.allRows.mock.calls.every(([,path])=>path.includes('owner_id=is.null'))).toBe(true);
+});
+it('requires write permission before structure changes',async()=>{
+ const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'shared-structure',entity:'folder',operation:'delete',payload:{id:'folder'}}})).status).toBe(403);
+ expect(fetch).not.toHaveBeenCalled();
+});
+it('binds structure mutations to the verified actor and session',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ const fetch=vi.fn(async()=>Response.json({ok:true,row:{id:'new'}}));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'shared-structure',actor:other,sid:'forged',entity:'folder',operation:'save',payload:{name:'Новая',categoryId:'shared'}}});
+ expect(result).toMatchObject({status:200,data:{ok:true}});
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({actor,sid:'verified-session',entity:'folder',operation:'save',payload:{name:'Новая',categoryId:'shared'}});
+});
+it.each([['42501',403],['40001',409],['P0001',400]])('returns structure error %s as HTTP %i',async(code,status)=>{
+ mocks.requireUser.mockResolvedValue({id:actor,sessionId:'session',access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({code,message:'Структура изменилась'},{status:400})));
+ expect(await run({method:'POST',body:{action:'shared-structure',entity:'folder',operation:'up',payload:{id:'folder',expected:'old'}}})).toEqual({status,data:{error:'Структура изменилась'}});
+});

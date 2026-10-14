@@ -113,13 +113,15 @@ beforeEach(() => {
 						? { users: [], total: 0 }
 						: path === "/api/projects"
 							? { projects: [] }
-							: path.includes("quality-signals")
-								? { feedback: [], gaps: [] }
-								: {
-										version: 1,
-										content: "",
-										document: { entries: [], feedback: [] },
-									},
+							: path === "/api/binds?action=shared-structure"
+								? { categories: [], folders: [] }
+								: path.includes("quality-signals")
+									? { feedback: [], gaps: [] }
+									: {
+											version: 1,
+											content: "",
+											document: { entries: [], feedback: [] },
+										},
 				),
 			),
 	);
@@ -208,10 +210,9 @@ it("uses EmptyState for a material search with no matches without fetching again
 	mocks.list.mockResolvedValue([material]);
 	mount(<SharedBindsPage />);
 	await screen.findByRole("button", { name: /Проверенный ответ/ });
-	fireEvent.change(
-		screen.getByRole("textbox", { name: "Поиск общих биндов" }),
-		{ target: { value: "Несуществующий материал" } },
-	);
+	fireEvent.change(screen.getByRole("textbox", { name: "Поиск в дереве" }), {
+		target: { value: "Несуществующий материал" },
+	});
 	expect(screen.getByText("Ничего не найдено")).toBeTruthy();
 	expect(mocks.list).toHaveBeenCalledOnce();
 });

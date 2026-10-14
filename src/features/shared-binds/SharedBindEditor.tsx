@@ -1,5 +1,17 @@
-import { Check, Users } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+	Bold,
+	Check,
+	Eye,
+	Italic,
+	Link2,
+	List,
+	Pencil,
+	Users,
+	X,
+} from "lucide-react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button, Field, Select } from "@/components/ui";
 import type { Bind, BindTranslation } from "@/entities/bind";
 import { languages } from "@/entities/language";
@@ -9,10 +21,44 @@ import { getFolderPath } from "@/shared/modals/knowledge-modal-helpers";
 import { ColorField } from "@/shared/modals/ModalFormHelpers";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
+import type { LibraryStructure } from "@/services/shared-library.service";
 import { BindDiff } from "./BindDiff";
 import { draftKey, readDraft, removeDraft, writeDraft } from "./bind-drafts";
 
 const inputClass = "w-full";
+function EditorFrame({
+	embedded,
+	children,
+	...props
+}: {
+	embedded: boolean;
+	children: ReactNode;
+	title: string;
+	onClose: () => void;
+	closeDisabled: boolean;
+	size: "lg";
+}) {
+	if (!embedded) return <BaseModal {...props}>{children}</BaseModal>;
+	return (
+		<section className="library-inline-editor" aria-label={props.title}>
+			<header className="library-editor-heading">
+				<div>
+					<span>Редактор материала</span>
+					<h2>{props.title}</h2>
+				</div>
+				<Button
+					variant="ghost"
+					disabled={props.closeDisabled}
+					onClick={props.onClose}
+					aria-label="Закрыть редактор"
+				>
+					<X size={16} />
+				</Button>
+			</header>
+			{children}
+		</section>
+	);
+}
 
 export function SharedBindEditor({
 	original,
@@ -22,11 +68,21 @@ export function SharedBindEditor({
 	draftSourceId,
 	draftTargetId,
 	save,
+	embedded = false,
+	structure,
+	initialLocation,
+	onDirtyChange,
+	initialLanguage,
 }: {
 	original?: Bind;
 	onClose: () => void;
 	onSaved: (bind: Bind) => void;
 	personal?: boolean;
+	embedded?: boolean;
+	structure?: LibraryStructure;
+	initialLocation?: { categoryId: string; folderId?: string };
+	onDirtyChange?: (dirty: boolean) => void;
+	initialLanguage?: string;
 	draftSourceId?: string;
 	draftTargetId?: string;
 	save?: (
@@ -86,16 +142,22 @@ export function SharedBindEditor({
 			],
 	);
 	const [language, setLanguage] = useState(
-		original?.translations[0]?.language ?? "ru",
+		initialLanguage ?? original?.translations[0]?.language ?? "ru",
 	);
 	const [tags, setTags] = useState(original?.tags.join(", ") ?? "");
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
-	const sharedCategories = categories.filter((c) => c.ownerId === null);
-	const [categoryId, setCategoryId] = useState(original?.categoryId ?? "");
-	const [folderId, setFolderId] = useState(original?.folderId ?? "");
+	const sharedCategories = (structure?.categories ?? categories).filter(
+		(c) => c.ownerId === null,
+	);
+	const [categoryId, setCategoryId] = useState(
+		original?.categoryId ?? initialLocation?.categoryId ?? "",
+	);
+	const [folderId, setFolderId] = useState(
+		original?.folderId ?? initialLocation?.folderId ?? "",
+	);
 	const [color, setColor] = useState(original?.color ?? "");
-	const availableFolders = folders.filter(
+	const availableFolders = (structure?.folders ?? folders).filter(
 		(f) => f.ownerId === null && f.categoryId === categoryId,
 	);
 	const locationName = [
@@ -123,6 +185,12 @@ export function SharedBindEditor({
 	};
 	const [error, setError] = useState("");
 	const dirty = useRef(false);
+	const contentRef = useRef<HTMLTextAreaElement>(null);
+	const contentId = useId();
+	const [preview, setPreview] = useState(false);
+	useEffect(() => {
+		onDirtyChange?.(dirty.current);
+	}, [translations, tags, categoryId, folderId, color, onDirtyChange]);
 	useEffect(() => {
 		if (!dirty.current || recovery) return;
 		try {
@@ -166,6 +234,10 @@ export function SharedBindEditor({
 		return () => window.removeEventListener("beforeunload", beforeUnload);
 	}, []);
 	const close = () => {
+		if (embedded) {
+			if (!saving) onClose();
+			return;
+		}
 		if (
 			!saving &&
 			(!dirty.current ||
@@ -192,8 +264,29 @@ export function SharedBindEditor({
 					];
 		});
 	}
+	function format(before: string, after = "") {
+		const input = contentRef.current;
+		if (!input) return;
+		const start = input.selectionStart,
+			end = input.selectionEnd,
+			text = translation?.content ?? "";
+		update(
+			"content",
+			text.slice(0, start) +
+				before +
+				text.slice(start, end) +
+				after +
+				text.slice(end),
+		);
+		setReviewed(false);
+		requestAnimationFrame(() => {
+			input.focus();
+			input.setSelectionRange(start + before.length, end + before.length);
+		});
+	}
 	return (
-		<BaseModal
+		<EditorFrame
+			embedded={embedded}
 			title={
 				personal
 					? "Личная версия ответа"
@@ -379,77 +472,85 @@ export function SharedBindEditor({
 					className="space-y-4 disabled:opacity-60"
 				>
 					{!personal && (
-						<section
-							className="min-w-0 space-y-4"
-							aria-label="Расположение общего бинда"
+						<details
+							open={!embedded}
+							className={embedded ? "library-editor-extra" : "contents"}
 						>
-							<p className="text-xs text-muted">
-								Общие → раздел → папка. Личные разделы здесь не используются.
-							</p>
-							<div className="grid min-w-0 gap-4 sm:grid-cols-2">
-								<Field label="Раздел">
-									<Select
-										value={categoryId}
-										onChange={(e) => {
-											dirty.current = true;
-											setCategoryId(e.target.value);
-											setFolderId("");
-										}}
-										className="w-full min-w-0"
-									>
-										<option value="">Выберите раздел</option>
-										{sharedCategories.map((c) => (
-											<option key={c.id} value={c.id}>
-												{c.name}
-											</option>
-										))}
-									</Select>
-								</Field>
-								<Field label="Папка">
-									<Select
-										value={folderId}
-										disabled={!categoryId}
-										onChange={(e) => {
-											dirty.current = true;
-											setFolderId(e.target.value);
-										}}
-										className="w-full min-w-0"
-									>
-										<option value="">Без папки</option>
-										{availableFolders.map((f) => (
-											<option key={f.id} value={f.id}>
-												{getFolderPath(f, availableFolders)}
-											</option>
-										))}
-									</Select>
-								</Field>
-							</div>
-							<ColorField
-								value={color}
-								disabled={saving}
-								onChange={(value) => {
-									dirty.current = true;
-									setColor(value);
-									setReviewed(false);
-								}}
-							/>
-							<div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-								<Button
-									type="button"
-									size="small"
-									onClick={() => {
+							<summary hidden={!embedded}>
+								Расположение и оформление · {locationName}
+							</summary>
+							<section
+								className="min-w-0 space-y-4"
+								aria-label="Расположение общего бинда"
+							>
+								<p className="text-xs text-muted">
+									Общие → раздел → папка. Личные разделы здесь не используются.
+								</p>
+								<div className="grid min-w-0 gap-4 sm:grid-cols-2">
+									<Field label="Раздел">
+										<Select
+											value={categoryId}
+											onChange={(e) => {
+												dirty.current = true;
+												setCategoryId(e.target.value);
+												setFolderId("");
+											}}
+											className="w-full min-w-0"
+										>
+											<option value="">Выберите раздел</option>
+											{sharedCategories.map((c) => (
+												<option key={c.id} value={c.id}>
+													{c.name}
+												</option>
+											))}
+										</Select>
+									</Field>
+									<Field label="Папка">
+										<Select
+											value={folderId}
+											disabled={!categoryId}
+											onChange={(e) => {
+												dirty.current = true;
+												setFolderId(e.target.value);
+											}}
+											className="w-full min-w-0"
+										>
+											<option value="">Без папки</option>
+											{availableFolders.map((f) => (
+												<option key={f.id} value={f.id}>
+													{getFolderPath(f, availableFolders)}
+												</option>
+											))}
+										</Select>
+									</Field>
+								</div>
+								<ColorField
+									value={color}
+									disabled={saving}
+									onChange={(value) => {
 										dirty.current = true;
-										setColor("");
+										setColor(value);
 										setReviewed(false);
 									}}
-								>
-									Использовать цвет папки
-								</Button>
-								{!color && <span>Цвет наследуется автоматически</span>}
-							</div>
-						</section>
+								/>
+								<div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+									<Button
+										type="button"
+										size="small"
+										onClick={() => {
+											dirty.current = true;
+											setColor("");
+											setReviewed(false);
+										}}
+									>
+										Использовать цвет папки
+									</Button>
+									{!color && <span>Цвет наследуется автоматически</span>}
+								</div>
+							</section>
+						</details>
 					)}
-					<label className="ui-field text-sm font-medium">
+					<label className="ui-field library-editor-language text-sm font-medium">
 						Язык перевода
 						<select
 							value={language}
@@ -473,7 +574,7 @@ export function SharedBindEditor({
 							))}
 						</select>
 					</label>
-					<label className="ui-field text-sm font-medium">
+					<label className="ui-field library-editor-title text-sm font-medium">
 						Название
 						<input
 							ref={initialFocus}
@@ -484,28 +585,97 @@ export function SharedBindEditor({
 							className={`ui-input ${`${inputClass} mt-2`}`}
 						/>
 					</label>
-					<label className="ui-field text-sm font-medium">
-						Инструкция для агента
-						<textarea
-							maxLength={8000}
-							value={translation?.agentInstructions ?? ""}
-							onChange={(event) =>
-								update("agentInstructions", event.target.value)
-							}
-							placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
-							className={`ui-input ${`${inputClass} mt-2 min-h-28 resize-y leading-6`}`}
-						/>
-					</label>
-					<label className="ui-field text-sm font-medium">
-						Текст ответа
-						<textarea
-							maxLength={30000}
-							value={translation?.content ?? ""}
-							onChange={(e) => update("content", e.target.value)}
-							placeholder="Напишите готовый ответ для клиента…"
-							className={`ui-input ${`${inputClass} mt-2 min-h-52 resize-y leading-6`}`}
-						/>
-					</label>
+					<details
+						open={!embedded}
+						className={embedded ? "library-editor-extra" : "contents"}
+					>
+						<summary hidden={!embedded}>
+							Внутренняя инструкция для сотрудника
+						</summary>
+						<label className="ui-field text-sm font-medium">
+							Инструкция для агента
+							<textarea
+								maxLength={8000}
+								value={translation?.agentInstructions ?? ""}
+								onChange={(event) =>
+									update("agentInstructions", event.target.value)
+								}
+								placeholder="Внутренние шаги и ограничения. Не копируется клиенту."
+								className={`ui-input ${`${inputClass} mt-2 min-h-28 resize-y leading-6`}`}
+							/>
+						</label>
+					</details>
+					<div className="ui-field text-sm font-medium">
+						<label htmlFor={contentId}>Текст ответа</label>
+						{embedded && (
+							<div className="library-writing-toolbar">
+								<div className="ui-actions">
+									<Button
+										size="small"
+										variant="ghost"
+										aria-label="Жирный текст"
+										disabled={preview}
+										onClick={() => format("**", "**")}
+									>
+										<Bold size={15} />
+									</Button>
+									<Button
+										size="small"
+										variant="ghost"
+										aria-label="Курсив"
+										disabled={preview}
+										onClick={() => format("*", "*")}
+									>
+										<Italic size={15} />
+									</Button>
+									<Button
+										size="small"
+										variant="ghost"
+										aria-label="Добавить список"
+										disabled={preview}
+										onClick={() => format("\n- ")}
+									>
+										<List size={15} />
+									</Button>
+									<Button
+										size="small"
+										variant="ghost"
+										aria-label="Добавить ссылку"
+										disabled={preview}
+										onClick={() => format("[", "](https://)")}
+									>
+										<Link2 size={15} />
+									</Button>
+								</div>
+								<Button
+									size="small"
+									variant="secondary"
+									aria-pressed={preview}
+									onClick={() => setPreview(!preview)}
+								>
+									{preview ? <Pencil size={14} /> : <Eye size={14} />}{" "}
+									{preview ? "Редактировать" : "Предпросмотр"}
+								</Button>
+							</div>
+						)}
+						{preview ? (
+							<div className="library-markdown-preview prose prose-sm dark:prose-invert">
+								<ReactMarkdown remarkPlugins={[remarkGfm]}>
+									{translation?.content || "*Здесь появится готовый ответ.*"}
+								</ReactMarkdown>
+							</div>
+						) : (
+							<textarea
+								ref={contentRef}
+								id={contentId}
+								maxLength={30000}
+								value={translation?.content ?? ""}
+								onChange={(e) => update("content", e.target.value)}
+								placeholder="Напишите готовый ответ для клиента…"
+								className={`ui-input ${`${inputClass} mt-2 min-h-52 resize-y leading-6`}`}
+							/>
+						)}
+					</div>
 					<label className="ui-field text-sm font-medium">
 						Теги <span className="font-normal text-muted">· через запятую</span>
 						<input
@@ -567,6 +737,6 @@ export function SharedBindEditor({
 					</button>
 				</div>
 			</form>
-		</BaseModal>
+		</EditorFrame>
 	);
 }

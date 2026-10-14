@@ -1,0 +1,50 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFile} from 'node:fs/promises';
+import {expect,it} from 'vitest';
+it('edits the shared tree atomically, protects personal folders, cycles, nonempty deletion and stale writes',async()=>{
+ const pg=new PGlite(),actor='11111111-1111-4111-8111-111111111111',reader='22222222-2222-4222-8222-222222222222',sid='33333333-3333-4333-8333-333333333333';
+ try{
+  await pg.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
+   create table auth.users(id uuid primary key,email text,raw_app_meta_data jsonb,raw_user_meta_data jsonb,is_anonymous boolean default false);
+   create table auth.sessions(id uuid primary key,user_id uuid);
+   create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+   grant usage on schema auth to authenticated;`);
+  for(const [id,role] of [[actor,'admin'],[reader,'support']])await pg.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',[id,`${role}@example.test`,{role}]);
+  await pg.exec(await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8'));
+  // Session approval itself is covered by the full Auth/MFA integration suite.
+  await pg.exec(`create function public.supportos_mfa_session_state(subject uuid,sid uuid) returns jsonb language sql as $$ select jsonb_build_object('status',case when exists(select 1 from auth.sessions s where s.id=sid and s.user_id=subject) then 'approved' else 'invalid_session' end) $$;`);
+  await pg.query('insert into auth.sessions values($1,$2)',[sid,actor]);
+  await pg.exec(await readFile(new URL('../supabase/migrations/20261014162453_shared_library_editor.sql',import.meta.url),'utf8'));
+  const change=async(entity,operation,payload,user=actor,session=sid)=>(await pg.query('select public.supportos_shared_tree_change($1,$2,$3,$4,$5) value',[user,session,entity,operation,payload])).rows[0].value;
+  const category=(await change('category','save',{name:'Общее',color:'#60a5fa'})).row;
+  const folder=(await change('folder','save',{name:'Бонусы',categoryId:category.id})).row;
+  const child=(await change('folder','save',{name:'Депозит',categoryId:category.id,parentId:folder.id})).row;
+  const payload={id:folder.id,expected:folder.updated_at,name:folder.name,categoryId:category.id,parentId:child.id};
+  await expect(change('folder','save',payload)).rejects.toThrow('Нельзя поместить папку');
+  await expect(change('folder','delete',{id:folder.id,expected:folder.updated_at})).rejects.toThrow('Папка содержит');
+  await expect(change('folder','save',{...payload,parentId:null,expected:'2000-01-01'})).rejects.toThrow('изменена другим');
+  await expect(change('folder','save',{name:'Бонусы',categoryId:category.id})).rejects.toThrow('уже есть');
+  await pg.query('insert into supportos_categories(id,owner_id,name) values($1,$2,$3)',['personal-category',reader,'Личное']);
+  await expect(change('folder','save',{name:'Private',categoryId:'personal-category'})).rejects.toThrow('Общий раздел');
+  await pg.query('insert into supportos_folders(id,owner_id,category_id,name) values($1,$2,$3,$4)',['private',reader,category.id,'Личная папка']);
+  await expect(change('folder','save',{name:'Private child',categoryId:category.id,parentId:'private'})).rejects.toThrow('недоступна');
+  await expect(change('folder','delete',{id:'private'})).rejects.toThrow('Личная структура');
+  await expect(change('category','save',{name:'Denied'},reader)).rejects.toThrow('Нет права');
+  await expect(change('category','save',{name:'Revoked'},actor,'44444444-4444-4444-8444-444444444444')).rejects.toThrow('Нет права');
+  const moved=(await change('folder','save',{id:child.id,expected:child.updated_at,name:'Пополнение',categoryId:category.id,parentId:null})).row;
+  expect(moved.parent_id).toBeNull();expect(moved.name).toBe('Пополнение');
+  await change('folder','up',{id:moved.id,expected:moved.updated_at});
+  expect((await pg.query('select id from supportos_folders where owner_id is null order by order_index')).rows[0].id).toBe(child.id);
+  await pg.query("insert into supportos_binds(id,slug,category_id,folder_id) values('answer','answer',$1,$2)",[category.id,folder.id]);
+  const latest=(await pg.query('select updated_at::text value from supportos_folders where id=$1',[folder.id])).rows[0].value;
+  await expect(change('folder','delete',{id:folder.id,expected:latest})).rejects.toThrow('Папка содержит');
+  await expect(change('category','delete',{id:category.id,expected:category.updated_at})).rejects.toThrow('не пуст');
+  const current=(await pg.query('select updated_at::text value from supportos_folders where id=$1',[child.id])).rows[0].value;
+  await change('folder','delete',{id:child.id,expected:current});
+  await expect(pg.query("insert into supportos_binds(id,slug,category_id,folder_id) values('orphan','orphan',$1,$2)",[category.id,child.id])).rejects.toThrow('Папка больше недоступна');
+  await expect(pg.query("update supportos_binds set folder_id='private' where id='answer'")).rejects.toThrow('Папка больше недоступна');
+  expect((await pg.query('select id from supportos_binds')).rows).toEqual([{id:'answer'}]);
+  expect((await pg.query("select count(*)::int n from supportos_access_audit where action like 'library.%' and actor_id=$1",[actor])).rows[0].n).toBe(6);
+  expect((await pg.query("select has_function_privilege('authenticated','public.supportos_shared_tree_change(uuid,uuid,text,text,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
+ }finally{await pg.close();}
+},30000);

@@ -17,12 +17,14 @@ export function OperationsWorkspace({
 	active,
 	children,
 	onSelect,
+	wide = false,
 }: {
 	area: "admin" | "qc";
 	sections: WorkspaceSection[];
 	active: string;
 	children: ReactNode;
 	onSelect: (id: string) => void;
+	wide?: boolean;
 }) {
 	const access = useAuthStore((s) => s.session?.user.access);
 	const available = sections.filter((s) =>
@@ -35,7 +37,7 @@ export function OperationsWorkspace({
 	);
 	const current = available.find((s) => s.id === active);
 	return (
-		<div className="ops-workspace">
+		<div className={`ops-workspace${wide ? " ops-workspace--wide" : ""}`}>
 			<aside className="ops-sidebar">
 				<Link to="/" className="ops-back">
 					← Рабочее пространство
