@@ -32,11 +32,11 @@ export function ExportButton() {
 	};
 
 	return (
-		<div className="flex gap-2">
+		<div className="ui-actions items-center flex gap-2">
 			<button
 				type="button"
 				onClick={exportToCSV}
-				className="flex items-center gap-1.5 rounded-lg bg-surface-elevated px-3 py-1.5 text-sm text-muted hover:text-foreground hover:bg-surface transition-colors"
+				className="ui-button ui-button--ghost flex items-center gap-1.5 bg-surface-elevated text-muted hover:text-foreground hover:bg-surface transition-colors"
 				title="Export as CSV"
 			>
 				<Download size={16} />
@@ -45,7 +45,7 @@ export function ExportButton() {
 			<button
 				type="button"
 				onClick={exportToGoogleSheets}
-				className="flex items-center gap-1.5 rounded-lg bg-surface-elevated px-3 py-1.5 text-sm text-muted hover:text-foreground hover:bg-surface transition-colors"
+				className="ui-button ui-button--ghost flex items-center gap-1.5 bg-surface-elevated text-muted hover:text-foreground hover:bg-surface transition-colors"
 				title="Export to Google Sheets"
 			>
 				<Download size={16} />

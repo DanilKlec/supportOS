@@ -4,6 +4,7 @@ dist
 dist-ssr
 *.local
 .env
+.env.collector
 .nitro
 .tanstack
 .wrangler
@@ -11,3 +12,8 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+test-results/
+playwright-report/
+
+.vercel
+.env*

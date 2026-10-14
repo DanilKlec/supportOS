@@ -21,13 +21,16 @@ function FavoritesPage() {
 					<div className="flex items-center gap-3 mb-6">
 						<Star size={28} className="text-yellow-400" fill="currentColor" />
 						<div>
-							<h1 className="text-3xl font-bold text-foreground">Favorites</h1>
+							<h1 className="text-3xl font-bold text-foreground">Избранное</h1>
 							<p className="text-sm text-muted mt-1">
-								Quick access to your favorite binds
+								Быстрый доступ к избранным биндам
 							</p>
 						</div>
 					</div>
-					<BindList binds={favoriteBinds} emptyMessage="No favorites yet" />
+					<BindList
+						binds={favoriteBinds}
+						emptyMessage="В избранном пока нет биндов"
+					/>
 				</div>
 			</main>
 		</div>

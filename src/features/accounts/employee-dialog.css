@@ -1,0 +1,303 @@
+.employee-dialog {
+	max-width: 820px;
+	border-radius: 20px;
+	--modal-padding: 28px;
+}
+.employee-dialog .modal-header {
+	padding: 18px 28px;
+}
+.employee-dialog .modal-header h2 {
+	font-size: 14px;
+	font-weight: 550;
+}
+.employee-dialog .modal-body {
+	background: var(--color-background);
+}
+.employee-content {
+	min-width: 0;
+}
+.employee-identity {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-bottom: 24px;
+	min-width: 0;
+}
+.employee-avatar {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 54px;
+	height: 54px;
+	border: 1px solid var(--color-border);
+	border-radius: 17px;
+	background: var(--color-surface-elevated);
+	font-size: 17px;
+	font-weight: 600;
+}
+.employee-identity > div:nth-child(2) {
+	min-width: 0;
+	flex: 1;
+}
+.employee-identity h3 {
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: -0.03em;
+	overflow-wrap: anywhere;
+}
+.employee-identity p {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--color-muted);
+	overflow-wrap: anywhere;
+}
+.employee-status {
+	flex: none;
+	border-radius: 99px;
+	padding: 5px 10px;
+	background: var(--color-surface-elevated);
+	color: var(--color-muted);
+	font-size: 10px;
+}
+.employee-status--active {
+	color: #34d399;
+	background: #10b98112;
+}
+.employee-status--pending {
+	color: #fbbf24;
+	background: #f59e0b12;
+}
+.employee-content > [role="tablist"] {
+	gap: 4px;
+	padding: 0 0 14px;
+	margin-bottom: 22px;
+	border-bottom: 1px solid var(--color-border);
+	flex-wrap: nowrap;
+	overflow-x: auto;
+}
+.employee-content > [role="tablist"] .space-tab {
+	flex: none;
+	min-height: 36px;
+	border-radius: 9px;
+	font-size: 11px;
+}
+.employee-access-form,
+.employee-security {
+	display: grid;
+	gap: 18px;
+	min-width: 0;
+}
+.employee-card {
+	min-width: 0;
+	border: 1px solid var(--color-border);
+	border-radius: 14px;
+	padding: 20px;
+	background: var(--color-surface);
+}
+.employee-card h3 {
+	font-size: 13px;
+	font-weight: 600;
+}
+.employee-section-heading {
+	margin-bottom: 18px;
+}
+.employee-section-heading p,
+.employee-card-heading p {
+	font-size: 11px;
+	color: var(--color-muted);
+	margin-top: 5px;
+}
+.employee-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+.employee-field {
+	display: grid;
+	gap: 8px;
+	min-width: 0;
+	font-size: 12px;
+}
+.employee-field > span {
+	color: var(--color-muted);
+	font-size: 11px;
+	overflow-wrap: anywhere;
+}
+.employee-field > :is(input, select) {
+	width: 100%;
+	min-width: 0;
+	margin: 0;
+	font-size: 12px;
+}
+.employee-card .role-choice-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+}
+.employee-card .role-choice-grid legend {
+	margin-bottom: 14px;
+	font-size: 13px;
+}
+.employee-card .access-role-card {
+	border-radius: 10px;
+	padding: 12px;
+}
+.employee-card .access-role-heading {
+	font-size: 12px;
+	gap: 9px;
+}
+.employee-card .access-role-avatar {
+	width: 29px;
+	height: 29px;
+	border-radius: 8px;
+	font-size: 10px;
+}
+.employee-card .access-role-state {
+	font-size: 9px;
+}
+.employee-card .access-role-card > span:nth-last-child(2) {
+	margin-top: 7px;
+	font-size: 10px;
+	line-height: 1.6;
+}
+.employee-card .access-role-card > span:last-child {
+	margin-top: 7px;
+	font-size: 10px;
+}
+.employee-permissions {
+	margin-top: 18px;
+	padding-top: 14px;
+	border-top: 1px solid var(--color-border);
+	font-size: 11px;
+	color: var(--color-muted);
+}
+.employee-permissions summary {
+	cursor: pointer;
+}
+.employee-permissions p {
+	margin-top: 10px;
+	line-height: 1.9;
+	overflow-wrap: anywhere;
+}
+.employee-dialog .employee-access-footer {
+	position: sticky;
+	bottom: -28px;
+	margin: 0 -28px -28px;
+	padding: 16px 28px;
+	background: var(--color-surface);
+	border-top: 1px solid var(--color-border);
+	flex-direction: row-reverse;
+	justify-content: flex-start;
+	gap: 8px;
+	z-index: 1;
+}
+.employee-card-heading {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+.employee-card-heading > svg {
+	flex: none;
+	color: var(--color-muted);
+}
+.employee-hint {
+	margin-top: 12px;
+	font-size: 11px;
+	line-height: 1.8;
+	color: var(--color-muted);
+}
+.employee-card-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 18px;
+}
+.employee-card-actions .ui-button {
+	font-size: 11px;
+}
+.employee-card--danger {
+	border-color: color-mix(in srgb, #ef4444 23%, var(--color-border));
+}
+.employee-security-tools {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 18px;
+}
+.employee-security-tool {
+	display: flex;
+	flex-direction: column;
+}
+.employee-security-tool .employee-card-heading {
+	align-items: flex-start;
+	margin-bottom: 0;
+}
+.employee-security-tool .employee-card-actions {
+	margin-top: auto;
+	padding-top: 18px;
+}
+.employee-card--danger .employee-card-heading > svg {
+	color: #f87171;
+}
+.employee-info {
+	display: flex;
+	align-items: flex-start;
+	gap: 11px;
+	padding: 13px 15px;
+	border: 1px solid var(--color-border);
+	border-radius: 11px;
+	background: var(--color-surface);
+	color: var(--color-muted);
+	font-size: 11px;
+	line-height: 1.8;
+}
+.employee-info svg {
+	flex: none;
+	margin-top: 2px;
+}
+.employee-delete-confirm {
+	margin-top: 18px;
+	padding-top: 18px;
+	border-top: 1px solid var(--color-border);
+}
+.employee-create-form .employee-fields {
+	grid-template-columns: 1fr;
+}
+@media (max-width: 639px) {
+	.employee-dialog {
+		border-radius: 0;
+		--modal-padding: 16px;
+	}
+	.employee-dialog .modal-header {
+		padding: 14px 16px;
+	}
+	.employee-identity {
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+	.employee-identity > div:nth-child(2) {
+		min-width: 190px;
+	}
+	.employee-identity h3 {
+		font-size: 18px;
+	}
+	.employee-status {
+		margin-left: 66px;
+	}
+	.employee-fields,
+	.employee-security-tools,
+	.employee-card .role-choice-grid {
+		grid-template-columns: 1fr;
+	}
+	.employee-card {
+		padding: 16px;
+	}
+	.employee-dialog .employee-access-footer {
+		bottom: -16px;
+		margin: 0 -16px -16px;
+		padding: 14px 16px;
+	}
+	.employee-card-actions > .ui-button {
+		flex: 1;
+	}
+}

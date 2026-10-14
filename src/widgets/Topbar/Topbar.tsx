@@ -1,16 +1,6 @@
-import { useNavigate } from "@tanstack/react-router";
-import {
-	Cloud,
-	Contact,
-	Gift,
-	LogIn,
-	LogOut,
-	Menu,
-	Plus,
-	Search,
-	Wrench,
-	X,
-} from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -19,43 +9,37 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
+import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
+import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
+import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
+import { Inbox } from "@/features/shared-binds/Inbox";
+import { SharedBindEditor } from "@/features/shared-binds/SharedBindEditor";
+import { ComposerLauncher } from "@/features/spaces/ComposerLauncher";
+import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
+import { contentApi } from "@/services/shared-content.service";
 import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
-import { isKeyboardCode } from "@/shared/lib/keyboard";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
+import { BaseModal } from "@/shared/modals/BaseModal";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
-import { useAccessStore } from "@/store/access.store";
 import { useAuthStore } from "@/store/auth.store";
-
+import { useBonusStore } from "@/store/bonus.store";
+import { can, canAccessPage } from "../../../shared/access.js";
+import { type CatalogResult, catalogResults } from "./search-catalog";
+import { type SearchCommand, searchCommands } from "./search-commands";
 import { ToolsMenu } from "./ToolsMenu";
 
 interface TopbarProps {
 	onOpenMobileSidebar?: () => void;
+	showKnowledgeControls?: boolean;
 }
-
-const QUICK_TOOLS = [
-	{
-		label: "Emails",
-		to: "/project-emails",
-		icon: Contact,
-	},
-	{
-		label: "Bonuses",
-		to: "/bonuses",
-		icon: Gift,
-	},
-	{
-		label: "Bonus Tools",
-		to: "/bonus-tools",
-		icon: Wrench,
-	},
-] as const;
 
 function getShortcutLabel() {
 	if (
@@ -155,44 +139,50 @@ function SearchResults({
 	categories,
 	folders,
 	activeIndex,
+	hasNavigationResults,
 	onActiveIndexChange,
 	onOpen,
 }: {
-	results: Bind[];
+	results: CatalogResult[];
 	query: string;
 	language: string;
 	categories: KnowledgeCategory[];
 	folders: KnowledgeFolder[];
 	activeIndex: number;
+	hasNavigationResults: boolean;
 	onActiveIndexChange: (index: number) => void;
-	onOpen: (bind: Bind) => void;
+	onOpen: (bind: CatalogResult) => void;
 }) {
 	if (!query.trim()) {
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
-				Type a title, tag, folder or answer text.
+				Введите команду, название, проект, почту или текст ответа.
 			</div>
 		);
 	}
 
 	if (results.length === 0) {
+		if (hasNavigationResults) return null;
 		return (
 			<div className="px-4 py-8 text-center text-sm text-muted">
-				Nothing found for “{query.trim()}”.
+				Ничего не найдено по запросу «{query.trim()}».
 			</div>
 		);
 	}
 
 	return (
-		<div role="listbox" aria-label="Search results" className="py-1">
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div role="group" aria-label="Материалы" className="py-1">
 			{results.map((bind, index) => {
 				const category = categories.find((item) => item.id === bind.categoryId);
 				const folderPath = getFolderPath(bind.folderId, folders);
 				const title = getBindTitle(bind, language);
 				const resultLanguage = getResultLanguage(bind, language);
-				const location = `${category?.name ?? "No category"}${
-					folderPath ? ` / ${folderPath}` : ""
-				}`;
+				const location = bind.resultKind
+					? `${bind.resultKind === "email" ? "Почты" : "Бонусы"} · ${bind.projectName}`
+					: `${category?.name ?? "Бинды"}${
+							folderPath ? ` / ${folderPath}` : ""
+						}`;
 				const active = index === activeIndex;
 
 				return (
@@ -200,11 +190,12 @@ function SearchResults({
 						key={bind.id}
 						type="button"
 						role="option"
+						aria-label={`${title}, ${location}${resultLanguage ? `, ${resultLanguage}` : ""}`}
 						aria-selected={active}
 						onMouseEnter={() => onActiveIndexChange(index)}
+						onClick={() => onOpen(bind)}
 						onMouseDown={(event) => {
 							event.preventDefault();
-							onOpen(bind);
 						}}
 						className={`flex min-h-16 w-full min-w-0 flex-col gap-1 px-4 py-3 text-left transition ${
 							active
@@ -232,36 +223,85 @@ function SearchResults({
 	);
 }
 
-export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
+export function Topbar({
+	onOpenMobileSidebar,
+	showKnowledgeControls = true,
+}: TopbarProps) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+	const [newShared, setNewShared] = useState(false);
+	const [preview, setPreview] = useState<CatalogResult | null>(null);
+	const [kind, setKind] = useState("all");
 	const [searchFocused, setSearchFocused] = useState(false);
 	const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 	const [activeResultIndex, setActiveResultIndex] = useState(0);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+	const desktopResultsRef = useRef<HTMLDivElement>(null);
+	const mobileResultsRef = useRef<HTMLDivElement>(null);
 	const { showToast } = useToast();
 
 	const authConfigured = useAuthStore((s) => s.configured);
 	const authSession = useAuthStore((s) => s.session);
-	const accessSession = useAccessStore((s) => s.session);
-	const signOutAccess = useAccessStore((s) => s.signOut);
+	const access = authSession?.user.access;
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const enabled = searchFocused || mobileSearchOpen;
+	const emails = useQuery({
+		queryKey: ["search-emails", authSession?.user.id],
+		enabled: enabled && can(access, "projects.read"),
+		staleTime: 10000,
+		queryFn: () => contentApi("emails"),
+	});
+	const bonuses = useQuery({
+		queryKey: ["search-bonuses", authSession?.user.id],
+		enabled: enabled && can(access, "bonuses.read"),
+		staleTime: 10000,
+		queryFn: async () => {
+			const [shared, personal] = await Promise.all([
+				contentApi("bonuses"),
+				contentApi("bonuses", undefined, undefined, "personal"),
+			]);
+			return personal ?? shared;
+		},
+	});
+	const catalog = useMemo(
+		() =>
+			catalogResults(
+				can(access, "projects.read") && !emails.error
+					? (emails.data?.data ?? [])
+					: [],
+				can(access, "bonuses.read") && !bonuses.error
+					? (bonuses.data?.data ?? [])
+					: [],
+			),
+		[access, emails.data, bonuses.data, emails.error, bonuses.error],
+	);
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
-	const activeTab = useKnowledgeStore((s) => s.activeTab);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
-	const selectedCategory = useKnowledgeStore((s) => s.selectedCategory);
-	const selectedFolder = useKnowledgeStore((s) => s.selectedFolder);
-	const binds = useKnowledgeStore((s) => s.binds);
+	const localBinds = useKnowledgeStore((s) => s.binds);
+	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const binds = useMemo(
+		() => [
+			...remoteBinds,
+			...localBinds.filter((b) => !remoteBinds.some((r) => r.id === b.id)),
+		],
+		[localBinds, remoteBinds],
+	);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const shortcutLabel = useMemo(getShortcutLabel, []);
 
 	const searchResults = searchValue.trim()
 		? searchBinds(
-				binds.filter((bind) => !bind.archived),
+				[...(can(access, "binds.read") ? binds : []), ...catalog].filter(
+					(bind: CatalogResult) =>
+						!bind.archived &&
+						(kind === "all" || (bind.resultKind ?? "bind") === kind),
+				),
 				searchValue,
 				{
 					categories,
@@ -271,45 +311,169 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 			).slice(0, 9)
 		: [];
 
-	const openSearchResult = (bind: Bind) => {
-		openBind(bind.id);
-		void navigate({ to: "/" });
+	const sectionResults = spaces
+		.flatMap((g) =>
+			(g.items as readonly SpaceItem[]).map((i) => ({ ...i, group: g.title })),
+		)
+		.filter(
+			(i) =>
+				canAccessPage(access, i.to, i.hash) &&
+				searchValue.trim() &&
+				`${i.label} ${i.group} ${i.to} ${i.hash ?? ""}`
+					.toLowerCase()
+					.includes(searchValue.trim().toLowerCase()),
+		);
+	const commands = searchCommands(access, searchValue);
+	const contentOffset = commands.length + sectionResults.length;
+	const resultCount = contentOffset + searchResults.length;
+	const activeIndex = Math.min(activeResultIndex, Math.max(0, resultCount - 1));
+	const openCommand = (command: SearchCommand) => {
+		const allowed = searchCommands(
+			useAuthStore.getState().session?.user.access,
+		).find((item) => item.id === command.id);
+		if (!allowed) return;
+		setSearchFocused(false);
+		setMobileSearchOpen(false);
+		if (allowed.action.type === "create-bind") {
+			const { selectedCategory, selectedFolder } = useKnowledgeStore.getState();
+			modalManager.open("createBind", {
+				categoryId: selectedCategory,
+				folderId: selectedFolder,
+			});
+		} else {
+			void navigate({ to: allowed.action.to, hash: allowed.action.hash });
+		}
+	};
+	const commandSearch = commands.length > 0 && (
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div
+			role="group"
+			aria-label="Команды"
+			className="border-b border-border py-1"
+		>
+			<div className="px-4 py-2 text-xs font-semibold text-muted">Команды</div>
+			{commands.map((command, index) => (
+				<button
+					key={command.id}
+					type="button"
+					role="option"
+					aria-label={command.label}
+					aria-selected={index === activeIndex}
+					onMouseDown={(event) => event.preventDefault()}
+					onMouseEnter={() => setActiveResultIndex(index)}
+					onClick={() => openCommand(command)}
+					className={`flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left text-sm hover:bg-surface-elevated ${index === activeIndex ? "bg-accent/10" : ""}`}
+				>
+					<span className="font-semibold">
+						<Highlight text={command.label} query={searchValue} />
+					</span>
+					<span className="text-xs text-muted">{command.description}</span>
+				</button>
+			))}
+		</div>
+	);
+	const openSection = (item: SpaceItem) => {
+		void navigate({ to: item.to, hash: item.hash ?? "" });
+		setSearchFocused(false);
+		setMobileSearchOpen(false);
+	};
+	const sectionSearch = sectionResults.length > 0 && (
+		// biome-ignore lint/a11y/useSemanticElements: A listbox option group is not a form fieldset.
+		<div role="group" aria-label="Разделы">
+			{sectionResults.map((i, index) => (
+				<button
+					type="button"
+					role="option"
+					aria-selected={commands.length + index === activeIndex}
+					key={i.to + (i.hash ?? "")}
+					className={`flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated ${commands.length + index === activeIndex ? "bg-accent/10" : ""}`}
+					onMouseDown={(e) => e.preventDefault()}
+					onMouseEnter={() => setActiveResultIndex(commands.length + index)}
+					onClick={() => openSection(i)}
+				>
+					{i.label}
+					<span className="text-xs text-muted">{i.group}</span>
+				</button>
+			))}
+		</div>
+	);
+	const searchFilters = (
+		<div className="border-b border-border p-2">
+			<KnowledgeGapButton />
+			<div className="flex gap-1">
+				{[
+					{ id: "all", label: "Всё" },
+					...(can(access, "binds.read")
+						? [{ id: "bind", label: "Бинды" }]
+						: []),
+					...(can(access, "projects.read")
+						? [{ id: "email", label: "Почты" }]
+						: []),
+					...(can(access, "bonuses.read")
+						? [{ id: "bonus", label: "Бонусы" }]
+						: []),
+				].map((item) => (
+					<button
+						key={item.id}
+						type="button"
+						aria-pressed={kind === item.id}
+						onMouseDown={(e) => e.preventDefault()}
+						onClick={() => {
+							setKind(item.id);
+							setActiveResultIndex(0);
+						}}
+						className="ui-button ui-button--ghost text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+					>
+						{item.label}
+					</button>
+				))}
+			</div>
+			{((can(access, "projects.read") && emails.isFetching) ||
+				(can(access, "bonuses.read") && bonuses.isFetching)) && (
+				<output className="p-2 text-xs text-muted">
+					Обновляем справочники…
+				</output>
+			)}
+			{((can(access, "projects.read") && emails.error) ||
+				(can(access, "bonuses.read") && bonuses.error)) && (
+				<p role="alert" className="p-2 text-xs text-red-400">
+					Часть справочников недоступна.{" "}
+					<Button
+						type="button"
+						onMouseDown={(e) => e.preventDefault()}
+						onClick={() => {
+							if (can(access, "projects.read")) void emails.refetch();
+							if (can(access, "bonuses.read")) void bonuses.refetch();
+						}}
+						variant="ghost"
+						size="small"
+						className="underline"
+					>
+						Повторить
+					</Button>
+				</p>
+			)}
+		</div>
+	);
+	const openSearchResult = (bind: CatalogResult) => {
+		setPreview(bind);
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
 
-	const createBind = useCallback(() => {
-		const categoryId = selectedCategory ?? categories[0]?.id;
-
-		if (!categoryId) {
-			showToast("Create a category first");
+	const signOut = async () => {
+		try {
+			await supabaseService.signOut();
+		} catch {
+			showToast("Не удалось выйти. Повторите попытку.");
 			return;
 		}
-
-		const selectedFolderEntity = folders.find(
-			(folder) => folder.id === selectedFolder,
-		);
-		modalManager.open("createBind", {
-			categoryId,
-			folderId:
-				selectedFolderEntity?.categoryId === categoryId
-					? selectedFolderEntity.id
-					: undefined,
-		});
-	}, [categories, folders, selectedCategory, selectedFolder, showToast]);
-
-	const signOut = async () => {
-		await supabaseService.signOut();
 		await knowledgeService.loadKnowledge();
-		showToast("Signed out");
-	};
-
-	const leaveWorkspace = () => {
-		signOutAccess();
-		void navigate({ to: "/login", replace: true });
+		showToast("Вы вышли из аккаунта");
 	};
 
 	const openGlobalSearch = useCallback(() => {
+		setActiveResultIndex(0);
 		const mobile = window.matchMedia("(max-width: 767px)").matches;
 
 		if (mobile) {
@@ -318,6 +482,7 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 			return;
 		}
 
+		setSearchFocused(true);
 		searchInputRef.current?.focus();
 		searchInputRef.current?.select();
 	}, []);
@@ -336,23 +501,26 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
-			setActiveResultIndex((index) =>
-				searchResults.length === 0 ? 0 : (index + 1) % searchResults.length,
+			setActiveResultIndex(
+				resultCount === 0 ? 0 : (activeIndex + 1) % resultCount,
 			);
 		}
 
 		if (event.key === "ArrowUp") {
 			event.preventDefault();
-			setActiveResultIndex((index) =>
-				searchResults.length === 0
-					? 0
-					: (index - 1 + searchResults.length) % searchResults.length,
+			setActiveResultIndex(
+				resultCount === 0 ? 0 : (activeIndex - 1 + resultCount) % resultCount,
 			);
 		}
 
-		if (event.key === "Enter" && searchResults[activeResultIndex]) {
+		if (event.key === "Enter" && resultCount) {
 			event.preventDefault();
-			openSearchResult(searchResults[activeResultIndex]);
+			const command = commands[activeIndex];
+			const section = sectionResults[activeIndex - commands.length];
+			const result = searchResults[activeIndex - contentOffset];
+			if (command) openCommand(command);
+			else if (section) openSection(section);
+			else if (result) openSearchResult(result);
 		}
 
 		if (event.key === "Escape") {
@@ -365,52 +533,42 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 	};
 
 	useEffect(() => {
-		const handler = (event: KeyboardEvent) => {
-			if (!event.ctrlKey && !event.metaKey) return;
+		if (!enabled || resultCount === 0) return;
+		const list = mobileSearchOpen
+			? mobileResultsRef.current
+			: desktopResultsRef.current;
+		list
+			?.querySelectorAll('[role="option"]')
+			[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+	}, [activeIndex, enabled, mobileSearchOpen, resultCount]);
 
+	useEffect(() => {
+		const handler = (event: KeyboardEvent) => {
 			if (
-				isKeyboardCode(event, "KeyK") ||
-				isKeyboardCode(event, "KeyF") ||
-				isKeyboardCode(event, "KeyP")
-			) {
+				event.defaultPrevented ||
+				event.repeat ||
+				event.altKey ||
+				document.querySelector('[aria-modal="true"]')
+			)
+				return;
+			const commandSearch =
+				(event.ctrlKey || event.metaKey) &&
+				!event.shiftKey &&
+				isKeyboardCode(event, "KeyK");
+			const quickSearch =
+				event.key === "/" &&
+				!event.ctrlKey &&
+				!event.metaKey &&
+				!isTypingTarget(event.target) &&
+				!isTypingTarget(document.activeElement);
+			if (commandSearch || quickSearch) {
 				event.preventDefault();
 				openGlobalSearch();
 			}
-
-			if (isKeyboardCode(event, "KeyN")) {
-				event.preventDefault();
-				createBind();
-			}
-
-			if (isKeyboardCode(event, "KeyD") && activeTab) {
-				event.preventDefault();
-				const favorite = knowledgeService.toggleFavorite(activeTab);
-
-				showToast(favorite ? "Added to favorites" : "Removed from favorites");
-			}
-
-			if (isKeyboardCode(event, "KeyS")) {
-				event.preventDefault();
-
-				const detail = { handled: false };
-
-				window.dispatchEvent(
-					new CustomEvent("supportos:save-active-bind", {
-						detail,
-					}),
-				);
-
-				if (!detail.handled) {
-					knowledgeService.saveKnowledge();
-					showToast("Saved");
-				}
-			}
 		};
-
 		window.addEventListener("keydown", handler);
-
 		return () => window.removeEventListener("keydown", handler);
-	}, [activeTab, createBind, openGlobalSearch, showToast]);
+	}, [openGlobalSearch]);
 
 	useEffect(() => {
 		if (!mobileSearchOpen) return undefined;
@@ -426,17 +584,86 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 
 	return (
 		<div className="relative z-30 shrink-0">
-			<header className="relative flex h-14 items-center gap-2 border-b border-border bg-surface/95 px-3 text-foreground backdrop-blur md:px-5">
-				<button
-					type="button"
-					aria-label={
-						layout.showSidebar ? "Collapse navigation" : "Open navigation"
-					}
+			{preview &&
+				can(
+					access,
+					preview.resultKind === "email" ? "projects.read" : "bonuses.read",
+				) && (
+					<BaseModal
+						title={getBindTitle(preview, language)}
+						onClose={() => setPreview(null)}
+					>
+						<p className="mb-3 text-xs text-muted">
+							{preview.resultKind === "email"
+								? "Почта проекта"
+								: preview.resultKind === "bonus"
+									? "Сохранённые условия бонуса"
+									: "Предпросмотр материала"}
+						</p>
+						{preview.freshness && <BonusFreshness bonus={preview.freshness} />}
+						<p className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border p-4 text-sm leading-6">
+							{
+								(
+									preview.translations.find((t) => t.language === language) ??
+									preview.translations[0]
+								)?.content
+							}
+						</p>
+						<div className="ui-actions items-center mt-4 flex gap-2">
+							<Button
+								type="button"
+								onClick={() =>
+									void copyToClipboard(
+										(
+											preview.translations.find(
+												(t) => t.language === language,
+											) ?? preview.translations[0]
+										)?.content ?? "",
+									).then((ok) =>
+										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
+									)
+								}
+								variant="primary"
+							>
+								Копировать
+							</Button>
+							<Button
+								type="button"
+								onClick={() => {
+									if (!preview.resultKind) openBind(preview.id);
+									if (preview.resultKind === "bonus") {
+										useBonusStore
+											.getState()
+											.setActiveProject(preview.projectId);
+										useBonusStore.getState().setDepositBonusQuery("");
+									}
+									void navigate({
+										to:
+											preview.resultKind === "email"
+												? "/project-emails"
+												: preview.resultKind === "bonus"
+													? "/bonuses"
+													: "/",
+									});
+									setPreview(null);
+								}}
+								variant="secondary"
+							>
+								Открыть раздел
+							</Button>
+						</div>
+					</BaseModal>
+				)}
+
+			<header className="product-topbar relative flex items-center border-b border-border bg-surface/95 text-foreground backdrop-blur">
+				<IconButton
+					label={layout.showSidebar ? "Свернуть папки" : "Открыть навигацию"}
 					onClick={toggleSidebar}
-					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					style={!showKnowledgeControls ? { display: "none" } : undefined}
+					className="shrink-0 text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					<Menu size={19} />
-				</button>
+				</IconButton>
 
 				<div className="flex min-w-0 shrink-0 items-center gap-2">
 					<SupportOSLogo className="h-8 w-8" />
@@ -445,19 +672,52 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 							SupportOS
 						</div>
 						<div className="truncate text-[11px] text-muted">
-							Support workspace
+							Рабочее пространство
 						</div>
 					</div>
 				</div>
 
+				<nav className="product-spaces" aria-label="Пространства">
+					{[
+						{ to: "/", label: "Бинды" },
+						{ to: "/qc", label: "QC" },
+						{ to: "/admin", label: "Администрирование" },
+					]
+						.filter((item) => canAccessPage(access, item.to))
+						.map((item) => (
+							<Link
+								key={item.to}
+								to={item.to}
+								className="space-tab"
+								aria-current={
+									(
+										item.to === "/qc"
+											? [
+													"/qc",
+													"/content",
+													"/shared-binds",
+													"/health",
+													"/archive",
+												].includes(pathname)
+											: pathname === item.to
+									)
+										? "page"
+										: undefined
+								}
+							>
+								{item.label}
+							</Link>
+						))}
+				</nav>
 				<div className="hidden min-w-0 flex-1 justify-center px-4 md:flex">
 					<div className="relative w-full max-w-2xl">
 						<Search
 							size={17}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 						/>
-						<input
+						<Input
 							ref={searchInputRef}
+							aria-label="Глобальный поиск"
 							value={searchValue}
 							onChange={(event) => {
 								setSearch(event.target.value);
@@ -468,174 +728,153 @@ export function Topbar({ onOpenMobileSidebar }: TopbarProps) {
 							onBlur={() => {
 								window.setTimeout(() => setSearchFocused(false), 120);
 							}}
-							className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-20 text-sm outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
-							placeholder="Search materials, folders, tags..."
+							className="w-full pl-10 pr-20 outline-none transition placeholder:text-muted/80 focus:border-accent focus:ring-2 focus:ring-accent/30"
+							placeholder="Команды, бинды, почты, бонусы…"
 						/>
 						<kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted lg:block">
 							{shortcutLabel}
 						</kbd>
 
-						{searchFocused && (
-							<div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
-								<SearchResults
-									results={searchResults}
-									query={searchValue}
-									language={language}
-									categories={categories}
-									folders={folders}
-									activeIndex={activeResultIndex}
-									onActiveIndexChange={setActiveResultIndex}
-									onOpen={openSearchResult}
-								/>
+						{searchFocused && !mobileSearchOpen && (
+							<div className="supportos-scroll absolute left-0 right-0 top-12 z-50 max-h-[70dvh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl">
+								{searchFilters}
+								<div
+									role="listbox"
+									aria-label="Результаты поиска"
+									ref={desktopResultsRef}
+								>
+									{commandSearch}
+									{sectionSearch}
+									<SearchResults
+										results={searchResults}
+										query={searchValue}
+										language={language}
+										categories={categories}
+										folders={folders}
+										activeIndex={activeIndex - contentOffset}
+										hasNavigationResults={contentOffset > 0}
+										onActiveIndexChange={(index) =>
+											setActiveResultIndex(index + contentOffset)
+										}
+										onOpen={openSearchResult}
+									/>
+								</div>
 							</div>
 						)}
 					</div>
 				</div>
 
 				<div className="ml-auto flex shrink-0 items-center gap-2">
-					<button
-						type="button"
-						aria-label="Search"
+					<IconButton
+						label="Поиск"
 						onClick={() => {
 							setMobileSearchOpen(true);
 							window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
 						}}
-						className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
+						className="text-muted transition hover:bg-surface-elevated hover:text-foreground md:hidden"
 					>
 						<Search size={19} />
-					</button>
-
-					<div className="hidden shrink-0 items-center gap-1 lg:flex">
-						{QUICK_TOOLS.map((item) => {
-							const Icon = item.icon;
-
-							return (
-								<button
-									key={item.to}
-									type="button"
-									title={item.label}
-									onClick={() => void navigate({ to: item.to })}
-									className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-2 text-sm font-medium text-foreground transition hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 xl:px-3"
-								>
-									<Icon size={17} />
-									<span className="hidden xl:inline">{item.label}</span>
-								</button>
-							);
-						})}
-					</div>
-
-					<button
-						type="button"
-						onClick={createBind}
-						className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-					>
-						<Plus size={17} />
-						<span className="hidden xl:inline">New material</span>
-					</button>
-
-					<ToolsMenu />
+					</IconButton>
 
 					{authConfigured &&
 						(authSession ? (
-							<button
+							<Button
 								type="button"
-								title={`Cloud: ${authSession.user.email}`}
+								title={`Выйти: ${authSession.user.email}`}
+								aria-label="Выйти из аккаунта"
 								onClick={signOut}
-								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+								variant="ghost"
 							>
-								<Cloud size={16} />
+								<span className="hidden max-w-28 truncate lg:block">
+									{authSession.user.access?.display_name ||
+										authSession.user.email?.split("@")[0]}
+								</span>
 								<LogOut size={16} />
-							</button>
+							</Button>
 						) : (
-							<button
+							<IconButton
 								type="button"
-								title="Cloud login"
+								label="Войти в облако"
 								onClick={() => void navigate({ to: "/login" })}
-								className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
+								variant="ghost"
 							>
-								<Cloud size={16} />
 								<LogIn size={16} />
-							</button>
+							</IconButton>
 						))}
-
-					{accessSession ? (
-						<button
-							type="button"
-							title={`Выйти: ${accessSession.username} (${accessSession.role})`}
-							onClick={leaveWorkspace}
-							className="hidden h-10 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted transition hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
-						>
-							<span className="max-w-24 truncate">
-								{accessSession.username}
-							</span>
-							<LogOut size={16} />
-						</button>
-					) : null}
+					{showKnowledgeControls && <ComposerLauncher />}
+					<Inbox />
+					<ToolsMenu />
 				</div>
 
 				{mobileSearchOpen && (
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label="Search materials"
+						aria-label="Поиск материалов"
 						className="fixed inset-0 z-50 flex flex-col bg-background text-foreground md:hidden"
 					>
 						<div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
 							<Search size={18} className="shrink-0 text-muted" />
-							<input
+							<Input
 								ref={mobileSearchInputRef}
+								aria-label="Глобальный поиск"
 								value={searchValue}
 								onChange={(event) => {
 									setSearch(event.target.value);
 									setActiveResultIndex(0);
 								}}
 								onKeyDown={handleSearchKeyDown}
-								placeholder="Search materials..."
-								className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+								placeholder="Команды и материалы…"
+								className="min-w-0 flex-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 							/>
-							<button
-								type="button"
-								aria-label="Close search"
+							<IconButton
+								label="Закрыть поиск"
 								onClick={() => setMobileSearchOpen(false)}
-								className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="shrink-0 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={19} />
-							</button>
+							</IconButton>
 						</div>
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-							<SearchResults
-								results={searchResults}
-								query={searchValue}
-								language={language}
-								categories={categories}
-								folders={folders}
-								activeIndex={activeResultIndex}
-								onActiveIndexChange={setActiveResultIndex}
-								onOpen={openSearchResult}
-							/>
+							{searchFilters}
+							<div
+								role="listbox"
+								aria-label="Результаты поиска"
+								ref={mobileResultsRef}
+							>
+								{commandSearch}
+								{sectionSearch}
+								<SearchResults
+									results={searchResults}
+									query={searchValue}
+									language={language}
+									categories={categories}
+									folders={folders}
+									activeIndex={activeIndex - contentOffset}
+									hasNavigationResults={contentOffset > 0}
+									onActiveIndexChange={(index) =>
+										setActiveResultIndex(index + contentOffset)
+									}
+									onOpen={openSearchResult}
+								/>
+							</div>
 						</div>
 					</div>
 				)}
 			</header>
 
-			<div className="supportos-scroll flex h-11 items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 lg:hidden">
-				{QUICK_TOOLS.map((item) => {
-					const Icon = item.icon;
-
-					return (
-						<button
-							key={item.to}
-							type="button"
-							onClick={() => void navigate({ to: item.to })}
-							className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-						>
-							<Icon size={16} />
-							<span>{item.label}</span>
-						</button>
-					);
-				})}
-			</div>
+			{newShared && can(authSession?.user.access, "knowledge.write") && (
+				<SharedBindEditor
+					onClose={() => setNewShared(false)}
+					onSaved={() => {
+						setNewShared(false);
+						void queryClient.invalidateQueries({ queryKey: ["shared-binds"] });
+						showToast("Бинд сохранён для всей команды");
+						void navigate({ to: "/shared-binds" });
+					}}
+				/>
+			)}
 		</div>
 	);
 }

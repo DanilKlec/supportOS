@@ -11,7 +11,7 @@ import {
 	Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import { QualitySignals } from "@/features/productivity/KnowledgeSignals";
 import { getBindTitle } from "@/shared/lib/bind-search";
 import {
 	getKnowledgeHealthReport,
@@ -30,6 +30,13 @@ const severityStyle = {
 	info: "border-border bg-background text-muted",
 };
 
+const severityLabels = {
+	all: "Все",
+	critical: "Критично",
+	warning: "Требует внимания",
+	info: "Информация",
+};
+
 function getSeverityIcon(issue: KnowledgeHealthIssue) {
 	if (issue.severity === "critical") return <AlertTriangle size={16} />;
 	if (issue.severity === "warning") return <Info size={16} />;
@@ -37,7 +44,7 @@ function getSeverityIcon(issue: KnowledgeHealthIssue) {
 	return <CheckCircle2 size={16} />;
 }
 
-function HealthPage() {
+export function HealthPage() {
 	const navigate = useNavigate();
 	const [query, setQuery] = useState("");
 	const [severity, setSeverity] = useState<
@@ -88,16 +95,17 @@ function HealthPage() {
 	return (
 		<div className="h-full overflow-auto bg-background">
 			<div className="mx-auto w-full max-w-6xl p-6">
+				<QualitySignals />
 				<header className="mb-6 flex flex-wrap items-start justify-between gap-4">
 					<div>
 						<div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted">
 							<HeartPulse size={14} />
-							Knowledge health
+							Состояние базы знаний
 						</div>
-						<h1 className="text-3xl font-bold">Database check</h1>
+						<h1 className="text-3xl font-bold">Проверка базы знаний</h1>
 						<p className="mt-2 max-w-2xl text-sm text-muted">
-							Find duplicates, empty binds, missing translations and unused
-							folders.
+							Найдите дубли, пустые бинды, отсутствующие переводы и
+							неиспользуемые папки.
 						</p>
 					</div>
 
@@ -106,28 +114,28 @@ function HealthPage() {
 						className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-elevated"
 					>
 						<Archive size={16} />
-						Open archive
+						Открыть архив
 					</Link>
 				</header>
 
 				<section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					<HealthStat label="Active binds" value={report.stats.activeBinds} />
-					<HealthStat label="Archived" value={report.stats.archivedBinds} />
-					<HealthStat label="Duplicates" value={report.stats.duplicates} />
+					<HealthStat label="Активные бинды" value={report.stats.activeBinds} />
+					<HealthStat label="В архиве" value={report.stats.archivedBinds} />
+					<HealthStat label="Дубли" value={report.stats.duplicates} />
 					<HealthStat
-						label="Missing translations"
+						label="Нет переводов"
 						value={report.stats.missingTranslations}
 					/>
-					<HealthStat label="Empty content" value={report.stats.emptyContent} />
+					<HealthStat label="Пустые бинды" value={report.stats.emptyContent} />
 					<HealthStat
-						label="Unused folders"
+						label="Неиспользуемые папки"
 						value={report.stats.unusedFolders}
 					/>
 					<HealthStat
-						label="Orphaned binds"
+						label="Бинды без расположения"
 						value={report.stats.orphanedBinds}
 					/>
-					<HealthStat label="Total issues" value={report.issues.length} />
+					<HealthStat label="Всего проблем" value={report.issues.length} />
 				</section>
 
 				<section className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 lg:flex-row lg:items-center">
@@ -136,8 +144,8 @@ function HealthPage() {
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							placeholder="Filter issues"
-							className="h-8 flex-1 bg-transparent text-sm outline-none"
+							placeholder="Поиск проблем"
+							className="ui-input flex-1 bg-transparent outline-none"
 						/>
 					</div>
 
@@ -153,7 +161,7 @@ function HealthPage() {
 										: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
 								}`}
 							>
-								{item}
+								{severityLabels[item]}
 							</button>
 						))}
 					</div>
@@ -161,7 +169,7 @@ function HealthPage() {
 
 				{visibleIssues.length === 0 ? (
 					<div className="rounded-lg border border-border bg-surface p-10 text-center text-sm text-muted">
-						No issues found
+						Проблем не найдено
 					</div>
 				) : (
 					<div className="space-y-3">
@@ -185,7 +193,7 @@ function HealthPage() {
 													className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs ${severityStyle[issue.severity]}`}
 												>
 													{getSeverityIcon(issue)}
-													{issue.severity}
+													{severityLabels[issue.severity]}
 												</span>
 												<h2 className="truncate text-base font-semibold">
 													{issue.title}
@@ -216,7 +224,7 @@ function HealthPage() {
 													type="button"
 													onClick={() => editIssueBind(issue.bindId)}
 													className="rounded-md border border-border p-2 text-muted hover:bg-surface-elevated hover:text-foreground"
-													title="Edit bind"
+													title="Редактировать бинд"
 												>
 													<Edit3 size={15} />
 												</button>
@@ -225,9 +233,9 @@ function HealthPage() {
 												<button
 													type="button"
 													onClick={() => openIssue(issue)}
-													className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-elevated"
+													className="ui-button ui-button--secondary border border-border hover:bg-surface-elevated"
 												>
-													Open
+													Открыть
 												</button>
 											)}
 										</div>

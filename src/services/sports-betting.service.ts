@@ -83,7 +83,7 @@ class SportsBettingService {
 			url.searchParams.set("sports", params.sports);
 		}
 
-		const response = await fetch(url.toString());
+		const response = await authenticatedFetch(url.toString());
 		const data = await readJson<SportsBettingFeed | SportsBettingErrorResponse>(
 			response,
 		);
@@ -92,12 +92,12 @@ class SportsBettingService {
 			const errorData = data as SportsBettingErrorResponse | undefined;
 
 			throw new Error(
-				errorData?.error ?? "Unable to load live sports betting data",
+				errorData?.error ?? "Не удалось загрузить актуальные данные ставок",
 			);
 		}
 
 		if (!data || !("events" in data)) {
-			throw new Error("Live sports betting data has an unexpected format");
+			throw new Error("Данные ставок получены в неожиданном формате");
 		}
 
 		return data;
@@ -105,3 +105,5 @@ class SportsBettingService {
 }
 
 export const sportsBettingService = new SportsBettingService();
+
+import { authenticatedFetch } from "@/services/authenticated-fetch";

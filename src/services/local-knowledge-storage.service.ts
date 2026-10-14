@@ -1,4 +1,5 @@
 import type { KnowledgeDatabase } from "@/services/knowledge.service";
+import { useAuthStore } from "@/store/auth.store";
 
 const DB_NAME = "supportos-local";
 const DB_VERSION = 1;
@@ -6,6 +7,19 @@ const STORE_NAME = "snapshots";
 const SNAPSHOT_ID = "knowledge";
 const LEGACY_STORAGE_KEY = "supportos:knowledge:v1";
 const STORAGE_VERSION = 1;
+const accountId = () =>
+	useAuthStore.getState().session?.user.id ?? "signed-out";
+function visibleSnapshot(database: Partial<StoredKnowledge>) {
+	const id = accountId();
+	const visible = (item: { ownerId?: string | null }) =>
+		!item.ownerId || item.ownerId === id;
+	return {
+		...database,
+		categories: database.categories?.filter(visible),
+		folders: database.folders?.filter(visible),
+		binds: database.binds?.filter(visible),
+	};
+}
 
 interface StoredKnowledge extends KnowledgeDatabase {
 	version?: number;
@@ -51,6 +65,7 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 async function readIndexedDbSnapshot() {
+	const key = `${SNAPSHOT_ID}:${accountId()}`;
 	if (!canUseIndexedDb()) return undefined;
 
 	const database = await openDatabase();
@@ -59,8 +74,15 @@ async function readIndexedDbSnapshot() {
 		const transaction = database.transaction(STORE_NAME, "readonly");
 		const store = transaction.objectStore(STORE_NAME);
 
+		const own = await requestToPromise<KnowledgeSnapshotRecord | undefined>(
+			store.get(key),
+		);
+		if (own) return own;
 		return await requestToPromise<KnowledgeSnapshotRecord | undefined>(
-			store.get(SNAPSHOT_ID),
+			database
+				.transaction(STORE_NAME, "readonly")
+				.objectStore(STORE_NAME)
+				.get(SNAPSHOT_ID),
 		);
 	} finally {
 		database.close();
@@ -68,6 +90,7 @@ async function readIndexedDbSnapshot() {
 }
 
 async function writeIndexedDbSnapshot(databaseSnapshot: KnowledgeDatabase) {
+	const key = `${SNAPSHOT_ID}:${accountId()}`;
 	if (!canUseIndexedDb()) return false;
 
 	const database = await openDatabase();
@@ -76,7 +99,7 @@ async function writeIndexedDbSnapshot(databaseSnapshot: KnowledgeDatabase) {
 		const transaction = database.transaction(STORE_NAME, "readwrite");
 		const store = transaction.objectStore(STORE_NAME);
 		const record: KnowledgeSnapshotRecord = {
-			id: SNAPSHOT_ID,
+			id: key,
 			version: STORAGE_VERSION,
 			updatedAt: new Date().toISOString(),
 			database: {
@@ -97,7 +120,9 @@ function readLegacySnapshot() {
 	if (!canUseLocalStorage()) return undefined;
 
 	try {
-		const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+		const raw =
+			localStorage.getItem(`${LEGACY_STORAGE_KEY}:${accountId()}`) ??
+			localStorage.getItem(LEGACY_STORAGE_KEY);
 
 		return raw ? (JSON.parse(raw) as Partial<StoredKnowledge>) : undefined;
 	} catch {
@@ -105,11 +130,11 @@ function readLegacySnapshot() {
 	}
 }
 
-function writeLegacySnapshot(database: KnowledgeDatabase) {
+function writeLegacySnapshot(database: KnowledgeDatabase, id = accountId()) {
 	if (!canUseLocalStorage()) return;
 
 	localStorage.setItem(
-		LEGACY_STORAGE_KEY,
+		`${LEGACY_STORAGE_KEY}:${id}`,
 		JSON.stringify({
 			version: STORAGE_VERSION,
 			...database,
@@ -120,7 +145,7 @@ function writeLegacySnapshot(database: KnowledgeDatabase) {
 function clearLegacySnapshot() {
 	if (!canUseLocalStorage()) return;
 
-	localStorage.removeItem(LEGACY_STORAGE_KEY);
+	localStorage.removeItem(`${LEGACY_STORAGE_KEY}:${accountId()}`);
 }
 
 class LocalKnowledgeStorageService {
@@ -129,13 +154,14 @@ class LocalKnowledgeStorageService {
 			const indexedDbSnapshot = await readIndexedDbSnapshot();
 
 			if (indexedDbSnapshot?.database) {
-				return indexedDbSnapshot.database;
+				return visibleSnapshot(indexedDbSnapshot.database);
 			}
 		} catch {
 			// Fall back to the legacy storage path below.
 		}
 
-		const legacySnapshot = readLegacySnapshot();
+		const source = readLegacySnapshot();
+		const legacySnapshot = source ? visibleSnapshot(source) : undefined;
 
 		if (legacySnapshot) {
 			try {
@@ -150,14 +176,15 @@ class LocalKnowledgeStorageService {
 	}
 
 	write(database: KnowledgeDatabase) {
+		const id = accountId();
 		void writeIndexedDbSnapshot(database)
 			.then((written) => {
 				if (!written) {
-					writeLegacySnapshot(database);
+					writeLegacySnapshot(database, id);
 				}
 			})
 			.catch(() => {
-				writeLegacySnapshot(database);
+				writeLegacySnapshot(database, id);
 			});
 	}
 }

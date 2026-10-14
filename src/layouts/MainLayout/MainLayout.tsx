@@ -1,13 +1,19 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { isLightweightRoute } from "@/app/route-mode";
-import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
-import { TranslatorWidget } from "@/features/translator/TranslatorWidget";
-import { useWorkspaceStore } from "@/store";
-import { CommandPalette } from "@/widgets/CommandPalette/CommandPalette";
+import { PersonalLibrary } from "@/features/productivity/PersonalLibrary";
+import { SelectionActions } from "@/features/productivity/SelectionActions";
+import { WorkspaceContinuity } from "@/features/productivity/WorkspaceContinuity";
+import { WorkspaceSharedBindsSync } from "@/features/shared-binds/WorkspaceSharedBinds";
+import { SpaceFrame } from "@/features/spaces/SpaceFrame";
+import { SupportComposer } from "@/features/spaces/SupportComposer";
+import { useScrollContext } from "@/shared/hooks/useScrollContext";
+import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { useBonusStore } from "@/store/bonus.store";
 import { Sidebar } from "@/widgets/Sidebar";
 import { Topbar } from "@/widgets/Topbar";
+import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
 
 export function MainLayout({ children }: { children: ReactNode }) {
 	const layout = useWorkspaceStore((state) => state.layout);
@@ -15,7 +21,26 @@ export function MainLayout({ children }: { children: ReactNode }) {
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
+	const scrollRoot = useRef<HTMLElement>(null);
+	const actor = useAuthStore((s) => s.session?.user.id);
+	const activeBind = useKnowledgeStore((s) => s.activeTab);
+	const activeProject = useBonusStore((s) => s.activeProjectId);
+	useScrollContext(
+		scrollRoot,
+		JSON.stringify([
+			actor,
+			pathname,
+			pathname === "/"
+				? activeBind
+				: pathname === "/bonuses"
+					? activeProject
+					: "",
+		]),
+	);
 	const previousPathnameRef = useRef(pathname);
+	const knowledgeRoute = ["/", "/binds", "/favorites", "/recent"].includes(
+		pathname.replace(/\/+$/, "") || "/",
+	);
 
 	useEffect(() => {
 		if (!mobileSidebarOpen) return undefined;
@@ -44,78 +69,36 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		return <main className="min-h-screen bg-background">{children}</main>;
 	}
 
-	if (isLightweightRoute(pathname)) {
-		return (
-			<div className="flex h-screen flex-col bg-background">
-				<header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
-					<Link
-						to="/"
-						className="inline-flex items-center gap-2 font-semibold hover:text-accent"
-					>
-						<SupportOSLogo className="h-7 w-7" />
-						SupportOS
-					</Link>
-
-					<nav className="flex items-center gap-2 text-sm">
-						<Link
-							to="/"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Knowledge
-						</Link>
-						<Link
-							to="/translator"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Translator
-						</Link>
-						<Link
-							to="/ai/assistant"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Assistant
-						</Link>
-						<Link
-							to="/settings"
-							className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							Settings
-						</Link>
-					</nav>
-				</header>
-
-				<main className="flex flex-1 flex-col overflow-hidden bg-background">
-					{children}
-				</main>
-
-				{layout.showTranslatorWidget && <TranslatorWidget />}
-				<CommandPalette />
-			</div>
-		);
-	}
-
 	return (
-		<div className="flex h-screen flex-col">
-			{layout.showTopbar && (
-				<Topbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />
-			)}
+		<div className="app-shell flex h-dvh flex-col">
+			<WorkspaceContinuity key={actor} />
+			<PersonalLibrary key={`library-${actor}`} />
+			<SelectionActions key={`selection-${actor}`} />
+			<WorkspaceSharedBindsSync />
 
-			<div className="flex flex-1 overflow-hidden">
-				{layout.showSidebar && (
+			{
+				<Topbar
+					showKnowledgeControls={knowledgeRoute}
+					onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+				/>
+			}
+
+			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				{knowledgeRoute && layout.showSidebar && (
 					<div className="hidden min-h-0 md:block">
 						<Sidebar />
 					</div>
 				)}
 
-				{mobileSidebarOpen && (
+				{knowledgeRoute && mobileSidebarOpen && (
 					<div className="fixed inset-0 z-40 md:hidden">
 						<button
 							type="button"
-							aria-label="Close navigation"
+							aria-label="Закрыть папки"
 							onClick={() => setMobileSidebarOpen(false)}
 							className="absolute inset-0 bg-black/45"
 						/>
-						<div className="absolute inset-y-0 left-0 w-[min(19rem,calc(100vw-2rem))] max-w-full">
+						<div className="absolute inset-y-0 left-0 w-[min(19rem,calc(100vw-2rem))] max-w-full bg-surface">
 							<Sidebar
 								mobile
 								onRequestClose={() => setMobileSidebarOpen(false)}
@@ -125,13 +108,23 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					</div>
 				)}
 
-				<main className="flex flex-1 flex-col overflow-hidden bg-background">
-					{children}
+				<main
+					ref={scrollRoot}
+					data-page={pathname.replace(/\/+$/, "") || "/"}
+					className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden"
+				>
+					<SpaceFrame>{children}</SpaceFrame>
 				</main>
+				<SupportComposer key={actor} />
 			</div>
 
-			{layout.showTranslatorWidget && <TranslatorWidget />}
-			<CommandPalette />
+			{(knowledgeRoute ||
+				[
+					"/bonuses",
+					"/bonus-tools",
+					"/project-emails",
+					"/agent-monitor",
+				].includes(pathname.replace(/\/+$/, ""))) && <WorkspaceDock />}
 		</div>
 	);
 }

@@ -8,7 +8,11 @@ import {
 	useTranslatorStore,
 } from "@/store/translator.store";
 
-export function TranslatorSettingsPage() {
+export function TranslatorSettingsPage({
+	embedded = false,
+}: {
+	embedded?: boolean;
+}) {
 	const provider = useTranslatorStore((state) => state.provider);
 	const endpoint = useTranslatorStore((state) => state.endpoint);
 	const lingvaEndpoint = useTranslatorStore((state) => state.lingvaEndpoint);
@@ -42,22 +46,28 @@ export function TranslatorSettingsPage() {
 			await translatorService.testConnection();
 
 			setStatus("ok");
-			setMessage("Connected. Translation provider is ready.");
+			setMessage("Подключено. Провайдер перевода готов к работе.");
 		} catch (error) {
 			setStatus("error");
-			setMessage(error instanceof Error ? error.message : "Unable to connect.");
+			setMessage(
+				error instanceof Error ? error.message : "Не удалось подключиться.",
+			);
 		} finally {
 			setChecking(false);
 		}
 	};
 
 	return (
-		<div className="h-full overflow-auto bg-background">
-			<div className="mx-auto max-w-3xl p-6">
+		<div
+			className={
+				embedded ? "bg-background" : "h-full overflow-auto bg-background"
+			}
+		>
+			<div className={embedded ? "max-w-3xl" : "mx-auto max-w-3xl p-6"}>
 				<div className="mb-6">
-					<h1 className="text-2xl font-bold">Translator Settings</h1>
+					<h1 className="text-2xl font-bold">Настройки переводчика</h1>
 					<p className="mt-1 text-sm text-muted">
-						Choose the translation provider used by SupportOS.
+						Выберите провайдера перевода для SupportOS.
 					</p>
 				</div>
 
@@ -72,9 +82,10 @@ export function TranslatorSettingsPage() {
 									: "border-border bg-background text-muted hover:bg-surface-elevated hover:text-foreground"
 							}`}
 						>
-							<div className="text-sm font-semibold">Free Smart</div>
+							<div className="text-sm font-semibold">Умный бесплатный</div>
 							<div className="mt-1 text-xs text-muted">
-								Free Google-style translation through Lingva. No API key.
+								Бесплатный перевод в стиле Google через Lingva. API-ключ не
+								нужен.
 							</div>
 						</button>
 
@@ -89,7 +100,8 @@ export function TranslatorSettingsPage() {
 						>
 							<div className="text-sm font-semibold">MyMemory</div>
 							<div className="mt-1 text-xs text-muted">
-								Simple free fallback. Optional email/API key.
+								Простой бесплатный резервный вариант. Адрес почты и API-ключ
+								необязательны.
 							</div>
 						</button>
 
@@ -104,7 +116,7 @@ export function TranslatorSettingsPage() {
 						>
 							<div className="text-sm font-semibold">LibreTranslate</div>
 							<div className="mt-1 text-xs text-muted">
-								For a custom server or Vercel proxy.
+								Для собственного сервера или прокси Vercel.
 							</div>
 						</button>
 					</div>
@@ -113,7 +125,9 @@ export function TranslatorSettingsPage() {
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-									<div className="text-sm font-medium">Free endpoint</div>
+									<div className="text-sm font-medium">
+										Бесплатная конечная точка
+									</div>
 									<div className="text-xs text-muted">
 										{lingvaEndpoint.trim() || DEFAULT_LINGVA_ENDPOINT}
 									</div>
@@ -126,65 +140,72 @@ export function TranslatorSettingsPage() {
 										lingvaEndpoint.trim().replace(/\/+$/, "") ===
 											DEFAULT_LINGVA_ENDPOINT || checking
 									}
-									className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
-									Use Default
+									Использовать стандартную
 								</button>
 							</div>
 
-							<label className="block space-y-2">
-								<span className="text-sm font-medium">Lingva Endpoint</span>
+							<label className="ui-field ">
+								<span className="text-sm font-medium">
+									Конечная точка Lingva
+								</span>
 								<input
 									value={lingvaEndpoint}
 									onChange={(event) => setLingvaEndpoint(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder={DEFAULT_LINGVA_ENDPOINT}
 								/>
 							</label>
 
 							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								This provider does not use OpenAI or paid API keys. If the
-								public endpoint is unavailable, switch to another Lingva
-								instance or use MyMemory.
+								Этот провайдер не использует OpenAI или платные API-ключи. Если
+								общедоступная конечная точка недоступна, переключитесь на другой
+								экземпляр Lingva или используйте MyMemory.
 							</div>
 						</div>
 					) : provider === "mymemory" ? (
 						<div className="space-y-4">
-							<label className="block space-y-2">
-								<span className="text-sm font-medium">Contact Email</span>
+							<label className="ui-field ">
+								<span className="text-sm font-medium">Контактная почта</span>
 								<input
 									type="email"
 									value={email}
 									onChange={(event) => setEmail(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Необязательно"
 								/>
 							</label>
 
-							<label className="block space-y-2">
-								<span className="text-sm font-medium">API Key</span>
+							<label className="ui-field ">
+								<span className="text-sm font-medium">API-ключ</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Необязательно"
 								/>
 							</label>
 
 							<div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted">
-								Anonymous MyMemory usage is limited. Adding a contact email
-								increases the free daily character limit on their API.
+								Анонимное использование MyMemory ограничено. Добавление
+								контактного адреса почты увеличивает бесплатный дневной лимит
+								символов их API.
 							</div>
 						</div>
 					) : (
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
 								<div>
-									<div className="text-sm font-medium">Endpoint Mode</div>
+									<div className="text-sm font-medium">
+										Режим конечной точки
+									</div>
 									<div className="text-xs text-muted">
-										{isBuiltIn ? "Built-in endpoint" : "Custom endpoint"}
+										{isBuiltIn
+											? "Встроенная конечная точка"
+											: "Собственная конечная точка"}
 									</div>
 								</div>
 
@@ -192,51 +213,51 @@ export function TranslatorSettingsPage() {
 									type="button"
 									onClick={useBuiltInEndpoint}
 									disabled={isBuiltIn || checking}
-									className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+									className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border font-medium text-muted hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									<RotateCcw size={16} />
-									Use Built-In
+									Использовать встроенную
 								</button>
 							</div>
 
-							<label className="block space-y-2">
+							<label className="ui-field ">
 								<span className="text-sm font-medium">
-									LibreTranslate Endpoint
+									Конечная точка LibreTranslate
 								</span>
 								<input
 									value={endpoint}
 									onChange={(event) => setEndpoint(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
 									placeholder="/api/translator"
 								/>
 							</label>
 
-							<label className="block space-y-2">
-								<span className="text-sm font-medium">API Key</span>
+							<label className="ui-field ">
+								<span className="text-sm font-medium">API-ключ</span>
 								<input
 									type="password"
 									value={apiKey}
 									onChange={(event) => setApiKey(event.target.value)}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-									placeholder="Optional"
+									className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+									placeholder="Необязательно"
 								/>
 							</label>
 						</div>
 					)}
 
-					<div className="flex flex-wrap items-center gap-3">
+					<div className="ui-actions items-center flex flex-wrap  gap-3">
 						<button
 							type="button"
 							onClick={testConnection}
 							disabled={checking}
-							className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{checking ? (
 								<Loader2 size={16} className="animate-spin" />
 							) : (
 								<PlugZap size={16} />
 							)}
-							Test Connection
+							Проверить подключение
 						</button>
 
 						{status === "ok" && (

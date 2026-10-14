@@ -1,0 +1,360 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
+const fixture = vi.hoisted(() => ({
+	auth: {
+		getSession: vi.fn(),
+		getUser: vi.fn(),
+		onAuthStateChange: vi.fn(),
+		signInWithPassword: vi.fn(),
+		signOut: vi.fn(),
+		signUp: vi.fn(),
+		signInWithOAuth: vi.fn(),
+		linkIdentity: vi.fn(),
+		resetPasswordForEmail: vi.fn(),
+		updateUser: vi.fn(),
+	},
+	callback: undefined,
+}));
+vi.mock("./supabase-client", () => ({ supabase: { auth: fixture.auth } }));
+let service, store;
+const session = {
+	access_token: "initial",
+	refresh_token: "refresh",
+	expires_at: 2000000000,
+	user: {
+		id: "user-a",
+		email: "a@example.test",
+		app_metadata: { role: "user" },
+	},
+};
+beforeEach(async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "active",
+							roles: [{ id: "support", name: "Support" }],
+							permissions: ["work", "binds.read"],
+							version: 1,
+							display_name: "",
+						},
+					}),
+				),
+		),
+	);
+	vi.resetModules();
+	vi.resetAllMocks();
+	fixture.auth.onAuthStateChange.mockImplementation((callback) => {
+		fixture.callback = callback;
+		return { data: { subscription: { unsubscribe: vi.fn() } } };
+	});
+	fixture.auth.getSession.mockResolvedValue({ data: { session }, error: null });
+	fixture.auth.getUser.mockResolvedValue({
+		data: { user: session.user },
+		error: null,
+	});
+	service = (await import("./supabase.service")).supabaseService;
+	store = (await import("@/store/auth.store")).useAuthStore;
+});
+afterEach(() => vi.unstubAllGlobals());
+it("preserves legacy login identities and existing email login", async () => {
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn(" Operator ", "long-password");
+	expect(fixture.auth.signInWithPassword).toHaveBeenLastCalledWith({
+		email: "operator@telegram.supportos.invalid",
+		password: "long-password",
+	});
+	await service.signIn(" a@example.test ", "long-password");
+	expect(fixture.auth.signInWithPassword).toHaveBeenLastCalledWith({
+		email: "a@example.test",
+		password: "long-password",
+	});
+});
+it("registers without granting access while email confirmation is required", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signUp.mockResolvedValue({
+		data: { session: null },
+		error: null,
+	});
+	expect(
+		await service.signUp(" new@example.test ", "long-password"),
+	).toBeUndefined();
+	expect(fixture.auth.signUp).toHaveBeenCalledWith({
+		email: "new@example.test",
+		password: "long-password",
+		options: { emailRedirectTo: "https://app.test/login" },
+	});
+	expect(store.getState().session).toBeUndefined();
+});
+it("uses PKCE Google OAuth with a safe local return URL and no elevated access", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signInWithOAuth.mockResolvedValue({ error: null });
+	await service.signInWithGoogle("//evil.test");
+	expect(fixture.auth.signInWithOAuth).toHaveBeenCalledWith({
+		provider: "google",
+		options: {
+			redirectTo: "https://app.test/login?redirect=%2F",
+			scopes: "openid email profile",
+			queryParams: { prompt: "select_account" },
+		},
+	});
+	expect(store.getState().session).toBeUndefined();
+});
+it("links Google to the signed-in identity instead of creating another account", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.linkIdentity.mockResolvedValue({ error: null });
+	await service.linkGoogle();
+	expect(fixture.auth.linkIdentity).toHaveBeenCalledWith(
+		expect.objectContaining({ provider: "google" }),
+	);
+	expect(fixture.auth.signUp).not.toHaveBeenCalled();
+});
+it("blocks access and requests TOTP when the server requires MFA", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(JSON.stringify({ code: "mfa_required" }), { status: 403 }),
+		),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession().authVerified).toBe(false);
+	expect(service.getSession().mfaRequired).toBe(true);
+	expect(service.getSession().user.access).toBeUndefined();
+});
+it("accepts server-authorized access without MFA and does not show its challenge", async () => {
+	const access = {
+		status: "active",
+		roles: [{ id: "support" }],
+		permissions: ["work"],
+		version: 1,
+	};
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => Response.json({ access, mfaEnabled: false })),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession()).toMatchObject({
+		authVerified: true,
+		mfaEnabled: false,
+		mfaRequired: false,
+	});
+});
+it("does not mistake an access service failure for a request to enroll MFA", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () =>
+			Response.json({ error: "Service unavailable" }, { status: 503 }),
+		),
+	);
+	fixture.auth.signInWithPassword.mockResolvedValue({
+		data: { session },
+		error: null,
+	});
+	await service.signIn("a@example.test", "long-password");
+	expect(service.getSession()).toMatchObject({
+		authVerified: false,
+		mfaRequired: false,
+	});
+	expect(service.getSession().user.access).toBeUndefined();
+});
+it("loads pending server access after signup with an immediate session", async () => {
+	vi.stubGlobal("window", { location: { origin: "https://app.test" } });
+	fixture.auth.signUp.mockResolvedValue({ data: { session }, error: null });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "pending",
+							roles: [],
+							permissions: [],
+							version: 1,
+							display_name: "",
+						},
+					}),
+				),
+		),
+	);
+	await service.signUp("new@example.test", "long-password");
+	expect(store.getState().session.user.access).toMatchObject({
+		status: "pending",
+		roles: [],
+		permissions: [],
+	});
+});
+it("does not restore permissions from an older concurrent access response", async () => {
+	await service.initialize();
+	let resolveOld;
+	const oldResponse = new Promise((resolve) => {
+		resolveOld = resolve;
+	});
+	vi.stubGlobal(
+		"fetch",
+		vi
+			.fn()
+			.mockReturnValueOnce(oldResponse)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						access: {
+							status: "disabled",
+							roles: [],
+							permissions: [],
+							version: 2,
+							display_name: "",
+						},
+					}),
+				),
+			),
+	);
+	const old = service.refreshIdentity();
+	await service.refreshIdentity();
+	resolveOld(
+		new Response(
+			JSON.stringify({
+				access: {
+					status: "active",
+					roles: [],
+					permissions: ["technical"],
+					version: 1,
+					display_name: "",
+				},
+			}),
+		),
+	);
+	await old;
+	expect(service.getSession().user.access.status).toBe("disabled");
+	expect(service.getSession().user.access.permissions).toEqual([]);
+});
+it("verifies restored identity, initializes once and receives refresh/signout events", async () => {
+	await Promise.all([service.initialize(), service.initialize()]);
+	expect(fixture.auth.getUser).toHaveBeenCalledOnce();
+	expect(store.getState().loading).toBe(false);
+	fixture.callback("TOKEN_REFRESHED", { ...session, access_token: "renewed" });
+	expect(service.getSession().accessToken).toBe("renewed");
+	fixture.callback("SIGNED_OUT", null);
+	expect(service.getSession()).toBeUndefined();
+});
+it("rejects an unverified cached identity", async () => {
+	fixture.auth.getUser.mockResolvedValue({
+		data: { user: null },
+		error: new Error("Expired"),
+	});
+	await service.initialize();
+	expect(store.getState().session).toBeUndefined();
+	expect(store.getState().loading).toBe(false);
+});
+it("does not claim successful logout after a network failure", async () => {
+	await service.initialize();
+	fixture.auth.signOut.mockResolvedValue({ error: new Error("Offline") });
+	await expect(service.signOut()).rejects.toThrow("Offline");
+	expect(service.getSession().user.id).toBe("user-a");
+});
+it("uses server-confirmed logout before clearing the SDK session", async () => {
+	await service.initialize();
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	await service.signOut();
+	expect(fetch).toHaveBeenCalledWith(
+		"/api/registration?action=logout",
+		expect.objectContaining({ method: "POST", body: "{}" }),
+	);
+	expect(fixture.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+	expect(service.getSession()).toBeUndefined();
+});
+it("does not silently bypass unavailable server auditing", async () => {
+	await service.initialize();
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 503 })),
+	);
+	await expect(service.signOut()).rejects.toThrow(
+		"Не удалось завершить сессию",
+	);
+	expect(fixture.auth.signOut).not.toHaveBeenCalled();
+	expect(service.getSession().user.id).toBe("user-a");
+});
+it("clears an already expired session without requiring a successful audit request", async () => {
+	await service.initialize();
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 401 })),
+	);
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	await service.signOut();
+	expect(service.getSession()).toBeUndefined();
+});
+it("uses the SDK refreshed access token for API requests", async () => {
+	fixture.auth.getSession.mockResolvedValue({
+		data: { session: { ...session, access_token: "fresh" } },
+		error: null,
+	});
+	expect(await service.getAccessToken()).toBe("fresh");
+});
+it("preserves recovery mode when logout after a password update fails", async () => {
+	await service.initialize();
+	store.setState({ passwordRecovery: true });
+	fixture.auth.updateUser.mockResolvedValue({ error: null });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => new Response("{}", { status: 503 })),
+	);
+	await expect(service.updatePassword("long-password")).rejects.toThrow(
+		"Не удалось завершить сессию",
+	);
+	expect(store.getState().passwordRecovery).toBe(true);
+	expect(fixture.auth.signOut).not.toHaveBeenCalled();
+});
+it("uses audited global logout after changing the password", async () => {
+	await service.initialize();
+	store.setState({ passwordRecovery: true });
+	fixture.auth.updateUser.mockResolvedValue({ error: null });
+	fixture.auth.signOut.mockResolvedValue({ error: null });
+	vi.stubGlobal("localStorage", { removeItem: vi.fn() });
+	await service.updatePassword("long-password");
+	expect(fixture.auth.updateUser).toHaveBeenCalledWith({
+		password: "long-password",
+	});
+	expect(fetch).toHaveBeenCalledWith(
+		"/api/registration?action=logout-all",
+		expect.objectContaining({ method: "POST", body: "{}" }),
+	);
+	expect(store.getState().session).toBeUndefined();
+	expect(store.getState().passwordRecovery).toBe(false);
+});
+it("keeps confirmation on token refresh but resets it for a new Supabase session", async () => {
+	const jwt = (id) =>
+		"x." + btoa(JSON.stringify({ session_id: id, aal: "aal2" })) + ".sig";
+	fixture.auth.getSession.mockResolvedValue({
+		data: { session: { ...session, access_token: jwt("first") } },
+		error: null,
+	});
+	await service.initialize();
+	expect(service.getSession().authVerified).toBe(true);
+	fixture.callback("TOKEN_REFRESHED", {
+		...session,
+		access_token: jwt("first"),
+	});
+	expect(service.getSession().authVerified).toBe(true);
+	fixture.callback("SIGNED_IN", { ...session, access_token: jwt("second") });
+	expect(service.getSession().authVerified).toBe(false);
+	fixture.callback("SIGNED_OUT", null);
+});

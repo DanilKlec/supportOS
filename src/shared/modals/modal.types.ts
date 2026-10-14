@@ -17,6 +17,8 @@ export interface ModalPayload {
 	folderId?: string;
 	parentId?: string;
 	bindId?: string;
+	bindIds?: string[];
+	moveFolderId?: string;
 	language?: string;
 	id?: string;
 	type?: KnowledgeObjectType;

@@ -10,19 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslatorRouteImport } from './routes/translator'
+import { Route as TeamRouteImport } from './routes/team'
 import { Route as SportsBettingRouteImport } from './routes/sports-betting'
+import { Route as SharedBindsRouteImport } from './routes/shared-binds'
 import { Route as RecentRouteImport } from './routes/recent'
+import { Route as QcRouteImport } from './routes/qc'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LivechatRouteImport } from './routes/livechat'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as ContentRouteImport } from './routes/content'
 import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
 import { Route as ArchiveRouteImport } from './routes/archive'
+import { Route as AgentMonitorRouteImport } from './routes/agent-monitor'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsUsersRouteImport } from './routes/settings/users'
 import { Route as SettingsTranslatorRouteImport } from './routes/settings/translator'
 import { Route as SettingsAiRouteImport } from './routes/settings/ai'
 import { Route as ImportGoogleSheetsRouteImport } from './routes/import/google-sheets'
@@ -35,14 +42,29 @@ const TranslatorRoute = TranslatorRouteImport.update({
   path: '/translator',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamRoute = TeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SportsBettingRoute = SportsBettingRouteImport.update({
   id: '/sports-betting',
   path: '/sports-betting',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SharedBindsRoute = SharedBindsRouteImport.update({
+  id: '/shared-binds',
+  path: '/shared-binds',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RecentRoute = RecentRouteImport.update({
   id: '/recent',
   path: '/recent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QcRoute = QcRouteImport.update({
+  id: '/qc',
+  path: '/qc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectEmailsRoute = ProjectEmailsRouteImport.update({
@@ -70,6 +92,11 @@ const FavoritesRoute = FavoritesRouteImport.update({
   path: '/favorites',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContentRoute = ContentRouteImport.update({
+  id: '/content',
+  path: '/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BonusesRoute = BonusesRouteImport.update({
   id: '/bonuses',
   path: '/bonuses',
@@ -90,6 +117,16 @@ const ArchiveRoute = ArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentMonitorRoute = AgentMonitorRouteImport.update({
+  id: '/agent-monitor',
+  path: '/agent-monitor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -98,6 +135,11 @@ const IndexRoute = IndexRouteImport.update({
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsUsersRoute = SettingsUsersRouteImport.update({
+  id: '/settings/users',
+  path: '/settings/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsTranslatorRoute = SettingsTranslatorRouteImport.update({
@@ -133,17 +175,23 @@ const AiAssistantRoute = AiAssistantRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -151,21 +199,28 @@ export interface FileRoutesByFullPath {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -173,22 +228,29 @@ export interface FileRoutesByTo {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
   '/bonuses': typeof BonusesRoute
+  '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
+  '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
+  '/shared-binds': typeof SharedBindsRoute
   '/sports-betting': typeof SportsBettingRoute
+  '/team': typeof TeamRoute
   '/translator': typeof TranslatorRoute
   '/ai/assistant': typeof AiAssistantRoute
   '/ai/knowledge': typeof AiKnowledgeRoute
@@ -196,23 +258,30 @@ export interface FileRoutesById {
   '/import/google-sheets': typeof ImportGoogleSheetsRoute
   '/settings/ai': typeof SettingsAiRoute
   '/settings/translator': typeof SettingsTranslatorRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -220,21 +289,28 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings/users'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -242,21 +318,28 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings/users'
     | '/settings'
   id:
     | '__root__'
     | '/'
+    | '/admin'
+    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
     | '/bonuses'
+    | '/content'
     | '/favorites'
     | '/health'
     | '/livechat'
     | '/login'
     | '/project-emails'
+    | '/qc'
     | '/recent'
+    | '/shared-binds'
     | '/sports-betting'
+    | '/team'
     | '/translator'
     | '/ai/assistant'
     | '/ai/knowledge'
@@ -264,22 +347,29 @@ export interface FileRouteTypes {
     | '/import/google-sheets'
     | '/settings/ai'
     | '/settings/translator'
+    | '/settings/users'
     | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  AgentMonitorRoute: typeof AgentMonitorRoute
   ArchiveRoute: typeof ArchiveRoute
   BindsRoute: typeof BindsRoute
   BonusToolsRoute: typeof BonusToolsRoute
   BonusesRoute: typeof BonusesRoute
+  ContentRoute: typeof ContentRoute
   FavoritesRoute: typeof FavoritesRoute
   HealthRoute: typeof HealthRoute
   LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
+  QcRoute: typeof QcRoute
   RecentRoute: typeof RecentRoute
+  SharedBindsRoute: typeof SharedBindsRoute
   SportsBettingRoute: typeof SportsBettingRoute
+  TeamRoute: typeof TeamRoute
   TranslatorRoute: typeof TranslatorRoute
   AiAssistantRoute: typeof AiAssistantRoute
   AiKnowledgeRoute: typeof AiKnowledgeRoute
@@ -287,6 +377,7 @@ export interface RootRouteChildren {
   ImportGoogleSheetsRoute: typeof ImportGoogleSheetsRoute
   SettingsAiRoute: typeof SettingsAiRoute
   SettingsTranslatorRoute: typeof SettingsTranslatorRoute
+  SettingsUsersRoute: typeof SettingsUsersRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -299,6 +390,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TranslatorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/team': {
+      id: '/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof TeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sports-betting': {
       id: '/sports-betting'
       path: '/sports-betting'
@@ -306,11 +404,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SportsBettingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shared-binds': {
+      id: '/shared-binds'
+      path: '/shared-binds'
+      fullPath: '/shared-binds'
+      preLoaderRoute: typeof SharedBindsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/recent': {
       id: '/recent'
       path: '/recent'
       fullPath: '/recent'
       preLoaderRoute: typeof RecentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/qc': {
+      id: '/qc'
+      path: '/qc'
+      fullPath: '/qc'
+      preLoaderRoute: typeof QcRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/project-emails': {
@@ -348,6 +460,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FavoritesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/content': {
+      id: '/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof ContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bonuses': {
       id: '/bonuses'
       path: '/bonuses'
@@ -376,6 +495,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArchiveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agent-monitor': {
+      id: '/agent-monitor'
+      path: '/agent-monitor'
+      fullPath: '/agent-monitor'
+      preLoaderRoute: typeof AgentMonitorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -388,6 +521,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/users': {
+      id: '/settings/users'
+      path: '/settings/users'
+      fullPath: '/settings/users'
+      preLoaderRoute: typeof SettingsUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/translator': {
@@ -437,17 +577,23 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  AgentMonitorRoute: AgentMonitorRoute,
   ArchiveRoute: ArchiveRoute,
   BindsRoute: BindsRoute,
   BonusToolsRoute: BonusToolsRoute,
   BonusesRoute: BonusesRoute,
+  ContentRoute: ContentRoute,
   FavoritesRoute: FavoritesRoute,
   HealthRoute: HealthRoute,
   LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
+  QcRoute: QcRoute,
   RecentRoute: RecentRoute,
+  SharedBindsRoute: SharedBindsRoute,
   SportsBettingRoute: SportsBettingRoute,
+  TeamRoute: TeamRoute,
   TranslatorRoute: TranslatorRoute,
   AiAssistantRoute: AiAssistantRoute,
   AiKnowledgeRoute: AiKnowledgeRoute,
@@ -455,6 +601,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportGoogleSheetsRoute: ImportGoogleSheetsRoute,
   SettingsAiRoute: SettingsAiRoute,
   SettingsTranslatorRoute: SettingsTranslatorRoute,
+  SettingsUsersRoute: SettingsUsersRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport

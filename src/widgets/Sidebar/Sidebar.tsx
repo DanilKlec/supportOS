@@ -14,15 +14,18 @@ import {
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
+import { usePreference } from "@/features/productivity/preferences";
+import { personalTree } from "@/features/shared-binds/shared-tree";
+import { WorkspaceSharedTree } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { useViewState } from "@/shared/hooks/useViewState";
 import { scoreTextSearch } from "@/shared/lib/bind-search";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
-
 import { Tree } from "./Tree";
 
 function getBindTitle(bind: Bind, language: string) {
@@ -98,7 +101,7 @@ function filterTree(
 
 const sidebarWidthClass = {
 	narrow: "w-64",
-	standard: "w-72",
+	standard: "w-[290px]",
 	wide: "w-80",
 };
 
@@ -114,6 +117,7 @@ export function Sidebar({
 	onNavigate,
 }: SidebarProps) {
 	const navigate = useNavigate();
+	const [sidebarPixels] = usePreference("sidebar-pixels", 290);
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
@@ -126,8 +130,16 @@ export function Sidebar({
 	const language = useKnowledgeStore((s) => s.language);
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const selectFolder = useKnowledgeStore((s) => s.selectFolder);
-	const [treeSearch, setTreeSearch] = useState("");
-	const [selectedTag, setSelectedTag] = useState("");
+	const [treeSearch, setTreeSearch] = useViewState(
+		"knowledge-tree",
+		"search",
+		"",
+	);
+	const [selectedTag, setSelectedTag] = useViewState(
+		"knowledge-tree",
+		"tag",
+		"",
+	);
 	const [selectedBindIds, setSelectedBindIds] = useState<string[]>([]);
 	const [bulkTag, setBulkTag] = useState("");
 	const [bulkTagOpen, setBulkTagOpen] = useState(false);
@@ -139,8 +151,13 @@ export function Sidebar({
 		[binds],
 	);
 	const filteredTree = useMemo(
-		() => filterTree(tree, treeSearch, selectedTag),
-		[tree, treeSearch, selectedTag],
+		() =>
+			filterTree(
+				personalTree(tree, categories, folders),
+				treeSearch,
+				selectedTag,
+			),
+		[tree, categories, folders, treeSearch, selectedTag],
 	);
 	const treeSearchActive = treeSearch.trim().length > 0 || Boolean(selectedTag);
 
@@ -175,8 +192,8 @@ export function Sidebar({
 
 		showToast(
 			favorite
-				? `${changed.length} bind(s) added to favorites`
-				: `${changed.length} bind(s) removed from favorites`,
+				? `Добавлено в избранное: ${changed.length}`
+				: `Удалено из избранного: ${changed.length}`,
 		);
 	};
 	const setSelectedPinned = () => {
@@ -189,8 +206,8 @@ export function Sidebar({
 
 		showToast(
 			pinned
-				? `${changed.length} bind(s) pinned`
-				: `${changed.length} bind(s) unpinned`,
+				? `Закреплено биндов: ${changed.length}`
+				: `Снято закрепление: ${changed.length}`,
 		);
 	};
 	const archiveSelected = () => {
@@ -200,12 +217,12 @@ export function Sidebar({
 		const archived = knowledgeService.archiveManyBinds(ids);
 
 		setSelectedBindIds([]);
-		showToast(`${archived.length} bind(s) archived`, {
+		showToast(`Архивировано биндов: ${archived.length}`, {
 			action: {
-				label: "Undo",
+				label: "Отменить",
 				onClick: () => {
 					knowledgeService.updateManyBinds(ids, { archived: false });
-					showToast("Archive undone");
+					showToast("Архивирование отменено");
 				},
 			},
 			duration: 7000,
@@ -218,7 +235,7 @@ export function Sidebar({
 
 		setBulkTag("");
 		setBulkTagOpen(false);
-		showToast(`${changed.length} bind(s) tagged`);
+		showToast(`Теги добавлены: ${changed.length}`);
 	};
 	const exportSelected = () => {
 		if (selectedBinds.length === 0) return;
@@ -275,7 +292,7 @@ export function Sidebar({
 		anchor.download = `supportos-selected-${new Date().toISOString().slice(0, 10)}.json`;
 		anchor.click();
 		URL.revokeObjectURL(url);
-		showToast("Selected binds exported");
+		showToast("Выбранные бинды экспортированы");
 	};
 
 	const renderBindShortcut = (bind: Bind) => (
@@ -310,64 +327,82 @@ export function Sidebar({
 
 	return (
 		<aside
-			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-background pb-[env(safe-area-inset-bottom)]`}
+			style={
+				mobile
+					? undefined
+					: { width: Math.min(480, Math.max(240, sidebarPixels)) }
+			}
+			className={`flex h-full ${mobile ? "w-full" : sidebarWidthClass[layout.sidebarWidth]} flex-col border-r border-border bg-surface/40 pb-[env(safe-area-inset-bottom)]`}
 		>
 			<div className="flex shrink-0 items-center justify-between border-b border-border/80 px-3 py-3">
 				<div className="min-w-0 px-1">
-					<div className="truncate text-sm font-semibold">Knowledge</div>
-					<div className="text-xs text-muted">{binds.length} materials</div>
+					<div className="truncate text-sm font-semibold">Материалы</div>
+					<div className="text-xs text-muted">
+						{binds.filter((b) => !b.archived).length} ответов
+					</div>
 				</div>
 
-				<button
-					type="button"
-					aria-label={mobile ? "Close navigation" : "Collapse navigation"}
+				<IconButton
+					label={mobile ? "Закрыть папки" : "Свернуть папки"}
 					onClick={() =>
 						mobile ? onRequestClose?.() : setLayout({ showSidebar: false })
 					}
-					className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+					className="text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
 					{mobile ? <X size={18} /> : <PanelLeftClose size={18} />}
-				</button>
+				</IconButton>
 			</div>
 
-			{layout.showSidebarFavorites && (
-				<div className="shrink-0 border-b border-border/80 px-3 py-3">
-					<div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase text-muted">
-						<Star size={13} />
-						Favorites
-					</div>
-
-					{favoriteFolderItems.length > 0 && (
-						<div className="mb-2 space-y-0.5">
+			{layout.showSidebarFavorites &&
+				(favoriteBinds.length > 0 || favoriteFolderItems.length > 0) && (
+					<details className="shrink-0 border-b border-border/60 px-4 py-3">
+						<summary className="cursor-pointer text-xs font-medium text-muted">
+							Избранное{" "}
+							<span className="ml-2 text-accent">
+								{favoriteBinds.length + favoriteFolderItems.length}
+							</span>
+						</summary>
+						<div className="supportos-scroll mt-3 max-h-40 space-y-1 overflow-auto">
 							{favoriteFolderItems.map(renderFolderShortcut)}
-						</div>
-					)}
-
-					{favoriteBinds.length > 0 ? (
-						<div className="space-y-0.5">
 							{favoriteBinds.map(renderBindShortcut)}
 						</div>
-					) : favoriteFolderItems.length === 0 ? (
-						<div className="px-2 text-xs text-muted">No favorites yet</div>
-					) : null}
-				</div>
-			)}
+					</details>
+				)}
 
 			<div className="flex min-h-0 flex-1 flex-col">
+				<nav aria-label="Библиотека" className="flex gap-1 p-2">
+					{[
+						["/", "Все"],
+						["/favorites", "Избранное"],
+						["/recent", "Недавние"],
+					].map(([to, label]) => (
+						<button
+							key={to}
+							type="button"
+							className="space-tab sidebar-tab"
+							onClick={() => {
+								void navigate({ to });
+								onNavigate?.();
+							}}
+						>
+							{label}
+						</button>
+					))}
+				</nav>
 				<div className="shrink-0 border-b border-border/80 px-3 py-3">
 					<div className="mb-3 flex items-center justify-between px-2">
 						<div className="text-xs font-semibold uppercase text-muted">
-							Categories
+							Категории
 						</div>
 
-						<button
-							type="button"
-							title="New category"
+						<IconButton
+							label="Добавить категорию"
 							onClick={createCategory}
-							className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
+							size="small"
+							className="text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Plus size={15} />
-						</button>
+						</IconButton>
 					</div>
 
 					<div className="relative">
@@ -375,47 +410,53 @@ export function Sidebar({
 							size={14}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 						/>
-						<input
+						<Input
 							type="search"
 							value={treeSearch}
 							onChange={(event) => setTreeSearch(event.target.value)}
-							placeholder="Search tree"
-							className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+							placeholder="Поиск в папках…"
+							className="w-full bg-surface pl-9 pr-10 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 						/>
 						{treeSearchActive && (
-							<button
+							<IconButton
 								type="button"
-								title="Clear search"
+								label="Очистить поиск"
+								size="small"
 								onClick={() => {
 									setTreeSearch("");
 									setSelectedTag("");
 								}}
-								className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
+								className="absolute right-1 top-1/2 -translate-y-1/2 text-muted hover:bg-surface-elevated hover:text-foreground"
 							>
 								<X size={14} />
-							</button>
+							</IconButton>
 						)}
 					</div>
 
 					{tags.length > 0 && (
-						<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
-							{tags.map((tag) => (
-								<button
-									key={tag}
-									type="button"
-									onClick={() =>
-										setSelectedTag((current) => (current === tag ? "" : tag))
-									}
-									className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
-										selectedTag === tag
-											? "border-accent bg-accent text-accent-foreground"
-											: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
-									}`}
-								>
-									<span className="break-all">#{tag}</span>
-								</button>
-							))}
-						</div>
+						<details className="mt-3">
+							<summary className="cursor-pointer text-xs text-muted">
+								Фильтр по тегам{selectedTag ? ` · #${selectedTag}` : ""}
+							</summary>
+							<div className="supportos-scroll mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-auto pr-1">
+								{tags.map((tag) => (
+									<button
+										key={tag}
+										type="button"
+										onClick={() =>
+											setSelectedTag((current) => (current === tag ? "" : tag))
+										}
+										className={`max-w-full rounded-lg border px-2 py-1 text-xs transition ${
+											selectedTag === tag
+												? "border-accent bg-accent text-accent-foreground"
+												: "border-border text-muted hover:bg-surface-elevated hover:text-foreground"
+										}`}
+									>
+										<span className="break-all">#{tag}</span>
+									</button>
+								))}
+							</div>
+						</details>
 					)}
 
 					{selectedBindIds.length > 0 && (
@@ -425,74 +466,92 @@ export function Sidebar({
 									<span className="font-semibold text-foreground">
 										{selectedBindIds.length}
 									</span>{" "}
-									selected - drag or use actions
+									выбрано — перетащите или выберите действие
 								</span>
-								<button
+								<IconButton
 									type="button"
 									onClick={() => setSelectedBindIds([])}
-									className="rounded-lg p-1 text-foreground hover:bg-accent/15"
-									title="Clear selection"
+									size="small"
+									className="text-foreground hover:bg-accent/15"
+									label="Снять выделение"
 								>
 									<X size={13} />
-								</button>
+								</IconButton>
 							</div>
 
-							<div className="flex flex-wrap gap-1">
-								<button
+							<div className="ui-actions sidebar-bulk-actions">
+								<Button
+									type="button"
+									size="small"
+									className="sidebar-bulk-move border-accent/25 bg-background text-foreground"
+									onClick={() =>
+										modalManager.open("moveBind", { bindIds: selectedBindIds })
+									}
+								>
+									Переместить выбранные
+								</Button>
+								<IconButton
 									type="button"
 									onClick={setSelectedFavorite}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title={
-										allSelectedFavorite
-											? "Remove from favorites"
-											: "Add to favorites"
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label={
+										allSelectedFavorite ? "Убрать из избранного" : "В избранное"
 									}
 								>
 									<Star
 										size={14}
 										fill={allSelectedFavorite ? "currentColor" : "none"}
 									/>
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={setSelectedPinned}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title={allSelectedPinned ? "Unpin selected" : "Pin selected"}
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label={
+										allSelectedPinned
+											? "Открепить выбранные"
+											: "Закрепить выбранные"
+									}
 								>
 									<Pin
 										size={14}
 										fill={allSelectedPinned ? "currentColor" : "none"}
 									/>
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={() => setBulkTagOpen((value) => !value)}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title="Add tag"
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label="Добавить тег"
 								>
 									<Tag size={14} />
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={exportSelected}
-									className="rounded-lg border border-accent/25 bg-background p-1.5 text-foreground hover:bg-accent/15"
-									title="Export selected"
+									size="small"
+									className="border-accent/25 bg-background text-foreground hover:bg-accent/15"
+									label="Экспортировать выбранные"
 								>
 									<Download size={14} />
-								</button>
-								<button
+								</IconButton>
+								<IconButton
 									type="button"
 									onClick={archiveSelected}
-									className="rounded-lg border border-red-500/30 bg-background p-1.5 text-red-300 hover:bg-red-500/10"
-									title="Archive selected"
+									size="small"
+									className="border-red-500/30 bg-background text-red-300 hover:bg-red-500/10"
+									label="Архивировать выбранные"
 								>
 									<Archive size={14} />
-								</button>
+								</IconButton>
 							</div>
 
 							{bulkTagOpen && (
-								<div className="mt-2 flex gap-1">
-									<input
+								<div className="ui-actions items-center mt-2 flex gap-1">
+									<Input
 										value={bulkTag}
 										onChange={(event) => setBulkTag(event.target.value)}
 										onKeyDown={(event) => {
@@ -500,17 +559,18 @@ export function Sidebar({
 												addTagToSelected();
 											}
 										}}
-										placeholder="Tag"
-										className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-accent"
+										placeholder="Тег"
+										className="ui-input--small min-w-0 flex-1 bg-background outline-none focus:border-accent"
 									/>
-									<button
+									<IconButton
 										type="button"
 										onClick={addTagToSelected}
-										className="rounded-lg border border-accent/30 bg-accent px-2 text-accent-foreground"
-										title="Apply tag"
+										variant="primary"
+										size="small"
+										label="Применить тег"
 									>
 										<Check size={14} />
-									</button>
+									</IconButton>
 								</div>
 							)}
 						</div>
@@ -518,6 +578,14 @@ export function Sidebar({
 				</div>
 
 				<div className="supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+					<WorkspaceSharedTree
+						onNavigate={onNavigate}
+						filterNodes={(nodes) => filterTree(nodes, treeSearch, selectedTag)}
+						forceExpanded={treeSearchActive}
+						selectedBindIds={selectedBindIds}
+						onToggleBindSelection={toggleSelectedBind}
+						onClearBindSelection={() => setSelectedBindIds([])}
+					/>
 					<Tree
 						nodes={filteredTree}
 						forceExpanded={treeSearchActive}

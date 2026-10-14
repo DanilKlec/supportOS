@@ -1,14 +1,22 @@
 import { create } from "zustand";
 
-export type AuthRole = "admin" | "user";
+export type AuthRole =
+	| import("../../shared/access.js").Role
+	| "user"
+	| "supervisor";
 
 export interface AuthUser {
 	id: string;
 	email: string;
 	role: AuthRole;
+	access?: import("../../shared/access.js").Access;
 }
 
 export interface AuthSession {
+	authVerified?: boolean;
+	mfaEnabled?: boolean;
+	mfaRequired?: boolean;
+	sessionId?: string;
 	accessToken: string;
 	refreshToken?: string;
 	expiresAt?: number;
@@ -16,6 +24,7 @@ export interface AuthSession {
 }
 
 interface AuthState {
+	passwordRecovery: boolean;
 	configured: boolean;
 	loading: boolean;
 	session?: AuthSession;
@@ -27,6 +36,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+	passwordRecovery: false,
 	configured: false,
 	loading: true,
 	session: undefined,

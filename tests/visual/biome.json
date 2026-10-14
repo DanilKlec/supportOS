@@ -1,0 +1,9 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
+	"root": false,
+	"extends": ["../../biome.json"],
+	"files": { "includes": ["**/*.ts", "**/*.mjs", "**/*.json"] },
+	"formatter": { "enabled": true, "indentStyle": "tab" },
+	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"linter": { "enabled": true, "rules": { "recommended": true } }
+}

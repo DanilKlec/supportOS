@@ -1,14 +1,12 @@
+import { Link } from "@tanstack/react-router";
 import {
 	Bot,
-	CheckCircle2,
 	Copy,
 	Languages,
 	Loader2,
 	RefreshCw,
-	Save,
 	Settings2,
 	Sparkles,
-	Trash2,
 	Wifi,
 	WifiOff,
 } from "lucide-react";
@@ -21,23 +19,26 @@ import {
 	answerAssistantService,
 	type CheckIssue,
 } from "@/services/answer-assistant.service";
+import { useTeamGlossary } from "@/services/team-glossary.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { useAuthStore } from "@/store/auth.store";
+import { canAccessPage } from "../../../shared/access.js";
 
 const LANGUAGES = [
 	{ code: "auto", label: "Как у клиента" },
 	{ code: "ru", label: "Русский" },
-	{ code: "en", label: "English" },
-	{ code: "el", label: "Ελληνικά" },
-	{ code: "de", label: "Deutsch" },
-	{ code: "uk", label: "Українська" },
-	{ code: "pt", label: "Português" },
-	{ code: "es", label: "Español" },
-	{ code: "fr", label: "Français" },
-	{ code: "it", label: "Italiano" },
-	{ code: "tr", label: "Türkçe" },
-	{ code: "pl", label: "Polski" },
-	{ code: "ar", label: "العربية" },
+	{ code: "en", label: "Английский" },
+	{ code: "el", label: "Греческий" },
+	{ code: "de", label: "Немецкий" },
+	{ code: "uk", label: "Украинский" },
+	{ code: "pt", label: "Португальский" },
+	{ code: "es", label: "Испанский" },
+	{ code: "fr", label: "Французский" },
+	{ code: "it", label: "Итальянский" },
+	{ code: "tr", label: "Турецкий" },
+	{ code: "pl", label: "Польский" },
+	{ code: "ar", label: "Арабский" },
 	{ code: "custom", label: "Другой язык" },
 ];
 
@@ -70,8 +71,14 @@ function getModeLabel(mode: "openai" | "gemini" | "free") {
 	return "Бесплатный режим";
 }
 
-export function AnswerAssistantPage() {
+export function AnswerAssistantPage({
+	settingsOnly = false,
+}: {
+	settingsOnly?: boolean;
+} = {}) {
 	const { showToast } = useToast();
+	const glossary = useTeamGlossary();
+	const access = useAuthStore((state) => state.session?.user.access);
 	const [data, setData] = useState(() => answerAssistantService.load());
 	const [customerMessage, setCustomerMessage] = useState("");
 	const [facts, setFacts] = useState("");
@@ -86,8 +93,6 @@ export function AnswerAssistantPage() {
 	const [aiModel, setAIModel] = useState("");
 	const [aiProvider, setAIProvider] = useState("");
 	const [customLanguage, setCustomLanguage] = useState("");
-	const [glossarySource, setGlossarySource] = useState("");
-	const [glossaryTarget, setGlossaryTarget] = useState("");
 	const settings = data.settings;
 	const languageIsPreset = LANGUAGES.some(
 		(item) => item.code !== "custom" && item.code === settings.language,
@@ -156,23 +161,6 @@ export function AnswerAssistantPage() {
 		setResultLanguage("");
 	};
 
-	const saveAnswer = () => {
-		if (!customerMessage.trim() || !answer.trim()) return;
-
-		const entry = answerAssistantService.createMemoryEntry({
-			source: customerMessage.trim(),
-			target: answer.trim(),
-			sourceLanguage: "auto",
-			targetLanguage: resultLanguage || settings.language,
-		});
-
-		setData((current) => ({
-			...current,
-			memory: [entry, ...current.memory].slice(0, 200),
-		}));
-		showToast("Ответ сохранён в память");
-	};
-
 	const checkAI = async () => {
 		setAIChecking(true);
 
@@ -181,7 +169,9 @@ export function AnswerAssistantPage() {
 			setAIOnline(true);
 			setAIModel(status.model);
 			setAIProvider(status.provider);
-			showToast(`${status.provider === "openai" ? "OpenAI" : "Gemini"} настроен`);
+			showToast(
+				`${status.provider === "openai" ? "OpenAI" : "Gemini"} настроен`,
+			);
 		} catch (error) {
 			setAIOnline(false);
 			setAIModel("");
@@ -192,41 +182,9 @@ export function AnswerAssistantPage() {
 		}
 	};
 
-	const addGlossaryTerm = () => {
-		if (!glossarySource.trim() || !glossaryTarget.trim()) return;
-
-		const term = answerAssistantService.createGlossaryTerm({
-			source: glossarySource.trim(),
-			target: glossaryTarget.trim(),
-			language: settings.language === "auto" ? "any" : settings.language,
-		});
-
-		setData((current) => ({
-			...current,
-			glossary: [term, ...current.glossary],
-		}));
-		setGlossarySource("");
-		setGlossaryTarget("");
-		showToast("Термин добавлен");
-	};
-
-	const removeGlossaryTerm = (id: string) => {
-		setData((current) => ({
-			...current,
-			glossary: current.glossary.filter((term) => term.id !== id),
-		}));
-	};
-
-	const removeMemoryEntry = (id: string) => {
-		setData((current) => ({
-			...current,
-			memory: current.memory.filter((entry) => entry.id !== id),
-		}));
-	};
-
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-background">
-			<div className="supportos-scroll mx-auto flex h-full w-full max-w-7xl flex-col gap-4 overflow-auto p-4 sm:p-6">
+		<div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
+			<div className="supportos-page-scroll flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto py-4 sm:py-6">
 				<header className="flex flex-wrap items-start justify-between gap-3">
 					<div className="min-w-0">
 						<div className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold uppercase text-muted">
@@ -245,7 +203,7 @@ export function AnswerAssistantPage() {
 					<button
 						type="button"
 						onClick={reset}
-						className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface text-muted hover:bg-surface-elevated hover:text-foreground"
 					>
 						<RefreshCw size={15} />
 						Новый ответ
@@ -253,10 +211,14 @@ export function AnswerAssistantPage() {
 				</header>
 
 				<form
+					data-settings-only={settingsOnly}
 					onSubmit={generate}
-					className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
+					className="grid min-h-0 min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,22rem)]"
 				>
-					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+					<section
+						hidden={settingsOnly}
+						className="flex min-h-[34rem] min-w-0 flex-col rounded-xl border border-border bg-surface"
+					>
 						<div className="border-b border-border px-4 py-3">
 							<div className="text-sm font-semibold">Краткое описание</div>
 							<div className="mt-1 text-xs text-muted">
@@ -272,7 +234,7 @@ export function AnswerAssistantPage() {
 								<textarea
 									value={customerMessage}
 									onChange={(event) => setCustomerMessage(event.target.value)}
-									className="supportos-scroll min-h-48 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="ui-input supportos-scroll min-h-48 flex-1 resize-none border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Например: клиент спрашивает, почему вывод ещё в обработке. Нужно объяснить, что заявка проверяется финансовым отделом."
 								/>
 							</label>
@@ -284,13 +246,13 @@ export function AnswerAssistantPage() {
 								<textarea
 									value={facts}
 									onChange={(event) => setFacts(event.target.value)}
-									className="supportos-scroll min-h-28 resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+									className="ui-input supportos-scroll min-h-28 resize-y border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									placeholder="Срок: до 3 рабочих дней. Обещать точное время нельзя. Нужно попросить дождаться обновления."
 								/>
 							</label>
 
 							<div className="grid gap-3 sm:grid-cols-2">
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Язык ответа
 									</span>
@@ -303,7 +265,7 @@ export function AnswerAssistantPage() {
 											}
 											updateSettings({ language: event.target.value });
 										}}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{LANGUAGES.map((language) => (
 											<option key={language.code} value={language.code}>
@@ -313,7 +275,7 @@ export function AnswerAssistantPage() {
 									</select>
 								</label>
 
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Тон
 									</span>
@@ -324,7 +286,7 @@ export function AnswerAssistantPage() {
 												tone: event.target.value as AnswerTone,
 											})
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{TONES.map((tone) => (
 											<option key={tone.value} value={tone.value}>
@@ -336,7 +298,7 @@ export function AnswerAssistantPage() {
 							</div>
 
 							{!languageIsPreset && (
-								<label className="space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Код языка
 									</span>
@@ -347,7 +309,7 @@ export function AnswerAssistantPage() {
 											updateSettings({ language: event.target.value });
 										}}
 										placeholder="Например: ro, bg, ka"
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									/>
 								</label>
 							)}
@@ -355,7 +317,7 @@ export function AnswerAssistantPage() {
 							<button
 								type="submit"
 								disabled={loading || !customerMessage.trim()}
-								className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+								className="ui-button ui-button--primary inline-flex w-full items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{loading ? (
 									<Loader2 size={18} className="animate-spin" />
@@ -367,7 +329,10 @@ export function AnswerAssistantPage() {
 						</div>
 					</section>
 
-					<section className="flex min-h-[34rem] flex-col rounded-xl border border-border bg-surface">
+					<section
+						hidden={settingsOnly}
+						className="flex min-h-[34rem] min-w-0 flex-col rounded-xl border border-border bg-surface"
+					>
 						<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
 							<div className="min-w-0">
 								<div className="text-sm font-semibold">Готовый ответ</div>
@@ -377,21 +342,12 @@ export function AnswerAssistantPage() {
 										: "Здесь появится текст для отправки клиенту."}
 								</div>
 							</div>
-							<div className="flex items-center gap-2">
-								<button
-									type="button"
-									onClick={saveAnswer}
-									disabled={!answer.trim()}
-									className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
-									aria-label="Сохранить ответ в память"
-								>
-									<Save size={16} />
-								</button>
+							<div className="ui-actions items-center flex  gap-2">
 								<button
 									type="button"
 									onClick={() => void copyAnswer()}
 									disabled={!answer.trim()}
-									className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+									className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
 								>
 									<Copy size={16} />
 									Копировать
@@ -403,7 +359,7 @@ export function AnswerAssistantPage() {
 							<textarea
 								value={answer}
 								onChange={(event) => setAnswer(event.target.value)}
-								className="supportos-scroll min-h-80 flex-1 resize-none rounded-lg border border-border bg-background px-4 py-4 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+								className="ui-input supportos-scroll min-h-80 flex-1 resize-none border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 								placeholder="Ответ ещё не создан."
 							/>
 
@@ -431,14 +387,14 @@ export function AnswerAssistantPage() {
 						</div>
 					</section>
 
-					<aside className="space-y-3 xl:sticky xl:top-0 xl:self-start">
+					<aside className="min-w-0 space-y-3 xl:sticky xl:top-0 xl:self-start">
 						<section className="rounded-xl border border-border bg-surface">
 							<div className="flex items-center gap-2 border-b border-border px-4 py-3">
 								<Settings2 size={17} />
 								<div className="font-semibold">Параметры</div>
 							</div>
 							<div className="space-y-3 p-4">
-								<label className="block space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Тип вопроса
 									</span>
@@ -449,7 +405,7 @@ export function AnswerAssistantPage() {
 												intent: event.target.value as AnswerIntent,
 											})
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 									>
 										{INTENTS.map((intent) => (
 											<option key={intent.value} value={intent.value}>
@@ -459,7 +415,7 @@ export function AnswerAssistantPage() {
 									</select>
 								</label>
 
-								<label className="block space-y-1.5">
+								<label className="ui-field ">
 									<span className="text-xs font-semibold uppercase text-muted">
 										Проект
 									</span>
@@ -468,7 +424,7 @@ export function AnswerAssistantPage() {
 										onChange={(event) =>
 											updateSettings({ product: event.target.value })
 										}
-										className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+										className="ui-input w-full border border-border bg-background outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
 										placeholder="SupportOS"
 									/>
 								</label>
@@ -487,12 +443,12 @@ export function AnswerAssistantPage() {
 												})
 											}
 											className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-											settings.aiEnabled
+												settings.aiEnabled
 													? "border-accent bg-accent/10 text-accent"
 													: "border-border text-muted"
 											}`}
 										>
-										{settings.aiEnabled ? "Включён" : "Выключен"}
+											{settings.aiEnabled ? "Включён" : "Выключен"}
 										</button>
 									</div>
 
@@ -504,13 +460,13 @@ export function AnswerAssistantPage() {
 									</div>
 									<button
 										type="button"
-									onClick={() => void checkAI()}
-									disabled={aiChecking}
-										className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm hover:bg-surface-elevated disabled:opacity-60"
+										onClick={() => void checkAI()}
+										disabled={aiChecking}
+										className="ui-button ui-button--secondary mt-3 inline-flex w-full items-center justify-center gap-2 border border-border hover:bg-surface-elevated disabled:opacity-60"
 									>
-									{aiChecking ? (
+										{aiChecking ? (
 											<Loader2 size={15} className="animate-spin" />
-									) : aiOnline ? (
+										) : aiOnline ? (
 											<Wifi size={15} />
 										) : (
 											<WifiOff size={15} />
@@ -522,102 +478,32 @@ export function AnswerAssistantPage() {
 						</section>
 
 						<section className="rounded-xl border border-border bg-surface">
-							<div className="flex items-center gap-2 border-b border-border px-4 py-3">
-								<Languages size={17} />
-								<div className="font-semibold">Словарь</div>
-							</div>
-							<div className="space-y-3 p-4">
-								<div className="grid gap-2">
-									<input
-										value={glossarySource}
-										onChange={(event) => setGlossarySource(event.target.value)}
-										placeholder="Термин"
-										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									/>
-									<input
-										value={glossaryTarget}
-										onChange={(event) => setGlossaryTarget(event.target.value)}
-										placeholder="Как писать в ответе"
-										className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-									/>
-								</div>
-								<button
-									type="button"
-									onClick={addGlossaryTerm}
-									className="h-10 w-full rounded-lg border border-border text-sm hover:bg-surface-elevated"
-								>
-									Добавить термин
-								</button>
-
-								<div className="supportos-scroll max-h-44 space-y-1 overflow-auto">
-									{data.glossary.length > 0 ? (
-										data.glossary.map((term) => (
-											<div
-												key={term.id}
-												className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2 text-xs"
-											>
-												<span className="min-w-0 truncate">
-													{term.source} → {term.target}
-												</span>
-												<button
-													type="button"
-													onClick={() => removeGlossaryTerm(term.id)}
-													className="shrink-0 text-muted hover:text-red-300"
-													aria-label="Удалить термин"
-												>
-													<Trash2 size={14} />
-												</button>
-											</div>
-										))
-									) : (
-										<div className="py-4 text-center text-xs text-muted">
-											Словарь пуст
-										</div>
-									)}
-								</div>
-							</div>
-						</section>
-
-						<section className="rounded-xl border border-border bg-surface">
 							<div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-								<div>
-									<div className="font-semibold">Память ответов</div>
-									<div className="text-xs text-muted">
-										Сохранено: {data.memory.length}
-									</div>
+								<div className="flex items-center gap-2 font-semibold">
+									<Languages size={17} /> Командный глоссарий
 								</div>
-								<CheckCircle2 size={18} className="text-emerald-400" />
+								{canAccessPage(access, "/qc", "glossary") && (
+									<Link to="/qc" hash="glossary" className="ui-button">
+										Управлять
+									</Link>
+								)}
 							</div>
-
-							<div className="supportos-scroll max-h-56 space-y-1 overflow-auto p-4">
-								{data.memory.length > 0 ? (
-									data.memory.slice(0, 10).map((entry) => (
+							<div className="supportos-scroll max-h-56 space-y-1 overflow-auto p-4 text-xs">
+								{glossary.isPending ? (
+									<p>Загрузка…</p>
+								) : glossary.error ? (
+									<p role="alert">{glossary.error.message}</p>
+								) : glossary.data?.length ? (
+									glossary.data.map((term) => (
 										<div
-											key={entry.id}
-											className="flex items-start justify-between gap-3 rounded-lg bg-background px-3 py-2 text-xs"
+											key={term.id}
+											className="rounded-lg bg-background px-3 py-2"
 										>
-											<div className="min-w-0">
-												<div className="truncate font-medium">
-													{entry.source}
-												</div>
-												<div className="mt-1 truncate text-muted">
-													{entry.target}
-												</div>
-											</div>
-											<button
-												type="button"
-												onClick={() => removeMemoryEntry(entry.id)}
-												className="shrink-0 text-muted hover:text-red-300"
-												aria-label="Удалить сохранённый ответ"
-											>
-												<Trash2 size={14} />
-											</button>
+											{term.source} → {term.target}
 										</div>
 									))
 								) : (
-									<div className="py-4 text-center text-xs text-muted">
-										Пока нет сохранённых ответов
-									</div>
+									<p className="text-muted">Опубликованных терминов пока нет</p>
 								)}
 							</div>
 						</section>

@@ -1,15 +1,15 @@
 export interface Folder {
-  id: string
+	id: string;
 
-  categoryId: string
+	categoryId: string;
 
-  parentId?: string
+	parentId?: string;
 
-  name: string
+	name: string;
 
-  icon?: string
+	icon?: string;
 
-  color?: string
+	color?: string;
 
-  order: number
+	order: number;
 }

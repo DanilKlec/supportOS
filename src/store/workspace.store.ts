@@ -90,6 +90,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 		}),
 		{
 			name: "supportos:workspace-layout:v1",
+			version: 1,
+			migrate: (stored) => ({
+				...(stored as Partial<WorkspaceState>),
+				layout: {
+					...DEFAULT_WORKSPACE_LAYOUT,
+					...(stored as Partial<WorkspaceState>)?.layout,
+					showSidebar: true,
+					showTabs: true,
+				},
+			}),
 			partialize: (state) => ({
 				layout: state.layout,
 			}),

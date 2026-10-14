@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/services/authenticated-fetch";
 export interface GoogleSheetTextResponse {
 	ok: boolean;
 	status: number;
@@ -75,7 +76,7 @@ async function fetchProxiedResponse(
 
 		proxyUrl.searchParams.set("url", url);
 
-		const response = await fetch(proxyUrl.toString(), {
+		const response = await authenticatedFetch(proxyUrl.toString(), {
 			cache: "no-store",
 		});
 
@@ -100,7 +101,7 @@ async function fetchProxiedResponse(
 }
 
 async function fetchDirectText(url: string): Promise<GoogleSheetTextResponse> {
-	const response = await fetch(url);
+	const response = await authenticatedFetch(url);
 	const text = await response.text();
 
 	return {
@@ -113,7 +114,7 @@ async function fetchDirectText(url: string): Promise<GoogleSheetTextResponse> {
 async function fetchDirectBinary(
 	url: string,
 ): Promise<GoogleSheetBinaryResponse> {
-	const response = await fetch(url);
+	const response = await authenticatedFetch(url);
 	const bytes = await response.arrayBuffer();
 
 	return {

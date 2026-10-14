@@ -1,3 +1,12 @@
+import { requireAppAuth } from "@/app/auth-guard";
+import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
+import { AuthConnectionScreen } from "@/features/auth/AuthConnectionScreen";
+import { PasswordForm } from "@/features/auth/PasswordForm";
+import { PendingApproval } from "@/features/auth/PendingApproval";
+import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
+import { ProjectEmailServerCache } from "@/features/project-emails/ProjectEmailServerCache";
+import { supabaseService } from "@/services/supabase.service";
+import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -13,6 +22,7 @@ import { ToastContainer } from "#/components/ui/Toast";
 import { MainLayout } from "#/layouts/MainLayout/MainLayout";
 import { ToastProvider } from "#/shared/hooks/useToast";
 import { ModalRoot } from "#/shared/modals/ModalRoot";
+import { safeAuthRedirect } from "@/app/auth-redirect";
 import { bootstrapApp, bootstrapAuth } from "@/app/bootstrap";
 import { cleanupDevelopmentCaches } from "@/app/dev-cleanup";
 import { isLightweightRoute } from "@/app/route-mode";
@@ -21,7 +31,7 @@ import {
 	getAppearanceSettings,
 	onSystemThemeChange,
 } from "@/shared/lib/appearance";
-import { isTemporaryAccessEnabled, useAccessStore } from "@/store/access.store";
+import { useAuthStore } from "@/store/auth.store";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -33,34 +43,66 @@ const queryClient = new QueryClient({
 	},
 });
 
+useAuthStore.subscribe((state, previous) => {
+	if (state.session?.user.id !== previous.session?.user.id) queryClient.clear();
+	if (
+		previous.session?.user.access &&
+		state.session?.user.id !== previous.session.user.id &&
+		typeof window !== "undefined"
+	)
+		window.location.reload();
+});
+
 export const Route = createRootRoute({
+	beforeLoad: requireAppAuth,
 	component: RootComponent,
 	notFoundComponent: NotFoundPage,
 });
 
 function RootComponent() {
+	useEffect(() => {
+		const check = () => void supabaseService.refreshIdentity();
+		const timer = setInterval(check, 30000);
+		window.addEventListener("focus", check);
+		return () => {
+			clearInterval(timer);
+			window.removeEventListener("focus", check);
+		};
+	}, []);
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
 
+	const hash = useRouterState({ select: (state) => state.location.hash });
 	const lightweight = isLightweightRoute(pathname);
-	const accessSession = useAccessStore((state) => state.session);
-	const accessRequired = isTemporaryAccessEnabled();
-	const isLoginRoute = pathname === "/login";
-	const accessGranted = !accessRequired || Boolean(accessSession);
-
+	const session = useAuthStore((state) => state.session);
+	const loading = useAuthStore((state) => state.loading);
+	const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
+	const authError = useAuthStore((state) => state.error);
+	const isLoginRoute = pathname.replace(/\/+$/, "") === "/login";
+	const accessGranted =
+		!loading &&
+		Boolean(session) &&
+		Boolean(session?.authVerified) &&
+		canAccessPage(session?.user.access, pathname, hash);
 	useEffect(() => {
-		if (!accessGranted && !isLoginRoute) {
-			void navigate({ to: "/login", replace: true });
-			return;
+		if (loading) return;
+		if (!session && !isLoginRoute) {
+			queryClient.clear();
+			void navigate({
+				to: "/login",
+				search: {
+					redirect: safeAuthRedirect(
+						window.location.pathname +
+							window.location.search +
+							window.location.hash,
+					),
+				},
+				replace: true,
+			});
 		}
-
-		if (accessGranted && isLoginRoute) {
-			void navigate({ to: "/", replace: true });
-		}
-	}, [accessGranted, isLoginRoute, navigate]);
-
+	}, [session, loading, isLoginRoute, navigate]);
 	useEffect(() => {
 		const applyStoredAppearance = () =>
 			applyAppearance(getAppearanceSettings());
@@ -72,6 +114,7 @@ function RootComponent() {
 
 	useEffect(() => {
 		cleanupDevelopmentCaches();
+		if (!accessGranted || isLoginRoute) return;
 
 		const timer = window.setTimeout(() => {
 			if (lightweight) {
@@ -83,20 +126,59 @@ function RootComponent() {
 		}, 50);
 
 		return () => window.clearTimeout(timer);
-	}, [lightweight]);
+	}, [lightweight, accessGranted, isLoginRoute]);
 
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
-				{accessGranted || isLoginRoute ? (
+				{!loading && session?.mfaRequired ? (
+					<AuthenticatorGate key={session.sessionId ?? session.user.id} />
+				) : !loading && session && !session.authVerified ? (
+					<AuthConnectionScreen
+						error={authError}
+						onRetry={() => supabaseService.refreshIdentity()}
+						onSignOut={() => supabaseService.signOut()}
+					/>
+				) : passwordRecovery && session ? (
+					<div className="min-h-screen bg-background px-6 py-16">
+						<PasswordForm />
+					</div>
+				) : accessGranted || isLoginRoute ? (
 					<MainLayout>
 						<Outlet />
 					</MainLayout>
 				) : (
-					<div className="min-h-screen bg-background" />
+					<div className="min-h-screen bg-background p-4 sm:p-8">
+						{!loading && session?.user.access?.status === "pending" ? (
+							<PendingApproval />
+						) : (
+							!loading &&
+							session && (
+								<>
+									<p>
+										Нет доступа к этому разделу. Обратитесь к администратору.
+									</p>
+									<button
+										type="button"
+										onClick={() => void navigate({ to: "/settings" })}
+									>
+										Мой аккаунт
+									</button>
+									<button
+										type="button"
+										onClick={() => void supabaseService.signOut()}
+									>
+										Выйти
+									</button>
+								</>
+							)
+						)}
+					</div>
 				)}
 
-				<ModalRoot />
+				{accessGranted && <ProjectEmailServerCache />}
+				{accessGranted && <BonusServerCache />}
+				{accessGranted && <ModalRoot />}
 
 				<ToastContainer />
 			</ToastProvider>

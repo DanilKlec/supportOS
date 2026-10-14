@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useId } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 interface BaseModalProps {
@@ -8,6 +8,8 @@ interface BaseModalProps {
 	onClose: () => void;
 	closeDisabled?: boolean;
 	size?: "sm" | "md" | "lg" | "xl";
+	placement?: "center" | "right";
+	className?: string;
 }
 
 const widths = {
@@ -16,6 +18,7 @@ const widths = {
 	lg: "max-w-2xl",
 	xl: "max-w-4xl",
 };
+const modalStack: string[] = [];
 
 export function BaseModal({
 	title,
@@ -23,23 +26,57 @@ export function BaseModal({
 	onClose,
 	closeDisabled = false,
 	size = "md",
+	placement = "center",
+	className = "",
 }: BaseModalProps) {
 	const titleId = useId();
+	const dialog = useRef<HTMLElement>(null);
+	const close = useRef({ onClose, closeDisabled });
+	close.current = { onClose, closeDisabled };
 
 	useEffect(() => {
-		if (closeDisabled) return undefined;
-
 		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
+			if (modalStack.at(-1) !== titleId) return;
+			if (event.key === "Escape" && !close.current.closeDisabled) {
 				event.preventDefault();
-				onClose();
+				event.stopImmediatePropagation();
+				close.current.onClose();
+			}
+			if (event.key === "Tab") {
+				const nodes = Array.from(
+					dialog.current?.querySelectorAll<HTMLElement>(
+						'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+					) ?? [],
+				).filter((node) => node.getClientRects().length > 0);
+				const first = nodes[0];
+				const last = nodes.at(-1);
+				if (!first) {
+					event.preventDefault();
+					dialog.current?.focus();
+				} else if (
+					event.shiftKey &&
+					(document.activeElement === first ||
+						document.activeElement === dialog.current)
+				) {
+					event.preventDefault();
+					last?.focus();
+				} else if (!event.shiftKey && document.activeElement === last) {
+					event.preventDefault();
+					first.focus();
+				}
 			}
 		};
-
-		window.addEventListener("keydown", handleEscape);
-
-		return () => window.removeEventListener("keydown", handleEscape);
-	}, [closeDisabled, onClose]);
+		const previous = document.activeElement;
+		modalStack.push(titleId);
+		dialog.current?.focus();
+		window.addEventListener("keydown", handleEscape, true);
+		return () => {
+			modalStack.splice(modalStack.indexOf(titleId), 1);
+			window.removeEventListener("keydown", handleEscape, true);
+			if (previous instanceof HTMLElement && previous.isConnected)
+				previous.focus();
+		};
+	}, [titleId]);
 
 	useEffect(() => {
 		const previousOverflow = document.body.style.overflow;
@@ -62,40 +99,42 @@ export function BaseModal({
 	}
 
 	return createPortal(
-		<div className="fixed inset-0 z-40 flex items-end justify-center p-0 sm:items-center sm:p-4">
+		<div
+			className={`modal-overlay ${placement === "right" ? "ops-drawer" : ""}`}
+		>
 			<button
 				type="button"
-				aria-label="Close modal"
+				aria-label="Закрыть окно"
 				onClick={handleClose}
 				disabled={closeDisabled}
 				className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm disabled:cursor-not-allowed"
 			/>
 
 			<section
+				ref={dialog}
+				tabIndex={-1}
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={titleId}
-				className={`relative flex h-[100dvh] max-h-[100dvh] w-full ${widths[size]} animate-slide-up flex-col overflow-hidden rounded-none border border-border bg-surface shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-xl`}
+				className={`modal-dialog ${widths[size]} animate-slide-up shadow-2xl ${className}`}
 			>
-				<div className="flex min-h-14 shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+				<div className="modal-header">
 					<h2 id={titleId} className="text-lg font-semibold text-foreground">
 						{title}
 					</h2>
 
 					<button
 						type="button"
-						title="Close"
+						title="Закрыть"
 						onClick={handleClose}
 						disabled={closeDisabled}
-						className="rounded-md p-1.5 text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+						className="ui-button ui-button--ghost ui-button--icon inline-flex shrink-0 items-center justify-center text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<X size={18} />
 					</button>
 				</div>
 
-				<div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
-					{children}
-				</div>
+				<div className="modal-body">{children}</div>
 			</section>
 		</div>,
 		document.body,

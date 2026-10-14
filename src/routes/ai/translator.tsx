@@ -1,8 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
-
+import { createFileRoute, redirect } from "@tanstack/react-router";
 export const Route = createFileRoute("/ai/translator")({
-	component: lazyRouteComponent(
-		() => import("@/features/translator/TranslatorPage"),
-		"TranslatorPage",
-	),
+	beforeLoad: () => {
+		throw redirect({ to: "/", hash: "composer-translate", replace: true });
+	},
 });

@@ -1,16 +1,14 @@
 import { defaultLocalDataService } from "@/services/default-local-data.service";
 import { knowledgeService } from "@/services/knowledge.service";
 import { supabaseService } from "@/services/supabase.service";
+import { useAuthStore } from "@/store/auth.store";
 
 let authInitialized = false;
-let knowledgeInitialized = false;
+let knowledgeInitializedFor: string | undefined;
+let knowledgePromise: Promise<void> | undefined;
 let authSessionPromise:
 	| ReturnType<typeof supabaseService.initialize>
 	| undefined;
-
-function shouldAutoSyncCloud() {
-	return import.meta.env.VITE_SUPPORTOS_CLOUD_SYNC === "true";
-}
 
 export async function bootstrapAuth() {
 	if (!authSessionPromise) {
@@ -25,16 +23,24 @@ export async function bootstrapAuth() {
 }
 
 export async function bootstrapApp() {
-	if (knowledgeInitialized) return;
+	await bootstrapAuth();
+	const session = useAuthStore.getState().session;
 
-	knowledgeInitialized = true;
+	if (!session?.user.access) return;
+	if (knowledgeInitializedFor === session.user.id) return;
+	if (knowledgePromise) return knowledgePromise;
 
-	await knowledgeService.loadKnowledge();
-	defaultLocalDataService.apply();
+	const accountId = session.user.id;
+	knowledgePromise = (async () => {
+		await knowledgeService.loadKnowledge();
+		if (useAuthStore.getState().session?.user.id !== accountId) return;
+		knowledgeInitializedFor = accountId;
+		defaultLocalDataService.apply();
+	})();
 
-	const session = await bootstrapAuth();
-
-	if (session && shouldAutoSyncCloud()) {
-		await knowledgeService.loadCloudKnowledge();
+	try {
+		await knowledgePromise;
+	} finally {
+		knowledgePromise = undefined;
 	}
 }

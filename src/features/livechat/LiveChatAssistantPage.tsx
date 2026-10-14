@@ -15,7 +15,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Bind, BindTranslation } from "@/entities/bind";
-import { languages } from "@/entities/language";
 import { knowledgeService } from "@/services/knowledge.service";
 import { searchBinds } from "@/shared/lib/bind-search";
 import {
@@ -23,6 +22,14 @@ import {
 	extractTemplateVariables,
 } from "@/shared/lib/template-variables";
 import { useKnowledgeStore } from "@/store";
+
+const LANGUAGE_LABELS: Record<string, string> = {
+	ru: "Русский",
+	en: "Английский",
+	de: "Немецкий",
+	pt: "Португальский",
+	el: "Греческий",
+};
 
 function isInsideIframe() {
 	try {
@@ -153,7 +160,7 @@ export function LiveChatAssistantPage() {
 	useEffect(() => {
 		if (!isInsideIframe()) {
 			setConnectionError(
-				"Preview mode. Add this URL as a LiveChat Details Widget to insert replies.",
+				"Режим предпросмотра. Добавьте этот URL как виджет панели сведений LiveChat, чтобы вставлять ответы.",
 			);
 			return undefined;
 		}
@@ -180,7 +187,7 @@ export function LiveChatAssistantPage() {
 				setConnectionError(
 					error instanceof Error
 						? error.message
-						: "Unable to connect to LiveChat Agent App.",
+						: "Не удалось подключиться к приложению LiveChat Agent.",
 				);
 			});
 
@@ -227,13 +234,13 @@ export function LiveChatAssistantPage() {
 	};
 
 	return (
-		<div className="supportos-scroll min-h-screen overflow-auto bg-background p-3 text-foreground">
+		<div className="supportos-scroll min-h-screen min-w-0 overflow-auto bg-background p-3 text-foreground">
 			<header className="mb-3 rounded-xl border border-border bg-surface p-3">
 				<div className="flex items-center justify-between gap-3">
-					<div>
-						<div className="font-semibold">SupportOS Knowledge</div>
+					<div className="min-w-0">
+						<div className="font-semibold">База знаний SupportOS</div>
 						<div className="mt-0.5 text-[11px] text-muted">
-							Find, review and insert an approved reply
+							Найдите, проверьте и вставьте утверждённый ответ
 						</div>
 					</div>
 					<span
@@ -243,13 +250,14 @@ export function LiveChatAssistantPage() {
 								: "bg-amber-500/15 text-amber-200"
 						}`}
 					>
-						{connected ? "Connected" : "Preview"}
+						{connected ? "Подключено" : "Предпросмотр"}
 					</span>
 				</div>
 				<div className="mt-2 truncate text-xs text-muted">
 					{profile
-						? `${profile.name || "Customer"}${profile.email ? ` · ${profile.email}` : ""}`
-						: connectionError || "Open a chat to load the customer profile."}
+						? `${profile.name || "Клиент"}${profile.email ? ` · ${profile.email}` : ""}`
+						: connectionError ||
+							"Откройте чат, чтобы загрузить профиль клиента."}
 				</div>
 			</header>
 
@@ -268,15 +276,15 @@ export function LiveChatAssistantPage() {
 						}
 						if (event.key === "Escape") setQuery("");
 					}}
-					placeholder="Search by topic, phrase or tag…"
-					className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-sm outline-none focus:border-accent"
+					placeholder="Поиск по теме, фразе или тегу…"
+					className="ui-input w-full border border-border bg-surface pl-9 pr-9 outline-none focus:border-accent"
 				/>
 				{query ? (
 					<button
 						type="button"
 						onClick={() => setQuery("")}
 						className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center text-muted hover:text-foreground"
-						aria-label="Clear search"
+						aria-label="Очистить поиск"
 					>
 						<X size={15} />
 					</button>
@@ -286,7 +294,7 @@ export function LiveChatAssistantPage() {
 			<section className="mb-3 overflow-hidden rounded-xl border border-border bg-surface">
 				<div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs">
 					<span className="font-semibold uppercase text-muted">
-						{query ? "Search results" : "Suggested replies"}
+						{query ? "Результаты поиска" : "Предложенные ответы"}
 					</span>
 					<span className="text-muted">{results.length}</span>
 				</div>
@@ -310,7 +318,7 @@ export function LiveChatAssistantPage() {
 										</span>
 										{query && index === 0 ? (
 											<span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-accent">
-												Best
+												Лучший результат
 											</span>
 										) : null}
 									</div>
@@ -326,9 +334,11 @@ export function LiveChatAssistantPage() {
 						))
 					) : (
 						<div className="px-5 py-8 text-center text-xs text-muted">
-							<div className="font-medium text-foreground">Nothing found</div>
+							<div className="font-medium text-foreground">
+								Ничего не найдено
+							</div>
 							<div className="mt-1 leading-4">
-								Try fewer words, a tag, or part of the reply text.
+								Попробуйте ввести меньше слов, тег или часть текста ответа.
 							</div>
 						</div>
 					)}
@@ -339,7 +349,7 @@ export function LiveChatAssistantPage() {
 				<div className="mb-2 flex items-center justify-between gap-2">
 					<div className="min-w-0">
 						<div className="truncate text-sm font-semibold">
-							{selectedTranslation?.title || "Select a reply"}
+							{selectedTranslation?.title || "Выберите ответ"}
 						</div>
 						{selectedBind ? (
 							<div className="mt-0.5 text-[11px] text-muted">
@@ -358,12 +368,11 @@ export function LiveChatAssistantPage() {
 								if (translation) selectTranslation(translation);
 							}}
 							disabled={!selectedBind}
-							className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none"
+							className="ui-input border border-border bg-background outline-none"
 						>
 							{availableLanguages.map((code) => (
 								<option key={code} value={code}>
-									{languages.find((item) => item.code === code)?.name ??
-										code.toUpperCase()}
+									{LANGUAGE_LABELS[code] ?? code.toUpperCase()}
 								</option>
 							))}
 						</select>
@@ -376,18 +385,18 @@ export function LiveChatAssistantPage() {
 						setDraft(event.target.value);
 						setInserted(false);
 					}}
-					placeholder="Select a bind to preview its reply."
-					className="min-h-44 w-full resize-y rounded-lg border border-border bg-background p-3 text-sm leading-5 outline-none focus:border-accent"
+					placeholder="Выберите бинд, чтобы просмотреть его ответ."
+					className="ui-input min-h-44 w-full resize-y border border-border bg-background outline-none focus:border-accent"
 				/>
 
 				{templateVariables.length > 0 ? (
 					<div className="mt-3 rounded-lg border border-border bg-background p-3">
 						<div className="mb-2 text-xs font-semibold uppercase text-muted">
-							Template variables
+							Переменные шаблона
 						</div>
 						<div className="grid gap-2">
 							{templateVariables.map((variable) => (
-								<label key={variable} className="grid gap-1">
+								<label key={variable} className="ui-field grid gap-1">
 									<span className="text-[11px] text-muted">{variable}</span>
 									<input
 										value={variableValues[variable] ?? ""}
@@ -398,8 +407,8 @@ export function LiveChatAssistantPage() {
 											}));
 											setInserted(false);
 										}}
-										placeholder={`Value for ${variable}`}
-										className="h-9 rounded-md border border-border bg-surface px-2.5 text-sm outline-none focus:border-accent"
+										placeholder={`Значение для ${variable}`}
+										className="ui-input border border-border bg-surface outline-none focus:border-accent"
 									/>
 								</label>
 							))}
@@ -426,10 +435,10 @@ export function LiveChatAssistantPage() {
 						<Send size={17} />
 					)}
 					{unresolvedVariables.length > 0
-						? `Fill ${unresolvedVariables.length} variable${unresolvedVariables.length === 1 ? "" : "s"}`
+						? `Заполните переменные: ${unresolvedVariables.length}`
 						: inserted
-							? "Inserted — review and send"
-							: "Insert into Message Box"}
+							? "Вставлено — проверьте и отправьте"
+							: "Вставить в поле сообщения"}
 				</button>
 			</section>
 		</div>

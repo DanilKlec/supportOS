@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#000000" />
     <meta name="description" content="SupportOS local-first bind knowledge base." />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -13,8 +13,10 @@
     <script>
       (() => {
         try {
-          const theme = localStorage.getItem("supportos-theme") || "dark";
-          document.documentElement.classList.toggle("dark", theme === "dark");
+          const mode = localStorage.getItem("supportos-theme-mode") || localStorage.getItem("supportos-theme") || "dark";
+          const theme = mode === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : mode;
+          document.documentElement.classList.toggle("dark", theme !== "light");
+          document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
         } catch {
           document.documentElement.classList.add("dark");
         }

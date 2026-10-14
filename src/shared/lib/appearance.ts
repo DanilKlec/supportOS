@@ -24,33 +24,34 @@ export interface AppearanceSettings {
 }
 
 export const ACCENT_COLORS = [
-	{ name: "Blue", value: "#3b82f6" },
-	{ name: "Cyan", value: "#06b6d4" },
-	{ name: "Emerald", value: "#10b981" },
-	{ name: "Rose", value: "#f43f5e" },
-	{ name: "Amber", value: "#f59e0b" },
+	{ name: "Графит", value: "#a1a1aa" },
+	{ name: "Синий", value: "#3b82f6" },
+	{ name: "Голубой", value: "#06b6d4" },
+	{ name: "Изумрудный", value: "#10b981" },
+	{ name: "Розовый", value: "#f43f5e" },
+	{ name: "Янтарный", value: "#f59e0b" },
 ] as const;
 
 export const PALETTE_OPTIONS = [
 	{
-		name: "Slate",
+		name: "Обсидиан",
 		value: "slate",
-		description: "Current SupportOS look.",
+		description: "Чёрный фон и графитовые поверхности.",
 	},
 	{
-		name: "Neutral",
+		name: "Нейтральный",
 		value: "neutral",
-		description: "Cleaner gray surfaces.",
+		description: "Чистые серые поверхности.",
 	},
 	{
-		name: "Contrast",
+		name: "Контрастный",
 		value: "contrast",
-		description: "Sharper borders and text.",
+		description: "Более выразительные границы и текст.",
 	},
 	{
-		name: "Custom",
+		name: "Свой",
 		value: "custom",
-		description: "Your own workspace colors.",
+		description: "Собственные цвета рабочего пространства.",
 	},
 ] as const;
 
@@ -58,24 +59,32 @@ export const CUSTOM_PALETTE_FIELDS: Array<{
 	key: keyof PaletteColors;
 	name: string;
 }> = [
-	{ key: "background", name: "Background" },
-	{ key: "foreground", name: "Text" },
-	{ key: "surface", name: "Surface" },
-	{ key: "surfaceElevated", name: "Raised" },
-	{ key: "border", name: "Border" },
-	{ key: "muted", name: "Muted text" },
+	{ key: "background", name: "Фон" },
+	{ key: "foreground", name: "Текст" },
+	{ key: "surface", name: "Поверхность" },
+	{ key: "surfaceElevated", name: "Приподнятая поверхность" },
+	{ key: "border", name: "Граница" },
+	{ key: "muted", name: "Приглушённый текст" },
 ];
 
 export const RADIUS_OPTIONS = [
-	{ name: "Sharp", value: "sharp", description: "Tighter corners." },
-	{ name: "Balanced", value: "balanced", description: "Default shape." },
-	{ name: "Rounded", value: "rounded", description: "Softer controls." },
+	{ name: "Острый", value: "sharp", description: "Более строгие углы." },
+	{
+		name: "Сбалансированный",
+		value: "balanced",
+		description: "Форма по умолчанию.",
+	},
+	{
+		name: "Закруглённый",
+		value: "rounded",
+		description: "Более мягкие элементы управления.",
+	},
 ] as const;
 
 export const FONT_SCALE_OPTIONS = [
-	{ name: "Small", value: "small" },
-	{ name: "Normal", value: "normal" },
-	{ name: "Large", value: "large" },
+	{ name: "Маленький", value: "small" },
+	{ name: "Обычный", value: "normal" },
+	{ name: "Большой", value: "large" },
 ] as const;
 
 const THEME_MODE_KEY = "supportos-theme-mode";
@@ -88,12 +97,12 @@ const RADIUS_KEY = "supportos-radius";
 const FONT_SCALE_KEY = "supportos-font-scale";
 
 const DEFAULT_CUSTOM_PALETTE: PaletteColors = {
-	background: "#0b1120",
-	foreground: "#e2e8f0",
-	surface: "#111827",
-	surfaceElevated: "#1e293b",
-	border: "#1e293b",
-	muted: "#94a3b8",
+	background: "#000000",
+	foreground: "#f4f4f5",
+	surface: "#0d0d0f",
+	surfaceElevated: "#18181b",
+	border: "#27272a",
+	muted: "#a1a1aa",
 };
 
 const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -127,12 +136,12 @@ const PALETTES: Record<
 			muted: "#64748b",
 		},
 		dark: {
-			background: "#0b1120",
-			foreground: "#e2e8f0",
-			surface: "#111827",
-			surfaceElevated: "#1e293b",
-			border: "#1e293b",
-			muted: "#94a3b8",
+			background: "#000000",
+			foreground: "#f4f4f5",
+			surface: "#0d0d0f",
+			surfaceElevated: "#18181b",
+			border: "#27272a",
+			muted: "#a1a1aa",
 		},
 	},
 	neutral: {
@@ -327,6 +336,7 @@ export function applyAppearance(settings = getAppearanceSettings()) {
 		settings.density === "compact" ? baseFontSize - 1 : baseFontSize;
 
 	root.classList.toggle("dark", resolvedTheme === "dark");
+	root.style.colorScheme = resolvedTheme;
 	root.dataset.themeMode = settings.themeMode;
 	root.dataset.density = settings.density;
 	root.dataset.palette = settings.palette;
@@ -338,7 +348,10 @@ export function applyAppearance(settings = getAppearanceSettings()) {
 	root.style.setProperty("--color-border", palette.border);
 	root.style.setProperty("--color-muted", palette.muted);
 	root.style.setProperty("--color-accent", settings.accent);
-	root.style.setProperty("--color-accent-foreground", "#ffffff");
+	root.style.setProperty(
+		"--color-accent-foreground",
+		settings.accent === "#a1a1aa" ? "#09090b" : "#ffffff",
+	);
 	root.style.setProperty("--supportos-font-size", `${fontSize}px`);
 
 	for (const [key, value] of Object.entries(RADIUS_VALUES[settings.radius])) {

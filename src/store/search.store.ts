@@ -1,35 +1,35 @@
 import { create } from "zustand";
 
 interface SearchState {
-  query: string;
+	query: string;
 
-  opened: boolean;
+	opened: boolean;
 
-  setQuery: (query: string) => void;
+	setQuery: (query: string) => void;
 
-  open: () => void;
+	open: () => void;
 
-  close: () => void;
+	close: () => void;
 }
 
 export const useSearchStore = create<SearchState>((set) => ({
-  query: "",
+	query: "",
 
-  opened: false,
+	opened: false,
 
-  setQuery: (query) =>
-    set({
-      query,
-    }),
+	setQuery: (query) =>
+		set({
+			query,
+		}),
 
-  open: () =>
-    set({
-      opened: true,
-    }),
+	open: () =>
+		set({
+			opened: true,
+		}),
 
-  close: () =>
-    set({
-      opened: false,
-      query: "",
-    }),
+	close: () =>
+		set({
+			opened: false,
+			query: "",
+		}),
 }));

@@ -4,6 +4,7 @@ import {
 	looksLikeGoogleSheetHtml,
 	toGoogleSheetExportUrl,
 } from "@/services/google-sheet-fetch.service";
+import { normalizeProjectEmail } from "../../shared/project-emails.js";
 
 export type ProjectEmailImportMode = "upsert" | "replace";
 
@@ -142,30 +143,26 @@ function extractEmail(value: string) {
 	return value.match(EMAIL_PATTERN)?.[0]?.toLowerCase() ?? "";
 }
 
-function hasAnyEmail(
-	record: Pick<ProjectEmailRecord, "supportEmail" | "kycEmail" | "vipEmail">,
-) {
-	return Boolean(record.supportEmail || record.kycEmail || record.vipEmail);
-}
-
 class ProjectEmailImportService {
 	async preview(url: string): Promise<ProjectEmailImportPreview> {
 		const sourceUrl = url.trim();
 
 		if (!sourceUrl) {
-			throw new Error("Google Sheets URL is required");
+			throw new Error("Укажите ссылку на Google-таблицу");
 		}
 
 		const csvUrl = toGoogleSheetExportUrl(sourceUrl);
 		const response = await fetchGoogleSheetText(csvUrl);
 
 		if (!response.ok) {
-			throw new Error(`Unable to load Google Sheet (${response.status})`);
+			throw new Error(
+				`Не удалось загрузить Google-таблицу (${response.status})`,
+			);
 		}
 
 		if (looksLikeGoogleSheetHtml(response.text)) {
 			throw new Error(
-				"Google returned a web page instead of table data. Publish the sheet to the web or share it for anyone with the link.",
+				"Таблица недоступна. Опубликуйте её или откройте доступ по ссылке.",
 			);
 		}
 
@@ -180,7 +177,7 @@ class ProjectEmailImportService {
 				sourceUrl,
 				csvUrl,
 				records: [],
-				errors: ["Sheet is empty"],
+				errors: ["Таблица пуста"],
 				warnings,
 			};
 		}
@@ -197,7 +194,7 @@ class ProjectEmailImportService {
 		const vipColumn = findColumn(headers, ["vip", "manager"]);
 
 		if (projectColumn < 0) {
-			errors.push("Project column was not found");
+			errors.push("Столбец проекта не найден");
 		}
 
 		for (const [name, index] of [
@@ -206,7 +203,7 @@ class ProjectEmailImportService {
 			["VIP", vipColumn],
 		] as const) {
 			if (index < 0) {
-				warnings.push(`${name} email column was not found`);
+				warnings.push(`${name} — столбец почты не найден`);
 			}
 		}
 
@@ -221,23 +218,39 @@ class ProjectEmailImportService {
 				id: createId("project-email"),
 				projectName,
 				slug: slugify(projectName),
-				supportEmail: extractEmail(cleanCell(row[supportColumn])),
-				kycEmail: extractEmail(cleanCell(row[kycColumn])),
-				vipEmail: extractEmail(cleanCell(row[vipColumn])),
+				addresses: headerRow.flatMap((type, index) => {
+					const email = extractEmail(cleanCell(row[index]));
+					return index !== projectColumn && email
+						? [
+								{
+									id: createId("email"),
+									type: /^(support|help)( email)?$/.test(headers[index])
+										? "Support"
+										: /^kyc( email)?$/.test(headers[index])
+											? "KYC"
+											: /^vip( email)?$/.test(headers[index])
+												? "VIP"
+												: type.trim() || "Другое",
+									email,
+									order: index,
+								},
+							]
+						: [];
+				}),
 				updatedAt: new Date().toISOString(),
 			};
 
-			if (!hasAnyEmail(record)) {
-				warnings.push(`Row ${rowIndex + 2}: no emails found`);
+			if (!record.addresses.length) {
+				warnings.push(`Строка ${rowIndex + 2}: почты не найдены`);
 				continue;
 			}
 
 			record.sourceHash = await hashText(JSON.stringify(record));
-			records.push(record);
+			records.push(normalizeProjectEmail(record));
 		}
 
 		if (records.length === 0 && errors.length === 0) {
-			errors.push("No importable project emails found");
+			errors.push("Почты для импорта не найдены");
 		}
 
 		return {

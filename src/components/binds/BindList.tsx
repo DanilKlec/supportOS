@@ -8,7 +8,7 @@ interface BindListProps {
 
 export function BindList({
 	binds,
-	emptyMessage = "Nothing found",
+	emptyMessage = "Ничего не найдено",
 }: BindListProps) {
 	if (binds.length === 0) {
 		return (

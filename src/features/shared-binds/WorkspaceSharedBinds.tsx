@@ -1,0 +1,911 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	ChevronDown,
+	ChevronRight,
+	Copy,
+	Pencil,
+	RotateCcw,
+	Users,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { LocalBindActions } from "@/components/binds/LocalBindActions";
+import { MoreActions } from "@/components/MoreActions";
+import type { Bind } from "@/entities/bind";
+import type { KnowledgeTreeNode } from "@/entities/knowledge";
+import { knowledgeService } from "@/services/knowledge.service";
+import type { BindBranches } from "@/services/shared-binds.service";
+import { sharedBindsService } from "@/services/shared-binds.service";
+import { useBindHotkeys } from "@/shared/hooks/useBindHotkeys";
+import { useToast } from "@/shared/hooks/useToast";
+import { copyToClipboard } from "@/shared/lib/clipboard";
+import { BaseModal } from "@/shared/modals/BaseModal";
+import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
+import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
+import type { LanguageCode } from "@/store/knowledge.store";
+import { Tree } from "@/widgets/Sidebar/Tree";
+import { can } from "../../../shared/access.js";
+import { BindLinkEditor } from "./BindLinkEditor";
+import { BindProposals } from "./BindProposals";
+import { reconcileBindLinks } from "./bind-links";
+import { SharedBindEditor } from "./SharedBindEditor";
+import { ShareRecipientPicker } from "./ShareRecipientPicker";
+import { buildSharedTree } from "./shared-tree";
+
+export function useWorkspaceSharedBinds() {
+	const user = useAuthStore((s) => s.session?.user);
+	const enabled = can(user?.access, "binds.read");
+	const common = useQuery({
+		queryKey: ["shared-binds", user?.id],
+		queryFn: () => sharedBindsService.list(),
+		enabled,
+		staleTime: 30000,
+		refetchInterval: 30000,
+	});
+	const personal = useQuery({
+		queryKey: ["personal-binds", user?.id, user?.id],
+		queryFn: () => sharedBindsService.personal(user!.id),
+		enabled,
+		staleTime: 30000,
+		refetchInterval: 30000,
+	});
+	const branches = useQuery({
+		queryKey: ["bind-branches", user?.id],
+		queryFn: () => sharedBindsService.branches(),
+		enabled,
+		staleTime: 30000,
+		refetchInterval: 30000,
+	});
+	const locals = useKnowledgeStore((s) => s.binds);
+	const saved = useBindLinksStore((s) =>
+		user?.id ? (s.accounts[user.id] ?? EMPTY_BIND_LINKS) : EMPTY_BIND_LINKS,
+	);
+	const links = useMemo(
+		() => reconcileBindLinks(common.data ?? [], locals, saved),
+		[common.data, locals, saved],
+	);
+	return { user, common, personal, branches, links };
+}
+
+export function matchLocalBind(base: Bind, locals: Bind[]) {
+	const exact = locals.find(
+		(b) => b.id === base.id || b.sourceBindId === base.id,
+	);
+	if (exact) return exact;
+	const matches = locals.filter((b) => b.slug === base.slug && !b.archived);
+	return matches.length === 1 ? matches[0] : undefined;
+}
+
+// Keep cloud records separate from the browser's editable knowledge snapshot.
+export function WorkspaceSharedBindsSync() {
+	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
+	const locals = useKnowledgeStore((s) => s.binds);
+	useEffect(() => {
+		const values = (common.data ?? [])
+			.filter((b) => !b.archived)
+			.filter(
+				(b) =>
+					!locals.some((local) => local.id === links[b.id] && local.archived),
+			)
+			.map((base) => {
+				const own = (personal.data ?? []).find(
+					(b) => b.sourceBindId === base.id && !b.archived,
+				);
+				const local = locals.find(
+					(b) => b.id === links[base.id] && !b.archived,
+				);
+				return {
+					...resolveBranch(
+						base,
+						own ?? (local?.ownerId === null ? undefined : local),
+						branches.data,
+					).bind,
+					id: local?.id ?? base.id,
+					sourceBindId: base.id,
+				};
+			});
+		useKnowledgeStore.setState({ remoteBinds: values });
+	}, [common.data, personal.data, branches.data, locals, links]);
+	useEffect(() => {
+		if (user?.id && common.data)
+			useBindLinksStore.getState().remember(user.id, links);
+	}, [user?.id, common.data, links]);
+	useEffect(
+		() => () => {
+			useKnowledgeStore.setState({ remoteBinds: [] });
+		},
+		[],
+	);
+	return null;
+}
+
+export function WorkspaceSharedTree({
+	onNavigate,
+	filterNodes = (nodes) => nodes,
+	forceExpanded = false,
+	selectedBindIds,
+	onToggleBindSelection,
+	onClearBindSelection,
+}: {
+	onNavigate?: () => void;
+	filterNodes?: (nodes: KnowledgeTreeNode[]) => KnowledgeTreeNode[];
+	forceExpanded?: boolean;
+	selectedBindIds?: string[];
+	onToggleBindSelection?: (id: string) => void;
+	onClearBindSelection?: () => void;
+}) {
+	const { common, personal } = useWorkspaceSharedBinds();
+	const locals = useKnowledgeStore((s) => s.binds);
+	const categories = useKnowledgeStore((s) => s.categories);
+	const folders = useKnowledgeStore((s) => s.folders);
+	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const [expanded, setExpanded] = useState(true);
+	// Include newly created runtime binds until the common query refreshes.
+	// Conversely, never hide an existing common bind just because the snapshot contains it.
+	const items = [
+		...(common.data ?? []),
+		...locals.filter(
+			(b) =>
+				b.ownerId === null &&
+				!(common.data ?? []).some((base) => base.id === b.id),
+		),
+	];
+	const nodes = filterNodes(
+		buildSharedTree(
+			categories,
+			folders,
+			items.map((base) => ({
+				...base,
+				// Keep existing personal-link tab IDs while retaining the common location.
+				id: remoteBinds.find((b) => b.sourceBindId === base.id)?.id ?? base.id,
+			})),
+		),
+	);
+	return (
+		<section aria-label="Общие бинды">
+			<button
+				type="button"
+				aria-expanded={expanded || forceExpanded}
+				onClick={() => setExpanded((value) => !value)}
+				className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium hover:bg-surface-elevated"
+			>
+				{expanded || forceExpanded ? (
+					<ChevronDown size={14} />
+				) : (
+					<ChevronRight size={14} />
+				)}
+				<Users size={14} />
+				<span>Общие</span>
+			</button>
+			{(common.error || personal.error) && (
+				<p role="alert" className="p-2 text-xs text-red-400">
+					{(common.error ?? personal.error)?.message}
+				</p>
+			)}
+			{common.isPending && (
+				<p className="p-2 text-xs text-muted">Загрузка биндов…</p>
+			)}
+			{(expanded || forceExpanded) && (
+				<Tree
+					nodes={nodes}
+					forceExpanded={forceExpanded}
+					selectedBindIds={selectedBindIds}
+					onToggleBindSelection={onToggleBindSelection}
+					onClearBindSelection={onClearBindSelection}
+					onOpenItem={onNavigate}
+				/>
+			)}
+		</section>
+	);
+}
+
+export function resolveBranch(
+	base: Bind,
+	own: Bind | undefined,
+	branches: BindBranches | undefined,
+) {
+	const choice = branches?.choices[base.id] ?? (own ? "mine" : "main");
+	const received = branches?.incoming.find(
+		(s) => s.sourceId === base.id && s.id === choice,
+	);
+	if (received)
+		return { branch: choice, bind: received.bind, label: received.sender };
+	if (choice === "main") return { branch: "main", bind: base, label: "Общая" };
+	return {
+		branch: "mine",
+		bind: own ?? base,
+		label: own ? "Моя" : "Моя · из основной",
+	};
+}
+
+export function WorkspaceSharedBindViewer({ id }: { id: string }) {
+	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
+	const client = useQueryClient();
+	const { showToast } = useToast();
+	const base = common.data?.find((b) => b.id === id),
+		savedOwn = personal.data?.find((b) => b.sourceBindId === id && !b.archived);
+	const locals = useKnowledgeStore((s) => s.binds);
+	const local = locals.find((b) => b.id === links[id] && !b.archived);
+	// Version links can be separated or point to a record replaced by a personal
+	// override. Library actions still target an existing runtime record, not the
+	// displayed (possibly received/read-only) version.
+	const libraryBind =
+		local ??
+		locals.find((b) => b.id === id && !b.archived) ??
+		locals.find((b) => b.id === savedOwn?.id && !b.archived);
+	const [linkOpen, setLinkOpen] = useState(false);
+	// The shared runtime copy is not a personal branch.
+	const own = savedOwn ?? (local?.ownerId === null ? undefined : local);
+	const [editor, setEditor] = useState<Bind | null>(null),
+		[busy, setBusy] = useState(false),
+		[error, setError] = useState("");
+	const [declineId, setDeclineId] = useState<string>();
+	const [compare, setCompare] = useState(false),
+		[historyOpen, setHistoryOpen] = useState(false),
+		[shareOpen, setShareOpen] = useState(false),
+		[email, setEmail] = useState("");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: changing the selected bind resets its transient dialogs.
+	useEffect(() => {
+		setEditor(null);
+		setLinkOpen(false);
+		setShareOpen(false);
+		setError("");
+		setHistoryOpen(false);
+		setCompare(false);
+	}, [id]);
+	const language = useKnowledgeStore((s) => s.language);
+	const history = useQuery({
+		queryKey: ["bind-history", user?.id, id],
+		queryFn: () => sharedBindsService.history(id),
+		enabled: historyOpen,
+	});
+	const choose = async (branch: string) => {
+		const key = ["bind-branches", user?.id];
+		await client.cancelQueries({ queryKey: key });
+		const previous = client.getQueryData<BindBranches>(key)?.choices[id];
+		client.setQueryData<BindBranches>(key, (current) =>
+			current
+				? { ...current, choices: { ...current.choices, [id]: branch } }
+				: current,
+		);
+		try {
+			await sharedBindsService.branchAction("choose", { sourceId: id, branch });
+		} catch (error) {
+			client.setQueryData<BindBranches>(key, (current) => {
+				if (!current) return current;
+				const choices = { ...current.choices };
+				if (previous === undefined) delete choices[id];
+				else choices[id] = previous;
+				return { ...current, choices };
+			});
+			throw error;
+		}
+	};
+
+	const action = async (fn: () => Promise<unknown>) => {
+		setBusy(true);
+		setError("");
+		try {
+			await fn();
+		} catch (e) {
+			setError((e as Error).message);
+		} finally {
+			setBusy(false);
+		}
+	};
+	const selected = base ? resolveBranch(base, own, branches.data) : undefined;
+	const item = selected?.bind;
+	const translation =
+		item?.translations.find((t) => t.language === language) ??
+		item?.translations[0];
+	const copyContent = () =>
+		copyToClipboard(translation?.content ?? "").then((ok) =>
+			showToast(ok ? "Ответ скопирован" : "Не удалось скопировать"),
+		);
+	const libraryAction = (fn: () => unknown) => {
+		try {
+			fn();
+		} catch (error) {
+			showToast(
+				error instanceof Error
+					? error.message
+					: "Не удалось выполнить действие",
+			);
+		}
+	};
+	useBindHotkeys({
+		enabled:
+			Boolean(item && translation) &&
+			!busy &&
+			!common.isPending &&
+			!personal.isPending &&
+			!branches.isPending &&
+			!common.error &&
+			!personal.error &&
+			!branches.error,
+		copy: copyContent,
+		edit: item && user ? () => setEditor(item) : undefined,
+		duplicate: libraryBind
+			? () =>
+					libraryAction(() => knowledgeService.duplicateBind(libraryBind.id))
+			: undefined,
+		favorite: libraryBind
+			? () =>
+					libraryAction(() => knowledgeService.toggleFavorite(libraryBind.id))
+			: undefined,
+		pin: libraryBind
+			? () => useKnowledgeStore.getState().togglePinnedTab(libraryBind.id)
+			: undefined,
+		languages: item?.translations.map((t) => t.language) ?? [],
+		language: translation?.language ?? language,
+		setLanguage: (next) =>
+			useKnowledgeStore.getState().setLanguage(next as LanguageCode),
+	});
+	if (common.isPending || personal.isPending || branches.isPending)
+		return <p className="p-6 text-muted">Открываем ветки бинда…</p>;
+	if (common.error || personal.error || branches.error)
+		return (
+			<div className="p-6">
+				<p role="alert" className="text-red-400">
+					{(common.error ?? personal.error ?? branches.error)?.message}
+				</p>
+				<button
+					type="button"
+					onClick={() => {
+						void common.refetch();
+						void personal.refetch();
+						void branches.refetch();
+					}}
+					className="mt-3 text-sm underline"
+				>
+					Повторить
+				</button>
+			</div>
+		);
+	if (!base || !selected || !item)
+		return <p className="p-6 text-muted">Бинд больше недоступен.</p>;
+	const incoming =
+		branches.data?.incoming.filter((s) => s.sourceId === id) ?? [];
+	const outgoing =
+		branches.data?.outgoing.filter((s) => s.sourceId === id) ?? [];
+	const originalText = base.translations.find(
+		(t) => t.language === translation?.language,
+	);
+	const comparison = selected.branch === "main" ? (own ?? base) : item;
+	const comparisonText = comparison.translations.find(
+		(t) => t.language === translation?.language,
+	);
+	return (
+		<div className="supportos-scroll min-h-0 flex-1 overflow-auto p-5 sm:p-8">
+			<div className="mx-auto min-w-0 max-w-5xl space-y-5 [overflow-wrap:anywhere]">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="min-w-0 basis-full sm:flex-1">
+						<div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted">
+							<span>Версия ответа</span>
+							<output className="normal-case tracking-normal">
+								{busy ? "· Сохраняем…" : ""}
+							</output>
+						</div>
+						<fieldset aria-label="Ветка бинда" className="bind-version-switch">
+							{[
+								{ id: "main", label: "Общая", hint: "Для команды" },
+								{
+									id: "mine",
+									label: "Моя",
+									hint: own ? "Личная версия" : "Из общей",
+								},
+								...incoming.map((s) => ({
+									id: s.id,
+									label: s.sender,
+									hint: "От коллеги",
+								})),
+							].map((v) => (
+								<button
+									key={v.id}
+									aria-label={v.label}
+									type="button"
+									disabled={busy}
+									aria-pressed={selected.branch === v.id}
+									onClick={() => void action(() => choose(v.id))}
+									className="bind-version-option"
+								>
+									<span className="block text-sm font-medium">{v.label}</span>
+									<span className="block text-[10px] text-muted">{v.hint}</span>
+								</button>
+							))}
+						</fieldset>
+					</div>
+					<div className="ui-actions items-center flex flex-wrap gap-2">
+						<MoreActions>
+							{libraryBind && <LocalBindActions bind={libraryBind} />}
+							{incoming.some((share) => share.id === selected.branch) && (
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => setDeclineId(selected.branch)}
+									className="min-h-10 px-3 text-left text-sm text-red-400"
+								>
+									Отказаться от версии
+								</button>
+							)}
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() => setLinkOpen(true)}
+								className="ui-button ui-button--secondary border border-border"
+							>
+								Связь версий
+							</button>
+							<button
+								type="button"
+								aria-pressed={compare}
+								onClick={() => setCompare((v) => !v)}
+								className="ui-button ui-button--secondary border border-border"
+							>
+								Сравнить
+							</button>
+							<button
+								type="button"
+								aria-expanded={historyOpen}
+								onClick={() => setHistoryOpen((v) => !v)}
+								className="ui-button ui-button--secondary border border-border"
+							>
+								История
+							</button>
+							{savedOwn && (
+								<div className="ui-actions items-center flex flex-wrap gap-2">
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() =>
+											void action(async () => {
+												await sharedBindsService.branchAction("propose", {
+													sourceId: id,
+													expected: base.updatedAt,
+												});
+												await client.invalidateQueries({
+													queryKey: ["bind-proposals"],
+												});
+												showToast("Предложение отправлено на проверку");
+											})
+										}
+										className="ui-button ui-button--secondary border border-border"
+									>
+										Предложить мою версию команде
+									</button>
+									<button
+										type="button"
+										disabled={busy}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Удалить свою ветку этого бинда? Доступ коллег к ней тоже будет отозван.",
+												)
+											)
+												void action(async () => {
+													if (savedOwn)
+														await sharedBindsService.resetPersonal(
+															base,
+															savedOwn,
+															user!.id,
+														);
+													await choose("main");
+													await Promise.all([
+														client.invalidateQueries({
+															queryKey: ["personal-binds"],
+														}),
+														client.invalidateQueries({
+															queryKey: ["bind-branches"],
+														}),
+														client.invalidateQueries({
+															queryKey: ["bind-history"],
+														}),
+													]);
+												});
+										}}
+										className="ui-button ui-button--ghost flex items-center gap-2 text-muted"
+									>
+										<RotateCcw size={13} />
+										Сбросить мою ветку
+									</button>
+								</div>
+							)}
+						</MoreActions>
+						<button
+							type="button"
+							disabled={busy}
+							onClick={() => {
+								setError("");
+								setShareOpen(true);
+							}}
+							className="ui-button ui-button--secondary border border-border disabled:opacity-40"
+						>
+							Поделиться
+						</button>
+					</div>
+				</div>
+				{error && !shareOpen && (
+					<p role="alert" className="text-sm text-red-400">
+						{error}
+					</p>
+				)}
+				<div className="flex flex-wrap items-start justify-between gap-4">
+					<div className="min-w-0">
+						<p className="mb-2 text-xs text-muted">
+							{selected.label}
+							{incoming.some((s) => s.id === selected.branch)
+								? " · доступ только для чтения"
+								: ""}
+						</p>
+						<h1 className="text-2xl font-semibold">{translation?.title}</h1>
+					</div>
+					<div className="ui-actions items-center flex flex-wrap gap-2">
+						<button
+							type="button"
+							disabled={busy}
+							onClick={() => setEditor(item)}
+							aria-keyshortcuts="E"
+							className="ui-button ui-button--secondary flex items-center gap-2 border border-border"
+						>
+							<Pencil size={15} />
+							{incoming.some((s) => s.id === selected.branch)
+								? "Скопировать в мою ветку"
+								: "Изменить для себя"}
+						</button>
+						<button
+							type="button"
+							onClick={() => void copyContent()}
+							title="Копировать (Ctrl+C / ⌘C или C)"
+							aria-keyshortcuts="Control+C Meta+C C"
+							className="ui-button ui-button--primary flex items-center gap-2 bg-accent text-accent-foreground"
+						>
+							<Copy size={16} />
+							Копировать
+						</button>
+					</div>
+				</div>
+				<div className="flex flex-wrap gap-2">
+					{item.translations.map((t) => (
+						<button
+							type="button"
+							key={t.language}
+							onClick={() =>
+								useKnowledgeStore
+									.getState()
+									.setLanguage(t.language as LanguageCode)
+							}
+							aria-pressed={translation?.language === t.language}
+							className="ui-button ui-button--secondary border border-border uppercase aria-pressed:bg-surface-elevated"
+						>
+							{t.language}
+						</button>
+					))}
+				</div>
+				{own &&
+					new Date(own.sourceHash ?? "").getTime() !==
+						new Date(base.updatedAt).getTime() && (
+						<p className="text-xs text-amber-400">
+							Основная ветка обновилась. Сравните изменения перед
+							редактированием своей.
+						</p>
+					)}
+				{translation?.agentInstructions && (
+					<section className="bind-instructions">
+						<p className="section-eyebrow">Инструкция</p>
+						<h2>Что должен знать агент</h2>
+						<p className="whitespace-pre-wrap">
+							{translation.agentInstructions}
+						</p>
+					</section>
+				)}
+				<article className="bind-answer rounded-2xl border border-border bg-surface p-6 leading-7 whitespace-pre-wrap break-words">
+					<div className="bind-answer-heading">
+						<span>Готовый ответ</span>
+					</div>
+					<ReactMarkdown
+						remarkPlugins={[remarkGfm]}
+						components={{
+							table: ({ children }) => (
+								<div className="supportos-scroll min-w-0 max-w-full overflow-x-auto">
+									<table>{children}</table>
+								</div>
+							),
+						}}
+					>
+						{translation?.content ?? ""}
+					</ReactMarkdown>
+				</article>
+				{compare && (
+					<section className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
+						<div className="rounded-xl border border-border bg-surface p-4">
+							<h2 className="mb-3 text-sm font-semibold">
+								Основная · {translation?.language}
+							</h2>
+							<p className="whitespace-pre-wrap break-words text-sm leading-6">
+								{originalText?.content ?? "Нет перевода на этом языке"}
+							</p>
+							<p className="mt-3 text-xs text-muted">
+								Теги: {base.tags.join(", ") || "нет"}
+							</p>
+						</div>
+						<div className="rounded-xl border border-border bg-surface p-4">
+							<h2 className="mb-3 text-sm font-semibold">
+								{selected.branch === "main" ? "Моя" : selected.label} ·{" "}
+								{translation?.language}
+							</h2>
+							<p className="whitespace-pre-wrap break-words text-sm leading-6">
+								{comparisonText?.content ?? "Нет перевода на этом языке"}
+							</p>
+							<p className="mt-3 text-xs text-muted">
+								Теги: {comparison.tags.join(", ") || "нет"}
+							</p>
+						</div>
+					</section>
+				)}
+				{historyOpen && (
+					<section className="rounded-2xl border border-border bg-surface p-4">
+						<h2 className="mb-3 text-sm font-semibold">
+							История основной и моей веток · последние 50 версий
+						</h2>
+						{history.isPending && (
+							<p className="text-xs text-muted">Загрузка…</p>
+						)}
+						{history.error && (
+							<p role="alert" className="text-red-400">
+								{history.error.message}
+							</p>
+						)}
+						{history.data?.map((revision) => (
+							<details
+								key={revision.id}
+								className="border-t border-border py-3"
+							>
+								<summary className="cursor-pointer text-xs">
+									{revision.owner_id ? "Моя" : "Основная"} ·{" "}
+									{new Date(revision.created_at).toLocaleString("ru")}{" "}
+									{revision.operation === "DELETE" ? "· удаление" : ""}
+								</summary>
+								{revision.snapshot.translations.map((t) => (
+									<p
+										key={t.language}
+										className="mt-3 whitespace-pre-wrap break-words text-sm"
+									>
+										{t.language} · {t.title}
+										{"\n"}
+										{t.content}
+									</p>
+								))}
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => setEditor(revision.snapshot)}
+									className="ui-button ui-button--secondary mt-3 border border-border"
+								>
+									Взять за основу моей версии
+								</button>
+							</details>
+						))}
+					</section>
+				)}
+
+				<details className="rounded-xl border border-border p-3">
+					<summary className="cursor-pointer text-xs text-muted">
+						Предложения команды
+					</summary>
+					<div className="mt-3">
+						<BindProposals sourceId={id} />
+					</div>
+				</details>
+				{linkOpen && user && (
+					<BindLinkEditor
+						base={base}
+						locals={locals}
+						links={links}
+						userId={user.id}
+						onClose={() => setLinkOpen(false)}
+					/>
+				)}
+				{editor && user && (
+					<SharedBindEditor
+						draftSourceId={id}
+						draftTargetId={user.id}
+						personal
+						original={editor}
+						onClose={() => setEditor(null)}
+						save={(draft, latest) =>
+							sharedBindsService.savePersonal({
+								source: base,
+								original:
+									latest === undefined ? savedOwn : (latest ?? undefined),
+								userId: user.id,
+								...draft,
+							})
+						}
+						onSaved={() => {
+							setEditor(null);
+							void action(async () => {
+								await Promise.all([
+									client.invalidateQueries({ queryKey: ["personal-binds"] }),
+									client.invalidateQueries({ queryKey: ["bind-history"] }),
+								]);
+								await choose("mine");
+							});
+						}}
+					/>
+				)}
+				{declineId && (
+					<BaseModal
+						title="Отказаться от версии?"
+						closeDisabled={busy}
+						onClose={() => setDeclineId(undefined)}
+					>
+						<p className="mb-4 text-sm">
+							После отказа вы вернётесь к своей или общей версии бинда.
+						</p>
+						{error && <p role="alert">{error}</p>}
+						<div className="ui-actions items-center flex gap-3">
+							<button
+								type="button"
+								disabled={busy}
+								className="min-h-10 rounded-lg border border-border px-3"
+								onClick={() =>
+									void action(async () => {
+										await sharedBindsService.branchAction("decline", {
+											shareId: declineId,
+										});
+										await client.cancelQueries({
+											queryKey: ["bind-branches", user?.id],
+										});
+										client.setQueryData<BindBranches>(
+											["bind-branches", user?.id],
+											(current) => {
+												if (!current) return current;
+												const choices = { ...current.choices };
+												if (choices[id] === declineId) delete choices[id];
+												return {
+													...current,
+													choices,
+													incoming: current.incoming.filter(
+														(share) => share.id !== declineId,
+													),
+												};
+											},
+										);
+										setDeclineId(undefined);
+										showToast("Вы отказались от полученной версии");
+										await client.invalidateQueries({
+											queryKey: ["bind-branches"],
+										});
+									})
+								}
+							>
+								Отказаться
+							</button>
+							<button
+								type="button"
+								disabled={busy}
+								className="min-h-10 px-3"
+								onClick={() => setDeclineId(undefined)}
+							>
+								Отмена
+							</button>
+						</div>
+					</BaseModal>
+				)}
+				{shareOpen && (
+					<BaseModal
+						title="Поделиться версией"
+						closeDisabled={busy}
+						onClose={() => setShareOpen(false)}
+					>
+						<p className="mb-4 text-sm leading-6 text-muted">
+							Сотрудник сможет читать вашу ветку и видеть её обновления. Для
+							редактирования он создаст свою копию. Отзыв доступа не удаляет уже
+							сделанные копии.
+						</p>
+						<form
+							onSubmit={(e) => {
+								e.preventDefault();
+								if (
+									busy ||
+									!email ||
+									outgoing.some(
+										(share) =>
+											share.email.toLowerCase() === email.toLowerCase(),
+									)
+								)
+									return;
+								void action(async () => {
+									if (!savedOwn) {
+										await sharedBindsService.savePersonal({
+											source: base,
+											original: undefined,
+											userId: user!.id,
+											translations: (own ?? base).translations,
+											tags: (own ?? base).tags,
+										});
+										await client.invalidateQueries({
+											queryKey: ["personal-binds"],
+										});
+									}
+									await sharedBindsService.branchAction("share", {
+										sourceId: id,
+										email,
+									});
+									setEmail("");
+									await client.invalidateQueries({
+										queryKey: ["bind-branches"],
+									});
+									showToast("Доступ к ветке предоставлен");
+								});
+							}}
+							className="ui-actions items-center flex flex-wrap gap-2"
+						>
+							<ShareRecipientPicker
+								value={email}
+								onChange={setEmail}
+								sharedEmails={outgoing.map((share) => share.email)}
+								disabled={busy}
+							/>
+							<button
+								type="submit"
+								disabled={
+									busy ||
+									!email ||
+									outgoing.some(
+										(share) =>
+											share.email.toLowerCase() === email.toLowerCase(),
+									)
+								}
+								className="ui-button ui-button--primary bg-accent text-accent-foreground"
+							>
+								Предоставить доступ
+							</button>
+						</form>
+						{error && (
+							<p role="alert" className="mt-3 text-sm text-red-400">
+								{error}
+							</p>
+						)}
+						<h3 className="mb-2 mt-5 text-xs font-semibold text-muted">
+							У кого есть доступ
+						</h3>
+						{!outgoing.length && (
+							<p className="text-sm text-muted">Пока только у вас.</p>
+						)}
+						{outgoing.map((s) => (
+							<div
+								key={s.id}
+								className="flex items-center justify-between gap-3 border-t border-border py-3"
+							>
+								<div className="min-w-0">
+									<p className="truncate text-sm">{s.recipient}</p>
+									<p className="truncate text-xs text-muted">{s.email}</p>
+								</div>
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() =>
+										void action(async () => {
+											await sharedBindsService.branchAction("revoke", {
+												shareId: s.id,
+											});
+											await client.invalidateQueries({
+												queryKey: ["bind-branches"],
+											});
+										})
+									}
+									className="text-xs text-red-400"
+								>
+									Отозвать доступ
+								</button>
+							</div>
+						))}
+					</BaseModal>
+				)}
+			</div>
+		</div>
+	);
+}

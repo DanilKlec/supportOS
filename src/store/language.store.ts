@@ -1,16 +1,16 @@
 import { create } from "zustand";
 
 interface LanguageState {
-  current: string;
+	current: string;
 
-  setLanguage: (code: string) => void;
+	setLanguage: (code: string) => void;
 }
 
 export const useLanguageStore = create<LanguageState>((set) => ({
-  current: "en",
+	current: "en",
 
-  setLanguage: (current) =>
-    set({
-      current,
-    }),
+	setLanguage: (current) =>
+		set({
+			current,
+		}),
 }));

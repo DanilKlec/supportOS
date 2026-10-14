@@ -12,32 +12,35 @@ import {
 	X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-
-import type { ProjectEmailRecord } from "@/entities/project-email";
+import { useSharedPublication } from "@/components/SharedPublication";
+import type {
+	ProjectEmailAddress,
+	ProjectEmailRecord,
+} from "@/entities/project-email";
 import {
 	type ProjectEmailImportMode,
 	type ProjectEmailImportPreview,
 	projectEmailImportService,
 } from "@/services/project-email-import.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { useViewState } from "@/shared/hooks/useViewState";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { useProjectEmailStore } from "@/store/project-email.store";
+import {
+	emailAddresses,
+	mergeEmailImport,
+	normalizeProjectEmail,
+	projectEmailText,
+} from "../../../shared/project-emails.js";
 
 interface EmailDraft {
 	projectName: string;
-	supportEmail: string;
-	kycEmail: string;
-	vipEmail: string;
+	addresses: ProjectEmailAddress[];
 }
 
 type WorkPanel = "closed" | "editor" | "import";
 
-const EMPTY_DRAFT: EmailDraft = {
-	projectName: "",
-	supportEmail: "",
-	kycEmail: "",
-	vipEmail: "",
-};
+const EMPTY_DRAFT: EmailDraft = { projectName: "", addresses: [] };
 
 function createId(prefix: string) {
 	const random =
@@ -69,16 +72,7 @@ function isEmail(value: string) {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-function buildProjectEmailBlock(record: ProjectEmailRecord) {
-	return [
-		record.projectName,
-		record.supportEmail ? `Support: ${record.supportEmail}` : "",
-		record.kycEmail ? `KYC: ${record.kycEmail}` : "",
-		record.vipEmail ? `VIP: ${record.vipEmail}` : "",
-	]
-		.filter(Boolean)
-		.join("\n");
-}
+const buildProjectEmailBlock = projectEmailText;
 
 function toRecord(draft: EmailDraft, existing?: ProjectEmailRecord) {
 	const projectName = draft.projectName.trim();
@@ -87,24 +81,43 @@ function toRecord(draft: EmailDraft, existing?: ProjectEmailRecord) {
 		id: existing?.id ?? createId("project-email"),
 		projectName,
 		slug: existing?.slug ?? slugify(projectName),
-		supportEmail: normalizeEmail(draft.supportEmail),
-		kycEmail: normalizeEmail(draft.kycEmail),
-		vipEmail: normalizeEmail(draft.vipEmail),
+		addresses: draft.addresses.map((row, order) => ({
+			...row,
+			order,
+			type: row.type.trim(),
+			email: normalizeEmail(row.email),
+			note: row.note?.trim(),
+		})),
 		sourceHash: existing?.sourceHash,
 		updatedAt: new Date().toISOString(),
 	};
 }
 
-export function ProjectEmailsPage() {
+export function ProjectEmailsPage({
+	management = false,
+}: {
+	management?: boolean;
+} = {}) {
 	const { showToast } = useToast();
 	const records = useProjectEmailStore((state) => state.records);
 	const upsertRecords = useProjectEmailStore((state) => state.upsertRecords);
 	const replaceRecords = useProjectEmailStore((state) => state.replaceRecords);
 	const removeRecord = useProjectEmailStore((state) => state.removeRecord);
-	const [query, setQuery] = useState("");
+	const publication = useSharedPublication(
+		"emails",
+		records,
+		replaceRecords,
+		management,
+	);
+	const canEdit = publication.canEdit;
+	const [query, setQuery] = useViewState(`emails:${management}`, "query", "");
 	const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 	const [editingId, setEditingId] = useState<string>();
-	const [selectedId, setSelectedId] = useState<string>();
+	const [selectedId, setSelectedId] = useViewState<string | undefined>(
+		`emails:${management}`,
+		"selected",
+		undefined,
+	);
 	const [deleteId, setDeleteId] = useState<string>();
 	const [workPanel, setWorkPanel] = useState<WorkPanel>("closed");
 	const [formError, setFormError] = useState("");
@@ -117,26 +130,24 @@ export function ProjectEmailsPage() {
 	const filteredRecords = useMemo(() => {
 		const value = query.trim().toLowerCase();
 
-		if (!value) return records;
-
 		return records.filter((record) =>
 			[
 				record.projectName,
-				record.supportEmail,
-				record.kycEmail,
-				record.vipEmail,
+				...emailAddresses(record).flatMap((row) => [
+					row.type,
+					row.email,
+					row.note || "",
+				]),
 			]
 				.join(" ")
 				.toLowerCase()
 				.includes(value),
 		);
-	}, [records, query]);
+	}, [query, records]);
 
 	const selectedRecord =
 		filteredRecords.find((record) => record.id === selectedId) ??
-		records.find((record) => record.id === selectedId) ??
-		filteredRecords[0] ??
-		records[0];
+		filteredRecords[0];
 	const deleteTarget = records.find((record) => record.id === deleteId);
 
 	const resetForm = () => {
@@ -151,12 +162,14 @@ export function ProjectEmailsPage() {
 	};
 
 	const openCreate = () => {
+		if (!canEdit) return;
 		resetForm();
 		setWorkPanel("editor");
 	};
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
+		if (!canEdit) return;
 		setFormError("");
 
 		const existing = editingId
@@ -165,42 +178,41 @@ export function ProjectEmailsPage() {
 		const projectName = draft.projectName.trim();
 
 		if (!projectName) {
-			setFormError("Project name is required");
+			setFormError("Укажите название проекта");
 			return;
 		}
 
-		for (const email of [draft.supportEmail, draft.kycEmail, draft.vipEmail]) {
-			if (!isEmail(email)) {
-				setFormError("Email format is invalid");
+		for (const row of draft.addresses) {
+			if (!row.type.trim() || !row.email.trim() || !isEmail(row.email)) {
+				setFormError("Проверьте формат почты");
 				return;
 			}
 		}
 
-		if (
-			!draft.supportEmail.trim() &&
-			!draft.kycEmail.trim() &&
-			!draft.vipEmail.trim()
-		) {
-			setFormError("Add at least one email");
+		if (draft.addresses.length === 0) {
+			setFormError("Укажите хотя бы одну почту");
 			return;
 		}
 
-		const nextRecord = toRecord(draft, existing);
+		const nextRecord = normalizeProjectEmail(toRecord(draft, existing));
 
 		upsertRecords([nextRecord]);
 		setSelectedId(nextRecord.id);
-		showToast(editingId ? "Project emails saved" : "Project emails added");
+		showToast(
+			editingId
+				? "Изменения применены. Сохраните справочник для публикации."
+				: "Проект добавлен в черновик справочника",
+		);
 		closePanel();
 	};
 
 	const editRecord = (record: ProjectEmailRecord) => {
+		if (!canEdit) return;
 		setSelectedId(record.id);
 		setEditingId(record.id);
 		setDraft({
 			projectName: record.projectName,
-			supportEmail: record.supportEmail,
-			kycEmail: record.kycEmail,
-			vipEmail: record.vipEmail,
+			addresses: emailAddresses(record).map((row) => ({ ...row })),
 		});
 		setFormError("");
 		setWorkPanel("editor");
@@ -210,25 +222,29 @@ export function ProjectEmailsPage() {
 		if (!text.trim()) return;
 
 		const copied = await copyToClipboard(text);
-		showToast(copied ? successMessage : "Copy failed");
+		showToast(copied ? successMessage : "Не удалось скопировать");
 	};
 
 	const loadPreview = async () => {
+		if (!canEdit) return;
 		setImporting(true);
 
 		try {
 			const nextPreview = await projectEmailImportService.preview(sheetUrl);
 
 			setPreview(nextPreview);
-			showToast("Preview loaded");
+			showToast("Предпросмотр готов");
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Import failed");
+			showToast(
+				error instanceof Error ? error.message : "Не удалось загрузить данные",
+			);
 		} finally {
 			setImporting(false);
 		}
 	};
 
 	const commitPreview = () => {
+		if (!canEdit) return;
 		if (!preview || preview.records.length === 0) return;
 
 		setCommitting(true);
@@ -237,11 +253,20 @@ export function ProjectEmailsPage() {
 			if (mode === "replace") {
 				replaceRecords(preview.records);
 			} else {
-				upsertRecords(preview.records);
+				upsertRecords(
+					preview.records.map((row) =>
+						mergeEmailImport(
+							records.find((old) => old.slug === row.slug),
+							row,
+						),
+					),
+				);
 			}
 
 			setSelectedId(preview.records[0]?.id);
-			showToast(`Imported and saved ${preview.records.length} projects`);
+			showToast(
+				`Добавлено в черновик проектов: ${preview.records.length}. Сохраните для публикации.`,
+			);
 			setPreview(undefined);
 			setSheetUrl("");
 			setWorkPanel("closed");
@@ -251,6 +276,7 @@ export function ProjectEmailsPage() {
 	};
 
 	const confirmDelete = () => {
+		if (!canEdit) return;
 		if (!deleteTarget) return;
 
 		removeRecord(deleteTarget.id);
@@ -258,50 +284,56 @@ export function ProjectEmailsPage() {
 			setSelectedId(undefined);
 		}
 		setDeleteId(undefined);
-		showToast("Project emails deleted");
+		showToast("Проект удалён из черновика справочника");
 	};
 
+	if (!publication.ready) return publication.banner;
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-background">
-			<div className="mx-auto grid h-full w-full max-w-7xl grid-rows-[auto_minmax(0,1fr)] gap-4 p-4 sm:p-6">
+		<div className="supportos-page-scroll min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
+			{publication.banner}
+			<div className="grid min-h-full min-w-0 w-full grid-rows-[auto_1fr] gap-4 py-4 sm:py-6 lg:h-full lg:min-h-0 lg:grid-rows-[auto_minmax(0,1fr)]">
 				<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">
 						<div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
 							<Mail size={14} />
-							Quick directory
+							Справочник
 						</div>
 						<h1 className="mt-1 text-xl font-semibold sm:text-2xl">
-							Project Emails
+							Почты проектов
 						</h1>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="ui-actions items-center flex flex-wrap  gap-2">
 						<button
 							type="button"
+							style={!management ? { display: "none" } : undefined}
+							disabled={!canEdit}
 							onClick={openCreate}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+							className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 						>
 							<Plus size={16} />
-							Add project
+							Добавить проект
 						</button>
 						<button
 							type="button"
+							style={!management ? { display: "none" } : undefined}
+							disabled={!canEdit}
 							onClick={() =>
 								setWorkPanel((current) =>
 									current === "import" ? "closed" : "import",
 								)
 							}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+							className="ui-button ui-button--secondary inline-flex items-center justify-center gap-2 border border-border bg-surface font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 						>
 							<Upload size={16} />
-							Import
+							Импорт
 						</button>
 					</div>
 				</header>
 
-				<div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
-					<aside className="flex min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border bg-surface lg:min-h-0">
-						<div className="border-b border-border p-3">
+				<div className="grid min-h-0 min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+					<aside className="flex h-[min(24rem,45dvh)] min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface lg:h-auto lg:min-h-0">
+						<div className="shrink-0 border-b border-border p-3">
 							<div className="relative">
 								<Search
 									size={16}
@@ -310,13 +342,22 @@ export function ProjectEmailsPage() {
 								<input
 									value={query}
 									onChange={(event) => setQuery(event.target.value)}
-									className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
-									placeholder="Search project or email..."
+									className="ui-input w-full border border-border bg-background pl-10 pr-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+									placeholder="Поиск проекта или почты…"
 								/>
 							</div>
 							<div className="mt-2 text-xs text-muted">
-								{filteredRecords.length} of {records.length} projects
+								{filteredRecords.length} из {records.length} проектов
 							</div>
+							{query && (
+								<button
+									type="button"
+									className="ui-button ui-button--secondary ui-button--compact mt-2"
+									onClick={() => setQuery("")}
+								>
+									Сбросить поиск
+								</button>
+							)}
 						</div>
 
 						<div className="supportos-scroll min-h-0 flex-1 overflow-auto">
@@ -341,20 +382,12 @@ export function ProjectEmailsPage() {
 														{record.projectName}
 													</span>
 													<span className="mt-0.5 block truncate text-xs text-muted">
-														{record.supportEmail ||
-															record.kycEmail ||
-															record.vipEmail ||
-															"No email"}
+														{emailAddresses(record)[0]?.email ||
+															"Почта не указана"}
 													</span>
 												</span>
 												<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
-													{
-														[
-															record.supportEmail,
-															record.kycEmail,
-															record.vipEmail,
-														].filter(Boolean).length
-													}
+													{emailAddresses(record).length}
 												</span>
 											</button>
 										);
@@ -362,19 +395,21 @@ export function ProjectEmailsPage() {
 								</div>
 							) : (
 								<EmptyState
-									title={records.length ? "Nothing found" : "No projects yet"}
+									title={
+										records.length ? "Ничего не найдено" : "Проектов пока нет"
+									}
 									description={
 										records.length
-											? "Try another project name or email."
-											: "Add a project or import a Google Sheet."
+											? "Попробуйте другое название или почту."
+											: "Данные публикуются через общую базу команды."
 									}
 								/>
 							)}
 						</div>
 					</aside>
 
-					<main className="supportos-scroll min-h-0 overflow-auto rounded-xl border border-border bg-surface">
-						{workPanel === "editor" && (
+					<main className="min-h-0 min-w-0 rounded-xl border border-border bg-surface lg:overflow-y-auto">
+						{canEdit && workPanel === "editor" && (
 							<ProjectEmailEditor
 								draft={draft}
 								editing={Boolean(editingId)}
@@ -385,7 +420,7 @@ export function ProjectEmailsPage() {
 							/>
 						)}
 
-						{workPanel === "import" && (
+						{canEdit && workPanel === "import" && (
 							<ProjectEmailImportPanel
 								committing={committing}
 								importing={importing}
@@ -403,46 +438,50 @@ export function ProjectEmailsPage() {
 						{selectedRecord ? (
 							<section>
 								<div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between">
-									<div className="min-w-0">
+									<div className="min-w-0 sm:flex-1">
 										<div className="text-xs font-semibold uppercase text-muted">
-											Selected project
+											Выбранный проект
 										</div>
 										<h2 className="mt-1 truncate text-xl font-semibold">
 											{selectedRecord.projectName}
 										</h2>
 										<div className="mt-1 text-xs text-muted">
-											Updated{" "}
+											Обновлено{" "}
 											{new Date(selectedRecord.updatedAt).toLocaleDateString()}
 										</div>
 									</div>
 
-									<div className="flex flex-wrap items-center gap-2">
+									<div className="ui-actions items-center flex flex-wrap shrink-0 gap-2">
 										<button
 											type="button"
 											onClick={() =>
 												void copyText(
 													buildProjectEmailBlock(selectedRecord),
-													"Project emails copied",
+													"Почты проекта скопированы",
 												)
 											}
-											className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+											className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 										>
 											<Copy size={16} />
-											Copy all
+											Копировать всё
 										</button>
 										<button
 											type="button"
+											style={!management ? { display: "none" } : undefined}
+											disabled={!canEdit}
 											onClick={() => editRecord(selectedRecord)}
-											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
-											aria-label="Edit project emails"
+											className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+											aria-label="Редактировать почты проекта"
 										>
 											<Pencil size={16} />
 										</button>
 										<button
 											type="button"
+											style={!management ? { display: "none" } : undefined}
+											disabled={!canEdit}
 											onClick={() => setDeleteId(selectedRecord.id)}
-											className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
-											aria-label="Delete project emails"
+											className="ui-button ui-button--danger-quiet ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-red-400"
+											aria-label="Удалить почты проекта"
 										>
 											<Trash2 size={16} />
 										</button>
@@ -450,26 +489,45 @@ export function ProjectEmailsPage() {
 								</div>
 
 								<div className="p-4">
-									<div className="grid gap-2">
-										<EmailRow
-											label="Support"
-											email={selectedRecord.supportEmail}
-											onCopy={(email) => void copyText(email, "Support copied")}
-										/>
-										<EmailRow
-											label="KYC"
-											email={selectedRecord.kycEmail}
-											onCopy={(email) => void copyText(email, "KYC copied")}
-										/>
-										<EmailRow
-											label="VIP"
-											email={selectedRecord.vipEmail}
-											onCopy={(email) => void copyText(email, "VIP copied")}
-										/>
+									<div className="grid min-w-0 grid-cols-1 gap-2">
+										{emailAddresses(selectedRecord).map((row) => (
+											<EmailRow
+												key={row.id}
+												label={row.type}
+												email={row.email}
+												note={row.note}
+												onCopy={(email) =>
+													void copyText(email, "Почта скопирована")
+												}
+											/>
+										))}
+										{canEdit && (
+											<button
+												type="button"
+												className="ui-button"
+												onClick={() => {
+													editRecord(selectedRecord);
+													setDraft({
+														projectName: selectedRecord.projectName,
+														addresses: [
+															...emailAddresses(selectedRecord),
+															{
+																id: createId("email"),
+																type: "",
+																email: "",
+																order: emailAddresses(selectedRecord).length,
+															},
+														],
+													});
+												}}
+											>
+												+ Добавить адрес
+											</button>
+										)}
 									</div>
 
 									<div className="mt-4 rounded-lg bg-background p-3 text-xs text-muted">
-										<pre className="whitespace-pre-wrap font-sans leading-5">
+										<pre className="whitespace-pre-wrap break-all font-sans leading-5">
 											{buildProjectEmailBlock(selectedRecord)}
 										</pre>
 									</div>
@@ -477,8 +535,14 @@ export function ProjectEmailsPage() {
 							</section>
 						) : (
 							<EmptyState
-								title="Project email directory is empty"
-								description="Add a project manually or import a Google Sheet to start copying ready contact blocks."
+								title={
+									records.length ? "Ничего не найдено" : "Справочник почт пуст"
+								}
+								description={
+									records.length
+										? "Попробуйте другое название или почту."
+										: "После публикации в общей базе здесь появятся почты проектов."
+								}
 							/>
 						)}
 					</main>
@@ -487,10 +551,10 @@ export function ProjectEmailsPage() {
 
 			<DeleteConfirmDialog
 				open={Boolean(deleteTarget)}
-				title="Delete project emails?"
+				title="Удалить почты проекта?"
 				description={
 					deleteTarget
-						? `${deleteTarget.projectName} will be removed from this directory.`
+						? `${deleteTarget.projectName} будет удалён из черновика справочника.`
 						: ""
 				}
 				onCancel={() => setDeleteId(undefined)}
@@ -515,56 +579,174 @@ function ProjectEmailEditor({
 	onChange: (draft: EmailDraft) => void;
 	onSubmit: (event: FormEvent) => void;
 }) {
+	const moveAddress = (index: number, direction: -1 | 1) => {
+		const addresses = [...draft.addresses];
+		[addresses[index], addresses[index + direction]] = [
+			addresses[index + direction],
+			addresses[index],
+		];
+		onChange({
+			...draft,
+			addresses: addresses.map((item, order) => ({ ...item, order })),
+		});
+	};
 	return (
 		<form onSubmit={onSubmit} className="border-b border-border p-4">
 			<div className="mb-4 flex items-center justify-between gap-3">
 				<div>
 					<div className="flex items-center gap-2 text-sm font-semibold">
 						<Mail size={16} />
-						{editing ? "Edit project" : "Add project"}
+						{editing ? "Редактировать проект" : "Добавить проект"}
 					</div>
 					<p className="mt-1 text-xs text-muted">
-						Fill only the emails that are used by this project.
+						Добавьте используемые адреса. Тип можно указать вручную.
 					</p>
 				</div>
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
-					aria-label="Close editor"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					aria-label="Закрыть редактор"
 				>
 					<X size={16} />
 				</button>
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2">
-				<label className="block space-y-1.5 md:col-span-2">
-					<span className="text-sm font-medium">Project</span>
+				<label className="ui-field md:col-span-2">
+					<span className="text-sm font-medium">Проект</span>
 					<input
 						value={draft.projectName}
 						onChange={(event) =>
 							onChange({ ...draft, projectName: event.target.value })
 						}
-						className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
-						placeholder="Project name"
+						className="ui-input w-full border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+						placeholder="Название проекта"
 					/>
 				</label>
 
-				<EmailInput
-					label="Support"
-					value={draft.supportEmail}
-					onChange={(supportEmail) => onChange({ ...draft, supportEmail })}
-				/>
-				<EmailInput
-					label="KYC"
-					value={draft.kycEmail}
-					onChange={(kycEmail) => onChange({ ...draft, kycEmail })}
-				/>
-				<EmailInput
-					label="VIP"
-					value={draft.vipEmail}
-					onChange={(vipEmail) => onChange({ ...draft, vipEmail })}
-				/>
+				{draft.addresses.map((row, index) => (
+					<fieldset
+						key={row.id}
+						className="md:col-span-2 rounded-lg border border-border p-3 space-y-3"
+					>
+						<legend>Почта {index + 1}</legend>
+						<div className="grid gap-3 md:grid-cols-2">
+							<label className="ui-field">
+								Тип
+								<input
+									className="ui-input"
+									required
+									maxLength={100}
+									list="email-types"
+									value={row.type}
+									onChange={(e) =>
+										onChange({
+											...draft,
+											addresses: draft.addresses.map((v) =>
+												v.id === row.id ? { ...v, type: e.target.value } : v,
+											),
+										})
+									}
+								/>
+							</label>
+							<EmailInput
+								label="Почта"
+								value={row.email}
+								onChange={(email) =>
+									onChange({
+										...draft,
+										addresses: draft.addresses.map((v) =>
+											v.id === row.id ? { ...v, email } : v,
+										),
+									})
+								}
+							/>
+							<label className="ui-field md:col-span-2">
+								Комментарий
+								<input
+									className="ui-input"
+									maxLength={2000}
+									value={row.note || ""}
+									onChange={(e) =>
+										onChange({
+											...draft,
+											addresses: draft.addresses.map((v) =>
+												v.id === row.id ? { ...v, note: e.target.value } : v,
+											),
+										})
+									}
+								/>
+							</label>
+						</div>
+						<div className="ui-actions flex flex-wrap gap-2">
+							<button
+								type="button"
+								className="ui-button ui-button--secondary"
+								disabled={index === 0}
+								onClick={() => moveAddress(index, -1)}
+							>
+								Выше
+							</button>
+							<button
+								type="button"
+								className="ui-button ui-button--secondary"
+								disabled={index === draft.addresses.length - 1}
+								onClick={() => moveAddress(index, 1)}
+							>
+								Ниже
+							</button>
+							<button
+								type="button"
+								className="ui-button ui-button--danger-quiet"
+								onClick={() =>
+									onChange({
+										...draft,
+										addresses: draft.addresses
+											.filter((v) => v.id !== row.id)
+											.map((item, order) => ({ ...item, order })),
+									})
+								}
+							>
+								Удалить адрес
+							</button>
+						</div>
+					</fieldset>
+				))}
+				<datalist id="email-types">
+					{[
+						{ value: "Support", label: "Поддержка" },
+						{ value: "KYC", label: "KYC" },
+						{ value: "VIP", label: "VIP" },
+						{ value: "Finance", label: "Финансы" },
+						{ value: "Verification", label: "Верификация" },
+						{ value: "Complaints", label: "Жалобы" },
+						{ value: "Responsible Gaming", label: "Ответственная игра" },
+					].map(({ value, label }) => (
+						<option key={value} value={value} label={label} />
+					))}
+				</datalist>
+				<button
+					type="button"
+					className="ui-button"
+					disabled={draft.addresses.length >= 100}
+					onClick={() =>
+						onChange({
+							...draft,
+							addresses: [
+								...draft.addresses,
+								{
+									id: createId("email"),
+									type: "",
+									email: "",
+									order: draft.addresses.length,
+								},
+							],
+						})
+					}
+				>
+					+ Добавить адрес
+				</button>
 			</div>
 
 			{error && (
@@ -573,20 +755,20 @@ function ProjectEmailEditor({
 				</div>
 			)}
 
-			<div className="mt-4 flex flex-wrap justify-end gap-2">
+			<div className="ui-actions items-center mt-4 flex flex-wrap justify-end gap-2">
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					className="ui-button ui-button--secondary inline-flex items-center justify-center border border-border font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
-					Cancel
+					Отмена
 				</button>
 				<button
 					type="submit"
-					className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90"
+					className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90"
 				>
 					<Plus size={16} />
-					{editing ? "Save" : "Add"}
+					{editing ? "Сохранить" : "Добавить"}
 				</button>
 			</div>
 		</form>
@@ -622,17 +804,17 @@ function ProjectEmailImportPanel({
 				<div>
 					<div className="flex items-center gap-2 text-sm font-semibold">
 						<FileSpreadsheet size={16} />
-						Google Sheets import
+						Импорт из Google-таблицы
 					</div>
 					<p className="mt-1 text-xs text-muted">
-						Expected columns: Project, Support, KYC, VIP.
+						Столбец проекта и столбцы с типами почт.
 					</p>
 				</div>
 				<button
 					type="button"
 					onClick={onCancel}
-					className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
-					aria-label="Close import"
+					className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground"
+					aria-label="Закрыть импорт"
 				>
 					<X size={16} />
 				</button>
@@ -642,8 +824,8 @@ function ProjectEmailImportPanel({
 				<input
 					value={sheetUrl}
 					onChange={(event) => onSheetUrlChange(event.target.value)}
-					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
-					placeholder="Paste public Google Sheets URL"
+					className="ui-input border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+					placeholder="Ссылка на доступную Google-таблицу"
 				/>
 
 				<select
@@ -651,24 +833,24 @@ function ProjectEmailImportPanel({
 					onChange={(event) =>
 						onModeChange(event.target.value as ProjectEmailImportMode)
 					}
-					className="h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+					className="ui-input border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 				>
-					<option value="upsert">Upsert</option>
-					<option value="replace">Replace all emails</option>
+					<option value="upsert">Добавить и обновить</option>
+					<option value="replace">Заменить справочник</option>
 				</select>
 
 				<button
 					type="button"
 					onClick={onLoadPreview}
 					disabled={importing || !sheetUrl.trim()}
-					className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+					className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					{importing ? (
 						<Loader2 size={16} className="animate-spin" />
 					) : (
 						<FileSpreadsheet size={16} />
 					)}
-					Preview
+					Предпросмотр
 				</button>
 			</div>
 
@@ -678,7 +860,7 @@ function ProjectEmailImportPanel({
 						<div className="inline-flex items-center gap-2 text-sm">
 							<CheckCircle2 size={16} className="text-accent" />
 							<span className="font-semibold">{preview.records.length}</span>
-							projects found
+							проектов найдено
 						</div>
 
 						<button
@@ -689,10 +871,10 @@ function ProjectEmailImportPanel({
 								preview.records.length === 0 ||
 								preview.errors.length > 0
 							}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="ui-button ui-button--primary inline-flex items-center justify-center gap-2 bg-accent font-semibold text-accent-foreground transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{committing && <Loader2 size={15} className="animate-spin" />}
-							Commit import
+							Применить импорт
 						</button>
 					</div>
 
@@ -727,13 +909,13 @@ function EmailInput({
 	onChange: (value: string) => void;
 }) {
 	return (
-		<label className="block space-y-1.5">
+		<label className="ui-field ">
 			<span className="text-sm font-medium">{label}</span>
 			<input
 				type="email"
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
-				className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+				className="ui-input w-full border border-border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
 				placeholder={`${label.toLowerCase()}@project.com`}
 			/>
 		</label>
@@ -743,29 +925,30 @@ function EmailInput({
 function EmailRow({
 	label,
 	email,
+	note,
 	onCopy,
 }: {
 	label: string;
 	email: string;
+	note?: string;
 	onCopy: (email: string) => void;
 }) {
 	return (
-		<div className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-background px-3 py-2">
-			<div className="min-w-0">
+		<div className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg bg-background px-3 py-2">
+			<div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
 				<div className="text-xs font-semibold uppercase text-muted">
 					{label}
 				</div>
-				<div className="mt-0.5 truncate text-sm">
-					{email || "Not specified"}
-				</div>
+				<div className="mt-0.5 break-all text-sm">{email || "Не указано"}</div>
+				{note && <p className="text-xs text-muted break-words">{note}</p>}
 			</div>
 
 			<button
 				type="button"
 				onClick={() => onCopy(email)}
 				disabled={!email}
-				className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-				aria-label={`Copy ${label}`}
+				className="ui-button ui-button--secondary ui-button--icon inline-flex items-center justify-center border border-border text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				aria-label={`Скопировать ${label}`}
 			>
 				<Copy size={15} />
 			</button>
@@ -830,20 +1013,20 @@ function DeleteConfirmDialog({
 					{title}
 				</h2>
 				<p className="mt-2 text-sm text-muted">{description}</p>
-				<div className="mt-5 flex justify-end gap-2">
+				<div className="ui-actions items-center mt-5 flex justify-end gap-2">
 					<button
 						type="button"
 						onClick={onCancel}
-						className="inline-flex h-10 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+						className="ui-button ui-button--secondary inline-flex items-center border border-border font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
 					>
-						Cancel
+						Отмена
 					</button>
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white transition hover:bg-red-600"
+						className="ui-button ui-button--danger inline-flex items-center bg-red-500 font-semibold text-white transition hover:bg-red-600"
 					>
-						Delete
+						Удалить
 					</button>
 				</div>
 			</div>

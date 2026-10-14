@@ -10,9 +10,9 @@ import {
 	type CurrencyTable,
 	findCurrencyValue,
 	getCurrencyTableNameForRule,
-	loadStoredBonusToolsData,
 	normalizeBonusToolsSearch,
 } from "@/services/bonus-tools.service";
+import { useBonusToolsStore } from "@/store/bonus-tools.store";
 
 export interface BonusCurrencyContext {
 	rule?: BonusRule;
@@ -125,7 +125,7 @@ function getCurrencyContext(
 	data?: BonusToolsData,
 	tableName?: string,
 ) {
-	const registryData = data ?? loadStoredBonusToolsData();
+	const registryData = data ?? useBonusToolsStore.getState().data;
 
 	if (!registryData) return undefined;
 
@@ -195,7 +195,7 @@ class BonusCurrencyRegistryService {
 	}
 
 	getCurrencyGroupOptions(data?: BonusToolsData) {
-		const registryData = data ?? loadStoredBonusToolsData();
+		const registryData = data ?? useBonusToolsStore.getState().data;
 
 		return (
 			registryData?.currencyTables.map((table) => ({
