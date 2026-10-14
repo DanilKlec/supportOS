@@ -17,6 +17,41 @@ const draft = {
 	],
 	tags: ["tag"],
 };
+it("archives only shared binds with a server-confirmed revision", async () => {
+	const original = {
+		id: "common",
+		ownerId: null,
+		updatedAt: "2026-10-14",
+	} as import("@/entities/bind").Bind;
+	mock.request.mockResolvedValueOnce(
+		new Response(
+			JSON.stringify({
+				id: "common",
+				owner_id: null,
+				archived: true,
+				updated_at: "2026-10-15",
+			}),
+		),
+	);
+	expect(await sharedBindsService.archive(original, true)).toMatchObject({
+		id: "common",
+		archived: true,
+		updatedAt: "2026-10-15",
+	});
+	expect(JSON.parse(mock.request.mock.calls[0][1].body)).toEqual({
+		action: "shared-archive",
+		id: "common",
+		expected: "2026-10-14",
+		archived: true,
+	});
+	await expect(
+		sharedBindsService.archive({ ...original, ownerId: "someone" }, true),
+	).rejects.toThrow("Личный бинд");
+	mock.request.mockResolvedValueOnce(new Response("null"));
+	await expect(sharedBindsService.archive(original, true)).rejects.toThrow(
+		"Сервер не подтвердил",
+	);
+});
 beforeEach(() => {
 	vi.resetAllMocks();
 	mock.getSession.mockReturnValue({
@@ -201,4 +236,31 @@ it("adapts branch rows and history snapshots without dropping response metadata"
 		extra: "retained",
 		snapshot: { id: "base", createdAt: "created", updatedAt: "updated" },
 	});
+});
+
+it("loads an employee snapshot through the authorized API with cancellation", async () => {
+	const signal = new AbortController().signal;
+	const snapshot = { categories: [], folders: [], binds: [] };
+	mock.request.mockResolvedValue(Response.json(snapshot));
+	expect(await sharedBindsService.employeeLibrary("employee", signal)).toEqual(
+		snapshot,
+	);
+	expect(mock.request).toHaveBeenCalledWith(
+		"/api/binds?action=employee-library&user_id=employee",
+		{ signal },
+	);
+});
+it("rejects incomplete employee snapshots instead of showing a false empty tree", async () => {
+	mock.request.mockResolvedValue(Response.json({ binds: [] }));
+	await expect(sharedBindsService.employeeLibrary("employee")).rejects.toThrow(
+		"Сервер не подтвердил",
+	);
+});
+it("preserves server authorization errors for employee snapshots", async () => {
+	mock.request.mockResolvedValue(
+		Response.json({ error: "Нет доступа" }, { status: 403 }),
+	);
+	await expect(
+		sharedBindsService.employeeLibrary("employee"),
+	).rejects.toMatchObject({ message: "Нет доступа", status: 403 });
 });

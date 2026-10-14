@@ -2,6 +2,7 @@ import type { Bind, BindTranslation } from "@/entities/bind";
 import { can } from "../../shared/access.js";
 import { authenticatedFetch } from "./authenticated-fetch";
 import { supabaseService } from "./supabase.service";
+import type { LibraryStructure } from "./shared-library.service";
 
 interface BindRow {
 	id: string;
@@ -94,7 +95,11 @@ export interface BindRevision {
 }
 export const SHARED_CATEGORY = "supportos-shared";
 
-async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
+async function api<T = unknown>(
+	path: string,
+	body?: unknown,
+	signal?: AbortSignal,
+): Promise<T> {
 	const response = await authenticatedFetch(
 		`/api/binds${path}`,
 		body
@@ -102,8 +107,11 @@ async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(body),
+					signal,
 				}
-			: undefined,
+			: signal
+				? { signal }
+				: undefined,
 	);
 	const data: unknown = await response.json();
 	if (!response.ok)
@@ -122,7 +130,33 @@ export interface ProposalResult {
 	resolvedAt: string;
 	title: string;
 }
+export interface BindEmployee {
+	id: string;
+	email: string;
+	display_name: string;
+}
+export type EmployeeLibrary = LibraryStructure & { binds: Bind[] };
 export const sharedBindsService = {
+	async archive(original: Bind, archived: boolean): Promise<Bind> {
+		if (!can(supabaseService.getSession()?.user.access, "knowledge.write"))
+			throw new Error("Нет права изменять общие бинды");
+		if (original.ownerId !== null)
+			throw new Error("Личный бинд здесь недоступен");
+		const saved = await api<BindRow | null>("", {
+			action: "shared-archive",
+			id: original.id,
+			expected: original.updatedAt,
+			archived,
+		});
+		if (
+			!saved?.id ||
+			saved.id !== original.id ||
+			saved.owner_id !== null ||
+			saved.archived !== archived
+		)
+			throw new Error("Сервер не подтвердил изменение бинда");
+		return fromBindRow(saved);
+	},
 	async proposalResults(): Promise<ProposalResult[]> {
 		return api<ProposalResult[]>("?action=proposal-results");
 	},
@@ -153,14 +187,37 @@ export const sharedBindsService = {
 			`?action=proposals${sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""}`,
 		);
 	},
-	async users(search: string): Promise<{
+	async users(
+		search: string,
+		page = 1,
+	): Promise<{
 		total: number;
 		users: { id: string; email: string; display_name: string }[];
 	}> {
 		return api<{
 			total: number;
 			users: { id: string; email: string; display_name: string }[];
-		}>(`?action=users&search=${encodeURIComponent(search)}`);
+		}>(
+			`?action=users&search=${encodeURIComponent(search)}${page > 1 ? `&page=${page}` : ""}`,
+		);
+	},
+	async employeeLibrary(
+		userId: string,
+		signal?: AbortSignal,
+	): Promise<EmployeeLibrary> {
+		const data = await api<EmployeeLibrary>(
+			`?action=employee-library&user_id=${encodeURIComponent(userId)}`,
+			undefined,
+			signal,
+		);
+		if (
+			!data ||
+			!Array.isArray(data.categories) ||
+			!Array.isArray(data.folders) ||
+			!Array.isArray(data.binds)
+		)
+			throw new Error("Сервер не подтвердил загрузку библиотеки сотрудника");
+		return data;
 	},
 	async personal(userId: string): Promise<Bind[]> {
 		const data = await api<BindRowsResponse>(

@@ -1,7 +1,9 @@
 import type { Bind } from "@/entities/bind";
-import type { KnowledgeTreeNode } from "@/entities/knowledge";
+import {
+	buildKnowledgeTree,
+	type KnowledgeTreeNode,
+} from "@/entities/knowledge";
 import type { LibraryStructure } from "@/services/shared-library.service";
-import { buildSharedTree } from "./shared-tree";
 export const nodeKey = (node: Pick<KnowledgeTreeNode, "type" | "id">) =>
 	`${node.type}:${node.id}`;
 export function folderPath(
@@ -35,32 +37,37 @@ export function buildLibraryTree(
 	structure: LibraryStructure,
 	binds: Bind[],
 	language: string,
+	ownerId?: string,
 ) {
-	const categories = structure.categories.filter((c) => c.ownerId === null);
-	const folders = structure.folders
-		.filter((f) => f.ownerId === null)
-		.map((f) => {
-			let parent = structure.folders.find(
+	const owns = (owner: string | null | undefined) =>
+		owner === null || (Boolean(ownerId) && owner === ownerId);
+	const categories = structure.categories.filter((c) => owns(c.ownerId));
+	const availableFolders = structure.folders.filter(
+		(f) => owns(f.ownerId) && categories.some((c) => c.id === f.categoryId),
+	);
+	const visibleBinds = binds.filter((b) => owns(b.ownerId) && !b.archived);
+	const folders = availableFolders.map((f) => {
+		let parent = availableFolders.find(
+				(p) => p.id === f.parentId && p.categoryId === f.categoryId,
+			),
+			seen = new Set([f.id]);
+		while (parent && !seen.has(parent.id)) {
+			seen.add(parent.id);
+			parent = availableFolders.find((p) => p.id === parent?.parentId);
+		}
+		return {
+			...f,
+			parentId:
+				parent ||
+				!availableFolders.some(
 					(p) => p.id === f.parentId && p.categoryId === f.categoryId,
-				),
-				seen = new Set([f.id]);
-			while (parent && !seen.has(parent.id)) {
-				seen.add(parent.id);
-				parent = structure.folders.find((p) => p.id === parent?.parentId);
-			}
-			return {
-				...f,
-				parentId:
-					parent ||
-					!structure.folders.some(
-						(p) => p.id === f.parentId && p.categoryId === f.categoryId,
-					)
-						? undefined
-						: f.parentId,
-			};
-		});
-	const orphaned = binds.some(
-		(b) => b.ownerId === null && !categories.some((c) => c.id === b.categoryId),
+				)
+					? undefined
+					: f.parentId,
+		};
+	});
+	const orphaned = visibleBinds.some(
+		(b) => !categories.some((c) => c.id === b.categoryId),
 	);
 	if (orphaned)
 		categories.push({
@@ -70,14 +77,20 @@ export function buildLibraryTree(
 			ownerId: null,
 			updatedAt: "",
 		});
-	const tree = buildSharedTree(
+	const tree = buildKnowledgeTree(
 		categories,
 		folders,
-		binds.map((b) =>
-			categories.some((c) => c.id === b.categoryId)
-				? b
-				: { ...b, categoryId: "__unplaced", folderId: undefined },
-		),
+		visibleBinds.map((b) => ({
+			...b,
+			categoryId: categories.some((c) => c.id === b.categoryId)
+				? b.categoryId
+				: "__unplaced",
+			folderId: folders.some(
+				(f) => f.id === b.folderId && f.categoryId === b.categoryId,
+			)
+				? b.folderId
+				: undefined,
+		})),
 	);
 	const name = (nodes: KnowledgeTreeNode[]): KnowledgeTreeNode[] =>
 		nodes.map((n) => ({

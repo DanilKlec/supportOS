@@ -89,6 +89,7 @@ export function QCWorkspace() {
 		<OperationsWorkspace
 			area="qc"
 			wide={active === "binds"}
+			fit={active === "binds"}
 			sections={qcSections}
 			active={destination.section}
 			onSelect={select}
@@ -124,9 +125,11 @@ export function QCWorkspace() {
 					</label>
 				</>
 			)}
-			<Suspense fallback={<LoadingState message="Загружаем раздел…" />}>
-				{content}
-			</Suspense>
+			<div className={active === "binds" ? "qc-library-content" : undefined}>
+				<Suspense fallback={<LoadingState message="Загружаем раздел…" />}>
+					{content}
+				</Suspense>
+			</div>
 		</OperationsWorkspace>
 	);
 }

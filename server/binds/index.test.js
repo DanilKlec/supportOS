@@ -7,6 +7,16 @@ const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-822
 beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read']}});});
 afterEach(()=>vi.unstubAllGlobals());
 async function run(req){const res={setHeader:vi.fn(),end:vi.fn(),statusCode:0};await handler({method:'GET',url:'/api/binds',headers:{host:'app.test',origin:'https://app.test'},...req},res);return {status:res.statusCode,data:JSON.parse(res.end.mock.calls[0][0])};}
+it('archives with the verified actor/session and maps version conflicts without touching personal data',async()=>{
+ expect((await run({method:'POST',body:{action:'shared-archive',id:'shared',expected:'2026-10-14',archived:true}})).status).toBe(403);
+ mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read','knowledge.write']}});
+ const fetch=vi.fn(async()=>new Response(JSON.stringify({code:'40001',message:'Бинд изменён другим сотрудником'}),{status:400}));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'shared-archive',id:'shared',expected:'2026-10-14',archived:true,actor:other,sid:'forged'}})).status).toBe(409);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({actor,sid:'verified-session',item_id:'shared',expected:'2026-10-14',archived:true});
+ expect((await run({method:'POST',body:{action:'shared-archive',id:'shared',expected:'bad',archived:true}})).status).toBe(400);
+ expect((await run({method:'POST',body:{action:'shared-archive',id:'shared',expected:'2026-10-14',archived:'true'}})).status).toBe(400);
+ expect(fetch).toHaveBeenCalledTimes(1);
+});
 it('rejects another employee bind read and account search without bind management',async()=>{expect((await run({url:`/api/binds?user_id=${other}`})).status).toBe(403);expect((await run({url:'/api/binds?action=users'})).status).toBe(403);expect(mocks.allRows).not.toHaveBeenCalled();});
 it('uses verified actor even when the request includes a forged actor',async()=>{const fetch=vi.fn(async()=>new Response(JSON.stringify({id:'personal'})));vi.stubGlobal('fetch',fetch);expect((await run({method:'POST',body:{action:'save',actor:other,userId:actor,sourceId:'common',translations:[],tags:[]}})).status).toBe(200);expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({actor,target:actor});});
 it('returns conflicts without reporting a successful save',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:'40001',message:'Версия уже изменена'}),{status:400})));expect((await run({method:'POST',body:{action:'reset',userId:actor,sourceId:'common',expected:'old'}})).status).toBe(409);});
@@ -196,4 +206,34 @@ it('uses the container removal RPC with a verified session and preserves the req
  expect((await run({method:'POST',body:{action:'shared-structure',entity:'category',operation:'delete',actor:other,sid:'forged',payload:{id:'old',expected:'version',strategy:'keep',destinationCategoryId:'new'}}})).status).toBe(200);
  expect(fetch.mock.calls[0][0]).toContain('/rpc/supportos_shared_tree_remove');
  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({actor,sid:'verified-session',entity:'category',payload:{id:'old',expected:'version',strategy:'keep',destinationCategoryId:'new'}});
+});
+
+it('rejects employee library reads without bind management before reading any employee data',async()=>{
+ expect((await run({url:`/api/binds?action=employee-library&user_id=${other}`})).status).toBe(403);
+ expect(mocks.db).not.toHaveBeenCalled();expect(mocks.allRows).not.toHaveBeenCalled();
+});
+it('loads shared and selected employee structure and standalone binds without another employee data',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','binds.manage']}});
+ mocks.db.mockResolvedValue([{id:other}]);
+ mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories')?[{id:'mine',owner_id:other,name:'Личное',order_index:1,updated_at:'version'}]:path.startsWith('supportos_folders')?[{id:'folder',owner_id:other,category_id:'mine',name:'Моё',order_index:1,updated_at:'version'}]:[{id:'standalone',owner_id:other,category_id:'mine',folder_id:'folder',slug:'standalone',translations:[],tags:[],created_at:'version',updated_at:'version'}]);
+ const result=await run({url:`/api/binds?action=employee-library&user_id=${other}&actor=forged`});
+ expect(result).toMatchObject({status:200,data:{categories:[{id:'mine',ownerId:other}],folders:[{id:'folder',ownerId:other}],binds:[{id:'standalone',ownerId:other,folderId:'folder'}]}});
+ expect(mocks.db).toHaveBeenCalledWith(expect.anything(),`supportos_users?select=id&id=eq.${other}`);
+ expect(mocks.allRows).toHaveBeenCalledTimes(3);
+ expect(mocks.allRows.mock.calls.every(([,path])=>path.includes(`or=(owner_id.is.null,owner_id.eq.${other})`))).toBe(true);
+ expect(mocks.allRows.mock.calls.some(([,path])=>path.includes(actor))).toBe(false);
+});
+it('rejects malformed employee IDs and returns 404 for a deleted employee',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','binds.manage']}});
+ expect((await run({url:'/api/binds?action=employee-library&user_id=someone,owner_id.is.null'})).status).toBe(400);
+ mocks.db.mockResolvedValue([]);
+ expect((await run({url:`/api/binds?action=employee-library&user_id=${other}`})).status).toBe(404);
+ expect(mocks.allRows).not.toHaveBeenCalled();
+});
+it('pages employee search through the existing server RPC and rejects invalid pages',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','binds.manage']}});
+ mocks.db.mockResolvedValue({total:65,users:[{id:other,email:'employee@example.test',display_name:'Сотрудник',private_field:'hidden'}]});
+ expect(await run({url:'/api/binds?action=users&search=employee&page=2'})).toEqual({status:200,data:{total:65,users:[{id:other,email:'employee@example.test',display_name:'Сотрудник'}]}});
+ expect(mocks.db).toHaveBeenCalledWith(expect.anything(),'rpc/supportos_rbac_list_users',{search_text:'employee',page_number:2});
+ expect((await run({url:'/api/binds?action=users&page=-1'})).status).toBe(400);
 });

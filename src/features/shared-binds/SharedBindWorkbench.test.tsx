@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/auth.store";
 const mock = vi.hoisted(() => ({
 	list: vi.fn(),
 	save: vi.fn(),
+	archive: vi.fn(),
 	load: vi.fn(),
 	change: vi.fn(),
 	loadKnowledge: vi.fn(),
@@ -104,6 +105,97 @@ function mount() {
 	);
 	return client;
 }
+it("closes folder and bind menus on outside pointer, focus and Escape", async () => {
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.click(screen.getByRole("button", { name: "Раскрыть Бонусы" }));
+	const folderMenu = screen
+		.getByLabelText("Действия: Бонусы")
+		.closest("details")!;
+	const bindMenu = screen
+		.getByLabelText("Действия: Условия бонуса")
+		.closest("details")!;
+	folderMenu.open = true;
+	fireEvent.pointerDown(document.body);
+	expect(folderMenu.open).toBe(false);
+	bindMenu.open = true;
+	fireEvent.focusIn(screen.getByLabelText("Поиск в дереве"));
+	expect(bindMenu.open).toBe(false);
+	bindMenu.open = true;
+	fireEvent.keyDown(document, { key: "Escape" });
+	expect(bindMenu.open).toBe(false);
+	expect(document.activeElement).toBe(bindMenu.querySelector("summary"));
+});
+it("confirms removal of the exact shared revision, then restores it from the trash", async () => {
+	mock.archive.mockImplementation(async (original, archived) => {
+		const saved = {
+			...original,
+			archived,
+			updatedAt: archived ? "2026-10-15" : "2026-10-16",
+		};
+		mock.list.mockResolvedValue([saved]);
+		return saved;
+	});
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.change(screen.getByLabelText("Поиск в дереве"), {
+		target: { value: "Условия" },
+	});
+	fireEvent.click(
+		within(screen.getByRole("tree")).getByRole("button", {
+			name: "Условия бонуса",
+		}),
+	);
+	fireEvent.click(
+		screen.getAllByRole("button", { name: "Удалить бинд" }).at(-1)!,
+	);
+	const dialog = screen.getByRole("dialog", { name: "Удалить общий бинд?" });
+	expect(mock.archive).not.toHaveBeenCalled();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Удалить" }));
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	expect(mock.archive).toHaveBeenCalledWith(bind, true);
+	expect(screen.queryByRole("treeitem", { name: "Условия бонуса" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "Корзина (1)" }));
+	fireEvent.click(screen.getByRole("button", { name: "Восстановить" }));
+	fireEvent.click(
+		within(
+			screen.getByRole("dialog", { name: "Восстановить бинд?" }),
+		).getByRole("button", { name: "Восстановить" }),
+	);
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	expect(mock.archive).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			id: bind.id,
+			archived: true,
+			updatedAt: "2026-10-15",
+		}),
+		false,
+	);
+});
+it("retains the bind and confirmation when removal conflicts with another edit", async () => {
+	mock.archive.mockRejectedValue(new Error("Бинд изменён другим сотрудником"));
+	mount();
+	await screen.findByRole("tree");
+	fireEvent.change(screen.getByLabelText("Поиск в дереве"), {
+		target: { value: "Условия" },
+	});
+	fireEvent.click(
+		within(screen.getByRole("tree")).getByRole("button", {
+			name: "Условия бонуса",
+		}),
+	);
+	fireEvent.click(
+		screen.getAllByRole("button", { name: "Удалить бинд" }).at(-1)!,
+	);
+	fireEvent.click(
+		within(screen.getByRole("dialog")).getByRole("button", { name: "Удалить" }),
+	);
+	expect(await screen.findByRole("alert")).toHaveProperty(
+		"textContent",
+		"Бинд изменён другим сотрудником",
+	);
+	expect(screen.getByRole("treeitem", { name: "Условия бонуса" })).toBeTruthy();
+});
 it("shows a nested tree, creates a child folder at the selected location and refreshes from the server", async () => {
 	mount();
 	await screen.findByRole("tree");

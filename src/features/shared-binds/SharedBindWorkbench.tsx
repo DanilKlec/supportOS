@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeft,
 	ArrowRight,
+	Archive,
 	Check,
 	ChevronRight,
 	Copy,
@@ -13,6 +14,7 @@ import {
 	Pencil,
 	Plus,
 	RefreshCw,
+	RotateCcw,
 	Search,
 	Upload,
 	Users,
@@ -93,6 +95,11 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 		[importOpen, setImportOpen] = useState(false),
 		[structureBusy, setStructureBusy] = useState(false);
 	const [notice, setNotice] = useState("");
+	const [trashOpen, setTrashOpen] = useState(false),
+		[pendingRemoval, setPendingRemoval] = useState<Bind | null>(null),
+		[removalBusy, setRemovalBusy] = useState(false),
+		[removalError, setRemovalError] = useState("");
+	const archived = (binds.data ?? []).filter((b) => b.archived);
 	const tree = buildLibraryTree(structure, sources, language),
 		all = flattenLibrary(tree),
 		visible = searchLibraryTree(tree, search);
@@ -241,6 +248,13 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 		void client.invalidateQueries({ queryKey: bindsKey });
 	}
 	function action(kind: LibraryNodeAction, node: KnowledgeTreeNode) {
+		if (kind === "delete" && node.bind) {
+			guard(() => {
+				setPendingRemoval(structuredClone(node.bind!));
+				setRemovalError("");
+			});
+			return;
+		}
 		if (kind === "bind") {
 			edit(undefined, nodeLocation(node, structure));
 			return;
@@ -273,6 +287,40 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 	}
 	const problem = binds.error ?? metadata.error;
 	const hasLoaded = binds.data !== undefined && metadata.data !== undefined;
+	async function confirmRemoval() {
+		if (!pendingRemoval || removalBusy) return;
+		setRemovalBusy(true);
+		setRemovalError("");
+		try {
+			const saved = await sharedBindsService.archive(
+				pendingRemoval,
+				!pendingRemoval.archived,
+			);
+			client.setQueryData<Bind[]>(bindsKey, (old) =>
+				(old ?? []).map((b) => (b.id === saved.id ? saved : b)),
+			);
+			useKnowledgeStore.setState((s) => ({
+				binds: s.binds.map((b) => (b.id === saved.id ? saved : b)),
+			}));
+			setPendingRemoval(null);
+			setEditor(null);
+			setDirty(false);
+			setSelection("");
+			setNotice(
+				saved.archived
+					? "Бинд удалён из общей базы. Его можно восстановить в корзине."
+					: "Бинд восстановлен в общей базе.",
+			);
+			void client.invalidateQueries({ queryKey: bindsKey });
+			void client.invalidateQueries({ queryKey: ["employee-bind-library"] });
+		} catch (error) {
+			setRemovalError(
+				error instanceof Error ? error.message : "Не удалось изменить бинд",
+			);
+		} finally {
+			setRemovalBusy(false);
+		}
+	}
 	return (
 		<section className="library-workbench" aria-label="Редактор общей базы">
 			<header className="library-toolbar">
@@ -287,6 +335,22 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 					</div>
 				</div>
 				<div className="ui-actions">
+					<Button
+						variant="ghost"
+						aria-pressed={trashOpen}
+						onClick={() =>
+							guard(() => {
+								setTrashOpen(!trashOpen);
+								setEditor(null);
+								setDirty(false);
+							})
+						}
+					>
+						<Archive size={15} />
+						{trashOpen
+							? "К материалам"
+							: `Корзина${archived.length ? ` (${archived.length})` : ""}`}
+					</Button>
 					<Button
 						variant="ghost"
 						aria-label="Обновить общие бинды"
@@ -356,6 +420,45 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 			)}
 			{!hasLoaded ? (
 				!problem && <LoadingState message="Загружаем материалы команды…" />
+			) : trashOpen ? (
+				<div className="library-trash-list" aria-label="Корзина общих биндов">
+					{!archived.length && (
+						<EmptyState
+							title="Корзина пуста"
+							description="Удалённые общие бинды появятся здесь."
+						/>
+					)}
+					{archived.map((bind) => (
+						<div className="library-trash-row" key={bind.id}>
+							<div>
+								<strong>
+									{bind.translations.find((t) => t.language === language)
+										?.title ||
+										bind.translations[0]?.title ||
+										bind.slug}
+								</strong>
+								<small>
+									{bind.translations
+										.map((t) => t.language.toUpperCase())
+										.join(" · ")}
+								</small>
+							</div>
+							{allowed && (
+								<Button
+									variant="secondary"
+									disabled={Boolean(problem)}
+									onClick={() => {
+										setPendingRemoval(structuredClone(bind));
+										setRemovalError("");
+									}}
+								>
+									<RotateCcw size={14} />
+									Восстановить
+								</Button>
+							)}
+						</div>
+					))}
+				</div>
 			) : (
 				<div className="library-canvas">
 					<aside
@@ -421,7 +524,7 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 								selected={selection}
 								expanded={expanded}
 								searching={Boolean(search.trim())}
-								canEdit={allowed && !structureBusy}
+								canEdit={allowed && !structureBusy && !problem}
 								onExpand={(id) =>
 									setExpanded((old) => {
 										const next = new Set(old);
@@ -536,6 +639,14 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 									<div className="ui-actions">
 										{allowed && (
 											<>
+												<Button
+													variant="danger"
+													disabled={Boolean(problem)}
+													onClick={() => action("delete", selected)}
+												>
+													<Trash2 size={15} />
+													Удалить бинд
+												</Button>
 												<Button
 													variant="secondary"
 													onClick={() => action("move", selected)}
@@ -707,6 +818,55 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 						)}
 					</div>
 				</div>
+			)}
+			{pendingRemoval && (
+				<BaseModal
+					title={
+						pendingRemoval.archived
+							? "Восстановить бинд?"
+							: "Удалить общий бинд?"
+					}
+					size="sm"
+					onClose={() => {
+						if (!removalBusy) setPendingRemoval(null);
+					}}
+				>
+					<p className="library-dialog-note">
+						<strong>
+							{pendingRemoval.translations[0]?.title || pendingRemoval.slug}
+						</strong>
+					</p>
+					<p className="library-dialog-note">
+						{pendingRemoval.archived
+							? "Ответ снова появится в общей базе команды."
+							: "Ответ исчезнет из общей базы команды. Переводы и история сохранятся в корзине; личные версии сотрудников сохранятся."}
+					</p>
+					{removalError && (
+						<p role="alert" className="library-dialog-error">
+							{removalError}
+						</p>
+					)}
+					<div className="ui-actions justify-end">
+						<Button
+							variant="secondary"
+							disabled={removalBusy}
+							onClick={() => setPendingRemoval(null)}
+						>
+							Отмена
+						</Button>
+						<Button
+							variant={pendingRemoval.archived ? "primary" : "danger"}
+							disabled={removalBusy}
+							onClick={() => void confirmRemoval()}
+						>
+							{removalBusy
+								? "Сохраняем…"
+								: pendingRemoval.archived
+									? "Восстановить"
+									: "Удалить"}
+						</Button>
+					</div>
+				</BaseModal>
 			)}
 			{dialog && (
 				<LibraryStructureDialog

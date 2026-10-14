@@ -18,6 +18,7 @@ export function OperationsWorkspace({
 	children,
 	onSelect,
 	wide = false,
+	fit = false,
 }: {
 	area: "admin" | "qc";
 	sections: WorkspaceSection[];
@@ -25,6 +26,7 @@ export function OperationsWorkspace({
 	children: ReactNode;
 	onSelect: (id: string) => void;
 	wide?: boolean;
+	fit?: boolean;
 }) {
 	const access = useAuthStore((s) => s.session?.user.access);
 	const available = sections.filter((s) =>
@@ -37,7 +39,9 @@ export function OperationsWorkspace({
 	);
 	const current = available.find((s) => s.id === active);
 	return (
-		<div className={`ops-workspace${wide ? " ops-workspace--wide" : ""}`}>
+		<div
+			className={`ops-workspace${wide ? " ops-workspace--wide" : ""}${fit ? " ops-workspace--library" : ""}`}
+		>
 			<aside className="ops-sidebar">
 				<Link to="/" className="ops-back">
 					← Рабочее пространство

@@ -5,8 +5,9 @@ import {
 	Folder,
 	FolderOpen,
 	MoreHorizontal,
+	UserRound,
 } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { bindCount, flattenLibrary, nodeKey } from "./library-tree";
 export type LibraryNodeAction =
@@ -27,6 +28,8 @@ export function LibraryTree({
 	onDropNode,
 	canEdit,
 	searching,
+	personalOwnerId,
+	personalStructureIds,
 }: {
 	nodes: KnowledgeTreeNode[];
 	selected: string;
@@ -37,9 +40,38 @@ export function LibraryTree({
 	onDropNode: (key: string, target: KnowledgeTreeNode) => void;
 	canEdit: boolean;
 	searching: boolean;
+	personalOwnerId?: string;
+	personalStructureIds?: Set<string>;
 }) {
 	const root = useRef<HTMLUListElement>(null);
 	const [drop, setDrop] = useState("");
+	useEffect(() => {
+		const openMenus = () =>
+			root.current?.querySelectorAll<HTMLDetailsElement>(
+				".library-node-menu[open]",
+			) ?? [];
+		const outside = (event: Event) => {
+			for (const menu of openMenus()) {
+				if (event.target instanceof Node && !menu.contains(event.target))
+					menu.open = false;
+			}
+		};
+		const escape = (event: globalThis.KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			for (const menu of openMenus()) {
+				menu.open = false;
+				menu.querySelector("summary")?.focus();
+			}
+		};
+		document.addEventListener("pointerdown", outside, true);
+		document.addEventListener("focusin", outside);
+		document.addEventListener("keydown", escape);
+		return () => {
+			document.removeEventListener("pointerdown", outside, true);
+			document.removeEventListener("focusin", outside);
+			document.removeEventListener("keydown", escape);
+		};
+	}, []);
 	const hasSelected = flattenLibrary(nodes).some(
 		(n) => nodeKey(n) === selected,
 	);
@@ -152,6 +184,29 @@ export function LibraryTree({
 								style={node.color ? { color: node.color } : undefined}
 							/>
 							<span>{node.name}</span>
+							{personalOwnerId &&
+								(node.bind?.ownerId === personalOwnerId ||
+									personalStructureIds?.has(key)) && (
+									<small
+										className="library-tree-personal"
+										aria-label={
+											node.type === "bind"
+												? "Личный материал"
+												: node.type === "folder"
+													? "Личная папка"
+													: "Личный раздел"
+										}
+										title={
+											node.type === "bind"
+												? "Личный материал"
+												: node.type === "folder"
+													? "Личная папка"
+													: "Личный раздел"
+										}
+									>
+										<UserRound size={12} />
+									</small>
+								)}
 							{node.type !== "bind" && <small>{bindCount(node)}</small>}
 						</button>
 						{canEdit && node.id !== "__unplaced" && (
@@ -175,6 +230,7 @@ export function LibraryTree({
 										: [
 												["edit", "Редактировать бинд"],
 												["move", "Переместить бинд"],
+												["delete", "Удалить бинд"],
 											]
 									).map(([action, label]) => (
 										<button

@@ -276,6 +276,14 @@ export default async function handler(req,res) {
    return send(200,{ok:true,mode:body.mode,counts:plan.counts});
   }
   if(req.method==='POST'&&body.action==='shared-save')return send(200,await saveShared(env,actor,body));
+  if(req.method==='POST'&&body.action==='shared-archive'){
+   if(!can(actor.access,'knowledge.write'))throw fail('Нет права изменять общие бинды',403);
+   if(!validId(body.id)||typeof body.expected!=='string'||body.expected.length>100||!Number.isFinite(Date.parse(body.expected))||typeof body.archived!=='boolean')throw fail('Некорректная версия бинда');
+   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/supportos_shared_bind_archive`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({actor:actor.id,sid:actor.sessionId,item_id:body.id,expected:body.expected,archived:body.archived}),signal:AbortSignal.timeout(15000)});
+   const result=await response.json();
+   if(!response.ok)throw fail(['42501','40001','P0001'].includes(result.code)?result.message:'Не удалось изменить бинд',result.code==='42501'?403:result.code==='40001'?409:400);
+   return send(200,result);
+  }
   if(req.method==='GET'&&url.searchParams.get('action')==='knowledge')return send(200,await knowledgeSnapshot(env,actor));
   if(req.method==='POST'&&body.action==='knowledge-save')return send(200,await saveKnowledge(env,actor,body));
   if(req.method==='POST'&&body.action==='knowledge-delete')return send(200,await deleteKnowledge(env,actor,body));
@@ -283,8 +291,22 @@ export default async function handler(req,res) {
    if(!can(actor.access,'binds.manage'))throw fail('Нет права управления биндами сотрудников',403);
    const search=(url.searchParams.get('search')??'').slice(0,120);
    // The existing RPC searches on the server. Only identity fields are returned to this UI.
-   const data=await db(env,'rpc/supportos_rbac_list_users',{search_text:search,page_number:1});
+   const page=pageParam(url.searchParams.get('page'),1,{min:1,max:100000});
+   const data=await db(env,'rpc/supportos_rbac_list_users',{search_text:search,page_number:page});
    return send(200,{total:data.total,users:data.users.map(u=>({id:u.id,email:u.email,display_name:u.display_name}))});
+  }
+  if(req.method==='GET'&&url.searchParams.get('action')==='employee-library') {
+   if(!can(actor.access,'binds.manage'))throw fail('Нет права просмотра биндов сотрудников',403);
+   const target=url.searchParams.get('user_id');
+   if(typeof target!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target))throw fail('Выберите сотрудника');
+   if(!(await db(env,`supportos_users?select=id&id=eq.${target}`)).length)throw fail('Сотрудник больше недоступен',404);
+   const owner=`or=(owner_id.is.null,owner_id.eq.${target})`;
+   const [categories,folders,binds]=await Promise.all([
+    allRows(env,`supportos_categories?select=*&${owner}&order=order_index.asc,id.asc`),
+    allRows(env,`supportos_folders?select=*&${owner}&order=order_index.asc,id.asc`),
+    allRows(env,`supportos_binds?select=*&${owner}&order=id.asc`),
+   ]);
+   return send(200,{categories:categories.map(row=>({...categoryFromRow(row),updatedAt:row.updated_at})),folders:folders.map(row=>({...folderFromRow(row),updatedAt:row.updated_at})),binds:binds.map(row=>bindFromRow(row))});
   }
   if(req.method==='GET'&&url.searchParams.get('action')==='proposal-results') {
    const rows=await db(env,`supportos_bind_proposals?select=id,source_id,status,resolved_at,translations&author_id=eq.${actor.id}&status=in.(accepted,rejected)&order=resolved_at.desc&limit=50`);
