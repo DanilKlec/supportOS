@@ -225,10 +225,24 @@ export default defineConfig({
 			manifest: false,
 			workbox: {
 				cleanupOutdatedCaches: true,
-				navigateFallback: "/index.html",
-				// Login callbacks and API requests must reach the current server.
-				navigateFallbackDenylist: [/^\/login(?:\/|$)/, /^\/api\//],
-				globPatterns: ["**/*.{js,css,html,ico,png,svg,json,webmanifest}"],
+				// HTML must come from the current deployment, never an old app shell.
+				navigateFallback: null,
+				globIgnores: ["**/index.html", "**/startup.js"],
+				// Download sections on demand instead of fetching every page on login.
+				globPatterns: ["**/*.{ico,png,svg,webmanifest}"],
+				runtimeCaching: [
+					{
+						urlPattern: ({ url }) =>
+							url.origin === self.location.origin &&
+							/^\/assets\/.*\.(?:js|css)$/.test(url.pathname),
+						handler: "CacheFirst",
+						options: {
+							cacheName: "supportos-assets-v1",
+							cacheableResponse: { statuses: [200] },
+							expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
+						},
+					},
+				],
 			},
 			devOptions: {
 				enabled: false,

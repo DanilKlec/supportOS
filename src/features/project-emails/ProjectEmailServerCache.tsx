@@ -24,8 +24,8 @@ export function ProjectEmailServerCache() {
 		queryKey: ["shared-publication", user?.id, "emails", "shared"],
 		queryFn: () => contentApi("emails"),
 		enabled: Boolean(user?.id) && canRead,
-		refetchInterval: 30000,
-		refetchOnWindowFocus: true,
+		staleTime: 60000,
+		refetchOnWindowFocus: false,
 		retry: false,
 	});
 

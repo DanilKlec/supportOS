@@ -59,7 +59,10 @@ beforeEach(async () => {
 	service = (await import("./supabase.service")).supabaseService;
 	store = (await import("@/store/auth.store")).useAuthStore;
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.useRealTimers();
+});
 it("preserves legacy login identities and existing email login", async () => {
 	fixture.auth.signInWithPassword.mockResolvedValue({
 		data: { session },
@@ -308,6 +311,43 @@ it("uses the SDK refreshed access token for API requests", async () => {
 		error: null,
 	});
 	expect(await service.getAccessToken()).toBe("fresh");
+});
+
+it("coalesces concurrent background identity checks while preserving forced access checks", async () => {
+	await service.initialize();
+	let finish;
+	const response = new Promise((resolve) => {
+		finish = resolve;
+	});
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(() => response),
+	);
+	const first = service.refreshIdentity({ deduplicate: true });
+	const second = service.refreshIdentity({ deduplicate: true });
+	expect(first).toBe(second);
+	expect(fetch).toHaveBeenCalledOnce();
+	finish(
+		Response.json({
+			access: { status: "disabled", roles: [], permissions: [], version: 2 },
+		}),
+	);
+	await Promise.all([first, second]);
+	expect(service.getSession().user.access.status).toBe("disabled");
+});
+
+it.each([
+	"getSession",
+	"getUser",
+])("leaves loading and grants no access if SDK %s hangs", async (method) => {
+	vi.useFakeTimers();
+	fixture.auth[method].mockReturnValue(new Promise(() => {}));
+	const initialization = service.initialize();
+	await vi.advanceTimersByTimeAsync(15000);
+	await initialization;
+	expect(store.getState().loading).toBe(false);
+	expect(service.getSession()).toBeUndefined();
+	expect(store.getState().error).toContain("Время ожидания");
 });
 it("preserves recovery mode when logout after a password update fails", async () => {
 	await service.initialize();

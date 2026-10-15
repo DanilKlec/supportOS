@@ -8,10 +8,12 @@ import {
 	clearLegacyBonusToolsRecords,
 	useBonusToolsStore,
 } from "@/store/bonus-tools.store";
+import { can } from "../../../shared/access.js";
 
 /** Server-backed, in-memory caches. Refetches never overwrite a page draft. */
 export function BonusServerCache() {
-	const userId = useAuthStore((state) => state.session?.user.id);
+	const user = useAuthStore((state) => state.session?.user);
+	const userId = user?.id;
 	const setProjects = useBonusStore((state) => state.setProjects);
 	const setToolsData = useBonusToolsStore((state) => state.setData);
 	const appliedForUser = useRef<{ bonuses?: string; tools?: string }>({});
@@ -19,17 +21,17 @@ export function BonusServerCache() {
 	const bonuses = useQuery({
 		queryKey: ["shared-publication", userId, "bonuses", "shared"],
 		queryFn: () => contentApi("bonuses"),
-		enabled: Boolean(userId),
-		refetchInterval: 30000,
-		refetchOnWindowFocus: true,
+		enabled: Boolean(userId) && can(user?.access, "bonuses.read"),
+		staleTime: 60000,
+		refetchOnWindowFocus: false,
 		retry: false,
 	});
 	const tools = useQuery({
 		queryKey: ["shared-publication", userId, "bonus-tools", "shared"],
 		queryFn: () => contentApi("bonus-tools"),
-		enabled: Boolean(userId),
-		refetchInterval: 30000,
-		refetchOnWindowFocus: true,
+		enabled: Boolean(userId) && can(user?.access, "bonuses.read"),
+		staleTime: 60000,
+		refetchOnWindowFocus: false,
 		retry: false,
 	});
 

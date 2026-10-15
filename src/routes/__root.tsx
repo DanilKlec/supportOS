@@ -1,6 +1,6 @@
 import { requireAppAuth } from "@/app/auth-guard";
-import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
 import { AuthConnectionScreen } from "@/features/auth/AuthConnectionScreen";
+import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
 import { PasswordForm } from "@/features/auth/PasswordForm";
 import { PendingApproval } from "@/features/auth/PendingApproval";
 import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
@@ -16,12 +16,12 @@ import {
 	useNavigate,
 	useRouterState,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import { ToastContainer } from "#/components/ui/Toast";
-import { MainLayout } from "#/layouts/MainLayout/MainLayout";
 import { ToastProvider } from "#/shared/hooks/useToast";
-import { ModalRoot } from "#/shared/modals/ModalRoot";
+import { LazyModalRoot } from "#/shared/modals/LazyModalRoot";
+import { ApplicationStatus } from "@/app/ApplicationStatus";
 import { safeAuthRedirect } from "@/app/auth-redirect";
 import { bootstrapApp, bootstrapAuth } from "@/app/bootstrap";
 import { cleanupDevelopmentCaches } from "@/app/dev-cleanup";
@@ -43,6 +43,12 @@ const queryClient = new QueryClient({
 	},
 });
 
+const MainLayout = lazy(() =>
+	import("#/layouts/MainLayout/MainLayout").then((module) => ({
+		default: module.MainLayout,
+	})),
+);
+
 useAuthStore.subscribe((state, previous) => {
 	if (state.session?.user.id !== previous.session?.user.id) queryClient.clear();
 	if (
@@ -61,7 +67,10 @@ export const Route = createRootRoute({
 
 function RootComponent() {
 	useEffect(() => {
-		const check = () => void supabaseService.refreshIdentity();
+		const check = () => {
+			if (document.visibilityState !== "hidden")
+				void supabaseService.refreshIdentity({ deduplicate: true });
+		};
 		const timer = setInterval(check, 30000);
 		window.addEventListener("focus", check);
 		return () => {
@@ -143,10 +152,16 @@ function RootComponent() {
 					<div className="min-h-screen bg-background px-6 py-16">
 						<PasswordForm />
 					</div>
-				) : accessGranted || isLoginRoute ? (
-					<MainLayout>
-						<Outlet />
-					</MainLayout>
+				) : isLoginRoute ? (
+					<Outlet />
+				) : accessGranted ? (
+					<Suspense fallback={<ApplicationStatus />}>
+						<MainLayout>
+							<Outlet />
+						</MainLayout>
+					</Suspense>
+				) : loading || !session ? (
+					<ApplicationStatus />
 				) : (
 					<div className="min-h-screen bg-background p-4 sm:p-8">
 						{!loading && session?.user.access?.status === "pending" ? (
@@ -178,7 +193,7 @@ function RootComponent() {
 
 				{accessGranted && <ProjectEmailServerCache />}
 				{accessGranted && <BonusServerCache />}
-				{accessGranted && <ModalRoot />}
+				{accessGranted && <LazyModalRoot />}
 
 				<ToastContainer />
 			</ToastProvider>

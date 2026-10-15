@@ -16,5 +16,13 @@ export async function authenticatedFetch(
 		"Authorization",
 		`Bearer ${await supabaseService.getAccessToken()}`,
 	);
-	return fetch(input, { ...init, headers });
+	const method = init?.method?.toUpperCase() ?? "GET";
+	return fetch(input, {
+		...init,
+		headers,
+		// Bound reads; never automatically retry or cancel a write on a timer.
+		signal:
+			init?.signal ??
+			(method === "GET" ? AbortSignal.timeout(30000) : undefined),
+	});
 }

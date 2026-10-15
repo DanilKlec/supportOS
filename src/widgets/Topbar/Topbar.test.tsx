@@ -498,3 +498,23 @@ it("also switches multilingual bonus previews while keeping single-language bind
 	expect(mocks.navigate).toHaveBeenCalledWith({ to: "/" });
 	expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+it("reuses the warmed email publication instead of downloading it again on search focus", () => {
+	client.setQueryData(["shared-publication", "test", "emails", "shared"], {
+		data: [
+			{
+				id: "project",
+				projectName: "Cached project",
+				slug: "cached",
+				addresses: [
+					{ id: "support", type: "Support", email: "help@example.test" },
+				],
+				updatedAt: "",
+			},
+		],
+	});
+	const input = setup(["work", "projects.read"]);
+	fireEvent.change(input, { target: { value: "help@example.test" } });
+	expect(screen.getByRole("option", { name: /Cached project/ })).toBeTruthy();
+	expect(mocks.contentApi).not.toHaveBeenCalled();
+});

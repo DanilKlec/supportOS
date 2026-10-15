@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { safeAuthRedirect } from "@/app/auth-redirect";
+import { withTimeout } from "@/shared/lib/with-timeout";
 import { type AuthSession, useAuthStore } from "@/store/auth.store";
 import { normalizeRole } from "../../shared/access.js";
 import { loginEmail } from "../../shared/login-identity.js";
@@ -10,6 +11,11 @@ class SupabaseService {
 	private initialized?: Promise<AuthSession | undefined>;
 	private revision = 0;
 	private accessRevision = 0;
+	private identityRequest?: {
+		token: string;
+		revision: number;
+		promise: Promise<void>;
+	};
 	isConfigured() {
 		return Boolean(supabase);
 	}
@@ -95,22 +101,23 @@ class SupabaseService {
 				useAuthStore.setState({ passwordRecovery: false });
 			this.revision++;
 			this.accept(session);
-			if (session) queueMicrotask(() => void this.refreshIdentity());
+			if (session)
+				queueMicrotask(() => void this.refreshIdentity({ deduplicate: true }));
 		});
 		try {
-			const { data, error } = await supabase.auth.getSession();
+			const { data, error } = await withTimeout(supabase.auth.getSession());
 			if (error) throw error;
 			if (!data.session) return this.accept(null);
 			const revision = this.revision;
-			const verified = await supabase.auth.getUser();
+			const verified = await withTimeout(supabase.auth.getUser());
 			if (revision !== this.revision) {
-				await this.refreshIdentity();
+				await this.refreshIdentity({ deduplicate: true });
 				return this.getSession();
 			}
 			if (verified.error || !verified.data.user)
 				throw verified.error ?? new Error("Session expired");
 			this.accept({ ...data.session, user: verified.data.user });
-			await this.refreshIdentity();
+			await this.refreshIdentity({ deduplicate: true });
 			return this.getSession();
 		} catch (error) {
 			this.accept(null);
@@ -224,13 +231,32 @@ class SupabaseService {
 	}
 	async getAccessToken() {
 		if (!supabase) throw new Error("Supabase is not configured");
-		const { data, error } = await supabase.auth.getSession();
+		const { data, error } = await withTimeout(supabase.auth.getSession());
 		if (error || !data.session) throw error ?? new Error("Sign in required");
 		return data.session.access_token;
 	}
-	async refreshIdentity() {
+	refreshIdentity({ deduplicate = false }: { deduplicate?: boolean } = {}) {
 		const current = this.getSession();
-		if (!current) return;
+		if (!current) return Promise.resolve();
+		if (
+			deduplicate &&
+			this.identityRequest?.token === current.accessToken &&
+			this.identityRequest.revision === this.revision
+		)
+			return this.identityRequest.promise;
+		const promise = this.loadIdentity(current);
+		this.identityRequest = {
+			token: current.accessToken,
+			revision: this.revision,
+			promise,
+		};
+		void promise.finally(() => {
+			if (this.identityRequest?.promise === promise)
+				this.identityRequest = undefined;
+		});
+		return promise;
+	}
+	private async loadIdentity(current: AuthSession) {
 		const revision = this.revision;
 		const accessRevision = ++this.accessRevision;
 		try {

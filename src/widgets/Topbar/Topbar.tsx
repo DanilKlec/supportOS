@@ -250,18 +250,27 @@ export function Topbar({
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const enabled = searchFocused || mobileSearchOpen;
 	const emails = useQuery({
-		queryKey: ["search-emails", authSession?.user.id],
+		queryKey: ["shared-publication", authSession?.user.id, "emails", "shared"],
 		enabled: enabled && can(access, "projects.read"),
-		staleTime: 10000,
+		staleTime: 60000,
 		queryFn: () => contentApi("emails"),
 	});
 	const bonuses = useQuery({
 		queryKey: ["search-bonuses", authSession?.user.id],
 		enabled: enabled && can(access, "bonuses.read"),
-		staleTime: 10000,
+		staleTime: 60000,
 		queryFn: async () => {
 			const [shared, personal] = await Promise.all([
-				contentApi("bonuses"),
+				queryClient.fetchQuery({
+					queryKey: [
+						"shared-publication",
+						authSession?.user.id,
+						"bonuses",
+						"shared",
+					],
+					queryFn: () => contentApi("bonuses"),
+					staleTime: 60000,
+				}),
 				contentApi("bonuses", undefined, undefined, "personal"),
 			]);
 			return personal ?? shared;
