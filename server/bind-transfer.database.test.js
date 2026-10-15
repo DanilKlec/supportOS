@@ -30,6 +30,26 @@ it('persists atomic placement and ordering, preserves text and enforces ownershi
   expect(personal.replacements.a).toBeTruthy();
   expect(personal.binds.find(b=>b.id===personal.replacements.a)).toMatchObject({owner_id:reader,source_bind_id:'a',category_id:'private',translations:before.translations});
   expect((await pg.query("select * from supportos_binds where id='a'")).rows[0]).toEqual(before);
+  // Support can use common folders as destinations, but every write must stay personal.
+  const sharedBefore=(await pg.query('select * from supportos_binds where owner_id is null order by id')).rows;
+  const structureBefore=(await pg.query("select jsonb_build_object('categories',(select jsonb_agg(c order by id) from supportos_categories c),'folders',(select jsonb_agg(f order by id) from supportos_folders f)) value")).rows[0].value;
+  const sharedDestination=await move({sources:[source('b','new')],categoryId:'cat',folderId:'old'},reader,readerSid);
+  const ownB=sharedDestination.replacements.b;
+  expect(ownB).toBeTruthy();
+  expect(sharedDestination.binds.every(b=>b.owner_id===reader)).toBe(true);
+  expect(sharedDestination.binds.find(b=>b.id===ownB)).toMatchObject({source_bind_id:'b',category_id:'cat',folder_id:'old'});
+  const ordered=await move({sources:[source('c','new')],categoryId:'cat',folderId:'old',beforeId:ownB},reader,readerSid);
+  const ownC=ordered.replacements.c;
+  expect(ordered.binds.map(b=>b.id)).toEqual([ownC,ownB]);
+  expect(ordered.binds.every(b=>b.owner_id===reader)).toBe(true);
+  // A second move reuses the personal branch and cannot create duplicate overrides.
+  const reused=await move({sources:[source('b','new')],categoryId:'cat',folderId:'new',beforeId:'c'},reader,readerSid);
+  expect(reused.replacements.b).toBe(ownB);
+  expect(reused.binds.every(b=>b.owner_id===reader)).toBe(true);
+  expect((await pg.query("select count(*)::int n from supportos_binds where owner_id=$1 and source_bind_id='b'",[reader])).rows[0].n).toBe(1);
+  await move({sources:[{id:ownB,categoryId:'cat',folderId:'new'}],categoryId:'cat'},reader,readerSid);
+  expect((await pg.query('select * from supportos_binds where owner_id is null order by id')).rows).toEqual(sharedBefore);
+  expect((await pg.query("select jsonb_build_object('categories',(select jsonb_agg(c order by id) from supportos_categories c),'folders',(select jsonb_agg(f order by id) from supportos_folders f)) value")).rows[0].value).toEqual(structureBefore);
   await expect(move({sources:[source('b','new')],categoryId:'private'})).rejects.toThrow('Раздел назначения недоступен');
   expect((await pg.query("select has_function_privilege('authenticated','public.supportos_bind_transfer(uuid,uuid,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
   expect((await pg.query("select has_function_privilege('anon','public.supportos_bind_transfer(uuid,uuid,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);

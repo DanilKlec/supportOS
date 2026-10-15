@@ -15,6 +15,8 @@ import { knowledgeService } from "@/services/knowledge.service";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBindLinksStore } from "@/store/bind-links.store";
+import { ModalRoot } from "@/shared/modals/ModalRoot";
+import { useModalStore } from "@/shared/modals/modal.store";
 import { Sidebar } from "@/widgets/Sidebar/Sidebar";
 import { WorkspaceSharedBindsSync } from "./WorkspaceSharedBinds";
 
@@ -101,6 +103,7 @@ beforeEach(() => {
 		} as never,
 	});
 	useBindLinksStore.setState({ accounts: {} });
+	useModalStore.setState({ activeModal: null });
 	useKnowledgeStore.setState({
 		...initial,
 		remoteBinds: [],
@@ -134,6 +137,7 @@ function mount() {
 		<QueryClientProvider client={client}>
 			<WorkspaceSharedBindsSync />
 			<Sidebar />
+			<ModalRoot />
 		</QueryClientProvider>,
 	);
 	return { ...view, client };
@@ -330,6 +334,140 @@ it("does not apply a confirmed response to another account after a session switc
 	expect(
 		useKnowledgeStore.getState().binds.find((b) => b.id === "a")?.folderId,
 	).toBe("old");
+});
+
+it("creates a support bind from a common folder menu only in the personal tree, including after reload", async () => {
+	useAuthStore.setState({
+		session: {
+			user: {
+				id: "actor",
+				role: "support",
+				access: { status: "active", permissions: ["binds.read"] },
+			},
+		} as never,
+	});
+	const commonBefore = structuredClone(rows);
+	mock.fetch.mockImplementation(async (_url, options) => {
+		const body = JSON.parse(options.body);
+		if (body.action !== "knowledge-save")
+			throw new Error("Unexpected operation");
+		rows.push(...body.binds);
+		return new Response("{}");
+	});
+	const { unmount } = mount();
+	await screen.findByRole("button", { name: "Ответ a" });
+	fireEvent.click(screen.getByRole("button", { name: "Действия: Исходная" }));
+	fireEvent.click(
+		within(screen.getByRole("menu")).getByRole("button", {
+			name: "Новый бинд",
+		}),
+	);
+	fireEvent.change(
+		within(screen.getByRole("group", { name: "Заголовок" })).getByRole(
+			"textbox",
+		),
+		{ target: { value: "Мой новый ответ" } },
+	);
+	fireEvent.change(
+		within(screen.getByRole("group", { name: "Содержание" })).getByRole(
+			"textbox",
+		),
+		{ target: { value: "Личный текст сотрудника" } },
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+	await waitFor(() => expect(mock.fetch).toHaveBeenCalledTimes(1));
+	expect(JSON.parse(mock.fetch.mock.calls[0][1].body).binds[0]).toMatchObject({
+		ownerId: "actor",
+		categoryId: "cat",
+		folderId: "old",
+	});
+	expect(
+		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
+			"button",
+			{ name: "Мой новый ответ" },
+		),
+	).toBeNull();
+	expect(
+		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
+			"button",
+			{ name: "Мой новый ответ" },
+		),
+	).toBeTruthy();
+	expect(rows.filter((b) => b.ownerId === null)).toEqual(commonBefore);
+	unmount();
+	useKnowledgeStore
+		.getState()
+		.setKnowledge({ categories, folders, binds: rows });
+	mount();
+	await screen.findByRole("button", { name: "Ответ a" });
+	expect(
+		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
+			"button",
+			{ name: "Мой новый ответ" },
+		),
+	).toBeTruthy();
+	expect(
+		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
+			"button",
+			{ name: "Мой новый ответ" },
+		),
+	).toBeNull();
+});
+
+it("places a support move into a common folder only under the employee's personal tree", async () => {
+	useAuthStore.setState({
+		session: {
+			user: {
+				id: "actor",
+				role: "support",
+				access: { status: "active", permissions: ["binds.read"] },
+			},
+		} as never,
+	});
+	const original = structuredClone(rows);
+	mock.fetch.mockImplementationOnce(async () => {
+		const own = {
+			...rows[0],
+			id: "own-a",
+			ownerId: "actor",
+			sourceBindId: "a",
+			folderId: "new",
+			order: 1,
+		};
+		rows.push(own);
+		return new Response(
+			JSON.stringify({ binds: [own], replacements: { a: "own-a" } }),
+		);
+	});
+	const { client } = mount();
+	await screen.findByRole("button", { name: "Ответ a" });
+	drag("a", "Новая папка");
+	await waitFor(() =>
+		expect(
+			within(
+				screen.getByRole("region", { name: "Личные материалы" }),
+			).getByRole("button", { name: "Ответ a" }),
+		).toBeTruthy(),
+	);
+	expect(
+		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
+			"button",
+			{ name: "Ответ a" },
+		),
+	).toBeNull();
+	expect(rows.filter((b) => b.ownerId === null)).toEqual(original);
+	expect(client.getQueryData<Bind[]>(["shared-binds", "actor"])).toEqual(
+		original,
+	);
+	await act(async () => {
+		await client.invalidateQueries({ queryKey: ["shared-binds", "actor"] });
+	});
+	expect(
+		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
+			"button",
+			{ name: "Ответ a" },
+		),
+	).toBeTruthy();
 });
 
 it("uses the current cloud location when a colleague moved a common bind after local hydration", async () => {

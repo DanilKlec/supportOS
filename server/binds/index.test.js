@@ -137,6 +137,19 @@ it('persists knowledge through the server and never accepts a forged owner',asyn
  expect((await run({method:'POST',body:{action:'knowledge-save',categories:[{id:'shared',ownerId:null,name:'Общее',order:1}]}})).status).toBe(403);
 });
 
+it('creates support binds only in the authenticated personal branch even inside common folders',async()=>{
+ const shared={id:'base',owner_id:null,category_id:'shared',folder_id:'folder',slug:'base',tags:[],translations:[],updated_at:'original-version'};
+ mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_binds?select=id,owner_id')?[{id:shared.id,owner_id:null}]:[]);
+ const fetch=vi.fn(async()=>Response.json({}));vi.stubGlobal('fetch',fetch);
+ const bind={id:'new-personal',ownerId:other,categoryId:'shared',folderId:'folder',slug:'new-personal',tags:[],translations:[{language:'ru',title:'Мой ответ',content:'Личный текст'}]};
+ expect((await run({method:'POST',body:{action:'knowledge-save',binds:[bind],actor:other}})).status).toBe(200);
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual([expect.objectContaining({id:'new-personal',owner_id:actor,category_id:'shared',folder_id:'folder'})]);
+ expect((await run({method:'POST',body:{action:'knowledge-save',binds:[{...bind,id:'try-publish',ownerId:null}]}})).status).toBe(403);
+ expect((await run({method:'POST',body:{action:'knowledge-save',binds:[{...bind,id:shared.id,ownerId:actor}]}})).status).toBe(403);
+ expect((await run({method:'POST',body:{action:'shared-save',categoryId:'shared',folderId:'folder',translations:bind.translations,tags:[]}})).status).toBe(403);
+ expect(fetch).toHaveBeenCalledTimes(1);
+});
+
 const backup={app:'SupportOS',version:3,knowledge:{categories:[{id:'shared',ownerId:null,name:'Общее',order:1},{id:'new',ownerId:null,name:'Новое',order:2}],folders:[],binds:[]}};
 function allowBackup(){mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read','knowledge.write']}});mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories')?[{id:'shared',owner_id:null,name:'Сервер',order_index:1}]:[]);mocks.db.mockImplementation(async(_env,path)=>path.startsWith('supportos_categories?select=id')?[{id:'shared',owner_id:null,updated_at:'2026-01-01'}]:[]);}
 it('exports only the authorized server snapshot, not browser state',async()=>{
