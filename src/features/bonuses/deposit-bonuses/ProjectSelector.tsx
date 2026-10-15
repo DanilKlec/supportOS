@@ -25,6 +25,7 @@ export function ProjectSelector({
 	projectCurrencyGroups,
 	searchTokens,
 	setActiveProject,
+	creationOnly = false,
 }: {
 	canEdit: boolean;
 	newProjectName: string;
@@ -40,6 +41,7 @@ export function ProjectSelector({
 	projectCurrencyGroups: Record<string, string>;
 	searchTokens: string[];
 	setActiveProject: (id: string) => void;
+	creationOnly?: boolean;
 }) {
 	return (
 		<div className="min-w-0 space-y-3">
@@ -84,64 +86,73 @@ export function ProjectSelector({
 				</fieldset>
 			</form>
 
-			<div className="relative">
-				<Search
-					size={16}
-					className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-				/>
-				<input
-					value={query}
-					onChange={(event) => setQuery(event.target.value)}
-					className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-					placeholder="Поиск проектов или бонусов…"
-				/>
-			</div>
+			{!creationOnly && (
+				<>
+					<div className="relative">
+						<Search
+							size={16}
+							className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+						/>
+						<input
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							className="ui-input w-full border border-border bg-surface pl-10 pr-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+							placeholder="Поиск проектов или бонусов…"
+						/>
+					</div>
 
-			<div className="supportos-scroll max-h-[28rem] overflow-auto rounded-xl border border-border bg-surface">
-				{filteredProjects.length > 0 ? (
-					filteredProjects.map((project) => {
-						const active = project.id === activeProject?.id;
-						const currencyGroup = projectCurrencyGroups[project.id];
-						const visibleCount =
-							searchTokens.length > 0 &&
-							!matchesTokens(buildProjectSearchText(project), searchTokens)
-								? project.bonuses.filter((bonus) =>
-										matchesTokens(buildBonusSearchText(bonus), searchTokens),
-									).length
-								: project.bonuses.length;
+					<div className="supportos-scroll max-h-[28rem] overflow-auto rounded-xl border border-border bg-surface">
+						{filteredProjects.length > 0 ? (
+							filteredProjects.map((project) => {
+								const active = project.id === activeProject?.id;
+								const currencyGroup = projectCurrencyGroups[project.id];
+								const visibleCount =
+									searchTokens.length > 0 &&
+									!matchesTokens(buildProjectSearchText(project), searchTokens)
+										? project.bonuses.filter((bonus) =>
+												matchesTokens(
+													buildBonusSearchText(bonus),
+													searchTokens,
+												),
+											).length
+										: project.bonuses.length;
 
-						return (
-							<button
-								key={project.id}
-								type="button"
-								onClick={() => setActiveProject(project.id)}
-								className={`flex min-h-14 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-3 text-left text-sm transition last:border-b-0 ${
-									active
-										? "bg-accent/10 text-foreground"
-										: "text-muted hover:bg-surface-elevated hover:text-foreground"
-								}`}
-							>
-								<span className="min-w-0">
-									<span className="block truncate font-medium">
-										{project.name}
-									</span>
-									<span className="mt-0.5 block text-xs text-muted">
-										{visibleCount} бонусов
-										{currencyGroup
-											? ` - ${getCurrencyGroupShortName(currencyGroup)}`
-											: ""}
-									</span>
-								</span>
-								<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
-									{project.bonuses.length}
-								</span>
-							</button>
-						);
-					})
-				) : (
-					<div className="px-2 py-6 text-sm text-muted">Проектов пока нет</div>
-				)}
-			</div>
+								return (
+									<button
+										key={project.id}
+										type="button"
+										onClick={() => setActiveProject(project.id)}
+										className={`flex min-h-14 w-full min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-3 text-left text-sm transition last:border-b-0 ${
+											active
+												? "bg-accent/10 text-foreground"
+												: "text-muted hover:bg-surface-elevated hover:text-foreground"
+										}`}
+									>
+										<span className="min-w-0">
+											<span className="block truncate font-medium">
+												{project.name}
+											</span>
+											<span className="mt-0.5 block text-xs text-muted">
+												{visibleCount} бонусов
+												{currencyGroup
+													? ` - ${getCurrencyGroupShortName(currencyGroup)}`
+													: ""}
+											</span>
+										</span>
+										<span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs text-muted">
+											{project.bonuses.length}
+										</span>
+									</button>
+								);
+							})
+						) : (
+							<div className="px-2 py-6 text-sm text-muted">
+								Проектов пока нет
+							</div>
+						)}
+					</div>
+				</>
+			)}
 		</div>
 	);
 }

@@ -1,5 +1,6 @@
 import {
 	CheckCircle2,
+	ChevronRight,
 	Copy,
 	FileSpreadsheet,
 	Loader2,
@@ -13,6 +14,11 @@ import {
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useSharedPublication } from "@/components/SharedPublication";
+import {
+	MaterialWorkbench,
+	useMaterialNavigation,
+	type MaterialNode,
+} from "@/features/qc/MaterialWorkbench";
 import type {
 	ProjectEmailAddress,
 	ProjectEmailRecord,
@@ -126,6 +132,15 @@ export function ProjectEmailsPage({
 	const [preview, setPreview] = useState<ProjectEmailImportPreview>();
 	const [importing, setImporting] = useState(false);
 	const [committing, setCommitting] = useState(false);
+	const [selectedAddressId, setSelectedAddressId] = useState<string>();
+	const [draftBase, setDraftBase] = useState(JSON.stringify(EMPTY_DRAFT));
+	const navigation = useMaterialNavigation(
+		management && workPanel === "editor" && JSON.stringify(draft) !== draftBase,
+	);
+	const [deleteAddress, setDeleteAddress] = useState<{
+		record: ProjectEmailRecord;
+		address: ProjectEmailAddress;
+	} | null>(null);
 
 	const filteredRecords = useMemo(() => {
 		const value = query.trim().toLowerCase();
@@ -152,6 +167,7 @@ export function ProjectEmailsPage({
 
 	const resetForm = () => {
 		setDraft(EMPTY_DRAFT);
+		setDraftBase(JSON.stringify(EMPTY_DRAFT));
 		setEditingId(undefined);
 		setFormError("");
 	};
@@ -198,6 +214,8 @@ export function ProjectEmailsPage({
 
 		upsertRecords([nextRecord]);
 		setSelectedId(nextRecord.id);
+		setSelectedAddressId(undefined);
+		if (management) setQuery("");
 		showToast(
 			editingId
 				? "Изменения применены. Сохраните справочник для публикации."
@@ -210,10 +228,12 @@ export function ProjectEmailsPage({
 		if (!canEdit) return;
 		setSelectedId(record.id);
 		setEditingId(record.id);
-		setDraft({
+		const nextDraft = {
 			projectName: record.projectName,
 			addresses: emailAddresses(record).map((row) => ({ ...row })),
-		});
+		};
+		setDraft(nextDraft);
+		setDraftBase(JSON.stringify(nextDraft));
 		setFormError("");
 		setWorkPanel("editor");
 	};
@@ -288,6 +308,301 @@ export function ProjectEmailsPage({
 	};
 
 	if (!publication.ready) return publication.banner;
+	if (management) {
+		const nodes: MaterialNode[] = filteredRecords.map((record) => ({
+			id: JSON.stringify([record.id, null]),
+			label: record.projectName,
+			children: emailAddresses(record).map((address) => ({
+				id: JSON.stringify([record.id, address.id]),
+				label: address.type,
+				detail: address.email,
+				icon: Mail,
+				actions: canEdit
+					? [
+							{
+								label: "Редактировать адрес",
+								onClick: () => navigation.guard(() => editRecord(record)),
+							},
+							{
+								label:
+									emailAddresses(record).length === 1
+										? "Удалить проект"
+										: "Удалить адрес",
+								danger: true,
+								onClick: () =>
+									navigation.guard(() =>
+										emailAddresses(record).length === 1
+											? setDeleteId(record.id)
+											: setDeleteAddress({ record, address }),
+									),
+							},
+						]
+					: [],
+			})),
+			actions: canEdit
+				? [
+						{
+							label: "Редактировать проект",
+							onClick: () => navigation.guard(() => editRecord(record)),
+						},
+						{
+							label: "Добавить адрес",
+							onClick: () =>
+								navigation.guard(() => {
+									editRecord(record);
+									setDraft({
+										projectName: record.projectName,
+										addresses: [
+											...emailAddresses(record),
+											{
+												id: createId("email"),
+												type: "",
+												email: "",
+												order: emailAddresses(record).length,
+											},
+										],
+									});
+								}),
+						},
+						{
+							label: "Удалить проект",
+							danger: true,
+							onClick: () => navigation.guard(() => setDeleteId(record.id)),
+						},
+					]
+				: [],
+		}));
+		const currentAddresses = selectedRecord
+			? emailAddresses(selectedRecord)
+			: [];
+		const address = currentAddresses.find(
+			(row) => row.id === selectedAddressId,
+		);
+		const selectProject = () =>
+			navigation.guard(() => {
+				closePanel();
+				setSelectedAddressId(undefined);
+			});
+		return (
+			<MaterialWorkbench
+				title="Почты проектов"
+				icon={Mail}
+				summary={`${records.length} проектов · ${records.reduce((sum, r) => sum + emailAddresses(r).length, 0)} адресов`}
+				nodes={nodes}
+				selected={JSON.stringify([
+					selectedRecord?.id,
+					selectedAddressId ?? null,
+				])}
+				onSelect={(node) =>
+					navigation.guard(() => {
+						const [id, addressId] = JSON.parse(node.id);
+						closePanel();
+						setSelectedId(id);
+						setSelectedAddressId(addressId ?? undefined);
+					})
+				}
+				query={query}
+				onSearch={(value) =>
+					navigation.guard(() => {
+						closePanel();
+						setSelectedAddressId(undefined);
+						setQuery(value);
+					})
+				}
+				searchPlaceholder="Поиск проекта или почты…"
+				actions={
+					<>
+						<button
+							type="button"
+							className="ui-button ui-button--secondary border border-border"
+							disabled={!canEdit}
+							onClick={() =>
+								navigation.guard(() => {
+									resetForm();
+									setWorkPanel(workPanel === "import" ? "closed" : "import");
+								})
+							}
+						>
+							<Upload size={15} />
+							Импорт
+						</button>
+						<button
+							type="button"
+							className="ui-button ui-button--primary"
+							disabled={!canEdit}
+							onClick={() => navigation.guard(openCreate)}
+						>
+							<Plus size={15} />
+							Добавить проект
+						</button>
+					</>
+				}
+				banner={publication.banner}
+				breadcrumb={
+					<>
+						<span>Общая база</span>
+						<ChevronRight size={12} />
+						<span>Почты</span>
+						{selectedRecord && (
+							<>
+								<ChevronRight size={12} />
+								<button type="button" onClick={selectProject}>
+									{selectedRecord.projectName}
+								</button>
+							</>
+						)}
+						{address && (
+							<>
+								<ChevronRight size={12} />
+								<span>{address.type}</span>
+							</>
+						)}
+					</>
+				}
+			>
+				{workPanel === "editor" && canEdit ? (
+					<ProjectEmailEditor
+						draft={draft}
+						editing={Boolean(editingId)}
+						error={formError}
+						onCancel={() => navigation.guard(closePanel)}
+						onChange={setDraft}
+						onSubmit={submit}
+					/>
+				) : workPanel === "import" && canEdit ? (
+					<ProjectEmailImportPanel
+						committing={committing}
+						importing={importing}
+						mode={mode}
+						preview={preview}
+						sheetUrl={sheetUrl}
+						onCancel={() => setWorkPanel("closed")}
+						onCommit={commitPreview}
+						onLoadPreview={loadPreview}
+						onModeChange={setMode}
+						onSheetUrlChange={setSheetUrl}
+					/>
+				) : selectedRecord ? (
+					<>
+						<div className="qc-material-heading">
+							<div>
+								<div className="qc-material-eyebrow">
+									{address ? "Адрес проекта" : "Почты проекта"}
+								</div>
+								<h2>{address?.type ?? selectedRecord.projectName}</h2>
+								<p>
+									{currentAddresses.length} адресов · Обновлено{" "}
+									{new Date(selectedRecord.updatedAt).toLocaleDateString("ru")}
+								</p>
+							</div>
+							<div className="ui-actions flex gap-2">
+								<button
+									type="button"
+									className="ui-button ui-button--secondary border border-border"
+									onClick={() =>
+										void copyText(
+											buildProjectEmailBlock(selectedRecord),
+											"Почты проекта скопированы",
+										)
+									}
+								>
+									<Copy size={15} />
+									Копировать всё
+								</button>
+								{canEdit && (
+									<button
+										type="button"
+										className="ui-button ui-button--primary"
+										aria-label="Редактировать почты проекта"
+										onClick={() => editRecord(selectedRecord)}
+									>
+										<Pencil size={15} />
+										Редактировать
+									</button>
+								)}
+							</div>
+						</div>
+						<div className="qc-material-email-grid">
+							{(address ? [address] : currentAddresses).map((row) => (
+								<article key={row.id} className="qc-material-email">
+									<header>
+										<strong>{row.type}</strong>
+										<button
+											type="button"
+											className="ui-button ui-button--secondary border border-border"
+											aria-label={`Копировать ${row.type}`}
+											onClick={() =>
+												void copyText(row.email, "Почта скопирована")
+											}
+										>
+											<Copy size={14} />
+											Копировать
+										</button>
+									</header>
+									<div className="qc-material-email-address">{row.email}</div>
+									{row.note && <p>{row.note}</p>}
+								</article>
+							))}
+						</div>
+					</>
+				) : (
+					<EmptyState
+						title={query ? "Ничего не найдено" : "Справочник почт пуст"}
+						description="Добавьте проект или импортируйте справочник."
+					/>
+				)}
+				<div className="mt-4 text-xs text-muted">
+					{filteredRecords.length} из {records.length} проектов
+				</div>
+				{navigation.dialog}
+				<DeleteConfirmDialog
+					open={Boolean(deleteTarget)}
+					title="Удалить почты проекта?"
+					description={
+						deleteTarget
+							? `${deleteTarget.projectName} будет удалён из черновика справочника.`
+							: ""
+					}
+					onCancel={() => setDeleteId(undefined)}
+					onConfirm={confirmDelete}
+				/>
+				<DeleteConfirmDialog
+					open={Boolean(deleteAddress)}
+					title="Удалить адрес?"
+					description={
+						deleteAddress
+							? `${deleteAddress.address.type}: ${deleteAddress.address.email}`
+							: ""
+					}
+					onCancel={() => setDeleteAddress(null)}
+					onConfirm={() => {
+						if (!canEdit || !deleteAddress) return;
+						const record = records.find(
+							(r) => r.id === deleteAddress.record.id,
+						);
+						if (record && emailAddresses(record).length <= 1) {
+							showToast("Это последний адрес. Удалите проект целиком.");
+							setDeleteAddress(null);
+							return;
+						}
+						if (record)
+							upsertRecords([
+								{
+									...record,
+									addresses: emailAddresses(record).filter(
+										(a) => a.id !== deleteAddress.address.id,
+									),
+									updatedAt: new Date().toISOString(),
+								},
+							]);
+						setSelectedAddressId(undefined);
+						setDeleteAddress(null);
+						showToast("Адрес удалён из черновика справочника");
+					}}
+				/>
+			</MaterialWorkbench>
+		);
+	}
 	return (
 		<div className="supportos-page-scroll min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
 			{publication.banner}

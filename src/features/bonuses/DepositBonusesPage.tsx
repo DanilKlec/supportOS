@@ -1,4 +1,13 @@
-import { Copy, Loader2, RefreshCw, Upload } from "lucide-react";
+import {
+	Copy,
+	Loader2,
+	RefreshCw,
+	Upload,
+	Gift,
+	Plus,
+	ChevronRight,
+	Settings2,
+} from "lucide-react";
 import {
 	type FormEvent,
 	useCallback,
@@ -7,6 +16,11 @@ import {
 	useState,
 } from "react";
 import { useSharedPublication } from "@/components/SharedPublication";
+import {
+	MaterialWorkbench,
+	useMaterialNavigation,
+	type MaterialNode,
+} from "@/features/qc/MaterialWorkbench";
 import type { BonusProject, DepositBonus } from "@/entities/bonus";
 import { bonusCurrencyRegistryService } from "@/services/bonus-currency-registry.service";
 import {
@@ -54,6 +68,8 @@ export function DepositBonusesPage({
 	const bonusDataProjects = useBonusStore((state) => state.projects);
 	const projectCatalog = useProjectCatalog();
 	const projects = useMemo(() => {
+		// QC manages entries in this directory; empty catalog projects are added explicitly.
+		if (management) return bonusDataProjects;
 		const catalog = projectCatalog.data ?? [];
 		if (!catalog.length) return bonusDataProjects;
 
@@ -71,7 +87,7 @@ export function DepositBonusesPage({
 
 			return {
 				id: project.id,
-				name: project.name,
+				name: bonusData?.name ?? project.name,
 				slug: project.slug,
 				bonuses: bonusData?.bonuses ?? [],
 				updatedAt: bonusData?.updatedAt ?? "",
@@ -86,7 +102,7 @@ export function DepositBonusesPage({
 			...canonicalProjects,
 			...bonusDataProjects.filter((project) => !matchedDataIds.has(project.id)),
 		];
-	}, [bonusDataProjects, projectCatalog.data]);
+	}, [bonusDataProjects, projectCatalog.data, management]);
 	const activeProjectId = useBonusStore((state) => state.activeProjectId);
 	const selectedCurrency = useBonusStore((state) => state.selectedCurrency);
 	const selectedLanguage = useBonusStore((state) => state.depositBonusLanguage);
@@ -139,6 +155,11 @@ export function DepositBonusesPage({
 	const [importOpen, setImportOpen] = useState(false);
 	const [deleteProjectId, setDeleteProjectId] = useState<string>();
 	const [deleteBonusId, setDeleteBonusId] = useState<string>();
+	const [managementView, setManagementView] = useState<
+		"view" | "editor" | "project" | "create" | "import"
+	>("view");
+	const [selectedBonusId, setSelectedBonusId] = useState<string>();
+	const [draftBase, setDraftBase] = useState("");
 
 	const rateCurrencies = useMemo(() => {
 		const values = new Set([
@@ -348,6 +369,10 @@ export function DepositBonusesPage({
 
 		setNewProjectName("");
 		setNewProjectCurrencyGroup("");
+		if (management) {
+			setManagementView("project");
+			setSelectedBonusId(undefined);
+		}
 		showToast(
 			newProjectCurrencyGroup
 				? "Проект добавлен в группу валют"
@@ -390,6 +415,7 @@ export function DepositBonusesPage({
 		setBonusDraft(createEmptyBonusDraft(defaultBonusCurrency));
 		setEditingBonusId(undefined);
 		setFormError("");
+		if (management) setManagementView("view");
 	};
 
 	const submitBonus = (event: FormEvent) => {
@@ -402,6 +428,10 @@ export function DepositBonusesPage({
 
 		if (!activeProject) {
 			setFormError("Сначала создайте проект");
+			return;
+		}
+		if (editingBonusId && !editingBonus) {
+			setFormError("Бонус больше недоступен. Обновите проект.");
 			return;
 		}
 
@@ -458,12 +488,18 @@ export function DepositBonusesPage({
 		}
 
 		resetBonusForm();
+		if (management) setSelectedBonusId(editingBonusId);
 	};
 
 	const editBonus = (bonus: DepositBonus) => {
 		setEditingBonusId(bonus.id);
 		setBonusDraft(toDraft(bonus));
 		setFormError("");
+		if (management) {
+			setSelectedBonusId(bonus.id);
+			setDraftBase(JSON.stringify(toDraft(bonus)));
+			setManagementView("editor");
+		}
 	};
 
 	const copyBonus = async (bonus: DepositBonus) => {
@@ -508,11 +544,426 @@ export function DepositBonusesPage({
 		if (!activeProject || !deleteBonusTarget) return;
 
 		removeBonus(activeProject.id, deleteBonusTarget.id);
+		if (selectedBonusId === deleteBonusTarget.id) setSelectedBonusId(undefined);
 		setDeleteBonusId(undefined);
 		showToast("Бонус удалён из черновика");
 	};
 
+	const navigation = useMaterialNavigation(
+		management &&
+			((managementView === "editor" &&
+				JSON.stringify(bonusDraft) !== draftBase) ||
+				(managementView === "create" && !!newProjectName.trim()) ||
+				(managementView === "project" && renameValue !== activeProject?.name)),
+	);
 	if (!publication.ready) return publication.banner;
+	if (management) {
+		function newBonus(project = activeProject) {
+			if (!project || !canEdit) return;
+			setActiveProject(project.id);
+			setSelectedBonusId(undefined);
+			setEditingBonusId(undefined);
+			setFormError("");
+			const draft = createEmptyBonusDraft(
+				bonusCurrencyRegistryService.getDefaultCurrency(
+					project,
+					undefined,
+					projectCurrencyGroups[project.id] ?? "",
+				) ?? "USD",
+			);
+			setBonusDraft(draft);
+			setDraftBase(JSON.stringify(draft));
+			setManagementView("editor");
+		}
+		const nodes: MaterialNode[] = filteredProjects.map((project) => ({
+			id: JSON.stringify([project.id, null]),
+			label: project.name,
+			children: project.bonuses
+				.filter(
+					(bonus) =>
+						!searchTokens.length ||
+						matchesTokens(buildProjectSearchText(project), searchTokens) ||
+						matchesTokens(buildBonusSearchText(bonus), searchTokens),
+				)
+				.sort((a, b) => a.order - b.order)
+				.map((bonus) => ({
+					id: JSON.stringify([project.id, bonus.id]),
+					label: bonus.name,
+					icon: Gift,
+					actions: canEdit
+						? [
+								{
+									label: "Редактировать бонус",
+									onClick: () =>
+										navigation.guard(() => {
+											setActiveProject(project.id);
+											editBonus(bonus);
+										}),
+								},
+								{
+									label: "Удалить бонус",
+									danger: true,
+									onClick: () =>
+										navigation.guard(() => {
+											setActiveProject(project.id);
+											setDeleteBonusId(bonus.id);
+										}),
+								},
+							]
+						: [],
+				})),
+			actions: canEdit
+				? [
+						{
+							label: "Новый бонус",
+							onClick: () => navigation.guard(() => newBonus(project)),
+						},
+						{
+							label: "Настройки проекта",
+							onClick: () =>
+								navigation.guard(() => {
+									setActiveProject(project.id);
+									setSelectedBonusId(undefined);
+									setManagementView("project");
+								}),
+						},
+						{
+							label: "Удалить проект",
+							danger: true,
+							onClick: () =>
+								navigation.guard(() => setDeleteProjectId(project.id)),
+						},
+					]
+				: [],
+		}));
+		const selectedBonus = visibleBonuses.find((b) => b.id === selectedBonusId);
+		const editor = (mode: "bonus" | "project") =>
+			activeProject && (
+				<div className="qc-material-editor">
+					<BonusEditor
+						mode={mode}
+						activeProject={activeProject}
+						renameValue={renameValue}
+						setRenameValue={setRenameValue}
+						canEdit={canEdit}
+						saveProjectName={saveProjectName}
+						activeProjectCurrencyGroup={activeProjectCurrencyGroup}
+						updateActiveProjectCurrencyGroup={updateActiveProjectCurrencyGroup}
+						currencyGroupOptions={currencyGroupOptions}
+						activeCurrencyContext={activeCurrencyContext}
+						setDeleteProjectId={setDeleteProjectId}
+						submitBonus={submitBonus}
+						bonusDraft={bonusDraft}
+						setBonusDraft={setBonusDraft}
+						selectedLanguage={selectedLanguage}
+						formError={formError}
+						editingBonusId={editingBonusId}
+						resetBonusForm={() => navigation.guard(resetBonusForm)}
+					/>
+				</div>
+			);
+		return (
+			<MaterialWorkbench
+				title="Welcome-бонусы"
+				icon={Gift}
+				summary={`${projects.length} проектов · ${totalBonuses} бонусов`}
+				nodes={nodes}
+				selected={JSON.stringify([activeProject?.id, selectedBonusId ?? null])}
+				onSelect={(node) =>
+					navigation.guard(() => {
+						const [id, bonusId] = JSON.parse(node.id);
+						setActiveProject(id);
+						setSelectedBonusId(bonusId ?? undefined);
+						setManagementView("view");
+						setEditingBonusId(undefined);
+						setFormError("");
+					})
+				}
+				query={query}
+				onSearch={(value) =>
+					navigation.guard(() => {
+						setQuery(value);
+						setSelectedBonusId(undefined);
+						setManagementView("view");
+					})
+				}
+				searchPlaceholder="Поиск проектов или бонусов…"
+				actions={
+					<>
+						<button
+							type="button"
+							disabled={!canEdit}
+							className="ui-button ui-button--secondary border border-border"
+							onClick={() =>
+								navigation.guard(() =>
+									setManagementView(
+										managementView === "import" ? "view" : "import",
+									),
+								)
+							}
+						>
+							<Upload size={15} />
+							Импорт
+						</button>
+						<button
+							type="button"
+							disabled={!canEdit}
+							className="ui-button ui-button--secondary border border-border"
+							onClick={() =>
+								navigation.guard(() => setManagementView("create"))
+							}
+						>
+							<Plus size={15} />
+							Новый проект
+						</button>
+						<button
+							type="button"
+							disabled={!canEdit || !activeProject}
+							className="ui-button ui-button--primary"
+							onClick={() => navigation.guard(() => newBonus())}
+						>
+							<Plus size={15} />
+							Новый бонус
+						</button>
+					</>
+				}
+				banner={publication.banner}
+				breadcrumb={
+					<>
+						<span>Общая база</span>
+						<ChevronRight size={12} />
+						<span>Welcome-бонусы</span>
+						{activeProject && (
+							<>
+								<ChevronRight size={12} />
+								<button
+									type="button"
+									onClick={() =>
+										navigation.guard(() => {
+											setSelectedBonusId(undefined);
+											setManagementView("view");
+										})
+									}
+								>
+									{activeProject.name}
+								</button>
+							</>
+						)}
+						{selectedBonus && (
+							<>
+								<ChevronRight size={12} />
+								<span>{selectedBonus.name}</span>
+							</>
+						)}
+					</>
+				}
+			>
+				<datalist id="deposit-bonus-currencies">
+					{currencies.map((c) => (
+						<option key={c} value={c} />
+					))}
+				</datalist>
+				<div className="qc-material-heading">
+					<div>
+						<div className="qc-material-eyebrow">
+							{managementView === "editor"
+								? "Редактор бонуса"
+								: managementView === "project"
+									? "Настройки проекта"
+									: managementView === "create"
+										? "Добавление проекта"
+										: managementView === "import"
+											? "Импорт материалов"
+											: "Условия бонусов"}
+						</div>
+						<h2>
+							{managementView === "editor"
+								? editingBonusId
+									? "Редактировать бонус"
+									: "Новый бонус"
+								: managementView === "create"
+									? "Новый проект"
+									: managementView === "import"
+										? "Импорт welcome-бонусов"
+										: (selectedBonus?.name ??
+											activeProject?.name ??
+											"Проектов пока нет")}
+						</h2>
+						{activeProject && (
+							<p>{activeProject.bonuses.length} бонусов в проекте</p>
+						)}
+					</div>
+					{activeProject && managementView === "view" && (
+						<div className="ui-actions flex gap-2">
+							<button
+								type="button"
+								className="ui-button ui-button--secondary border border-border"
+								onClick={() => void copyPackage(activeProject)}
+							>
+								<Copy size={15} />
+								Скопировать пакет
+							</button>
+							{canEdit && (
+								<button
+									type="button"
+									className="ui-button ui-button--secondary border border-border"
+									onClick={() => setManagementView("project")}
+								>
+									<Settings2 size={15} />
+									Настройки проекта
+								</button>
+							)}
+						</div>
+					)}
+				</div>
+				{!["create", "import"].includes(managementView) && (
+					<div className="qc-material-options">
+						<div className="flex gap-1">
+							{BONUS_LANGUAGES.map((lang) => (
+								<button
+									type="button"
+									key={lang.code}
+									aria-pressed={selectedLanguage === lang.code}
+									className={`ui-button ${selectedLanguage === lang.code ? "ui-button--primary" : "ui-button--secondary border border-border"}`}
+									onClick={() => setSelectedLanguage(lang.code)}
+								>
+									{lang.label}
+								</button>
+							))}
+						</div>
+						<select
+							className="ui-input"
+							aria-label="Валюта просмотра"
+							value={selectedCurrency}
+							onChange={(e) => setSelectedCurrency(e.target.value)}
+						>
+							{currencies.map((c) => (
+								<option key={c} value={c}>
+									{c}
+								</option>
+							))}
+						</select>
+						<button
+							type="button"
+							className="ui-button ui-button--secondary border border-border"
+							disabled={ratesLoading}
+							onClick={() => void loadRates(true)}
+						>
+							{ratesLoading ? (
+								<Loader2 size={14} className="animate-spin" />
+							) : (
+								<RefreshCw size={14} />
+							)}
+							Курсы валют
+						</button>
+					</div>
+				)}
+				{ratesError && (
+					<p role="alert" className="mb-4 text-xs text-amber-400">
+						{ratesError}
+					</p>
+				)}
+				{managementView === "editor" ? (
+					editor("bonus")
+				) : managementView === "project" ? (
+					editor("project")
+				) : managementView === "create" ? (
+					<ProjectSelector
+						creationOnly
+						canEdit={canEdit}
+						newProjectName={newProjectName}
+						setNewProjectName={setNewProjectName}
+						newProjectCurrencyGroup={newProjectCurrencyGroup}
+						setNewProjectCurrencyGroup={setNewProjectCurrencyGroup}
+						currencyGroupOptions={currencyGroupOptions}
+						createProject={createProject}
+						query={query}
+						setQuery={setQuery}
+						filteredProjects={filteredProjects}
+						activeProject={activeProject}
+						projectCurrencyGroups={projectCurrencyGroups}
+						searchTokens={searchTokens}
+						setActiveProject={setActiveProject}
+					/>
+				) : managementView === "import" ? (
+					<ImportSourcePanel
+						sheetUrl={sheetUrl}
+						setSheetUrl={setSheetUrl}
+						mode={mode}
+						setMode={setMode}
+						loadPreview={loadPreview}
+						importing={importing}
+						preview={preview}
+						commitPreview={() => {
+							commitPreview();
+							if (preview?.projects.length) setManagementView("view");
+						}}
+						committing={committing}
+					/>
+				) : activeProject ? (
+					<div className="qc-material-preview">
+						<BonusList
+							activeProject={activeProject}
+							visibleBonuses={selectedBonus ? [selectedBonus] : visibleBonuses}
+							selectedLanguage={selectedLanguage}
+							selectedCurrency={selectedCurrency}
+							activeProjectCurrencyGroup={activeProjectCurrencyGroup}
+							canEdit={canEdit}
+							updateBonus={updateBonus}
+							rates={rates}
+							setSelectedLanguage={setSelectedLanguage}
+							copyBonus={copyBonus}
+							editBonus={editBonus}
+							setDeleteBonusId={setDeleteBonusId}
+							searchTokens={searchTokens}
+						/>
+					</div>
+				) : (
+					<p className="text-sm text-muted">
+						Добавьте проект, чтобы начать заполнять бонусы.
+					</p>
+				)}
+				{rates && managementView === "view" && (
+					<details className="mt-5 text-xs text-muted">
+						<summary className="cursor-pointer">
+							Валюты и источник расчёта
+						</summary>
+						<p className="mt-2">
+							{rates.source} · {rates.date} · Базовая валюта: {rates.base}
+						</p>
+						{activeCurrencyContext && (
+							<p className="mt-2">
+								Группа валют: {activeCurrencyContext.table.name}
+							</p>
+						)}
+					</details>
+				)}
+				{navigation.dialog}
+				<ConfirmDialog
+					open={Boolean(deleteProjectTarget)}
+					title="Удалить проект?"
+					description={
+						deleteProjectTarget
+							? `${deleteProjectTarget.name} и его бонусы будут удалены из черновика.`
+							: ""
+					}
+					onCancel={() => setDeleteProjectId(undefined)}
+					onConfirm={confirmDeleteProject}
+				/>
+				<ConfirmDialog
+					open={Boolean(deleteBonusTarget)}
+					title="Удалить бонус?"
+					description={
+						deleteBonusTarget
+							? `${deleteBonusTarget.name} будет удалён из черновика проекта.`
+							: ""
+					}
+					onCancel={() => setDeleteBonusId(undefined)}
+					onConfirm={confirmDeleteBonus}
+				/>
+			</MaterialWorkbench>
+		);
+	}
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
 			{publication.banner}

@@ -18,6 +18,7 @@ const mock = vi.hoisted(() => ({
 	copy: vi.fn(),
 	preview: vi.fn(),
 	getRates: vi.fn(),
+	catalog: [] as { id: string; name: string; slug: string }[],
 }));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: mock.showToast }),
@@ -31,7 +32,7 @@ vi.mock("@/components/SharedPublication", () => ({
 	}),
 }));
 vi.mock("@/services/project-catalog.service", () => ({
-	useProjectCatalog: () => ({ data: [] }),
+	useProjectCatalog: () => ({ data: mock.catalog }),
 }));
 vi.mock("@/services/deposit-bonus-import.service", () => ({
 	depositBonusImportService: { preview: mock.preview },
@@ -110,6 +111,7 @@ const projects: BonusProject[] = [
 beforeEach(() => {
 	vi.clearAllMocks();
 	mock.canEdit = true;
+	mock.catalog = [];
 	mock.ready = true;
 	mock.copy.mockResolvedValue(true);
 	mock.getRates.mockResolvedValue({
@@ -167,8 +169,8 @@ it("keeps project selection, translated search, bonus ordering and copying", asy
 	fireEvent.change(screen.getByPlaceholderText("Поиск проектов или бонусов…"), {
 		target: { value: "English offer" },
 	});
-	expect(screen.getByText("First bonus")).toBeTruthy();
-	expect(screen.queryByText("Second bonus")).toBeNull();
+	expect(screen.getByRole("treeitem", { name: "First bonus" })).toBeTruthy();
+	expect(screen.queryByRole("treeitem", { name: "Second bonus" })).toBeNull();
 	fireEvent.click(screen.getAllByRole("button", { name: "EN" })[0]);
 	fireEvent.click(screen.getByRole("button", { name: "Копировать" }));
 	await waitFor(() => expect(mock.copy).toHaveBeenCalledWith("English offer"));
@@ -236,8 +238,9 @@ it("retains multilingual drafts and the existing bonus model when saving an edit
 	).toBeNull();
 });
 
-it("preserves a draft across project changes and keeps validation and cancel behavior", async () => {
+it("guards unfinished edits before project changes and keeps validation and cancel behavior", async () => {
 	await openPage();
+	fireEvent.click(screen.getByRole("button", { name: "Новый бонус" }));
 	fireEvent.click(screen.getByRole("button", { name: "Добавить бонус" }));
 	expect(screen.getByText("Укажите название бонуса")).toBeTruthy();
 	fireEvent.change(screen.getByPlaceholderText("Название бонуса"), {
@@ -252,6 +255,10 @@ it("preserves a draft across project changes and keeps validation and cancel beh
 		{ target: { value: "Черновик" } },
 	);
 	fireEvent.click(screen.getByRole("button", { name: /^Beta/ }));
+	expect(useBonusStore.getState().activeProjectId).toBe("alpha");
+	fireEvent.click(
+		screen.getByRole("button", { name: "Продолжить редактирование" }),
+	);
 	expect(
 		(screen.getByPlaceholderText("Название бонуса") as HTMLInputElement).value,
 	).toBe("Unsaved bonus");
@@ -262,15 +269,18 @@ it("preserves a draft across project changes and keeps validation and cancel beh
 			) as HTMLTextAreaElement
 		).value,
 	).toBe("Черновик");
+	fireEvent.click(screen.getByRole("button", { name: /^Beta/ }));
+	fireEvent.click(
+		screen.getByRole("button", { name: "Перейти без сохранения" }),
+	);
+	expect(useBonusStore.getState().activeProjectId).toBe("beta");
 	fireEvent.click(screen.getByRole("button", { name: /^Alpha/ }));
 	fireEvent.click(
 		screen.getAllByRole("button", { name: "Редактировать бонус" })[0],
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
-	expect(
-		(screen.getByPlaceholderText("Название бонуса") as HTMLInputElement).value,
-	).toBe("");
-	expect(screen.getByRole("button", { name: "Добавить бонус" })).toBeTruthy();
+	expect(screen.queryByPlaceholderText("Название бонуса")).toBeNull();
+	expect(screen.getByRole("button", { name: "Новый бонус" })).toBeTruthy();
 });
 
 it("keeps freshness form state through language changes and updates only the selected bonus", async () => {
@@ -379,4 +389,81 @@ it("requires the existing confirmation dialog before deleting a bonus", async ()
 	expect(
 		useBonusStore.getState().projects[0].bonuses.map((bonus) => bonus.id),
 	).toEqual(["second"]);
+});
+
+it("selects a single bonus from the QC tree, creates new projects and keeps menu deletion confirmed", async () => {
+	await openPage();
+	fireEvent.click(screen.getByRole("button", { name: "First bonus" }));
+	expect(screen.getByRole("heading", { name: "First bonus" })).toBeTruthy();
+	expect(
+		screen.getAllByRole("button", { name: "Редактировать бонус" }),
+	).toHaveLength(1);
+	fireEvent.click(screen.getByRole("button", { name: "Новый проект" }));
+	fireEvent.change(screen.getByPlaceholderText("Название проекта"), {
+		target: { value: "Gamma" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
+	const gamma = useBonusStore
+		.getState()
+		.projects.find((p) => p.name === "Gamma")!;
+	expect(gamma).toBeTruthy();
+	expect(useBonusStore.getState().activeProjectId).toBe(gamma.id);
+	fireEvent.click(screen.getByRole("button", { name: "Новый бонус" }));
+	fireEvent.change(screen.getByPlaceholderText("Название бонуса"), {
+		target: { value: "Gamma welcome" },
+	});
+	fireEvent.change(
+		screen.getByPlaceholderText("Текст бонуса / готовый ответ (RU)"),
+		{ target: { value: "Тестовые условия" } },
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Добавить бонус" }));
+	expect(
+		useBonusStore.getState().projects.find((p) => p.id === gamma.id)?.bonuses[0]
+			.name,
+	).toBe("Gamma welcome");
+	fireEvent.click(screen.getByLabelText("Действия: Gamma welcome"));
+	fireEvent.click(
+		within(await screen.findByRole("menu")).getByRole("button", {
+			name: "Удалить бонус",
+		}),
+	);
+	expect(
+		useBonusStore.getState().projects.find((p) => p.id === gamma.id)?.bonuses,
+	).toHaveLength(1);
+	fireEvent.click(
+		within(screen.getByRole("dialog", { name: "Удалить бонус?" })).getByRole(
+			"button",
+			{ name: "Удалить" },
+		),
+	);
+	expect(
+		useBonusStore.getState().projects.find((p) => p.id === gamma.id)?.bonuses,
+	).toHaveLength(0);
+});
+
+it("removes a QC directory project without reviving it from the shared project catalog", async () => {
+	mock.catalog = [
+		{ id: "alpha", name: "Alpha", slug: "alpha" },
+		{ id: "other", name: "Other catalog project", slug: "other" },
+	];
+	await openPage();
+	expect(
+		screen.queryByRole("treeitem", {
+			name: "Other catalog project",
+		}),
+	).toBeNull();
+	fireEvent.click(screen.getByLabelText("Действия: Alpha"));
+	fireEvent.click(
+		within(await screen.findByRole("menu")).getByRole("button", {
+			name: "Удалить проект",
+		}),
+	);
+	fireEvent.click(
+		within(screen.getByRole("dialog", { name: "Удалить проект?" })).getByRole(
+			"button",
+			{ name: "Удалить" },
+		),
+	);
+	expect(screen.queryByRole("treeitem", { name: "Alpha" })).toBeNull();
+	expect(mock.catalog).toHaveLength(2);
 });

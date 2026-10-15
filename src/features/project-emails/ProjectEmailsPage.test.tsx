@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ProjectEmailRecord } from "@/entities/project-email";
 import { clearSessionViews } from "@/shared/hooks/useViewState";
@@ -8,12 +14,17 @@ import { useBonusStore } from "@/store/bonus.store";
 import { useProjectEmailStore } from "@/store/project-email.store";
 
 const copy = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const mock = vi.hoisted(() => ({ canEdit: false }));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
 vi.mock("@/shared/lib/clipboard", () => ({ copyToClipboard: copy }));
 vi.mock("@/components/SharedPublication", () => ({
-	useSharedPublication: () => ({ ready: true, canEdit: false, banner: null }),
+	useSharedPublication: () => ({
+		ready: true,
+		canEdit: mock.canEdit,
+		banner: null,
+	}),
 }));
 
 import { ProjectEmailsPage } from "./ProjectEmailsPage";
@@ -47,6 +58,7 @@ const records: ProjectEmailRecord[] = [
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	mock.canEdit = false;
 	useAuthStore.setState({ session: undefined });
 	clearSessionViews();
 	useBonusStore.setState({ activeProjectId: "alpha" });
@@ -71,7 +83,11 @@ it.each([
 	render(<ProjectEmailsPage management={management} />);
 	expect(screen.queryByRole("combobox")).toBeNull();
 	expect(screen.getByText("2 из 2 проектов")).toBeTruthy();
-	expect(screen.getByRole("button", { name: /Beta/ })).toBeTruthy();
+	expect(
+		screen.getByRole("button", {
+			name: management ? "Beta" : /Beta/,
+		}),
+	).toBeTruthy();
 });
 
 it.each([
@@ -107,4 +123,56 @@ it("preserves project selection and address copying", () => {
 	fireEvent.click(screen.getByRole("button", { name: "Копировать всё" }));
 	expect(copy).toHaveBeenCalledWith(expect.stringContaining("check@beta.test"));
 	expect(screen.getByRole("heading", { name: "Beta" })).toBeTruthy();
+});
+
+it("selects an address from the QC project tree and retains editing, draft protection and creation", () => {
+	mock.canEdit = true;
+	render(<ProjectEmailsPage management />);
+	fireEvent.click(
+		within(screen.getByRole("treeitem", { name: "Beta" })).getByRole("button", {
+			name: "KYC",
+		}),
+	);
+	expect(screen.getByRole("heading", { name: "KYC" })).toBeTruthy();
+	expect(screen.getByText("check@beta.test")).toBeTruthy();
+	fireEvent.click(
+		screen.getByRole("button", { name: "Редактировать почты проекта" }),
+	);
+	fireEvent.change(screen.getByLabelText("Проект"), {
+		target: { value: "Beta updated" },
+	});
+	fireEvent.click(
+		within(screen.getByRole("treeitem", { name: "Alpha" })).getByRole(
+			"button",
+			{ name: "Alpha" },
+		),
+	);
+	expect(
+		screen.getByRole("dialog", { name: "Есть несохранённые изменения" }),
+	).toBeTruthy();
+	fireEvent.click(
+		screen.getByRole("button", { name: "Продолжить редактирование" }),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+	expect(
+		useProjectEmailStore.getState().records.find((r) => r.id === "beta")
+			?.projectName,
+	).toBe("Beta updated");
+	fireEvent.click(screen.getByRole("button", { name: "Добавить проект" }));
+	fireEvent.change(screen.getByLabelText("Проект"), {
+		target: { value: "Gamma" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: /Добавить адрес/ }));
+	fireEvent.change(screen.getByLabelText("Тип"), {
+		target: { value: "Support" },
+	});
+	fireEvent.change(screen.getByLabelText("Почта"), {
+		target: { value: "help@gamma.test" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
+	expect(
+		useProjectEmailStore
+			.getState()
+			.records.find((r) => r.projectName === "Gamma")?.addresses[0].email,
+	).toBe("help@gamma.test");
 });

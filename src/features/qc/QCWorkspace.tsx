@@ -66,6 +66,9 @@ export function QCWorkspace() {
 		!tabs.some((t) => t.id === destination.tab)
 			? tabs[0]?.id
 			: destination.tab;
+	const materialWorkbench = ["binds", "emails", "bonuses"].includes(
+		active ?? "",
+	);
 	let content: React.ReactNode;
 	if (!active || !canAccessPage(access, "/qc", active))
 		content = <p role="alert">Нет доступа к этому инструменту.</p>;
@@ -88,8 +91,8 @@ export function QCWorkspace() {
 	return (
 		<OperationsWorkspace
 			area="qc"
-			wide={active === "binds"}
-			fit={active === "binds"}
+			wide={materialWorkbench}
+			fit={materialWorkbench}
 			sections={qcSections}
 			active={destination.section}
 			onSelect={select}
@@ -125,7 +128,7 @@ export function QCWorkspace() {
 					</label>
 				</>
 			)}
-			<div className={active === "binds" ? "qc-library-content" : undefined}>
+			<div className={materialWorkbench ? "qc-library-content" : undefined}>
 				<Suspense fallback={<LoadingState message="Загружаем раздел…" />}>
 					{content}
 				</Suspense>

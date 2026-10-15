@@ -1,0 +1,198 @@
+.qc-material-workbench .qc-material-publication > div {
+	margin: 0 0 10px;
+	padding: 8px 12px;
+	font-size: 11px;
+	border-radius: 9px;
+	gap: 8px;
+}
+.qc-material-publication strong {
+	font-size: 11px;
+}
+.qc-material-publication .ui-button {
+	min-height: 30px;
+	padding: 5px 10px;
+	font-size: 11px;
+}
+.qc-material-indent {
+	width: 22px;
+	flex: none;
+}
+.qc-material-count {
+	font-size: 10px;
+	color: var(--color-muted);
+	padding: 0 5px;
+}
+.qc-material-workbench .library-tree-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+.qc-material-workbench .library-tree-label > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qc-material-workbench .library-tree-label > svg {
+	flex: none;
+	color: var(--color-muted);
+}
+.qc-material-workbench .library-tree-row > details > summary {
+	min-height: 26px;
+	padding: 0 6px;
+	border: 0;
+	background: transparent;
+}
+.qc-material-workbench .library-tree-row > details {
+	opacity: 0.4;
+}
+.qc-material-workbench .library-tree-row:hover > details,
+.qc-material-workbench .library-tree-row:focus-within > details {
+	opacity: 1;
+}
+.qc-material-dot {
+	display: inline-block;
+	width: 5px;
+	height: 5px;
+	background: #34d399;
+	border-radius: 50%;
+	margin-right: 7px;
+}
+.qc-material-breadcrumb {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding-bottom: 16px;
+	margin-bottom: 20px;
+	border-bottom: 1px solid var(--color-border);
+	font-size: 11px;
+	color: var(--color-muted);
+}
+.qc-material-breadcrumb > button {
+	cursor: pointer;
+}
+.qc-material-breadcrumb > button:hover {
+	color: var(--color-foreground);
+}
+.qc-material-heading {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-bottom: 22px;
+}
+.qc-material-heading h2 {
+	font-size: 21px;
+	font-weight: 600;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+.qc-material-heading p {
+	font-size: 12px;
+	color: var(--color-muted);
+	margin-top: 6px;
+}
+.qc-material-eyebrow {
+	font-size: 10px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--color-muted);
+	margin-bottom: 8px;
+}
+.qc-material-detail > form,
+.qc-material-detail > section {
+	max-width: 1100px;
+}
+.qc-material-detail > form {
+	border: 0;
+	padding: 0;
+}
+.qc-material-detail .qc-material-editor > section {
+	border: 0;
+	background: transparent;
+	border-radius: 0;
+}
+.qc-material-detail .qc-material-editor form {
+	padding: 0;
+}
+.qc-material-detail .qc-material-editor textarea {
+	min-height: 220px;
+}
+.qc-material-detail .qc-material-editor > section > div {
+	padding: 0 0 20px;
+	border: 0;
+}
+.qc-material-options {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 12px 0 20px;
+}
+.qc-material-options .ui-input {
+	width: auto;
+	min-width: 90px;
+}
+.qc-material-detail .qc-material-preview > section {
+	border: 0;
+	background: transparent;
+}
+.qc-material-detail .qc-material-preview > section > div:first-child {
+	display: none;
+}
+.qc-material-detail .qc-material-preview > section > div {
+	border: 0;
+}
+.qc-material-preview .ui-actions {
+	align-self: start;
+}
+.qc-material-email-grid {
+	display: grid;
+	gap: 12px;
+	max-width: 1000px;
+}
+.qc-material-email {
+	border: 1px solid var(--color-border);
+	border-radius: 12px;
+	padding: 18px;
+}
+.qc-material-email header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+.qc-material-email strong {
+	font-size: 12px;
+}
+.qc-material-email .qc-material-email-address {
+	font-size: 16px;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.qc-material-email p {
+	font-size: 12px;
+	color: var(--color-muted);
+	margin-top: 10px;
+	line-height: 1.7;
+}
+@media (max-width: 767px) {
+	.qc-material-workbench .qc-material-publication > div {
+		font-size: 10px;
+		padding: 6px 8px;
+	}
+	.qc-material-heading h2 {
+		font-size: 18px;
+	}
+	.qc-material-breadcrumb {
+		margin-bottom: 14px;
+		padding-bottom: 12px;
+	}
+	.qc-material-email {
+		padding: 12px;
+	}
+}

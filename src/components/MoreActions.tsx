@@ -1,6 +1,14 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ActionMenuPortal } from "./ActionMenuPortal";
-export function MoreActions({ children }: { children: ReactNode }) {
+export function MoreActions({
+	children,
+	label = "Действия бинда",
+	compact = false,
+}: {
+	children: ReactNode;
+	label?: string;
+	compact?: boolean;
+}) {
 	const ref = useRef<HTMLDetailsElement>(null),
 		[open, setOpen] = useState(false);
 	const close = () => {
@@ -53,14 +61,14 @@ export function MoreActions({ children }: { children: ReactNode }) {
 			}}
 		>
 			<summary
-				aria-label="Действия бинда"
+				aria-label={label}
 				aria-haspopup="menu"
 				className="ui-button ui-button--secondary list-none"
 			>
 				<span aria-hidden="true" className="text-lg leading-none">
 					···
 				</span>
-				<span className="">Действия</span>
+				{!compact && <span>Действия</span>}
 			</summary>
 			{open && <ActionMenuPortal anchor={ref}>{children}</ActionMenuPortal>}
 		</details>
