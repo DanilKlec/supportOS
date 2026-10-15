@@ -18,6 +18,7 @@ import { useAuthStore } from "@/store/auth.store";
 const mocks = vi.hoisted(() => ({
 	navigate: vi.fn(),
 	contentApi: vi.fn(async () => null),
+	copyToClipboard: vi.fn(async () => true),
 }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => mocks.navigate,
@@ -33,6 +34,9 @@ vi.mock("@/shared/hooks/useToast", () => ({
 }));
 vi.mock("@/services/shared-content.service", () => ({
 	contentApi: mocks.contentApi,
+}));
+vi.mock("@/shared/lib/clipboard", () => ({
+	copyToClipboard: mocks.copyToClipboard,
 }));
 vi.mock("@/features/shared-binds/Inbox", () => ({ Inbox: () => null }));
 vi.mock("@/features/shared-binds/SharedBindEditor", () => ({
@@ -323,4 +327,174 @@ it("opens the existing search with / without stealing text entry or modal shortc
 	fireEvent.keyDown(window, { key: "/", code: "Slash" });
 	fireEvent.keyDown(window, { ctrlKey: true, code: "KeyK" });
 	expect(screen.queryByRole("listbox")).toBeNull();
+});
+
+const multilingual: Bind = {
+	...source,
+	translations: [
+		...source.translations,
+		{
+			language: "en",
+			title: "Customer material",
+			content: "Customer reply",
+			updatedAt: "2026-10-16",
+		},
+		{
+			language: "de",
+			title: "Kundenmaterial",
+			content: "Antwort an den Kunden",
+			updatedAt: "2026-10-16",
+		},
+	],
+};
+
+it("switches and copies the preview language with binds.read alone, without navigation or editing the bind", () => {
+	useKnowledgeStore.setState({ binds: [multilingual] });
+	const input = setup(["work", "binds.read"]);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Материал клиента/ }));
+	const dialog = screen.getByRole("dialog", { name: "Материал клиента" });
+	const languages = within(dialog).getByRole("group", {
+		name: "Язык материала",
+	});
+	expect(
+		within(languages)
+			.getByRole("button", { name: "Русский (RU)" })
+			.getAttribute("aria-pressed"),
+	).toBe("true");
+	fireEvent.click(
+		within(languages).getByRole("button", { name: "Английский (EN)" }),
+	);
+	expect(screen.getByRole("dialog", { name: "Customer material" })).toBe(
+		dialog,
+	);
+	expect(within(dialog).getByText("Customer reply")).toBeTruthy();
+	expect(within(dialog).queryByText("Ответ клиенту")).toBeNull();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+	expect(mocks.copyToClipboard).toHaveBeenLastCalledWith("Customer reply");
+	fireEvent.click(
+		within(languages).getByRole("button", { name: "Немецкий (DE)" }),
+	);
+	expect(screen.getByRole("dialog", { name: "Kundenmaterial" })).toBe(dialog);
+	expect(within(dialog).getByText("Antwort an den Kunden")).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+	expect(mocks.copyToClipboard).toHaveBeenLastCalledWith(
+		"Antwort an den Kunden",
+	);
+	expect(useKnowledgeStore.getState().language).toBe("ru");
+	expect(useKnowledgeStore.getState().binds).toEqual([multilingual]);
+	expect(mocks.navigate).not.toHaveBeenCalled();
+	act(() => setAccess(["work"]));
+	expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("resets to the workspace language when reopening a result from mobile search", () => {
+	useKnowledgeStore.setState({ binds: [multilingual], language: "en" });
+	setup(["work", "binds.read"]);
+	const openMobilePreview = () => {
+		fireEvent.click(screen.getByRole("button", { name: "Поиск" }));
+		const search = screen.getByRole("dialog", { name: "Поиск материалов" });
+		fireEvent.change(
+			within(search).getByRole("textbox", { name: "Глобальный поиск" }),
+			{ target: { value: "Customer material" } },
+		);
+		fireEvent.click(
+			within(search).getByRole("option", { name: /Customer material/ }),
+		);
+	};
+	openMobilePreview();
+	let preview = screen.getByRole("dialog", { name: "Customer material" });
+	expect(screen.getAllByRole("dialog")).toHaveLength(1);
+	fireEvent.click(
+		within(preview).getByRole("button", { name: "Русский (RU)" }),
+	);
+	expect(within(preview).getByText("Ответ клиенту")).toBeTruthy();
+	fireEvent.keyDown(window, { key: "Escape" });
+	openMobilePreview();
+	preview = screen.getByRole("dialog", { name: "Customer material" });
+	expect(
+		within(preview)
+			.getByRole("button", { name: "Английский (EN)" })
+			.getAttribute("aria-pressed"),
+	).toBe("true");
+	expect(within(preview).getByText("Customer reply")).toBeTruthy();
+});
+
+it("uses the same available fallback for the preview title and text and omits empty translations", () => {
+	useKnowledgeStore.setState({
+		language: "de",
+		binds: [
+			{
+				...multilingual,
+				translations: [
+					multilingual.translations[1],
+					multilingual.translations[0],
+					{ ...multilingual.translations[2], content: "  " },
+				],
+			},
+		],
+	});
+	const input = setup(["work", "binds.read"]);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Kundenmaterial/ }));
+	const dialog = screen.getByRole("dialog", { name: "Материал клиента" });
+	expect(within(dialog).getByText("Ответ клиенту")).toBeTruthy();
+	expect(
+		within(dialog).queryByRole("button", { name: "Немецкий (DE)" }),
+	).toBeNull();
+	expect(
+		within(dialog)
+			.getByRole("button", { name: "Русский (RU)" })
+			.getAttribute("aria-pressed"),
+	).toBe("true");
+});
+
+it("also switches multilingual bonus previews while keeping single-language binds usable", () => {
+	client.setQueryData(["search-bonuses", "test"], {
+		data: [
+			{
+				id: "project",
+				name: "Example",
+				slug: "example",
+				updatedAt: "",
+				bonuses: [
+					{
+						id: "welcome",
+						name: "Welcome",
+						content: "Бонус",
+						order: 0,
+						translations: [
+							{ language: "ru", content: "Бонус", updatedAt: "" },
+							{ language: "en", content: "Deposit reward", updatedAt: "" },
+						],
+					},
+				],
+			},
+		],
+	});
+	const input = setup();
+	fireEvent.change(input, { target: { value: "Example Welcome" } });
+	fireEvent.click(screen.getByRole("option", { name: /Example · Welcome/ }));
+	let dialog = screen.getByRole("dialog", { name: "Example · Welcome" });
+	fireEvent.click(
+		within(dialog).getByRole("button", { name: "Английский (EN)" }),
+	);
+	expect(within(dialog).getByText("Deposit reward")).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+	expect(mocks.copyToClipboard).toHaveBeenLastCalledWith("Deposit reward");
+	fireEvent.keyDown(window, { key: "Escape" });
+	fireEvent.focus(input);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Материал клиента/ }));
+	dialog = screen.getByRole("dialog", { name: "Материал клиента" });
+	expect(
+		within(dialog).getAllByRole("button", { name: /\(RU\)/ }),
+	).toHaveLength(1);
+	expect(within(dialog).getByText("Ответ клиенту")).toBeTruthy();
+	fireEvent.click(
+		within(dialog).getByRole("button", { name: "Открыть раздел" }),
+	);
+	expect(useKnowledgeStore.getState().selectedBind).toBe(source.id);
+	expect(mocks.navigate).toHaveBeenCalledWith({ to: "/" });
+	expect(screen.queryByRole("dialog")).toBeNull();
 });

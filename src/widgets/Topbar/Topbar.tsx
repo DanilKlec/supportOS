@@ -26,7 +26,9 @@ import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
+import { getLabelForLanguage } from "@/shared/lib/languages";
 import { BaseModal } from "@/shared/modals/BaseModal";
+import { getBindTranslation } from "@/shared/modals/knowledge-modal-helpers";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
@@ -231,6 +233,7 @@ export function Topbar({
 	const queryClient = useQueryClient();
 	const [newShared, setNewShared] = useState(false);
 	const [preview, setPreview] = useState<CatalogResult | null>(null);
+	const [previewLanguage, setPreviewLanguage] = useState("");
 	const [kind, setKind] = useState("all");
 	const [searchFocused, setSearchFocused] = useState(false);
 	const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -281,6 +284,18 @@ export function Topbar({
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
+	const previewTranslations =
+		preview?.translations.filter((translation) => translation.content.trim()) ??
+		[];
+	const previewTranslation = preview
+		? getBindTranslation(
+				{ ...preview, translations: previewTranslations },
+				previewLanguage,
+			)
+		: undefined;
+	const previewLanguages = [
+		...new Set(previewTranslations.map((translation) => translation.language)),
+	];
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const localBinds = useKnowledgeStore((s) => s.binds);
@@ -457,6 +472,7 @@ export function Topbar({
 	);
 	const openSearchResult = (bind: CatalogResult) => {
 		setPreview(bind);
+		setPreviewLanguage(getResultLanguage(bind, language) ?? language);
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
@@ -587,40 +603,60 @@ export function Topbar({
 			{preview &&
 				can(
 					access,
-					preview.resultKind === "email" ? "projects.read" : "bonuses.read",
+					preview.resultKind === "email"
+						? "projects.read"
+						: preview.resultKind === "bonus"
+							? "bonuses.read"
+							: "binds.read",
 				) && (
 					<BaseModal
-						title={getBindTitle(preview, language)}
+						title={getBindTitle(
+							preview,
+							previewTranslation?.language ?? previewLanguage,
+						)}
 						onClose={() => setPreview(null)}
 					>
-						<p className="mb-3 text-xs text-muted">
-							{preview.resultKind === "email"
-								? "Почта проекта"
-								: preview.resultKind === "bonus"
-									? "Сохранённые условия бонуса"
-									: "Предпросмотр материала"}
-						</p>
+						<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+							<p className="text-xs text-muted">
+								{preview.resultKind === "email"
+									? "Почта проекта"
+									: preview.resultKind === "bonus"
+										? "Сохранённые условия бонуса"
+										: "Предпросмотр материала"}
+							</p>
+							{preview.resultKind !== "email" &&
+								previewLanguages.length > 0 && (
+									<fieldset className="flex min-w-0 flex-wrap gap-1 rounded-xl bg-surface-elevated p-1">
+										<legend className="sr-only">Язык материала</legend>
+										{previewLanguages.map((code) => (
+											<button
+												key={code}
+												type="button"
+												aria-label={`${getLabelForLanguage(code)} (${code.toUpperCase()})`}
+												title={getLabelForLanguage(code)}
+												aria-pressed={previewTranslation?.language === code}
+												onClick={() => setPreviewLanguage(code)}
+												className="h-7 rounded-lg px-2 text-xs font-semibold uppercase text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+											>
+												{code}
+											</button>
+										))}
+									</fieldset>
+								)}
+						</div>
 						{preview.freshness && <BonusFreshness bonus={preview.freshness} />}
 						<p className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border p-4 text-sm leading-6">
-							{
-								(
-									preview.translations.find((t) => t.language === language) ??
-									preview.translations[0]
-								)?.content
-							}
+							{previewTranslation?.content ??
+								"Текст материала пока не заполнен."}
 						</p>
 						<div className="ui-actions items-center mt-4 flex gap-2">
 							<Button
 								type="button"
+								disabled={!previewTranslation}
 								onClick={() =>
-									void copyToClipboard(
-										(
-											preview.translations.find(
-												(t) => t.language === language,
-											) ?? preview.translations[0]
-										)?.content ?? "",
-									).then((ok) =>
-										showToast(ok ? "Скопировано" : "Не удалось скопировать"),
+									void copyToClipboard(previewTranslation?.content ?? "").then(
+										(ok) =>
+											showToast(ok ? "Скопировано" : "Не удалось скопировать"),
 									)
 								}
 								variant="primary"
