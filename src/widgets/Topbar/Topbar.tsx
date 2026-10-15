@@ -13,6 +13,7 @@ import { SupportOSLogo } from "@/components/brand/SupportOSLogo";
 import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
+import { languages } from "@/entities/language";
 import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
 import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
 import { Inbox } from "@/features/shared-binds/Inbox";
@@ -232,7 +233,7 @@ export function Topbar({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [newShared, setNewShared] = useState(false);
-	const [preview, setPreview] = useState<CatalogResult | null>(null);
+	const [previewResult, setPreview] = useState<CatalogResult | null>(null);
 	const [previewLanguage, setPreviewLanguage] = useState("");
 	const [kind, setKind] = useState("all");
 	const [searchFocused, setSearchFocused] = useState(false);
@@ -293,18 +294,6 @@ export function Topbar({
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
-	const previewTranslations =
-		preview?.translations.filter((translation) => translation.content.trim()) ??
-		[];
-	const previewTranslation = preview
-		? getBindTranslation(
-				{ ...preview, translations: previewTranslations },
-				previewLanguage,
-			)
-		: undefined;
-	const previewLanguages = [
-		...new Set(previewTranslations.map((translation) => translation.language)),
-	];
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
 	const localBinds = useKnowledgeStore((s) => s.binds);
@@ -316,6 +305,29 @@ export function Topbar({
 		],
 		[localBinds, remoteBinds],
 	);
+	// Keep an open preview current when a shared/personal bind finishes loading.
+	const preview: CatalogResult | null = previewResult?.resultKind
+		? previewResult
+		: (binds.find((bind) => bind.id === previewResult?.id) ?? previewResult);
+	const previewTranslations =
+		preview?.translations
+			.filter((translation) => translation.content.trim())
+			.map((translation) => {
+				const code = translation.language.trim().toLowerCase();
+				return { ...translation, language: code === "gr" ? "el" : code };
+			}) ?? [];
+	const previewTranslation = preview
+		? getBindTranslation(
+				{ ...preview, translations: previewTranslations },
+				previewLanguage,
+			)
+		: undefined;
+	const previewLanguages = [
+		...new Set([
+			...languages.map((language) => language.code),
+			...previewTranslations.map((translation) => translation.language),
+		]),
+	];
 	const openBind = useKnowledgeStore((s) => s.openBind);
 	const shortcutLabel = useMemo(getShortcutLabel, []);
 
@@ -481,7 +493,7 @@ export function Topbar({
 	);
 	const openSearchResult = (bind: CatalogResult) => {
 		setPreview(bind);
-		setPreviewLanguage(getResultLanguage(bind, language) ?? language);
+		setPreviewLanguage(language);
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
@@ -619,13 +631,13 @@ export function Topbar({
 							: "binds.read",
 				) && (
 					<BaseModal
-						title={getBindTitle(
-							preview,
-							previewTranslation?.language ?? previewLanguage,
-						)}
+						title={
+							previewTranslation?.title ||
+							getBindTitle(preview, previewLanguage)
+						}
 						onClose={() => setPreview(null)}
 					>
-						<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+						<div className="mb-3">
 							<p className="text-xs text-muted">
 								{preview.resultKind === "email"
 									? "Почта проекта"
@@ -635,21 +647,30 @@ export function Topbar({
 							</p>
 							{preview.resultKind !== "email" &&
 								previewLanguages.length > 0 && (
-									<fieldset className="flex min-w-0 flex-wrap gap-1 rounded-xl bg-surface-elevated p-1">
-										<legend className="sr-only">Язык материала</legend>
-										{previewLanguages.map((code) => (
-											<button
-												key={code}
-												type="button"
-												aria-label={`${getLabelForLanguage(code)} (${code.toUpperCase()})`}
-												title={getLabelForLanguage(code)}
-												aria-pressed={previewTranslation?.language === code}
-												onClick={() => setPreviewLanguage(code)}
-												className="h-7 rounded-lg px-2 text-xs font-semibold uppercase text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-											>
-												{code}
-											</button>
-										))}
+									<fieldset className="mt-3 flex min-w-0 flex-wrap gap-1 rounded-xl bg-surface-elevated p-1">
+										<legend className="mb-1 text-xs text-muted">
+											Язык материала
+										</legend>
+										{previewLanguages.map((code) => {
+											const available = previewTranslations.some(
+												(translation) => translation.language === code,
+											);
+											const label = code === "el" ? "GR" : code.toUpperCase();
+											return (
+												<button
+													key={code}
+													type="button"
+													aria-label={`${getLabelForLanguage(code)} (${label})`}
+													title={`${getLabelForLanguage(code)}${available ? "" : " — перевод пока не добавлен"}`}
+													disabled={!available}
+													aria-pressed={previewTranslation?.language === code}
+													onClick={() => setPreviewLanguage(code)}
+													className="h-8 min-w-10 rounded-lg px-3 text-xs font-semibold text-muted transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 aria-pressed:bg-accent aria-pressed:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+												>
+													{label}
+												</button>
+											);
+										})}
 									</fieldset>
 								)}
 						</div>

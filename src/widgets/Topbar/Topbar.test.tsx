@@ -420,7 +420,7 @@ it("resets to the workspace language when reopening a result from mobile search"
 	expect(within(preview).getByText("Customer reply")).toBeTruthy();
 });
 
-it("uses the same available fallback for the preview title and text and omits empty translations", () => {
+it("uses the same available fallback for the preview title and text and marks empty translations unavailable", () => {
 	useKnowledgeStore.setState({
 		language: "de",
 		binds: [
@@ -440,8 +440,12 @@ it("uses the same available fallback for the preview title and text and omits em
 	const dialog = screen.getByRole("dialog", { name: "Материал клиента" });
 	expect(within(dialog).getByText("Ответ клиенту")).toBeTruthy();
 	expect(
-		within(dialog).queryByRole("button", { name: "Немецкий (DE)" }),
-	).toBeNull();
+		(
+			within(dialog).getByRole("button", {
+				name: "Немецкий (DE)",
+			}) as HTMLButtonElement
+		).disabled,
+	).toBe(true);
 	expect(
 		within(dialog)
 			.getByRole("button", { name: "Русский (RU)" })
@@ -517,4 +521,98 @@ it("reuses the warmed email publication instead of downloading it again on searc
 	fireEvent.change(input, { target: { value: "help@example.test" } });
 	expect(screen.getByRole("option", { name: /Cached project/ })).toBeTruthy();
 	expect(mocks.contentApi).not.toHaveBeenCalled();
+});
+
+it("shows RU EN DE PT GR in a fixed order and copies every available translation", () => {
+	const translations = [
+		...multilingual.translations,
+		{
+			language: "pt",
+			title: "Material do cliente",
+			content: "Resposta ao cliente",
+			updatedAt: "",
+		},
+		{
+			language: "el",
+			title: "Υλικό πελάτη",
+			content: "Απάντηση στον πελάτη",
+			updatedAt: "",
+		},
+	];
+	useKnowledgeStore.setState({ binds: [{ ...source, translations }] });
+	const input = setup(["work", "binds.read"]);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Материал клиента/ }));
+	const dialog = screen.getByRole("dialog");
+	const buttons = within(
+		within(dialog).getByRole("group", { name: "Язык материала" }),
+	).getAllByRole("button");
+	expect(buttons.map((button) => button.textContent)).toEqual([
+		"RU",
+		"EN",
+		"DE",
+		"PT",
+		"GR",
+	]);
+	for (let index = 0; index < buttons.length; index++) {
+		fireEvent.click(buttons[index]);
+		expect(within(dialog).getByText(translations[index].content)).toBeTruthy();
+		fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+		expect(mocks.copyToClipboard).toHaveBeenLastCalledWith(
+			translations[index].content,
+		);
+	}
+	expect(useKnowledgeStore.getState().language).toBe("ru");
+});
+
+it.each([
+	"el",
+	"gr",
+	"GR",
+])("uses a single GR button for Greek stored as %s without modifying the source", (greek) => {
+	const bind = {
+		...source,
+		translations: [
+			...source.translations,
+			{
+				language: greek,
+				title: "Ελληνικά",
+				content: "Ελληνική απάντηση",
+				updatedAt: "",
+			},
+		],
+	};
+	useKnowledgeStore.setState({ binds: [bind] });
+	const input = setup(["work", "binds.read"]);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Материал клиента/ }));
+	const dialog = screen.getByRole("dialog");
+	const greekButton = within(dialog).getByRole("button", {
+		name: "Греческий (GR)",
+	});
+	fireEvent.click(greekButton);
+	expect(screen.getByRole("dialog", { name: "Ελληνικά" })).toBe(dialog);
+	expect(within(dialog).getByText("Ελληνική απάντηση")).toBeTruthy();
+	expect(within(dialog).queryByRole("button", { name: /\(EL\)/ })).toBeNull();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+	expect(mocks.copyToClipboard).toHaveBeenLastCalledWith("Ελληνική απάντηση");
+	expect(useKnowledgeStore.getState().binds).toEqual([bind]);
+});
+
+it("updates the languages of an already open preview when remote translations finish loading", () => {
+	const input = setup(["work", "binds.read"]);
+	fireEvent.change(input, { target: { value: "материал клиента" } });
+	fireEvent.click(screen.getByRole("option", { name: /Материал клиента/ }));
+	const dialog = screen.getByRole("dialog");
+	const english = within(dialog).getByRole("button", {
+		name: "Английский (EN)",
+	}) as HTMLButtonElement;
+	expect(english.disabled).toBe(true);
+	act(() => useKnowledgeStore.setState({ remoteBinds: [multilingual] }));
+	expect(english.disabled).toBe(false);
+	fireEvent.click(english);
+	expect(within(dialog).getByText("Customer reply")).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "Копировать" }));
+	expect(mocks.copyToClipboard).toHaveBeenLastCalledWith("Customer reply");
+	expect(mocks.navigate).not.toHaveBeenCalled();
 });
