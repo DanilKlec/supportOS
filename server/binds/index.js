@@ -11,7 +11,7 @@ const optional=(value,max=2000)=>value==null?null:typeof value==='string'&&value
 
 function categoryFromRow(row){return {id:row.id,ownerId:row.owner_id,name:row.name,icon:row.icon??undefined,color:row.color??undefined,order:row.order_index};}
 function folderFromRow(row){return {id:row.id,ownerId:row.owner_id,categoryId:row.category_id,parentId:row.parent_id??undefined,name:row.name,icon:row.icon??undefined,color:row.color??undefined,order:row.order_index};}
-function bindFromRow(row,history=[]){return {id:row.id,ownerId:row.owner_id,sourceBindId:row.source_bind_id??undefined,sourceHash:row.source_hash??undefined,importBatchId:row.import_batch_id??undefined,imported:Boolean(row.imported),slug:row.slug,categoryId:row.category_id,folderId:row.folder_id??undefined,icon:row.icon??undefined,color:row.color??undefined,tags:Array.isArray(row.tags)?row.tags:[],translations:Array.isArray(row.translations)?row.translations:[],history,aiGenerated:row.ai_generated??undefined,aiTranslated:row.ai_translated??undefined,aiSummary:row.ai_summary??undefined,favorite:Boolean(row.favorite),archived:Boolean(row.archived),createdAt:row.created_at,updatedAt:row.updated_at};}
+function bindFromRow(row,history=[]){return {id:row.id,ownerId:row.owner_id,sourceBindId:row.source_bind_id??undefined,sourceHash:row.source_hash??undefined,importBatchId:row.import_batch_id??undefined,imported:Boolean(row.imported),slug:row.slug,categoryId:row.category_id,folderId:row.folder_id??undefined,order:row.order_index,icon:row.icon??undefined,color:row.color??undefined,tags:Array.isArray(row.tags)?row.tags:[],translations:Array.isArray(row.translations)?row.translations:[],history,aiGenerated:row.ai_generated??undefined,aiTranslated:row.ai_translated??undefined,aiSummary:row.ai_summary??undefined,favorite:Boolean(row.favorite),archived:Boolean(row.archived),createdAt:row.created_at,updatedAt:row.updated_at};}
 
 function pageParam(value,fallback,{min,max}){
  if(value==null)return fallback;
@@ -276,6 +276,14 @@ export default async function handler(req,res) {
    return send(200,{ok:true,mode:body.mode,counts:plan.counts});
   }
   if(req.method==='POST'&&body.action==='shared-save')return send(200,await saveShared(env,actor,body));
+  if(req.method==='POST'&&body.action==='knowledge-transfer'){
+   const payload=body.payload;
+   if(!payload||!Array.isArray(payload.sources)||payload.sources.length<1||payload.sources.length>100||JSON.stringify(payload).length>40000||!validId(payload.categoryId)||(payload.folderId!=null&&!validId(payload.folderId))||(payload.beforeId!=null&&!validId(payload.beforeId))||payload.sources.some(s=>!validId(s?.id)||!validId(s.categoryId)||(s.folderId!=null&&!validId(s.folderId))))throw fail('Некорректное перемещение биндов');
+   const response=await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/rpc/supportos_bind_transfer`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({actor:actor.id,sid:actor.sessionId,payload}),signal:AbortSignal.timeout(15000)});
+   const result=await response.json();
+   if(!response.ok)throw fail(['42501','40001','P0001'].includes(result.code)?result.message:'Не удалось переместить бинды',result.code==='42501'?403:result.code==='40001'?409:400);
+   return send(200,{binds:result.binds.map(row=>bindFromRow(row)),replacements:result.replacements});
+  }
   if(req.method==='POST'&&body.action==='shared-archive'){
    if(!can(actor.access,'knowledge.write'))throw fail('Нет права изменять общие бинды',403);
    if(!validId(body.id)||typeof body.expected!=='string'||body.expected.length>100||!Number.isFinite(Date.parse(body.expected))||typeof body.archived!=='boolean')throw fail('Некорректная версия бинда');

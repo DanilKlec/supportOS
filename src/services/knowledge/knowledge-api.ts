@@ -4,11 +4,12 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { supabaseService } from "@/services/supabase.service";
 
 import type { KnowledgeDatabase } from "./knowledge-import-export";
+import type { BindTransferPayload, BindTransferResult } from "./bind-transfers";
 
 // Server transport only; loading a query must not hydrate the runtime store.
-async function knowledgeApi(
+async function knowledgeApi<T = Partial<KnowledgeDatabase>>(
 	body?: Record<string, unknown>,
-): Promise<Partial<KnowledgeDatabase> | undefined> {
+): Promise<T> {
 	const response = await authenticatedFetch(
 		body ? "/api/binds" : "/api/binds?action=knowledge",
 		body
@@ -48,6 +49,30 @@ function enqueueKnowledgeMutation(body: Record<string, unknown>) {
 
 // In-memory request sequencing, not a persistent/local fallback write queue.
 export const databaseKnowledgeService = {
+	transferBinds(payload: BindTransferPayload): Promise<BindTransferResult> {
+		const accountId = supabaseService.getSession()?.user.id;
+		const request = databaseMutationQueue.then(async () => {
+			if (!accountId || supabaseService.getSession()?.user.id !== accountId)
+				throw new Error("Аккаунт изменился. Повторите перенос");
+			const result = await knowledgeApi<BindTransferResult>({
+				action: "knowledge-transfer",
+				payload,
+			});
+			if (
+				!Array.isArray(result.binds) ||
+				!result.binds.length ||
+				!result.replacements ||
+				typeof result.replacements !== "object"
+			)
+				throw new Error("Сервер не подтвердил перенос биндов");
+			return result;
+		});
+		databaseMutationQueue = request.then(
+			() => undefined,
+			() => undefined,
+		);
+		return request;
+	},
 	loadKnowledge: () => knowledgeApi(),
 	saveCategory: (category: KnowledgeCategory) =>
 		enqueueKnowledgeMutation({

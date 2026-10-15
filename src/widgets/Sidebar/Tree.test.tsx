@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
 	navigate: vi.fn(),
 	canManageStructure: vi.fn(() => true),
 	moveBind: vi.fn((id: string) => ({ id })),
+	transferBinds: vi.fn(async () => ({ binds: [], replacements: {} })),
 	moveFolderTo: vi.fn(),
 	showToast: vi.fn(),
 }));
@@ -122,7 +123,7 @@ it("expands independently from navigation, supports arrow keys, and opens the lo
 			.getAttribute("aria-selected"),
 	).toBe("false");
 });
-it("retains multi-selection dragging and moves every selected bind to the destination", () => {
+it("retains multi-selection dragging and moves every selected bind to the destination", async () => {
 	const toggle = mount(["one", "two"]);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Снять выделение: Ответ one" }),
@@ -142,10 +143,11 @@ it("retains multi-selection dragging and moves every selected bind to the destin
 			.closest(".workspace-tree-row")!,
 		{ dataTransfer },
 	);
-	expect(mock.moveBind.mock.calls).toEqual([
-		["one", { categoryId: "cat", folderId: "destination" }],
-		["two", { categoryId: "cat", folderId: "destination" }],
-	]);
+	expect(mock.transferBinds).toHaveBeenCalledWith(
+		["one", "two"],
+		{ categoryId: "cat", folderId: "destination" },
+		undefined,
+	);
 });
 it("retains folder dragging into another folder", () => {
 	mount();

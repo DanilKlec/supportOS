@@ -5,6 +5,7 @@ import {
 	fireEvent,
 	render,
 	screen,
+	waitFor,
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -23,12 +24,16 @@ vi.mock("@/features/shared-binds/WorkspaceSharedBinds", () => ({
 	),
 }));
 const mock = vi.hoisted(() => ({
+	fetch: vi.fn(),
 	session: {
 		user: {
 			id: "u",
 			access: { status: "active", permissions: ["knowledge.write"] },
 		},
 	},
+}));
+vi.mock("@/services/authenticated-fetch", () => ({
+	authenticatedFetch: mock.fetch,
 }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
@@ -58,6 +63,22 @@ beforeEach(() => {
 		selectedCategory: undefined,
 	});
 	mock.session.user.access.permissions = ["knowledge.write"];
+	mock.fetch.mockImplementation(async (_url, options) => {
+		const body = JSON.parse(options?.body ?? "{}");
+		if (body.action !== "knowledge-transfer") return new Response("{}");
+		const { sources, categoryId, folderId } = body.payload;
+		return new Response(
+			JSON.stringify({
+				binds: useKnowledgeStore
+					.getState()
+					.binds.filter((b) =>
+						sources.some((s: { id: string }) => s.id === b.id),
+					)
+					.map((b) => ({ ...b, categoryId, folderId })),
+				replacements: {},
+			}),
+		);
+	});
 });
 afterEach(() => {
 	cleanup();
@@ -104,7 +125,7 @@ function category(name: string) {
 	fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 	return useKnowledgeStore.getState().categories.at(-1)!;
 }
-it("creates nested content through menus, edits Viewer and Tree, moves to category root and archives without reload", () => {
+it("creates nested content through menus, edits Viewer and Tree, moves to category root and archives without reload", async () => {
 	render(<Workspace />);
 	const cat = category("Работа");
 	treeAction("Работа", "Новая папка");
@@ -150,6 +171,9 @@ it("creates nested content through menus, edits Viewer and Tree, moves to catego
 		target: { value: JSON.stringify([cat.id, ""]) },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Переместить" }));
+	await waitFor(() =>
+		expect(useKnowledgeStore.getState().binds[0].folderId).toBeUndefined(),
+	);
 	expect(useKnowledgeStore.getState().selectedBind).toBe(bind.id);
 	expect(useKnowledgeStore.getState().selectedFolder).toBeUndefined();
 	expect(useKnowledgeStore.getState().binds[0].folderId).toBeUndefined();
@@ -216,7 +240,7 @@ it("portals tree menus outside sidebar clipping and supports folder rename, move
 	expect(useKnowledgeStore.getState().folders).toHaveLength(0);
 	expect(useKnowledgeStore.getState().selectedCategory).toBe(b.id);
 });
-it("moves multiple binds with one target, expands all ancestors and prevents folder cycles", () => {
+it("moves multiple binds with one target, expands all ancestors and prevents folder cycles", async () => {
 	render(<Workspace />);
 	const cat = category("A");
 	let parent = "",
@@ -247,6 +271,11 @@ it("moves multiple binds with one target, expands all ancestors and prevents fol
 		target: { value: JSON.stringify([cat.id, child]) },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Переместить" }));
+	await waitFor(() =>
+		expect(
+			useKnowledgeStore.getState().binds.every((b) => b.folderId === child),
+		).toBe(true),
+	);
 	expect(
 		useKnowledgeStore.getState().binds.every((b) => b.folderId === child),
 	).toBe(true);
@@ -311,7 +340,7 @@ it("creates a personal override when moving shared local content and rejects rem
 		knowledgeService.moveBind("remote-only", { categoryId: cat.id }),
 	).toThrow();
 });
-it("offers bulk move from real tree selection and keeps drag and drop working", () => {
+it("offers bulk move from real tree selection and keeps drag and drop working", async () => {
 	const cat = knowledgeService.createCategory({ name: "A" });
 	const target = knowledgeService.createFolder({
 		categoryId: cat.id,
@@ -340,6 +369,11 @@ it("offers bulk move from real tree selection and keeps drag and drop working", 
 		target: { value: JSON.stringify([cat.id, target.id]) },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Переместить" }));
+	await waitFor(() =>
+		expect(
+			useKnowledgeStore.getState().binds.every((b) => b.folderId === target.id),
+		).toBe(true),
+	);
 	expect(
 		useKnowledgeStore.getState().binds.every((b) => b.folderId === target.id),
 	).toBe(true);
@@ -349,6 +383,11 @@ it("offers bulk move from real tree selection and keeps drag and drop working", 
 		dropEffect: "move",
 	};
 	fireEvent.drop(screen.getByRole("button", { name: "A" }), { dataTransfer });
+	await waitFor(() =>
+		expect(
+			useKnowledgeStore.getState().binds.find((b) => b.id === ids[0])?.folderId,
+		).toBeUndefined(),
+	);
 	expect(
 		useKnowledgeStore.getState().binds.find((b) => b.id === ids[0])?.folderId,
 	).toBeUndefined();

@@ -34,6 +34,7 @@ create table if not exists public.supportos_binds (
   slug text not null,
   category_id text not null,
   folder_id text,
+  order_index integer not null default 0,
   icon text,
   color text,
   tags jsonb not null default '[]'::jsonb,

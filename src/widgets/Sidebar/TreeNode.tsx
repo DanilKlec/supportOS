@@ -11,6 +11,7 @@ import {
 	FolderOpen,
 	FolderInput,
 	FolderPlus,
+	GripVertical,
 	MoreHorizontal,
 	Plus,
 	Star,
@@ -395,7 +396,7 @@ export function TreeNode({
 		setDragOver(false);
 	};
 
-	const handleDrop = (event: DragEvent<HTMLElement>) => {
+	const handleDrop = async (event: DragEvent<HTMLElement>) => {
 		if (!dropCategoryId) return;
 
 		event.preventDefault();
@@ -450,101 +451,70 @@ export function TreeNode({
 			return;
 		}
 
-		if (node.type === "bind" && bindIds.length > 0) {
-			try {
-				const movedCount = bindIds.filter(
-					(bindId) => bindId !== node.id,
-				).length;
-
-				for (const bindId of bindIds) {
-					if (bindId !== node.id) {
-						knowledgeService.moveBindBefore(bindId, node.id);
-					}
-				}
-
-				if (movedCount > 0) {
-					showToast(
-						movedCount > 1
-							? `Изменён порядок биндов: ${movedCount}`
-							: "Порядок бинда изменён",
-					);
-					onClearBindSelection?.();
-				}
-			} catch (error) {
-				showToast(
-					error instanceof Error
-						? error.message
-						: "Не удалось изменить порядок",
-				);
-			}
-
-			return;
-		}
-
+		if (node.type === "bind" && bindIds.includes(node.id)) return;
 		const store = useKnowledgeStore.getState();
-		const previousLocations = bindIds
-			.map((bindId) => {
-				const bind = store.binds.find((item) => item.id === bindId);
-
-				return bind
-					? {
-							id: bind.id,
-							categoryId: bind.categoryId,
-							folderId: bind.folderId,
-						}
-					: undefined;
-			})
-			.filter((item): item is NonNullable<typeof item> => item !== undefined);
-		const movedLocations: typeof previousLocations = [];
-
+		const previous = bindIds
+			.map(
+				(id) =>
+					store.binds.find((b) => b.id === id) ??
+					store.remoteBinds.find((b) => b.id === id),
+			)
+			.filter((b): b is NonNullable<typeof b> => Boolean(b));
+		if (!bindIds.length) return;
 		try {
-			for (const location of previousLocations) {
-				if (
-					location.categoryId === dropCategoryId &&
-					(location.folderId ?? "") === (dropFolderId ?? "")
-				) {
-					continue;
-				}
-
-				const movedBind = knowledgeService.moveBind(location.id, {
-					categoryId: dropCategoryId,
-					folderId: dropFolderId,
-				});
-
-				movedLocations.push({
-					...location,
-					id: movedBind.id,
-				});
-			}
-
+			const result = await knowledgeService.transferBinds(
+				bindIds,
+				{ categoryId: dropCategoryId, folderId: dropFolderId },
+				node.type === "bind" ? node.id : undefined,
+			);
 			expandDropTarget();
-
-			if (movedLocations.length > 0) {
-				showToast(
-					movedLocations.length > 1
-						? `Перемещено биндов: ${movedLocations.length}`
-						: "Бинд перемещён",
-					{
-						action: {
-							label: "Отменить",
-							onClick: () => {
-								for (const location of movedLocations) {
-									knowledgeService.moveBind(location.id, {
-										categoryId: location.categoryId,
-										folderId: location.folderId,
-									});
+			onClearBindSelection?.();
+			showToast(
+				node.type === "bind"
+					? "Порядок биндов сохранён"
+					: `Перемещено биндов: ${bindIds.length}`,
+				{
+					action: {
+						label: "Отменить",
+						onClick: () => {
+							void (async () => {
+								try {
+									const groups = new Map<
+										string,
+										{ categoryId: string; folderId?: string; ids: string[] }
+									>();
+									for (const bind of previous) {
+										const key = JSON.stringify([
+											bind.categoryId,
+											bind.folderId,
+										]);
+										const group = groups.get(key) ?? {
+											categoryId: bind.categoryId,
+											folderId: bind.folderId,
+											ids: [],
+										};
+										group.ids.push(result.replacements[bind.id] ?? bind.id);
+										groups.set(key, group);
+									}
+									for (const group of groups.values())
+										await knowledgeService.transferBinds(group.ids, group);
+									showToast("Перемещение отменено");
+								} catch (error) {
+									showToast(
+										error instanceof Error
+											? error.message
+											: "Не удалось отменить перенос",
+									);
 								}
-								showToast("Перемещение отменено");
-							},
+							})();
 						},
-						duration: 6000,
 					},
-				);
-				onClearBindSelection?.();
-			}
+					duration: 7000,
+				},
+			);
 		} catch (error) {
 			showToast(
-				error instanceof Error ? error.message : "Не удалось переместить бинд",
+				error instanceof Error ? error.message : "Не удалось переместить бинды",
 			);
 		}
 	};
@@ -637,6 +607,17 @@ export function TreeNode({
 					</div>
 				)}
 
+				{node.type !== "category" && (
+					<span
+						className="workspace-tree-drag"
+						title={`Перетащить: ${name}`}
+						draggable
+						onDragStart={handleDragStart}
+						onDragEnd={handleDragEnd}
+					>
+						<GripVertical size={13} />
+					</span>
+				)}
 				<div ref={actionsRef} className="workspace-tree-actions">
 					<button
 						type="button"

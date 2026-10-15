@@ -14,6 +14,7 @@ interface BindRow {
 	slug: string;
 	category_id: string;
 	folder_id: string | null;
+	order_index?: number;
 	icon: string | null;
 	color: string | null;
 	tags: string[] | null;
@@ -38,6 +39,7 @@ function fromBindRow(row: BindRow): Bind {
 		slug: row.slug,
 		categoryId: row.category_id,
 		folderId: row.folder_id ?? undefined,
+		order: row.order_index,
 		icon: row.icon ?? undefined,
 		color: row.color ?? undefined,
 		tags: Array.isArray(row.tags) ? row.tags : [],

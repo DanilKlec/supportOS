@@ -7,6 +7,16 @@ const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-822
 beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read']}});});
 afterEach(()=>vi.unstubAllGlobals());
 async function run(req){const res={setHeader:vi.fn(),end:vi.fn(),statusCode:0};await handler({method:'GET',url:'/api/binds',headers:{host:'app.test',origin:'https://app.test'},...req},res);return {status:res.statusCode,data:JSON.parse(res.end.mock.calls[0][0])};}
+it('transfers with the verified session, returns saved locations/order, and exposes database conflicts',async()=>{
+ mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read']}});
+ const payload={sources:[{id:'a',categoryId:'old'}],categoryId:'new'};
+ const fetch=vi.fn(async()=>Response.json({binds:[{id:'a',owner_id:null,category_id:'new',order_index:3}],replacements:{}}));vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'knowledge-transfer',payload,actor:other}})).data.binds[0]).toMatchObject({id:'a',categoryId:'new',order:3});
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({actor,sid:'verified-session',payload});
+ fetch.mockResolvedValueOnce(Response.json({code:'40001',message:'Бинд уже перемещён'},{status:400}));
+ expect((await run({method:'POST',body:{action:'knowledge-transfer',payload}})).status).toBe(409);
+ expect((await run({method:'POST',body:{action:'knowledge-transfer',payload:{...payload,sources:[]}}})).status).toBe(400);
+});
 it('archives with the verified actor/session and maps version conflicts without touching personal data',async()=>{
  expect((await run({method:'POST',body:{action:'shared-archive',id:'shared',expected:'2026-10-14',archived:true}})).status).toBe(403);
  mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read','knowledge.write']}});

@@ -15,6 +15,7 @@ import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { knowledgeService } from "@/services/knowledge.service";
+import { subscribeBindTransfers } from "@/services/knowledge/bind-transfers";
 import type { BindBranches } from "@/services/shared-binds.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { useBindHotkeys } from "@/shared/hooks/useBindHotkeys";
@@ -82,6 +83,39 @@ export function matchLocalBind(base: Bind, locals: Bind[]) {
 // Keep cloud records separate from the browser's editable knowledge snapshot.
 export function WorkspaceSharedBindsSync() {
 	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
+	const client = useQueryClient();
+	useEffect(
+		() =>
+			subscribeBindTransfers(async (actor, result) => {
+				if (actor !== user?.id) return;
+				const commonKey = ["shared-binds", actor],
+					personalKey = ["personal-binds", actor, actor];
+				await Promise.all([
+					client.cancelQueries({ queryKey: commonKey }),
+					client.cancelQueries({ queryKey: personalKey }),
+				]);
+				if (useAuthStore.getState().session?.user.id !== actor) return;
+				const merge = (old: Bind[] | undefined, rows: Bind[]) => {
+					const updated = new Map(rows.map((b) => [b.id, b]));
+					return [...(old ?? []).filter((b) => !updated.has(b.id)), ...rows];
+				};
+				client.setQueryData<Bind[]>(commonKey, (old) =>
+					merge(
+						old,
+						result.binds.filter((b) => b.ownerId === null),
+					),
+				);
+				client.setQueryData<Bind[]>(personalKey, (old) =>
+					merge(
+						old,
+						result.binds.filter((b) => b.ownerId === actor),
+					),
+				);
+				for (const [source, id] of Object.entries(result.replacements))
+					useBindLinksStore.getState().link(actor, source, id);
+			}),
+		[client, user?.id],
+	);
 	const locals = useKnowledgeStore((s) => s.binds);
 	useEffect(() => {
 		const values = (common.data ?? [])
@@ -137,7 +171,7 @@ export function WorkspaceSharedTree({
 	onToggleBindSelection?: (id: string) => void;
 	onClearBindSelection?: () => void;
 }) {
-	const { common, personal } = useWorkspaceSharedBinds();
+	const { user, common, personal, links } = useWorkspaceSharedBinds();
 	const locals = useKnowledgeStore((s) => s.binds);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
@@ -146,7 +180,15 @@ export function WorkspaceSharedTree({
 	// Include newly created runtime binds until the common query refreshes.
 	// Conversely, never hide an existing common bind just because the snapshot contains it.
 	const items = [
-		...(common.data ?? []),
+		...(common.data ?? []).filter(
+			(base) =>
+				!locals.some(
+					(local) =>
+						local.ownerId === user?.id &&
+						local.id === links[base.id] &&
+						!local.archived,
+				),
+		),
 		...locals.filter(
 			(b) =>
 				b.ownerId === null &&

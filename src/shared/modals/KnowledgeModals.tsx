@@ -488,11 +488,15 @@ export function MoveBindModal({
 		binds.find((b) => !b.archived)?.id ?? "",
 	);
 	const [error, setError] = useState("");
+	const [moving, setMoving] = useState(false);
 	const excluded = sourceFolder
 		? Array.from(knowledgeService.collectFolderIds(sourceFolder.id, folders))
 		: [];
-	const submit = (event: FormEvent) => {
+	const submit = async (event: FormEvent) => {
 		event.preventDefault();
+		if (moving) return;
+		setMoving(true);
+		setError("");
 		try {
 			const [categoryId, folderId] = JSON.parse(destination) as [
 				string,
@@ -512,16 +516,10 @@ export function MoveBindModal({
 					ids.some((id) => !binds.some((b) => b.id === id && !b.archived))
 				)
 					throw new Error("Выберите доступный бинд");
-				const selected = useKnowledgeStore.getState().selectedBind;
-				let keep = selected;
-				for (const id of ids) {
-					const moved = knowledgeService.moveBind(id, {
-						categoryId,
-						folderId: folderId || undefined,
-					});
-					if (id === selected || ids.length === 1) keep = moved.id;
-				}
-				if (keep) useKnowledgeStore.getState().openBind(keep);
+				await knowledgeService.transferBinds(ids, {
+					categoryId,
+					folderId: folderId || undefined,
+				});
 			}
 			knowledgeService.revealLocation(categoryId, folderId);
 			showToast("Перемещение выполнено");
@@ -529,6 +527,8 @@ export function MoveBindModal({
 			onClose();
 		} catch (e) {
 			setError(getErrorMessage(e));
+		} finally {
+			setMoving(false);
 		}
 	};
 	return (
@@ -541,6 +541,7 @@ export function MoveBindModal({
 						: "Добавить существующий бинд"
 			}
 			onClose={onClose}
+			closeDisabled={moving}
 		>
 			<form onSubmit={submit} className="space-y-4">
 				<FormError message={error} />
@@ -569,7 +570,7 @@ export function MoveBindModal({
 				/>
 				<ModalActions
 					submitLabel="Переместить"
-					saving={false}
+					saving={moving}
 					onCancel={onClose}
 				/>
 			</form>

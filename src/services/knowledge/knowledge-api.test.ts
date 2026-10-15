@@ -130,3 +130,58 @@ it("does not dispatch a mutation without a session", async () => {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 	expect(mocks.fetch).not.toHaveBeenCalled();
 });
+
+const transferPayload = {
+	sources: [{ id: "bind", categoryId: "old" }],
+	categoryId: "new",
+};
+it("waits for previous writes and returns only the confirmed transfer", async () => {
+	let finish!: (response: Response) => void;
+	mocks.fetch.mockImplementationOnce(
+		() =>
+			new Promise<Response>((resolve) => {
+				finish = resolve;
+			}),
+	);
+	databaseKnowledgeService.saveCategory({ id: "new", name: "New", order: 1 });
+	const result = {
+		binds: [{ id: "bind", categoryId: "new", order: 1 }],
+		replacements: {},
+	};
+	mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify(result)));
+	const request = databaseKnowledgeService.transferBinds(transferPayload);
+	await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+	finish(new Response("{}"));
+	await expect(request).resolves.toEqual(result);
+	expect(JSON.parse(mocks.fetch.mock.calls[1][1].body)).toEqual({
+		action: "knowledge-transfer",
+		payload: transferPayload,
+	});
+});
+it.each([
+	403, 409, 500,
+])("propagates transfer failure %s and allows the next transfer", async (status) => {
+	mocks.fetch.mockResolvedValueOnce(
+		new Response(JSON.stringify({ error: "Не удалось перенести" }), { status }),
+	);
+	await expect(
+		databaseKnowledgeService.transferBinds(transferPayload),
+	).rejects.toMatchObject({ message: "Не удалось перенести", status });
+	const result = {
+		binds: [{ id: "bind", categoryId: "new", order: 1 }],
+		replacements: {},
+	};
+	mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify(result)));
+	await expect(
+		databaseKnowledgeService.transferBinds(transferPayload),
+	).resolves.toEqual(result);
+});
+it("rejects missing confirmation and does not dispatch a transfer for a changed session", async () => {
+	await expect(
+		databaseKnowledgeService.transferBinds(transferPayload),
+	).rejects.toThrow("Сервер не подтвердил");
+	const request = databaseKnowledgeService.transferBinds(transferPayload);
+	mocks.session = { user: { id: "another" } };
+	await expect(request).rejects.toThrow("Аккаунт изменился");
+	expect(mocks.fetch).toHaveBeenCalledTimes(1);
+});

@@ -225,6 +225,18 @@
 	position: relative;
 	flex: none;
 }
+.workspace-tree-drag {
+	display: flex;
+	align-items: center;
+	flex: none;
+	color: var(--color-muted);
+	opacity: 0.35;
+	cursor: grab;
+}
+.workspace-tree-row:hover .workspace-tree-drag,
+.workspace-tree-row:focus-within .workspace-tree-drag {
+	opacity: 1;
+}
 .workspace-tree-row:hover :is(.workspace-tree-more, .workspace-tree-check),
 .workspace-tree-row:focus-within
 	:is(.workspace-tree-more, .workspace-tree-check),
