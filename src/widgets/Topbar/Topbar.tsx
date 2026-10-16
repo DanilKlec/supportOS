@@ -18,7 +18,6 @@ import { BonusFreshness } from "@/features/bonuses/BonusFreshness";
 import { KnowledgeGapButton } from "@/features/productivity/KnowledgeSignals";
 import { Inbox } from "@/features/shared-binds/Inbox";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindEditor";
-import { ComposerLauncher } from "@/features/spaces/ComposerLauncher";
 import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
 import { contentApi } from "@/services/shared-content.service";
@@ -867,7 +866,6 @@ export function Topbar({
 								<LogIn size={16} />
 							</IconButton>
 						))}
-					{showKnowledgeControls && <ComposerLauncher />}
 					<Inbox />
 					<ToolsMenu />
 				</div>

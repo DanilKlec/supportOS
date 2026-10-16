@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { IconButton } from "@/components/ui";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useKnowledgeStore } from "@/store";
@@ -121,20 +122,24 @@ export function Inbox() {
 	};
 	return (
 		<>
-			<button
+			<IconButton
 				type="button"
-				aria-label={`Входящие: ${unread.length} непрочитанных`}
+				label={`Входящие: ${unread.length} непрочитанных`}
+				title="Уведомления"
+				aria-haspopup="dialog"
+				aria-expanded={open}
 				onClick={() => setOpen(true)}
-				className="relative flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm"
+				variant="ghost"
+				className="relative"
 			>
-				<Bell size={16} />
-				<span className="hidden lg:inline">Входящие</span>
+				<Bell size={18} strokeWidth={1.6} aria-hidden="true" />
 				{unread.length > 0 && (
-					<span className="rounded-full bg-surface-elevated px-1.5 text-xs">
-						{unread.length}
-					</span>
+					<span
+						aria-hidden="true"
+						className="pointer-events-none absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-surface"
+					/>
 				)}
-			</button>
+			</IconButton>
 			{open && (
 				<BaseModal
 					title="Входящие"
