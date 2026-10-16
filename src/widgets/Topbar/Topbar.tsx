@@ -1,13 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import {
-	LogIn,
-	LogOut,
-	PanelLeftClose,
-	PanelLeftOpen,
-	Search,
-	X,
-} from "lucide-react";
+import { LogIn, LogOut, Search, X } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -37,18 +30,13 @@ import { getLabelForLanguage } from "@/shared/lib/languages";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { getBindTranslation } from "@/shared/modals/knowledge-modal-helpers";
 import { modalManager } from "@/shared/modals/modal.store";
-import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { can, canAccessPage } from "../../../shared/access.js";
 import { type CatalogResult, catalogResults } from "./search-catalog";
 import { type SearchCommand, searchCommands } from "./search-commands";
 import { ToolsMenu } from "./ToolsMenu";
-
-interface TopbarProps {
-	onOpenMobileSidebar?: () => void;
-	showKnowledgeControls?: boolean;
-}
 
 function getShortcutLabel() {
 	if (
@@ -232,10 +220,7 @@ function SearchResults({
 	);
 }
 
-export function Topbar({
-	onOpenMobileSidebar,
-	showKnowledgeControls = true,
-}: TopbarProps) {
+export function Topbar() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [newShared, setNewShared] = useState(false);
@@ -295,8 +280,6 @@ export function Topbar({
 			),
 		[access, emails.data, bonuses.data, emails.error, bonuses.error],
 	);
-	const layout = useWorkspaceStore((s) => s.layout);
-	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const searchValue = useKnowledgeStore((s) => s.search);
 	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
@@ -530,17 +513,6 @@ export function Topbar({
 		searchInputRef.current?.select();
 	}, []);
 
-	const toggleSidebar = () => {
-		const mobile = window.matchMedia("(max-width: 767px)").matches;
-
-		if (mobile) {
-			onOpenMobileSidebar?.();
-			return;
-		}
-
-		setLayout({ showSidebar: !layout.showSidebar });
-	};
-
 	const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
@@ -728,20 +700,6 @@ export function Topbar({
 				)}
 
 			<header className="product-topbar relative flex items-center border-b border-border bg-surface/95 text-foreground backdrop-blur">
-				<IconButton
-					label={layout.showSidebar ? "Свернуть папки" : "Открыть навигацию"}
-					onClick={toggleSidebar}
-					style={!showKnowledgeControls ? { display: "none" } : undefined}
-					variant="ghost"
-					className="shrink-0 text-muted transition hover:bg-surface-elevated hover:text-foreground"
-				>
-					{layout.showSidebar ? (
-						<PanelLeftClose size={18} strokeWidth={1.6} aria-hidden="true" />
-					) : (
-						<PanelLeftOpen size={18} strokeWidth={1.6} aria-hidden="true" />
-					)}
-				</IconButton>
-
 				<Link
 					to="/"
 					aria-label="SupportOS — на главную"

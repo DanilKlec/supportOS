@@ -1,4 +1,5 @@
 import { useRouterState } from "@tanstack/react-router";
+import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { PersonalLibrary } from "@/features/productivity/PersonalLibrary";
@@ -17,6 +18,7 @@ import { WorkspaceDock } from "@/widgets/Topbar/WorkspaceDock";
 
 export function MainLayout({ children }: { children: ReactNode }) {
 	const layout = useWorkspaceStore((state) => state.layout);
+	const setLayout = useWorkspaceStore((state) => state.setLayout);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
@@ -76,14 +78,27 @@ export function MainLayout({ children }: { children: ReactNode }) {
 			<SelectionActions key={`selection-${actor}`} />
 			<WorkspaceSharedBindsSync />
 
-			{
-				<Topbar
-					showKnowledgeControls={knowledgeRoute}
-					onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-				/>
-			}
+			<Topbar />
 
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				{knowledgeRoute && (
+					<button
+						type="button"
+						aria-label="Развернуть дерево биндов"
+						title="Развернуть дерево биндов"
+						className="workspace-tree-handle"
+						data-desktop-hidden={layout.showSidebar || undefined}
+						data-mobile-hidden={mobileSidebarOpen || undefined}
+						onClick={() => {
+							if (window.matchMedia("(max-width: 767px)").matches)
+								setMobileSidebarOpen(true);
+							else setLayout({ showSidebar: true });
+						}}
+					>
+						<ChevronRight size={15} strokeWidth={1.6} aria-hidden="true" />
+						<span>Бинды</span>
+					</button>
+				)}
 				{knowledgeRoute && layout.showSidebar && (
 					<div className="hidden min-h-0 md:block">
 						<Sidebar />
