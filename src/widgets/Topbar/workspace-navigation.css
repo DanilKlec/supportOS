@@ -313,7 +313,7 @@
 	}
 	.workspace-dock-link {
 		flex: 1;
-		min-width: 0;
+		min-width: min(64px, calc((100vw - 30px) / 5));
 		min-height: 44px;
 		flex-direction: column;
 		gap: 3px;
