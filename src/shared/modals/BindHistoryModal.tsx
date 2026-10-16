@@ -1,6 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
 
 import { BaseModal } from "./BaseModal";
 import type { ModalPayload } from "./modal.types";
@@ -17,7 +20,46 @@ export function BindHistoryModal({
 	const bind = useKnowledgeStore((state) =>
 		payload.bindId ? state.getBind(payload.bindId) : undefined,
 	);
-	const history = bind?.history ?? [];
+	const actor = useAuthStore((state) => state.session?.user.id);
+	const bindId = bind?.id;
+	const query = useQuery({
+		queryKey: ["knowledge-bind-history", actor, bind?.id],
+		queryFn: () => {
+			if (!bind) throw new Error("Бинд недоступен");
+			return knowledgeService.loadBindHistory(bind.id);
+		},
+		enabled: Boolean(actor && bind),
+		staleTime: 60000,
+	});
+	useEffect(() => {
+		if (
+			!query.data ||
+			!bindId ||
+			actor !== useAuthStore.getState().session?.user.id
+		)
+			return;
+		const store = useKnowledgeStore.getState();
+		store.setBinds(
+			store.binds.map((item) =>
+				item.id === bindId
+					? {
+							...item,
+							history: [
+								...new Map(
+									[...query.data, ...(item.history ?? [])].map((entry) => [
+										entry.id,
+										entry,
+									]),
+								).values(),
+							]
+								.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+								.slice(0, 25),
+						}
+					: item,
+			),
+		);
+	}, [query.data, bindId, actor]);
+	const history = bind?.history?.length ? bind.history : (query.data ?? []);
 
 	if (!bind) {
 		return (
@@ -36,7 +78,20 @@ export function BindHistoryModal({
 	return (
 		<BaseModal title="История" onClose={onClose} size="lg">
 			<div className="space-y-3">
-				{history.length === 0 ? (
+				{query.isFetching && (
+					<output className="text-sm text-muted">
+						Загружаем историю этого бинда…
+					</output>
+				)}
+				{query.error && (
+					<p role="alert" className="text-sm text-red-400">
+						Не удалось загрузить историю.{" "}
+						<button type="button" onClick={() => void query.refetch()}>
+							Повторить
+						</button>
+					</p>
+				)}
+				{history.length === 0 && !query.isFetching && !query.error ? (
 					<p className="text-sm text-muted">Предыдущих версий пока нет</p>
 				) : (
 					history.map((entry) => {

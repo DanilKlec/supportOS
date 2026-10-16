@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
+
 const mock = vi.hoisted(() => ({
 	list: vi.fn(),
 	save: vi.fn(),
@@ -25,10 +26,31 @@ vi.mock("@/services/shared-library.service", () => ({
 	sharedLibraryService: mock,
 }));
 vi.mock("@/services/knowledge.service", () => ({ knowledgeService: mock }));
+vi.mock("@/services/bind-workspace.service", () => ({
+	bindWorkspaceKey: (actor: string) => ["bind-workspace", actor],
+	readBindWorkspace: async (client: QueryClient, actor: string) => {
+		const binds = await mock.list();
+		client.setQueryData(["shared-binds", actor], binds);
+		client.setQueryData(["personal-binds", actor, actor], []);
+		client.setQueryData(["bind-branches", actor], {
+			choices: {},
+			incoming: [],
+			outgoing: [],
+		});
+		return {
+			categories: [],
+			folders: [],
+			binds,
+			branches: { choices: {}, incoming: [], outgoing: [] },
+		};
+	},
+}));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
+
 import { SharedBindWorkbench } from "./SharedBindWorkbench";
+
 const category = {
 	id: "cat",
 	name: "Общее",

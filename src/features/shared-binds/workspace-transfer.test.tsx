@@ -12,11 +12,11 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Bind } from "@/entities/bind";
 import { knowledgeService } from "@/services/knowledge.service";
+import { ModalRoot } from "@/shared/modals/ModalRoot";
+import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBindLinksStore } from "@/store/bind-links.store";
-import { ModalRoot } from "@/shared/modals/ModalRoot";
-import { useModalStore } from "@/shared/modals/modal.store";
 import { Sidebar } from "@/widgets/Sidebar/Sidebar";
 import { WorkspaceSharedBindsSync } from "./WorkspaceSharedBinds";
 
@@ -25,6 +25,26 @@ const mock = vi.hoisted(() => ({
 	list: vi.fn(),
 	personal: vi.fn(),
 	toast: vi.fn(),
+}));
+vi.mock("@/app/bootstrap", () => ({ bootstrapApp: async () => undefined }));
+vi.mock("@/services/bind-workspace.service", () => ({
+	bindWorkspaceKey: (actor: string) => ["bind-workspace", actor],
+	readBindWorkspace: async (client: QueryClient, actor: string) => {
+		const [common, personal] = await Promise.all([
+			mock.list(),
+			mock.personal(),
+		]);
+		const branches = { choices: {}, incoming: [], outgoing: [] };
+		client.setQueryData(["shared-binds", actor], common);
+		client.setQueryData(["personal-binds", actor, actor], personal);
+		client.setQueryData(["bind-branches", actor], branches);
+		return {
+			categories: [],
+			folders: [],
+			binds: [...common, ...personal],
+			branches,
+		};
+	},
 }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),

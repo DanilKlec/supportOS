@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	Archive,
 	ArrowLeft,
 	ArrowRight,
-	Archive,
 	Check,
 	ChevronRight,
 	Copy,
@@ -16,9 +16,9 @@ import {
 	RefreshCw,
 	RotateCcw,
 	Search,
+	Trash2,
 	Upload,
 	Users,
-	Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -27,12 +27,12 @@ import { Button, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
 import { languages } from "@/entities/language";
-import { sharedBindsService } from "@/services/shared-binds.service";
 import { knowledgeService } from "@/services/knowledge.service";
+import { sharedBindsService } from "@/services/shared-binds.service";
 import {
-	sharedLibraryService,
 	type LibraryStructure,
 	type StructureChange,
+	sharedLibraryService,
 } from "@/services/shared-library.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { copyToClipboard } from "@/shared/lib/clipboard";
@@ -45,7 +45,7 @@ import {
 	LibraryStructureDialog,
 	type StructureDialogState,
 } from "./LibraryStructureDialog";
-import { LibraryTree, type LibraryNodeAction } from "./LibraryTree";
+import { type LibraryNodeAction, LibraryTree } from "./LibraryTree";
 import {
 	bindCount,
 	buildLibraryTree,
@@ -55,6 +55,7 @@ import {
 	searchLibraryTree,
 } from "./library-tree";
 import { SharedBindEditor } from "./SharedBindEditor";
+import { useWorkspaceSharedBinds } from "./WorkspaceSharedBinds";
 import "./shared-library.css";
 
 const emptyStructure: LibraryStructure = { categories: [], folders: [] };
@@ -65,11 +66,7 @@ export function SharedBindWorkbench({ onManage }: { onManage?: () => void }) {
 		{ showToast } = useToast();
 	const bindsKey = ["shared-binds", user?.id],
 		structureKey = ["shared-library-structure", user?.id];
-	const binds = useQuery({
-		queryKey: bindsKey,
-		queryFn: () => sharedBindsService.list(),
-		refetchInterval: 30000,
-	});
+	const { common: binds } = useWorkspaceSharedBinds();
 	const metadata = useQuery({
 		queryKey: structureKey,
 		queryFn: ({ signal }) => sharedLibraryService.load(signal),

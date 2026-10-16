@@ -223,7 +223,9 @@ it('revokes others through the real backend + SDK and immediately blocks still-v
    const cursor=databasePaths.length;
    const denied=await call(handler,url,oldToken,body);
    expect(denied.statusCode).toBe(401);
-   expect(databasePaths.slice(cursor)).toEqual(['/rest/v1/rpc/supportos_mfa_session_state']);
+   // requireUser reads permissions concurrently, but no protected handler data
+   // or write is reached after the live-session check rejects the old JWT.
+   expect(databasePaths.slice(cursor)).toEqual(['/rest/v1/rpc/supportos_mfa_session_state','/rest/v1/rpc/supportos_rbac_context']);
   }
  }
  expect(await revokedEvents()).toEqual([{event_ref:'critical:'+proof.id}]);

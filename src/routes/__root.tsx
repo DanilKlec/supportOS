@@ -131,7 +131,9 @@ function RootComponent() {
 				return;
 			}
 
-			void bootstrapApp();
+			void bootstrapApp(queryClient).catch(() => {
+				// The workspace query renders its retry state and retries on refresh.
+			});
 		}, 50);
 
 		return () => window.clearTimeout(timer);

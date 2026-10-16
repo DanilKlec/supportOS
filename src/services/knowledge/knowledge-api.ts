@@ -1,17 +1,17 @@
-import type { Bind } from "@/entities/bind";
+import type { Bind, BindHistoryEntry } from "@/entities/bind";
 import type { KnowledgeCategory, KnowledgeFolder } from "@/entities/knowledge";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { supabaseService } from "@/services/supabase.service";
-
-import type { KnowledgeDatabase } from "./knowledge-import-export";
 import type { BindTransferPayload, BindTransferResult } from "./bind-transfers";
+import type { KnowledgeDatabase } from "./knowledge-import-export";
 
 // Server transport only; loading a query must not hydrate the runtime store.
 async function knowledgeApi<T = Partial<KnowledgeDatabase>>(
 	body?: Record<string, unknown>,
+	readPath = "/api/binds?action=knowledge&history=0",
 ): Promise<T> {
 	const response = await authenticatedFetch(
-		body ? "/api/binds" : "/api/binds?action=knowledge",
+		body ? "/api/binds" : readPath,
 		body
 			? {
 					method: "POST",
@@ -74,6 +74,11 @@ export const databaseKnowledgeService = {
 		return request;
 	},
 	loadKnowledge: () => knowledgeApi(),
+	loadBindHistory: (id: string) =>
+		knowledgeApi<BindHistoryEntry[]>(
+			undefined,
+			`/api/binds?action=knowledge-history&bind_id=${encodeURIComponent(id)}`,
+		),
 	saveCategory: (category: KnowledgeCategory) =>
 		enqueueKnowledgeMutation({
 			action: "knowledge-save",

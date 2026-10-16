@@ -14,8 +14,13 @@ import { LocalBindActions } from "@/components/binds/LocalBindActions";
 import { MoreActions } from "@/components/MoreActions";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeTreeNode } from "@/entities/knowledge";
-import { knowledgeService } from "@/services/knowledge.service";
+import { bootstrapApp } from "@/app/bootstrap";
+import {
+	bindWorkspaceKey,
+	readBindWorkspace,
+} from "@/services/bind-workspace.service";
 import { subscribeBindTransfers } from "@/services/knowledge/bind-transfers";
+import { knowledgeService } from "@/services/knowledge.service";
 import type { BindBranches } from "@/services/shared-binds.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { useBindHotkeys } from "@/shared/hooks/useBindHotkeys";
@@ -27,6 +32,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { Tree } from "@/widgets/Sidebar/Tree";
+import { countTreeBinds } from "@/widgets/Sidebar/tree-utils";
 import { can } from "../../../shared/access.js";
 import { BindLinkEditor } from "./BindLinkEditor";
 import { BindProposals } from "./BindProposals";
@@ -34,31 +40,46 @@ import { reconcileBindLinks } from "./bind-links";
 import { SharedBindEditor } from "./SharedBindEditor";
 import { ShareRecipientPicker } from "./ShareRecipientPicker";
 import { buildSharedTree } from "./shared-tree";
-import { countTreeBinds } from "@/widgets/Sidebar/tree-utils";
 
-export function useWorkspaceSharedBinds() {
+export function useWorkspaceSharedBinds({ poll = false } = {}) {
 	const user = useAuthStore((s) => s.session?.user);
-	const enabled = can(user?.access, "binds.read");
+	const client = useQueryClient();
+	const workspace = useQuery({
+		queryKey: bindWorkspaceKey(user?.id),
+		queryFn: ({ signal }) => {
+			if (!user) throw new Error("Войдите с личным аккаунтом");
+			return readBindWorkspace(client, user.id, signal);
+		},
+		enabled: can(user?.access, "binds.read"),
+		staleTime: 30000,
+		refetchInterval: poll ? 30000 : false,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
+	});
+	const enabled = can(user?.access, "binds.read") && Boolean(workspace.data);
 	const common = useQuery({
 		queryKey: ["shared-binds", user?.id],
 		queryFn: () => sharedBindsService.list(),
 		enabled,
 		staleTime: 30000,
-		refetchInterval: 30000,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
 	});
 	const personal = useQuery({
 		queryKey: ["personal-binds", user?.id, user?.id],
 		queryFn: () => sharedBindsService.personal(user!.id),
 		enabled,
 		staleTime: 30000,
-		refetchInterval: 30000,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
 	});
 	const branches = useQuery({
 		queryKey: ["bind-branches", user?.id],
 		queryFn: () => sharedBindsService.branches(),
 		enabled,
 		staleTime: 30000,
-		refetchInterval: 30000,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
 	});
 	const locals = useKnowledgeStore((s) => s.binds);
 	const saved = useBindLinksStore((s) =>
@@ -68,7 +89,25 @@ export function useWorkspaceSharedBinds() {
 		() => reconcileBindLinks(common.data ?? [], locals, saved),
 		[common.data, locals, saved],
 	);
-	return { user, common, personal, branches, links };
+	return {
+		user,
+		common: {
+			...common,
+			error: common.error ?? workspace.error,
+			isLoading: common.isLoading || workspace.isLoading,
+			isFetching: common.isFetching || workspace.isFetching,
+			refetch:
+				workspace.data && !workspace.error ? common.refetch : workspace.refetch,
+		},
+		personal: {
+			...personal,
+			error: personal.error ?? workspace.error,
+			isLoading: personal.isLoading || workspace.isLoading,
+		},
+		branches,
+		links,
+		workspace,
+	};
 }
 
 export function matchLocalBind(base: Bind, locals: Bind[]) {
@@ -82,8 +121,14 @@ export function matchLocalBind(base: Bind, locals: Bind[]) {
 
 // Keep cloud records separate from the browser's editable knowledge snapshot.
 export function WorkspaceSharedBindsSync() {
-	const { user, common, personal, branches, links } = useWorkspaceSharedBinds();
+	const { user, common, personal, branches, links, workspace } =
+		useWorkspaceSharedBinds({
+			poll: true,
+		});
 	const client = useQueryClient();
+	useEffect(() => {
+		if (workspace.isSuccess) void bootstrapApp(client).catch(() => undefined);
+	}, [client, workspace.isSuccess, workspace.dataUpdatedAt]);
 	useEffect(
 		() =>
 			subscribeBindTransfers(async (actor, result) => {
@@ -91,6 +136,7 @@ export function WorkspaceSharedBindsSync() {
 				const commonKey = ["shared-binds", actor],
 					personalKey = ["personal-binds", actor, actor];
 				await Promise.all([
+					client.cancelQueries({ queryKey: bindWorkspaceKey(actor) }),
 					client.cancelQueries({ queryKey: commonKey }),
 					client.cancelQueries({ queryKey: personalKey }),
 				]);

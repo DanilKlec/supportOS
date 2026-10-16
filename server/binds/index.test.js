@@ -7,6 +7,45 @@ const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-822
 beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read']}});});
 afterEach(()=>vi.unstubAllGlobals());
 async function run(req){const res={setHeader:vi.fn(),end:vi.fn(),statusCode:0};await handler({method:'GET',url:'/api/binds',headers:{host:'app.test',origin:'https://app.test'},...req},res);return {status:res.statusCode,data:JSON.parse(res.end.mock.calls[0][0])};}
+it('loads workspace binds once, includes shadowed sources for cache consumers, and omits history',async()=>{
+ mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_binds')?[
+  {id:'common',owner_id:null,translations:[],tags:[]},
+  {id:'personal',owner_id:actor,source_bind_id:'common',translations:[],tags:[]},
+ ]:[]);
+ mocks.db.mockResolvedValue({choices:{},incoming:[{id:'share',sourceId:'common',sender:'Sender',row:{id:'incoming',owner_id:other,translations:[],tags:[]}}],outgoing:[]});
+ const result=await run({url:`/api/binds?action=workspace&user_id=${other}`});
+ expect(result.status).toBe(200);
+ expect(result.data.binds.map(bind=>bind.id)).toEqual(['common','personal']);
+ expect(result.data.branches.incoming[0]).toMatchObject({id:'share',bind:{id:'incoming',ownerId:other}});
+ expect(result.data.branches.incoming[0]).not.toHaveProperty('row');
+ expect(mocks.allRows).toHaveBeenCalledTimes(3);
+ expect(mocks.allRows.mock.calls.every(([,path])=>path.includes(`owner_id.eq.${actor}`)&&!path.includes(other))).toBe(true);
+ expect(mocks.db).toHaveBeenCalledExactlyOnceWith(expect.anything(),'rpc/supportos_bind_branch_action',{actor,operation:'list',payload:{}});
+});
+it('skips history snapshots for lightweight knowledge reads',async()=>{
+ mocks.allRows.mockResolvedValue([]);
+ expect((await run({url:'/api/binds?action=knowledge&history=0'})).status).toBe(200);
+ expect(mocks.db).not.toHaveBeenCalled();
+});
+it.each([null,actor])('reads at most 26 history versions for the accessible bind owner %s',async owner=>{
+ mocks.db.mockResolvedValueOnce([{id:'answer',owner_id:owner,source_bind_id:owner?'source':null,updated_at:'current'}]).mockResolvedValueOnce([
+  {id:2,snapshot:{updated_at:'current'},created_at:'2026-10-16'},
+  {id:1,snapshot:{slug:'old',translations:[],tags:['old'],updated_at:'old'},created_at:'2026-10-15'},
+ ]);
+ const result=await run({url:`/api/binds?action=knowledge-history&bind_id=answer&user_id=${other}`});
+ expect(result).toEqual({status:200,data:[{id:'1',createdAt:'2026-10-15',slug:'old',translations:[],tags:['old']}]});
+ expect(mocks.db.mock.calls[0][1]).toContain(`or=(owner_id.is.null,owner_id.eq.${actor})`);
+ expect(mocks.db.mock.calls[1][1]).toContain(`source_id=eq.${owner?'source':'answer'}&owner_id=${owner?`eq.${actor}`:'is.null'}`);
+ expect(mocks.db.mock.calls[1][1]).toContain('limit=26');
+ expect(mocks.db.mock.calls.every(([,path])=>!path.includes(other))).toBe(true);
+});
+it('does not read history for an inaccessible bind or an injected id',async()=>{
+ mocks.db.mockResolvedValue([]);
+ expect((await run({url:'/api/binds?action=knowledge-history&bind_id=private'})).status).toBe(404);
+ expect(mocks.db).toHaveBeenCalledTimes(1);
+ expect((await run({url:'/api/binds?action=knowledge-history&bind_id=x%26owner_id=is.null'})).status).toBe(400);
+ expect(mocks.db).toHaveBeenCalledTimes(1);
+});
 it('transfers with the verified session, returns saved locations/order, and exposes database conflicts',async()=>{
  mocks.requireUser.mockResolvedValue({id:actor,sessionId:'verified-session',access:{status:'active',permissions:['binds.read']}});
  const payload={sources:[{id:'a',categoryId:'old'}],categoryId:'new'};

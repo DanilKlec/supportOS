@@ -77,13 +77,13 @@ async function saveShared(env,actor,body){
  return rows[0];
 }
 
-async function knowledgeSnapshot(env,actor,{includeShadowedShared=false}={}){
+async function knowledgeSnapshot(env,actor,{includeShadowedShared=false,includeHistory=true}={}){
  const owner=`or=(owner_id.is.null,owner_id.eq.${actor.id})`;
  const [categories,folders,rawBinds,historyRows]=await Promise.all([
   allRows(env,`supportos_categories?select=*&${owner}&order=order_index.asc,id.asc`),
   allRows(env,`supportos_folders?select=*&${owner}&order=order_index.asc,id.asc`),
   allRows(env,`supportos_binds?select=*&${owner}&order=updated_at.desc,id.asc`),
-  db(env,`supportos_bind_history?select=id,source_id,owner_id,snapshot,created_at,operation&${owner}&order=created_at.desc,id.desc&limit=5000`),
+  includeHistory?db(env,`supportos_bind_history?select=id,source_id,owner_id,snapshot,created_at,operation&${owner}&order=created_at.desc,id.desc&limit=5000`):Promise.resolve([]),
  ]);
  const personalSources=new Set(rawBinds.filter(row=>row.owner_id&&row.source_bind_id).map(row=>row.source_bind_id));
  const binds=includeShadowedShared?rawBinds:rawBinds.filter(row=>row.owner_id||!personalSources.has(row.id));
@@ -292,7 +292,24 @@ export default async function handler(req,res) {
    if(!response.ok)throw fail(['42501','40001','P0001'].includes(result.code)?result.message:'Не удалось изменить бинд',result.code==='42501'?403:result.code==='40001'?409:400);
    return send(200,result);
   }
-  if(req.method==='GET'&&url.searchParams.get('action')==='knowledge')return send(200,await knowledgeSnapshot(env,actor));
+  if(req.method==='GET'&&url.searchParams.get('action')==='workspace') {
+   // Read shared and personal binds once, without historical text snapshots.
+   const [knowledge,branches]=await Promise.all([
+    knowledgeSnapshot(env,actor,{includeShadowedShared:true,includeHistory:false}),
+    db(env,'rpc/supportos_bind_branch_action',{actor:actor.id,operation:'list',payload:{}}),
+   ]);
+   return send(200,{...knowledge,branches:{...branches,incoming:branches.incoming.map(({row,...entry})=>({...entry,bind:bindFromRow(row)}))}});
+  }
+  if(req.method==='GET'&&url.searchParams.get('action')==='knowledge')return send(200,await knowledgeSnapshot(env,actor,{includeHistory:url.searchParams.get('history')!=='0'}));
+  if(req.method==='GET'&&url.searchParams.get('action')==='knowledge-history') {
+   const id=url.searchParams.get('bind_id');
+   if(!validId(id))throw fail('Выберите бинд');
+   const rows=await db(env,`supportos_binds?select=id,owner_id,source_bind_id,updated_at&id=eq.${encodeURIComponent(id)}&or=(owner_id.is.null,owner_id.eq.${actor.id})`);
+   const bind=rows[0];if(!bind)throw fail('Бинд недоступен',404);
+   const owner=bind.owner_id===null?'owner_id=is.null':`owner_id=eq.${actor.id}`;
+   const history=await db(env,`supportos_bind_history?select=id,snapshot,created_at&source_id=eq.${encodeURIComponent(bind.source_bind_id??bind.id)}&${owner}&order=created_at.desc,id.desc&limit=26`);
+   return send(200,history.filter(row=>row.snapshot?.updated_at!==bind.updated_at).slice(0,25).map(row=>({id:String(row.id),createdAt:row.created_at,slug:row.snapshot?.slug??bind.id,tags:Array.isArray(row.snapshot?.tags)?row.snapshot.tags:[],translations:Array.isArray(row.snapshot?.translations)?row.snapshot.translations:[]})));
+  }
   if(req.method==='POST'&&body.action==='knowledge-save')return send(200,await saveKnowledge(env,actor,body));
   if(req.method==='POST'&&body.action==='knowledge-delete')return send(200,await deleteKnowledge(env,actor,body));
   if(req.method==='GET'&&url.searchParams.get('action')==='users') {

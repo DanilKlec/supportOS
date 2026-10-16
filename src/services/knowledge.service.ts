@@ -1,6 +1,8 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { KnowledgeFolder } from "@/entities/knowledge";
 import { supabaseService } from "@/services/supabase.service";
 import { useKnowledgeStore } from "@/store";
+import { fetchBindWorkspace } from "./bind-workspace.service";
 import { publishBindTransfer } from "./knowledge/bind-transfers";
 
 import { databaseKnowledgeService } from "./knowledge/knowledge-api";
@@ -78,18 +80,43 @@ class KnowledgeService extends KnowledgeMutations {
 		await publishBindTransfer(actor, result);
 		return result;
 	}
-	async loadKnowledge(): Promise<KnowledgeDatabase> {
+	async loadKnowledge(client?: QueryClient): Promise<KnowledgeDatabase> {
 		const accountId = supabaseService.getSession()?.user.id;
 
 		if (!accountId) throw new Error("Войдите с личным аккаунтом");
-		const loaded = await databaseKnowledgeService.loadKnowledge();
+		const loaded = client
+			? await fetchBindWorkspace(client, accountId)
+			: await databaseKnowledgeService.loadKnowledge();
 		if (supabaseService.getSession()?.user.id !== accountId)
 			throw new Error("Аккаунт изменился");
 		const database = normalizeDatabase(loaded ?? {});
+		const personalSources = new Set(
+			database.binds
+				.filter((bind) => bind.ownerId && bind.sourceBindId)
+				.map((bind) => bind.sourceBindId),
+		);
+		database.binds = database.binds.filter(
+			(bind) => bind.ownerId !== null || !personalSources.has(bind.id),
+		);
 
-		useKnowledgeStore.getState().setKnowledge(database);
+		const runtime = useKnowledgeStore.getState();
+		runtime.setKnowledge({
+			...database,
+			search: runtime.search,
+			language: runtime.language,
+		});
 
 		return database;
+	}
+	async loadBindHistory(id: string) {
+		const accountId = supabaseService.getSession()?.user.id;
+		if (!accountId) throw new Error("Войдите с личным аккаунтом");
+		const history = await databaseKnowledgeService.loadBindHistory(id);
+		if (supabaseService.getSession()?.user.id !== accountId)
+			throw new Error("Аккаунт изменился");
+		if (!Array.isArray(history))
+			throw new Error("Сервер не подтвердил загрузку истории");
+		return history;
 	}
 
 	async loadCloudKnowledge() {

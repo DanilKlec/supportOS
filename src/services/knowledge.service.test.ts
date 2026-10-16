@@ -79,13 +79,50 @@ it("hydrates Zustand only from the authenticated server snapshot", async () => {
 	const database = await knowledgeService.loadKnowledge();
 
 	expect(mocks.fetch).toHaveBeenCalledWith(
-		"/api/binds?action=knowledge",
+		"/api/binds?action=knowledge&history=0",
 		undefined,
 	);
 	expect(database.categories.map((category) => category.id)).toEqual([
 		"database",
 	]);
 	expect(useKnowledgeStore.getState().categories).toEqual(database.categories);
+});
+it("preserves search text and language changed while database data is loading", async () => {
+	let finish!: (response: Response) => void;
+	mocks.fetch.mockImplementation(
+		() =>
+			new Promise<Response>((resolve) => {
+				finish = resolve;
+			}),
+	);
+	const request = knowledgeService.loadKnowledge();
+	useKnowledgeStore.setState({ search: "Проверяю", language: "de" });
+	finish(Response.json({ categories: [], folders: [], binds: [] }));
+	await request;
+	expect(useKnowledgeStore.getState()).toMatchObject({
+		search: "Проверяю",
+		language: "de",
+	});
+});
+it("loads one bind history without replacing current edits or hydrating query data", async () => {
+	const current = bind("answer");
+	useKnowledgeStore.setState({ binds: [current] });
+	const history = [
+		{
+			id: "1",
+			createdAt: "2026-10-15",
+			slug: "old",
+			tags: [],
+			translations: [],
+		},
+	];
+	mocks.fetch.mockResolvedValue(Response.json(history));
+	expect(await knowledgeService.loadBindHistory("answer")).toEqual(history);
+	expect(mocks.fetch).toHaveBeenCalledWith(
+		"/api/binds?action=knowledge-history&bind_id=answer",
+		undefined,
+	);
+	expect(useKnowledgeStore.getState().binds).toEqual([current]);
 });
 
 function bind(id: string, patch: Partial<Bind> = {}): Bind {

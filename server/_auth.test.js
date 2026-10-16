@@ -16,6 +16,28 @@ it('rejects disabled accounts and uses database permissions over legacy admin me
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 it('fails closed without a bearer token',async()=>{await expect(requireUser({headers:{}},{env})).rejects.toMatchObject({status:401});});
+it('reads MFA state and permissions concurrently but waits for both before authorizing',async()=>{
+ const token='x.'+Buffer.from(JSON.stringify({sub:'u',session_id:'11111111-1111-4111-8111-111111111111'})).toString('base64url')+'.sig';
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({id:'u'})));
+ let finishMfa,finishAccess;
+ mfa.requireMfa.mockImplementationOnce(()=>new Promise(resolve=>{finishMfa=resolve;}));
+ rbac.loadAccess.mockImplementationOnce(()=>new Promise(resolve=>{finishAccess=resolve;}));
+ let authorized=false;
+ const request=requireUser({headers:{authorization:`Bearer ${token}`}},{env}).then(user=>{authorized=true;return user;});
+ await vi.waitFor(()=>expect(finishMfa&&finishAccess).toBeTruthy());
+ finishAccess({status:'active',permissions:['work']});
+ await Promise.resolve();
+ expect(authorized).toBe(false);
+ finishMfa();
+ await expect(request).resolves.toMatchObject({id:'u',access:{permissions:['work']}});
+});
+it('preserves MFA rejection when concurrent access lookup also fails',async()=>{
+ const token='x.'+Buffer.from(JSON.stringify({sub:'u',session_id:'11111111-1111-4111-8111-111111111111'})).toString('base64url')+'.sig';
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({id:'u'})));
+ mfa.requireMfa.mockRejectedValueOnce(Object.assign(new Error('MFA'),{status:403,code:'mfa_required'}));
+ rbac.loadAccess.mockRejectedValueOnce(new Error('DB unavailable'));
+ await expect(requireUser({headers:{authorization:`Bearer ${token}`}},{env})).rejects.toMatchObject({code:'mfa_required'});
+});
 it('does not authorize anonymous Supabase users',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response('{"id":"a","is_anonymous":true}')));await expect(requireUser({headers:{authorization:'Bearer token'}},{env})).rejects.toMatchObject({status:401});});
 it('fails closed on auth service failure',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('network');}));await expect(requireUser({headers:{authorization:'Bearer token'}},{env})).rejects.toMatchObject({status:503});});
 it('returns uncached 401 JSON for protected APIs',async()=>{const res={headers:{},setHeader(k,v){this.headers[k]=v;},end(body){this.body=JSON.parse(body);}};expect(await authorize({headers:{},method:'GET'},res)).toBe(false);expect(res.statusCode).toBe(401);expect(res.headers['Cache-Control']).toContain('no-store');});

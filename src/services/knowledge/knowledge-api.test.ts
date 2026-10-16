@@ -50,7 +50,7 @@ it("returns server query data without reading or hydrating the Zustand runtime c
 		expect(client.getQueryData(queryKey)).toEqual(server);
 		expect(useKnowledgeStore.getState().categories).toEqual(runtime);
 		expect(mocks.fetch).toHaveBeenCalledWith(
-			"/api/binds?action=knowledge",
+			"/api/binds?action=knowledge&history=0",
 			undefined,
 		);
 	} finally {

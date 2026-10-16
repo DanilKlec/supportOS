@@ -1,5 +1,4 @@
-import { defaultLocalDataService } from "@/services/default-local-data.service";
-import { knowledgeService } from "@/services/knowledge.service";
+import type { QueryClient } from "@tanstack/react-query";
 import { supabaseService } from "@/services/supabase.service";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -22,7 +21,7 @@ export async function bootstrapAuth() {
 	return authSessionPromise;
 }
 
-export async function bootstrapApp() {
+export async function bootstrapApp(client?: QueryClient) {
 	await bootstrapAuth();
 	const session = useAuthStore.getState().session;
 
@@ -32,7 +31,12 @@ export async function bootstrapApp() {
 
 	const accountId = session.user.id;
 	knowledgePromise = (async () => {
-		await knowledgeService.loadKnowledge();
+		const [{ knowledgeService }, { defaultLocalDataService }] =
+			await Promise.all([
+				import("@/services/knowledge.service"),
+				import("@/services/default-local-data.service"),
+			]);
+		await knowledgeService.loadKnowledge(client);
 		if (useAuthStore.getState().session?.user.id !== accountId) return;
 		knowledgeInitializedFor = accountId;
 		defaultLocalDataService.apply();

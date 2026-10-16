@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	act,
 	cleanup,
@@ -11,6 +13,7 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Bind } from "@/entities/bind";
 import { useKnowledgeStore, useProjectEmailStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
 import { ModalRoot } from "./ModalRoot";
 import { modalManager, useModalStore } from "./modal.store";
 
@@ -25,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 		archiveBind: vi.fn(),
 		restoreDeletedItems: vi.fn(),
 		restoreBindHistory: vi.fn(),
+		loadBindHistory: vi.fn(),
 		recordBindCopied: vi.fn(),
 	},
 }));
@@ -41,6 +45,7 @@ vi.mock("@/services/knowledge.service", () => ({
 
 const initialKnowledge = useKnowledgeStore.getState();
 const initialEmails = useProjectEmailStore.getState();
+const initialAuth = useAuthStore.getState();
 const presetKey = "supportos:variable-presets:v1";
 let originalPreset: string | null;
 
@@ -98,6 +103,7 @@ afterEach(() => {
 	useModalStore.setState({ activeModal: null });
 	useKnowledgeStore.setState(initialKnowledge);
 	useProjectEmailStore.setState(initialEmails);
+	useAuthStore.setState(initialAuth);
 	if (originalPreset === null) localStorage.removeItem(presetKey);
 	else localStorage.setItem(presetKey, originalPreset);
 });
@@ -331,7 +337,12 @@ it("shows the requested history language and restores the selected version", () 
 			}),
 		],
 	});
-	render(<ModalRoot />);
+	// The history is loaded on demand by an account-scoped query.
+	render(
+		<QueryClientProvider client={new QueryClient()}>
+			<ModalRoot />
+		</QueryClientProvider>,
+	);
 	act(() => modalManager.open("bindHistory", { bindId: "first" }));
 	expect(screen.getByText("Vorherige Antwort")).toBeTruthy();
 	expect(screen.getByText("Vorheriger Text")).toBeTruthy();
@@ -342,6 +353,66 @@ it("shows the requested history language and restores the selected version", () 
 	);
 	expect(mocks.showToast).toHaveBeenCalledWith("Версия восстановлена");
 	expect(screen.queryByRole("dialog")).toBeNull();
+});
+it("rehydrates cached history when reopened without replacing current bind edits or fetching again", async () => {
+	useAuthStore.setState({
+		session: {
+			accessToken: "test",
+			user: { id: "actor", email: "actor@example.test", role: "support" },
+		},
+	});
+	const entry = {
+		id: "old",
+		createdAt: "2026-10-01",
+		slug: "previous",
+		tags: [],
+		translations: [
+			{
+				language: "ru",
+				title: "Прошлая версия",
+				content: "Прежний текст",
+				updatedAt: "2026-10-01",
+			},
+		],
+	};
+	mocks.service.loadBindHistory.mockResolvedValue([entry]);
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		const first = render(
+			<QueryClientProvider client={client}>
+				<ModalRoot />
+			</QueryClientProvider>,
+		);
+		act(() => modalManager.open("bindHistory", { bindId: "first" }));
+		await waitFor(() =>
+			expect(useKnowledgeStore.getState().binds[0].history).toEqual([entry]),
+		);
+		first.unmount();
+		act(() =>
+			useKnowledgeStore
+				.getState()
+				.setBinds([bind("first", { slug: "edited", history: [] })]),
+		);
+		render(
+			<QueryClientProvider client={client}>
+				<ModalRoot />
+			</QueryClientProvider>,
+		);
+		await waitFor(() =>
+			expect(useKnowledgeStore.getState().binds[0].history).toEqual([entry]),
+		);
+		expect(useKnowledgeStore.getState().binds[0].slug).toBe("edited");
+		expect(mocks.service.loadBindHistory).toHaveBeenCalledTimes(1);
+		fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+		expect(mocks.service.restoreBindHistory).toHaveBeenCalledWith(
+			"first",
+			"old",
+		);
+	} finally {
+		client.clear();
+	}
 });
 
 it("keeps the nested deletion snapshot available for the toast restore action", () => {

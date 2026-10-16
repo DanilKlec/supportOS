@@ -27,8 +27,12 @@ export async function requireIdentity(request, env = process.env) {
 }
 export async function requireUser(request, { supervisor = false, permission = 'work', env = process.env } = {}) {
  const user=await requireIdentity(request,env);
- await requireMfa(user,env);
- user.access=await loadAccess(user.id,env);
+ // Both reads use the already verified identity. Neither authorizes the request
+ // alone: wait for both and preserve session/MFA rejection before permission errors.
+ const [mfa,access]=await Promise.allSettled([requireMfa(user,env),loadAccess(user.id,env)]);
+ if(mfa.status==='rejected')throw mfa.reason;
+ if(access.status==='rejected')throw access.reason;
+ user.access=access.value;
  if(permission!==null && !can(user.access,supervisor?'monitor.read':permission)) throw Object.assign(new Error(user.access.status==='disabled'?'Доступ к аккаунту отключён':'Недостаточно прав для этого действия'), { status: 403 });
  return user;
 }

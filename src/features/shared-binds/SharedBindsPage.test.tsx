@@ -35,6 +35,26 @@ vi.mock("@/services/authenticated-fetch", () => ({
 vi.mock("@/services/shared-binds.service", () => ({
 	sharedBindsService: mock,
 }));
+vi.mock("@/app/bootstrap", () => ({ bootstrapApp: async () => undefined }));
+vi.mock("@/services/bind-workspace.service", () => ({
+	bindWorkspaceKey: (actor: string) => ["bind-workspace", actor],
+	readBindWorkspace: async (client: QueryClient, actor: string) => {
+		const [common, personal, branches] = await Promise.all([
+			mock.list(),
+			mock.personal(),
+			mock.branches(),
+		]);
+		client.setQueryData(["shared-binds", actor], common);
+		client.setQueryData(["personal-binds", actor, actor], personal);
+		client.setQueryData(["bind-branches", actor], branches);
+		return {
+			categories: [],
+			folders: [],
+			binds: [...common, ...personal],
+			branches,
+		};
+	},
+}));
 vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));

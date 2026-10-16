@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	act,
 	cleanup,
@@ -46,7 +47,11 @@ vi.mock("@/shared/hooks/useToast", () => ({
 	useToast: () => ({ showToast: vi.fn() }),
 }));
 const initial = useKnowledgeStore.getState();
+let historyClient: QueryClient;
 beforeEach(() => {
+	historyClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	useKnowledgeStore.setState({
 		...initial,
 		categories: [],
@@ -82,6 +87,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	historyClient.clear();
 	useModalStore.setState({ activeModal: null });
 	useKnowledgeStore.setState(initial);
 	vi.restoreAllMocks();
@@ -97,7 +103,9 @@ function Workspace() {
 				<Tree nodes={tree} />
 			</div>
 			<BindViewer />
-			<ModalRoot />
+			<QueryClientProvider client={historyClient}>
+				<ModalRoot />
+			</QueryClientProvider>
 		</>
 	);
 }

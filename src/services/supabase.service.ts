@@ -1,4 +1,4 @@
-import type { Session } from "@supabase/supabase-js";
+import type { Session } from "@supabase/auth-js";
 import { safeAuthRedirect } from "@/app/auth-redirect";
 import { withTimeout } from "@/shared/lib/with-timeout";
 import { type AuthSession, useAuthStore } from "@/store/auth.store";
