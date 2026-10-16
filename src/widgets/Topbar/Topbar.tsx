@@ -1,6 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogIn, LogOut, Menu, Search, X } from "lucide-react";
+import {
+	LogIn,
+	LogOut,
+	PanelLeftClose,
+	PanelLeftOpen,
+	Search,
+	X,
+} from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -725,22 +732,24 @@ export function Topbar({
 					label={layout.showSidebar ? "Свернуть папки" : "Открыть навигацию"}
 					onClick={toggleSidebar}
 					style={!showKnowledgeControls ? { display: "none" } : undefined}
+					variant="ghost"
 					className="shrink-0 text-muted transition hover:bg-surface-elevated hover:text-foreground"
 				>
-					<Menu size={19} />
+					{layout.showSidebar ? (
+						<PanelLeftClose size={18} strokeWidth={1.6} aria-hidden="true" />
+					) : (
+						<PanelLeftOpen size={18} strokeWidth={1.6} aria-hidden="true" />
+					)}
 				</IconButton>
 
-				<div className="flex min-w-0 shrink-0 items-center gap-2">
-					<SupportOSLogo className="h-8 w-8" />
-					<div className="hidden min-w-0 sm:block">
-						<div className="truncate text-sm font-semibold leading-5">
-							SupportOS
-						</div>
-						<div className="truncate text-[11px] text-muted">
-							Рабочее пространство
-						</div>
-					</div>
-				</div>
+				<Link
+					to="/"
+					aria-label="SupportOS — на главную"
+					className="product-brand"
+				>
+					<SupportOSLogo className="h-7 w-7 shrink-0" />
+					<span className="hidden sm:inline">SupportOS</span>
+				</Link>
 
 				<nav className="product-spaces" aria-label="Пространства">
 					{[
@@ -753,7 +762,7 @@ export function Topbar({
 							<Link
 								key={item.to}
 								to={item.to}
-								className="space-tab"
+								className="product-space-link"
 								aria-current={
 									(
 										item.to === "/qc"
