@@ -7,11 +7,15 @@ import {
 	Import,
 	LayoutGrid,
 	type LucideIcon,
+	Menu,
 	Moon,
 	PanelRight,
 	Search,
-	Settings,
+	ShieldCheck,
+	Sun,
+	UserRound,
 	Users,
+	Wrench,
 	X,
 } from "lucide-react";
 import {
@@ -23,6 +27,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AmbientMotionButton } from "@/components/brand/AmbientBackground";
+import { IconButton } from "@/components/ui";
 import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { supportOSExportService } from "@/services/supportos-export.service";
 import { useToast } from "@/shared/hooks/useToast";
@@ -34,6 +39,7 @@ import {
 import { useAuthStore } from "@/store/auth.store";
 import type { Permission } from "../../../shared/access.js";
 import { can, canAccessPage, canAdmin } from "../../../shared/access.js";
+import "./workspace-navigation.css";
 
 type AppRoute =
 	| "/admin"
@@ -66,6 +72,7 @@ interface RouteToolItem {
 	to: AppRoute;
 	hash?: string;
 	permission?: Permission;
+	active?: boolean;
 }
 
 interface ActionToolItem {
@@ -187,11 +194,13 @@ export function ToolsMenu() {
 			...item,
 			to: item.to as AppRoute,
 			icon:
-				space.title === "Команда"
-					? Users
-					: space.title === "Личный кабинет"
-						? Settings
-						: BookOpen,
+				{
+					"Рабочее пространство": BookOpen,
+					Контент: LayoutGrid,
+					Команда: Users,
+					Инструменты: Wrench,
+					"Личный кабинет": UserRound,
+				}[space.title] ?? BookOpen,
 		})),
 	}));
 	groups.push({
@@ -201,7 +210,7 @@ export function ToolsMenu() {
 					{
 						type: "route",
 						label: "Администрирование",
-						icon: Settings,
+						icon: ShieldCheck,
 						to: "/admin",
 					},
 				]
@@ -261,7 +270,7 @@ export function ToolsMenu() {
 			{
 				type: "action",
 				label: resolvedTheme === "dark" ? "Светлая тема" : "Тёмная тема",
-				icon: Moon,
+				icon: resolvedTheme === "dark" ? Sun : Moon,
 				action: toggleTheme,
 			},
 		],
@@ -393,6 +402,11 @@ export function ToolsMenu() {
 										? "Бинды"
 										: group.title,
 								description: undefined,
+								active: group.items.some(
+									(item) =>
+										item.type === "route" &&
+										(pathname.replace(/\/+$/, "") || "/") === item.to,
+								),
 							};
 						}),
 				},
@@ -400,10 +414,11 @@ export function ToolsMenu() {
 			];
 	return (
 		<>
-			<button
+			<IconButton
 				ref={buttonRef}
 				type="button"
-				aria-label="Открыть меню пространства"
+				label="Открыть меню пространства"
+				title="Меню"
 				aria-haspopup="dialog"
 				aria-expanded={open}
 				aria-controls={menuId}
@@ -412,18 +427,17 @@ export function ToolsMenu() {
 					setOpen(true);
 					setThemeMode(getAppearanceSettings().themeMode);
 				}}
-				className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border bg-surface-elevated/50 font-medium text-foreground transition hover:bg-surface-elevated"
+				variant="ghost"
 			>
-				<PanelRight size={18} />
-				<span className="hidden sm:inline">Меню</span>
-			</button>
+				<Menu size={19} strokeWidth={1.6} aria-hidden="true" />
+			</IconButton>
 			{open &&
 				createPortal(
 					<div className="fixed inset-0 z-[80]">
 						<div
 							aria-hidden="true"
 							onClick={closeMenu}
-							className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+							className="absolute inset-0 bg-black/25"
 						/>
 						<div
 							ref={menuRef}
@@ -432,33 +446,31 @@ export function ToolsMenu() {
 							aria-modal="true"
 							aria-labelledby="workspace-menu-title"
 							onKeyDown={handleMenuKeyDown}
-							className="workspace-drawer absolute inset-y-0 right-0 flex w-full max-w-[360px] flex-col border-l border-border bg-surface text-foreground shadow-2xl"
+							className="workspace-menu tools-popover"
 						>
-							<header className="flex items-center gap-3 px-6 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
-								<span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface-elevated">
-									<LayoutGrid size={20} />
-								</span>
+							<header className="workspace-menu-heading">
 								<div className="min-w-0 flex-1">
-									<p className="text-[10px] uppercase tracking-[.2em] text-muted">
-										SupportOS
-									</p>
 									<h2
 										id="workspace-menu-title"
-										className="mt-1 text-lg font-semibold"
+										className="text-sm font-semibold"
 									>
-										Рабочее пространство
+										Меню
 									</h2>
+									<p className="mt-1 text-xs text-muted">
+										Разделы и инструменты
+									</p>
 								</div>
-								<button
+								<IconButton
 									type="button"
-									aria-label="Закрыть меню"
+									label="Закрыть меню"
 									onClick={closeMenu}
-									className="ui-button ui-button--ghost ui-button--icon flex   items-center justify-center  text-muted hover:bg-surface-elevated hover:text-foreground"
+									variant="ghost"
+									size="small"
 								>
-									<X size={20} />
-								</button>
+									<X size={17} strokeWidth={1.6} />
+								</IconButton>
 							</header>
-							<div className="relative mx-6 mb-4">
+							<div className="workspace-menu-search relative">
 								<Search
 									size={17}
 									className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 shrink-0 text-muted"
@@ -480,18 +492,25 @@ export function ToolsMenu() {
 										scrollPositions.current[actor ?? "guest"] =
 											e.currentTarget.scrollTop;
 								}}
-								className="supportos-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5"
+								className="workspace-menu-content supportos-scroll"
 							>
 								{displayGroups.map((group) => (
-									<section key={group.title} className="mb-3 p-1">
-										<h3 className="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted">
+									<section key={group.title} className="workspace-menu-section">
+										<h3>
 											<button
 												type="button"
-												className="w-full py-2 text-left"
+												className="workspace-menu-group"
 												aria-expanded={!!query || !collapsed[group.title]}
 												onClick={() => toggleGroup(group.title)}
 											>
 												{group.title}
+												<ChevronRight
+													size={12}
+													aria-hidden="true"
+													className={
+														!query && collapsed[group.title] ? "" : "rotate-90"
+													}
+												/>
 											</button>
 										</h3>
 										<div
@@ -502,8 +521,10 @@ export function ToolsMenu() {
 												const Icon = item.icon;
 												const active =
 													item.type === "route" &&
-													(pathname.replace(/\/+$/, "") || "/") === item.to &&
-													hash === (item.hash ?? "");
+													(item.active ??
+														((pathname.replace(/\/+$/, "") || "/") ===
+															item.to &&
+															hash === (item.hash ?? "")));
 												return (
 													<button
 														key={item.label}
@@ -515,26 +536,31 @@ export function ToolsMenu() {
 																? navigateTo(item.to, item.hash)
 																: item.action()
 														}
-														className={`drawer-link group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? "bg-surface-elevated text-foreground ring-1 ring-inset ring-border" : "hover:bg-surface-elevated"}`}
+														className="workspace-menu-link group"
 													>
-														<span
-															className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? "bg-accent/10" : "bg-background text-muted"}`}
-														>
-															<Icon size={18} strokeWidth={1.7} />
+														<span className="workspace-menu-icon">
+															<Icon
+																size={17}
+																strokeWidth={1.6}
+																aria-hidden="true"
+															/>
 														</span>
 														<span className="min-w-0 flex-1">
 															<span className="block text-sm font-medium">
 																{item.label}
 															</span>
-															<span className="mt-0.5 block text-xs leading-5 text-muted">
-																{item.description}
-															</span>
+															{item.description && (
+																<span className="mt-0.5 block text-xs leading-5 text-muted">
+																	{item.description}
+																</span>
+															)}
 														</span>
 														{active ? (
-															<span className="flex items-center gap-1 text-[10px] text-muted">
-																<Check size={13} />
-																Здесь
-															</span>
+															<Check
+																size={14}
+																aria-hidden="true"
+																className="text-muted"
+															/>
 														) : (
 															<ChevronRight
 																size={14}
@@ -553,8 +579,10 @@ export function ToolsMenu() {
 									</p>
 								)}
 							</nav>
-							<footer className="flex shrink-0 items-center justify-between border-t border-border px-6 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
-								<span className="text-xs text-muted">Esc — закрыть меню</span>
+							<footer className="workspace-menu-footer">
+								<span className="flex items-center gap-2 text-[11px] text-muted">
+									<kbd>Esc</kbd>Закрыть
+								</span>
 								<AmbientMotionButton />
 							</footer>
 						</div>

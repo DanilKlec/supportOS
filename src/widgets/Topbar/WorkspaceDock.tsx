@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, BookOpen, Calculator, Gift, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
+import "./workspace-navigation.css";
 
 const links = [
 	{
@@ -39,12 +40,9 @@ export function WorkspaceDock() {
 	);
 	if (!visibleLinks.length) return null;
 	return (
-		<footer className="workspace-dock relative z-30 shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
-			<div className="mx-auto flex min-h-16 max-w-screen-2xl items-center justify-center gap-2 px-3 sm:px-5">
-				<nav
-					aria-label="Рабочие справочники"
-					className="flex min-w-0 items-center gap-1 sm:gap-2"
-				>
+		<footer className="workspace-dock">
+			<div>
+				<nav aria-label="Рабочие справочники">
 					{visibleLinks.map(
 						({ to, hash: targetHash, label, short, icon: Icon }) => (
 							<Link
@@ -52,6 +50,7 @@ export function WorkspaceDock() {
 								to={to}
 								hash={targetHash}
 								aria-label={label}
+								title={label}
 								aria-current={
 									pathname === to &&
 									(targetHash
@@ -60,9 +59,9 @@ export function WorkspaceDock() {
 										? "page"
 										: undefined
 								}
-								className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-xs font-medium transition sm:px-4 sm:text-sm ${pathname === to && (targetHash ? hash.includes(targetHash) : !hash.includes("calculator")) ? "bg-accent/10 text-accent ring-1 ring-accent/20" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}
+								className="workspace-dock-link"
 							>
-								<Icon size={18} strokeWidth={1.7} />
+								<Icon size={17} strokeWidth={1.6} aria-hidden="true" />
 								<span className="hidden md:inline">{label}</span>
 								<span className="md:hidden">{short}</span>
 							</Link>
