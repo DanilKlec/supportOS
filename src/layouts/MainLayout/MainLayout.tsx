@@ -123,23 +123,24 @@ export function MainLayout({ children }: { children: ReactNode }) {
 					</div>
 				)}
 
-				<main
-					ref={scrollRoot}
-					data-page={pathname.replace(/\/+$/, "") || "/"}
-					className="workspace-main flex min-w-0 flex-1 flex-col overflow-hidden"
-				>
-					<SpaceFrame>{children}</SpaceFrame>
-				</main>
+				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+					<main
+						ref={scrollRoot}
+						data-page={pathname.replace(/\/+$/, "") || "/"}
+						className="workspace-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+					>
+						<SpaceFrame>{children}</SpaceFrame>
+					</main>
+					{(knowledgeRoute ||
+						[
+							"/bonuses",
+							"/bonus-tools",
+							"/project-emails",
+							"/agent-monitor",
+						].includes(pathname.replace(/\/+$/, ""))) && <WorkspaceDock />}
+				</div>
 				<SupportComposer key={actor} />
 			</div>
-
-			{(knowledgeRoute ||
-				[
-					"/bonuses",
-					"/bonus-tools",
-					"/project-emails",
-					"/agent-monitor",
-				].includes(pathname.replace(/\/+$/, ""))) && <WorkspaceDock />}
 		</div>
 	);
 }
