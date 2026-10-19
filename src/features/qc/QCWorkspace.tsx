@@ -1,5 +1,13 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
+import {
+	Copy,
+	FileText,
+	Gift,
+	Languages,
+	Mail,
+	type LucideIcon,
+} from "lucide-react";
 import { LoadingState } from "@/components/ui";
 import { OperationsWorkspace } from "@/features/operations/OperationsWorkspace";
 import { qcHashRedirects, qcSections } from "@/features/operations/sections";
@@ -13,6 +21,15 @@ import {
 	QCOverview,
 	ReviewInbox,
 } from "./QualityPages";
+import "./qc-workspace.css";
+
+const tabIcons: Record<string, LucideIcon> = {
+	binds: FileText,
+	emails: Mail,
+	bonuses: Gift,
+	duplicates: Copy,
+	languages: Languages,
+};
 
 // Keep related QC overview/review pages together; defer only whole workflows.
 const SharedBindsPage = lazy(() =>
@@ -100,17 +117,23 @@ export function QCWorkspace() {
 			{tabs.length > 0 && (
 				<>
 					<nav className="qc-tabs" aria-label="Инструменты раздела">
-						{tabs.map((t) => (
-							<button
-								key={t.id}
-								type="button"
-								className="space-tab"
-								aria-pressed={active === t.id}
-								onClick={() => select(t.id)}
-							>
-								{t.label}
-							</button>
-						))}
+						{tabs.map((t) => {
+							const Icon = tabIcons[t.id];
+							return (
+								<button
+									key={t.id}
+									type="button"
+									className="space-tab"
+									aria-pressed={active === t.id}
+									onClick={() => select(t.id)}
+								>
+									{Icon && (
+										<Icon size={15} strokeWidth={1.7} aria-hidden="true" />
+									)}
+									{t.label}
+								</button>
+							);
+						})}
 					</nav>
 					<label className="ui-field qc-tab-select">
 						Инструмент

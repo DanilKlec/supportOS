@@ -1,0 +1,212 @@
+.ops-workspace--qc .ops-sidebar {
+	width: 248px;
+	padding: 16px 12px 12px;
+	background: color-mix(
+		in srgb,
+		var(--color-surface) 60%,
+		var(--color-background)
+	);
+}
+.ops-workspace--qc .ops-back {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: fit-content;
+	padding: 6px 10px;
+	transition: color 150ms;
+}
+.ops-workspace--qc .ops-back:hover {
+	color: var(--color-foreground);
+}
+.ops-workspace--qc .ops-workspace-title {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	padding: 24px 8px 26px;
+}
+.qc-brand-mark {
+	display: grid;
+	place-items: center;
+	width: 39px;
+	height: 42px;
+	flex: none;
+	border: 1px solid var(--color-border);
+	border-radius: 12px;
+	background: var(--color-surface-elevated);
+	color: var(--color-foreground);
+}
+.ops-workspace--qc .ops-workspace-title p {
+	font-size: 9px;
+	letter-spacing: 0.13em;
+}
+.ops-workspace--qc .ops-workspace-title h1 {
+	font-size: 15px;
+	font-weight: 600;
+	margin-top: 5px;
+}
+.ops-workspace--qc .ops-sidebar nav section {
+	margin: 0;
+}
+.ops-workspace--qc .ops-nav {
+	min-height: 44px;
+	gap: 10px;
+	padding: 11px 12px;
+	margin: 4px 0;
+	font-size: 12px;
+	transition:
+		color 150ms,
+		background 150ms,
+		box-shadow 150ms;
+}
+.ops-workspace--qc .ops-nav > svg {
+	flex: none;
+}
+.ops-workspace--qc .ops-nav .qc-nav-arrow {
+	margin-left: auto;
+	opacity: 0;
+	transform: translateX(-3px);
+	transition:
+		opacity 150ms,
+		transform 150ms;
+}
+.ops-workspace--qc .ops-nav[aria-current="page"] {
+	background: var(--color-surface-elevated);
+	box-shadow: inset 0 0 0 1px var(--color-border);
+	color: var(--color-foreground);
+}
+.ops-workspace--qc
+	.ops-nav:is(:hover, :focus-visible, [aria-current="page"])
+	.qc-nav-arrow {
+	opacity: 0.65;
+	transform: none;
+}
+.ops-workspace--qc .ops-sidebar-footer {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+	padding: 15px 9px 4px;
+	border: 0;
+	border-top: 1px solid var(--color-border);
+	border-radius: 0;
+	background: transparent;
+}
+.ops-workspace--qc .ops-sidebar-footer > svg {
+	flex: none;
+	margin-top: 1px;
+	color: var(--color-muted);
+}
+.ops-workspace--qc .ops-sidebar-footer strong {
+	font-size: 11px;
+	font-weight: 500;
+}
+.ops-workspace--qc .ops-sidebar-footer p {
+	font-size: 10px;
+	line-height: 1.7;
+}
+.ops-workspace--qc .qc-tabs .space-tab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+.qc-metric-heading {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 36px;
+}
+.qc-metric-heading > span {
+	flex: 1;
+	line-height: 1.5;
+}
+.qc-metric-icon {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	flex: none;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface-elevated);
+	color: var(--color-foreground);
+}
+.qc-metric-arrow {
+	flex: none;
+	color: var(--color-muted);
+	opacity: 0.5;
+	transition:
+		opacity 150ms,
+		transform 150ms;
+}
+.qc-metrics > button {
+	transition:
+		background 150ms,
+		border-color 150ms;
+}
+.qc-metrics > button:hover {
+	border-color: color-mix(
+		in srgb,
+		var(--color-foreground) 25%,
+		var(--color-border)
+	);
+}
+.qc-metrics > button:hover .qc-metric-arrow {
+	opacity: 1;
+	transform: translate(1px, -1px);
+}
+.qc-metrics > button > strong {
+	margin: 17px 0 4px;
+	font-size: 30px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.04em;
+}
+.qc-metrics > button > small {
+	font-size: 11px;
+}
+@media (max-width: 800px) {
+	.ops-workspace--qc {
+		flex-direction: column;
+	}
+	.ops-workspace--qc .ops-sidebar {
+		display: block;
+		width: 100%;
+		overflow: hidden;
+		padding: 7px 10px;
+		border-right: 0;
+		border-bottom: 1px solid var(--color-border);
+	}
+	.ops-workspace--qc
+		.ops-sidebar
+		:is(.ops-back, .ops-workspace-title, .ops-sidebar-footer),
+	.ops-workspace--qc .ops-mobile-nav {
+		display: none;
+	}
+	.ops-workspace--qc .ops-sidebar nav section {
+		display: flex;
+		gap: 4px;
+		overflow-x: auto;
+		padding: 2px;
+	}
+	.ops-workspace--qc .ops-nav {
+		flex: none;
+		width: auto;
+		min-height: 38px;
+		margin: 0;
+		padding: 8px 10px;
+		font-size: 11px;
+		white-space: nowrap;
+	}
+	.ops-workspace--qc .ops-nav .qc-nav-arrow {
+		display: none;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.ops-workspace--qc .ops-nav,
+	.ops-workspace--qc .ops-back,
+	.ops-workspace--qc .qc-nav-arrow,
+	.qc-metrics > button,
+	.qc-metric-arrow {
+		transition: none;
+	}
+}

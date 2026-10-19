@@ -1,5 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import {
+	ArrowUpRight,
+	CircleHelp,
+	Clock3,
+	Copy,
+	Inbox,
+	Languages,
+	MessageSquareText,
+} from "lucide-react";
 import { useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { languages } from "@/entities/language";
@@ -86,36 +95,42 @@ export function QCOverview({ onSelect }: { onSelect: (hash: string) => void }) {
 	const cards = [
 		{
 			label: "Требуют проверки",
+			icon: Inbox,
 			value: items.length,
 			ready: !!proposals.data && !!signals.data,
 			hash: "inbox",
 		},
 		{
 			label: "Предложения операторов",
+			icon: MessageSquareText,
 			value: items.filter((i) => i.kind === "proposal").length,
 			ready: !!proposals.data,
 			hash: "proposals",
 		},
 		{
 			label: "Пробелы в знаниях",
+			icon: CircleHelp,
 			value: items.filter((i) => i.kind === "gap").length,
 			ready: !!signals.data,
 			hash: "gaps",
 		},
 		{
 			label: "Устаревшие материалы",
+			icon: Clock3,
 			value: items.filter((i) => i.kind === "outdated").length,
 			ready: !!signals.data,
 			hash: "outdated",
 		},
 		{
 			label: "Возможные дубли",
+			icon: Copy,
 			value: duplicates.length,
 			ready: !!materials.data,
 			hash: "duplicates",
 		},
 		{
 			label: "Нет нужных переводов",
+			icon: Languages,
 			value: translations.length,
 			ready: !!materials.data,
 			hash: "languages",
@@ -129,19 +144,37 @@ export function QCOverview({ onSelect }: { onSelect: (hash: string) => void }) {
 			<div className="qc-metrics">
 				{cards
 					.filter((c) => c.ready)
-					.map((c) => (
-						<button key={c.hash} type="button" onClick={() => onSelect(c.hash)}>
-							<span>{c.label}</span>
-							<strong>{c.value}</strong>
-							<small>
-								{c.hash === "duplicates"
-									? "Групп похожих материалов"
-									: c.hash === "languages"
-										? "Материалов"
-										: "В доступной выборке"}
-							</small>
-						</button>
-					))}
+					.map((c) => {
+						const Icon = c.icon;
+						return (
+							<button
+								key={c.hash}
+								type="button"
+								onClick={() => onSelect(c.hash)}
+							>
+								<div className="qc-metric-heading">
+									<div className="qc-metric-icon">
+										<Icon size={19} strokeWidth={1.6} aria-hidden="true" />
+									</div>
+									<span>{c.label}</span>
+									<ArrowUpRight
+										className="qc-metric-arrow"
+										size={17}
+										strokeWidth={1.6}
+										aria-hidden="true"
+									/>
+								</div>
+								<strong>{c.value}</strong>
+								<small>
+									{c.hash === "duplicates"
+										? "Групп похожих материалов"
+										: c.hash === "languages"
+											? "Материалов"
+											: "В доступной выборке"}
+								</small>
+							</button>
+						);
+					})}
 			</div>
 			<p className="ops-note">
 				Очередь учитывает последние 100 отметок материалов и 100 сообщений о

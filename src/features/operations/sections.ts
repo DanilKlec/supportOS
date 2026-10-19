@@ -1,4 +1,12 @@
 import type { WorkspaceSection } from "@/features/operations/OperationsWorkspace";
+import {
+	BookOpen,
+	History,
+	Inbox,
+	LayoutDashboard,
+	ScanSearch,
+	type LucideIcon,
+} from "lucide-react";
 export const adminSections: WorkspaceSection[] = [
 	[
 		"overview",
@@ -164,6 +172,13 @@ export const adminHashRedirects: Record<string, string> = {
 	flags: "overview",
 };
 
+const qcIcons: Record<string, LucideIcon> = {
+	overview: LayoutDashboard,
+	inbox: Inbox,
+	materials: BookOpen,
+	problems: ScanSearch,
+	history: History,
+};
 export const qcSections: WorkspaceSection[] = [
 	[
 		"overview",
@@ -195,7 +210,13 @@ export const qcSections: WorkspaceSection[] = [
 		"Контроль качества",
 		"История изменений и версии материалов.",
 	],
-].map(([id, label, group, description]) => ({ id, label, group, description }));
+].map(([id, label, group, description]) => ({
+	id,
+	label,
+	group,
+	description,
+	icon: qcIcons[id],
+}));
 
 export const qcHashRedirects: Record<string, string> = {
 	candidates: "inbox",

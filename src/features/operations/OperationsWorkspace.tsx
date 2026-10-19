@@ -1,4 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import {
+	ArrowLeft,
+	ChevronRight,
+	ShieldCheck,
+	type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { useAuthStore } from "@/store/auth.store";
@@ -10,6 +16,7 @@ export type WorkspaceSection = {
 	description: string;
 	parent?: string;
 	hiddenFromNavigation?: boolean;
+	icon?: LucideIcon;
 };
 export function OperationsWorkspace({
 	area,
@@ -40,21 +47,33 @@ export function OperationsWorkspace({
 	const current = available.find((s) => s.id === active);
 	return (
 		<div
-			className={`ops-workspace${wide ? " ops-workspace--wide" : ""}${fit ? " ops-workspace--library" : ""}`}
+			className={`ops-workspace${area === "qc" ? " ops-workspace--qc" : ""}${wide ? " ops-workspace--wide" : ""}${fit ? " ops-workspace--library" : ""}`}
 		>
 			<aside className="ops-sidebar">
 				<Link to="/" className="ops-back">
-					← Рабочее пространство
+					{area === "qc" ? (
+						<ArrowLeft size={15} strokeWidth={1.7} aria-hidden="true" />
+					) : (
+						"← "
+					)}
+					Рабочее пространство
 				</Link>
 				<div className="ops-workspace-title">
-					<p>
-						{area === "admin"
-							? "Рабочее пространство платформы"
-							: "Контроль качества"}
-					</p>
-					<h1>
-						{area === "admin" ? "Администрирование" : "Контроль качества"}
-					</h1>
+					{area === "qc" && (
+						<div className="qc-brand-mark">
+							<ShieldCheck size={21} strokeWidth={1.5} aria-hidden="true" />
+						</div>
+					)}
+					<div>
+						<p>
+							{area === "admin"
+								? "Рабочее пространство платформы"
+								: "Quality Control"}
+						</p>
+						<h1>
+							{area === "admin" ? "Администрирование" : "Контроль качества"}
+						</h1>
+					</div>
 				</div>
 				<nav
 					aria-label={
@@ -63,33 +82,59 @@ export function OperationsWorkspace({
 				>
 					{[...new Set(navigation.map((s) => s.group))].map((group) => (
 						<section key={group}>
-							<h2>{group}</h2>
+							<h2 className={area === "qc" ? "sr-only" : undefined}>{group}</h2>
 							{navigation
 								.filter((s) => s.group === group)
-								.map((s) => (
-									<button
-										type="button"
-										key={s.id}
-										className="ops-nav"
-										aria-current={
-											s.id === (current?.parent ?? active) ? "page" : undefined
-										}
-										onClick={() => onSelect(s.id)}
-									>
-										<span aria-hidden="true" />
-										{s.label}
-									</button>
-								))}
+								.map((s) => {
+									const Icon = s.icon;
+									return (
+										<button
+											type="button"
+											key={s.id}
+											className="ops-nav"
+											aria-current={
+												s.id === (current?.parent ?? active)
+													? "page"
+													: undefined
+											}
+											onClick={() => onSelect(s.id)}
+										>
+											{Icon ? (
+												<Icon size={18} strokeWidth={1.6} aria-hidden="true" />
+											) : (
+												<span aria-hidden="true" />
+											)}
+											{s.label}
+											{area === "qc" && (
+												<ChevronRight
+													className="qc-nav-arrow"
+													size={14}
+													strokeWidth={1.6}
+													aria-hidden="true"
+												/>
+											)}
+										</button>
+									);
+								})}
 						</section>
 					))}
 				</nav>
 				<div className="ops-sidebar-footer">
-					<strong>
-						{area === "admin"
-							? "Система и контроль доступов"
-							: "Качество рабочих материалов"}
-					</strong>
-					<p>Доступ по правам вашей учётной записи</p>
+					{area === "qc" && (
+						<ShieldCheck size={17} strokeWidth={1.6} aria-hidden="true" />
+					)}
+					<div>
+						<strong>
+							{area === "admin"
+								? "Система и контроль доступов"
+								: "Качество рабочих материалов"}
+						</strong>
+						<p>
+							{area === "qc"
+								? "Бинды, почты и бонусы команды"
+								: "Доступ по правам вашей учётной записи"}
+						</p>
+					</div>
 				</div>
 			</aside>
 			<div className="ops-content">
