@@ -14,7 +14,6 @@ import {
 	Search,
 	Star,
 	Tag,
-	UserRound,
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -22,8 +21,7 @@ import { Button, IconButton, Input } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { KnowledgeFolder, KnowledgeTreeNode } from "@/entities/knowledge";
 import { usePreference } from "@/features/productivity/preferences";
-import { personalTree } from "@/features/shared-binds/shared-tree";
-import { WorkspaceSharedTree } from "@/features/shared-binds/WorkspaceSharedBinds";
+import { WorkspaceTree } from "@/features/shared-binds/WorkspaceSharedBinds";
 import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { useViewState } from "@/shared/hooks/useViewState";
@@ -31,8 +29,6 @@ import { scoreTextSearch } from "@/shared/lib/bind-search";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
-import { Tree } from "./Tree";
-import { countTreeBinds } from "./tree-utils";
 import "./workspace-tree.css";
 
 function getBindTitle(bind: Bind, language: string) {
@@ -129,7 +125,6 @@ export function Sidebar({
 	const { showToast } = useToast();
 	const layout = useWorkspaceStore((s) => s.layout);
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
-	const tree = useKnowledgeStore((s) => s.tree);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const actor = useAuthStore((s) => s.session?.user.id);
 	const archiveCount = binds.filter(
@@ -161,15 +156,6 @@ export function Sidebar({
 				.filter(Boolean)
 				.sort((a, b) => a.localeCompare(b)),
 		[binds],
-	);
-	const filteredTree = useMemo(
-		() =>
-			filterTree(
-				personalTree(tree, categories, folders),
-				treeSearch,
-				selectedTag,
-			),
-		[tree, categories, folders, treeSearch, selectedTag],
 	);
 	const treeSearchActive = treeSearch.trim().length > 0 || Boolean(selectedTag);
 
@@ -655,7 +641,7 @@ export function Sidebar({
 				</div>
 
 				<div className="workspace-library-scroll supportos-tree-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-					<WorkspaceSharedTree
+					<WorkspaceTree
 						onNavigate={onNavigate}
 						filterNodes={(nodes) => filterTree(nodes, treeSearch, selectedTag)}
 						forceExpanded={treeSearchActive}
@@ -663,27 +649,6 @@ export function Sidebar({
 						onToggleBindSelection={toggleSelectedBind}
 						onClearBindSelection={() => setSelectedBindIds([])}
 					/>
-					{filteredTree.length > 0 && (
-						<section
-							className="workspace-tree-section"
-							aria-label="Личные материалы"
-						>
-							<div className="workspace-tree-section-heading">
-								<UserRound size={14} />
-								<span>Личные</span>
-								<small>{countTreeBinds(filteredTree)}</small>
-							</div>
-							<Tree
-								nodes={filteredTree}
-								label="Дерево личных материалов"
-								forceExpanded={treeSearchActive}
-								selectedBindIds={selectedBindIds}
-								onToggleBindSelection={toggleSelectedBind}
-								onClearBindSelection={() => setSelectedBindIds([])}
-								onOpenItem={onNavigate}
-							/>
-						</section>
-					)}
 				</div>
 				<div className="workspace-library-bottom shrink-0 border-t border-border px-2 py-2">
 					<button

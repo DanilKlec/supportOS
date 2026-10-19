@@ -7,6 +7,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { knowledgeService } from "@/services/knowledge.service";
@@ -14,6 +15,8 @@ import { useModalStore } from "@/shared/modals/modal.store";
 import { useKnowledgeStore } from "@/store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBindLinksStore } from "@/store/bind-links.store";
+import { Sidebar } from "@/widgets/Sidebar/Sidebar";
+import { BindWorkspace } from "@/widgets/Workspace/BindWorkspace";
 
 const mock = vi.hoisted(() => ({
 	accounts: vi.fn(),
@@ -28,6 +31,10 @@ const mock = vi.hoisted(() => ({
 	savePersonal: vi.fn(),
 	resetPersonal: vi.fn(),
 	copy: vi.fn(),
+}));
+vi.mock("@tanstack/react-router", () => ({
+	useNavigate: () => vi.fn(),
+	useRouterState: () => "/",
 }));
 vi.mock("@/services/authenticated-fetch", () => ({
 	authenticatedFetch: mock.accounts,
@@ -198,6 +205,70 @@ it("copies the displayed branch and language after switching between mine and co
 	expect(mock.copy).toHaveBeenLastCalledWith("Исходный текст");
 	expect(mock.save).not.toHaveBeenCalled();
 	expect(mock.savePersonal).not.toHaveBeenCalled();
+});
+
+it("opens a single material from the unified tree and switches personal and common branches inside the bind", async () => {
+	const own = {
+		...base,
+		id: "personal",
+		ownerId: "support",
+		sourceBindId: base.id,
+		translations: [
+			{ ...base.translations[0], title: "Мой вариант", content: "Мой ответ" },
+		],
+	};
+	mock.personal.mockResolvedValue([own]);
+	useKnowledgeStore
+		.getState()
+		.setKnowledge({
+			binds: [own],
+			expandedFolders: ["shared"],
+			openedTabs: [],
+			activeTab: undefined,
+			selectedBind: undefined,
+		});
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		render(
+			<QueryClientProvider client={client}>
+				<WorkspaceSharedBindsSync />
+				<Sidebar />
+				<BindWorkspace />
+			</QueryClientProvider>,
+		);
+		const tree = await screen.findByRole("tree", { name: "Дерево материалов" });
+		fireEvent.click(
+			await within(tree).findByRole("button", { name: "Мой вариант" }),
+		);
+		await screen.findByRole("heading", { name: "Мой вариант", level: 1 });
+		expect(screen.getAllByRole("tree")).toHaveLength(1);
+		expect(
+			within(tree).queryByRole("button", { name: "Общий ответ" }),
+		).toBeNull();
+		fireEvent.click(
+			within(screen.getByRole("group", { name: "Ветка бинда" })).getByRole(
+				"button",
+				{ name: "Общая" },
+			),
+		);
+		await screen.findByRole("heading", { name: "Общий ответ", level: 1 });
+		await waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: "Моя" }).hasAttribute("disabled"),
+			).toBe(false),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Моя" }));
+		await screen.findByRole("heading", { name: "Мой вариант", level: 1 });
+		expect(
+			within(tree).getAllByRole("button", { name: "Мой вариант" }),
+		).toHaveLength(1);
+		expect(mock.save).not.toHaveBeenCalled();
+		expect(mock.savePersonal).not.toHaveBeenCalled();
+	} finally {
+		client.clear();
+	}
 });
 
 it("runs library hotkeys against the linked record, and E copies a received answer into my editor", async () => {

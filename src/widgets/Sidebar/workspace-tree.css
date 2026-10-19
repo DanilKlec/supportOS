@@ -80,40 +80,6 @@
 	padding: 0 8px 12px;
 	scrollbar-width: thin;
 }
-.workspace-tree-section + .workspace-tree-section {
-	margin-top: 12px;
-	padding-top: 8px;
-	border-top: 1px solid var(--color-border);
-}
-.workspace-tree-section-toggle,
-.workspace-tree-section-heading {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-	min-height: 34px;
-	padding: 7px 8px;
-	color: var(--color-muted);
-	font-size: 11px;
-	text-align: left;
-	border-radius: 7px;
-}
-.workspace-tree-section-toggle {
-	cursor: pointer;
-}
-.workspace-tree-section-toggle:hover {
-	color: var(--color-foreground);
-	background: var(--color-surface-elevated);
-}
-.workspace-tree-section-toggle > svg,
-.workspace-tree-section-heading > svg {
-	flex: none;
-}
-.workspace-tree-section-toggle > small,
-.workspace-tree-section-heading > small {
-	margin-left: auto;
-	font-size: 10px;
-}
 .workspace-tree {
 	padding: 3px 0;
 }

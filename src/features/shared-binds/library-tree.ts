@@ -1,6 +1,8 @@
 import type { Bind } from "@/entities/bind";
 import {
 	buildKnowledgeTree,
+	type KnowledgeCategory,
+	type KnowledgeFolder,
 	type KnowledgeTreeNode,
 } from "@/entities/knowledge";
 import type { LibraryStructure } from "@/services/shared-library.service";
@@ -34,7 +36,7 @@ export function descendants(id: string, structure: LibraryStructure) {
 	return found;
 }
 export function buildLibraryTree(
-	structure: LibraryStructure,
+	structure: { categories: KnowledgeCategory[]; folders: KnowledgeFolder[] },
 	binds: Bind[],
 	language: string,
 	ownerId?: string,
@@ -75,7 +77,6 @@ export function buildLibraryTree(
 			name: "Материалы без раздела",
 			order: 999999,
 			ownerId: null,
-			updatedAt: "",
 		});
 	const tree = buildKnowledgeTree(
 		categories,

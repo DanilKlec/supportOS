@@ -356,7 +356,7 @@ it("does not apply a confirmed response to another account after a session switc
 	).toBe("old");
 });
 
-it("creates a support bind from a common folder menu only in the personal tree, including after reload", async () => {
+it("creates a support bind in the same folder of the unified tree while keeping its personal ownership after reload", async () => {
 	useAuthStore.setState({
 		session: {
 			user: {
@@ -401,18 +401,11 @@ it("creates a support bind from a common folder menu only in the personal tree, 
 		categoryId: "cat",
 		folderId: "old",
 	});
-	expect(
-		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
-			"button",
-			{ name: "Мой новый ответ" },
-		),
-	).toBeNull();
-	expect(
-		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
-			"button",
-			{ name: "Мой новый ответ" },
-		),
-	).toBeTruthy();
+	expect(children("Исходная")).toContain("Мой новый ответ");
+	expect(screen.getAllByRole("tree")).toHaveLength(1);
+	expect(screen.getAllByRole("button", { name: "Исходная" })).toHaveLength(1);
+	expect(screen.queryByRole("region", { name: "Личные материалы" })).toBeNull();
+	expect(screen.queryByRole("region", { name: "Общие бинды" })).toBeNull();
 	expect(rows.filter((b) => b.ownerId === null)).toEqual(commonBefore);
 	unmount();
 	useKnowledgeStore
@@ -420,21 +413,14 @@ it("creates a support bind from a common folder menu only in the personal tree, 
 		.setKnowledge({ categories, folders, binds: rows });
 	mount();
 	await screen.findByRole("button", { name: "Ответ a" });
+	expect(children("Исходная")).toContain("Мой новый ответ");
+	expect(screen.getAllByRole("tree")).toHaveLength(1);
 	expect(
-		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
-			"button",
-			{ name: "Мой новый ответ" },
-		),
-	).toBeTruthy();
-	expect(
-		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
-			"button",
-			{ name: "Мой новый ответ" },
-		),
-	).toBeNull();
+		screen.getAllByRole("button", { name: "Мой новый ответ" }),
+	).toHaveLength(1);
 });
 
-it("places a support move into a common folder only under the employee's personal tree", async () => {
+it("places a support move once in the unified destination folder while retaining the common source", async () => {
 	useAuthStore.setState({
 		session: {
 			user: {
@@ -462,19 +448,10 @@ it("places a support move into a common folder only under the employee's persona
 	const { client } = mount();
 	await screen.findByRole("button", { name: "Ответ a" });
 	drag("a", "Новая папка");
-	await waitFor(() =>
-		expect(
-			within(
-				screen.getByRole("region", { name: "Личные материалы" }),
-			).getByRole("button", { name: "Ответ a" }),
-		).toBeTruthy(),
-	);
-	expect(
-		within(screen.getByRole("region", { name: "Общие бинды" })).queryByRole(
-			"button",
-			{ name: "Ответ a" },
-		),
-	).toBeNull();
+	await waitFor(() => expect(children("Новая папка")).toContain("Ответ a"));
+	expect(children("Исходная")).not.toContain("Ответ a");
+	expect(screen.getAllByRole("button", { name: "Ответ a" })).toHaveLength(1);
+	expect(screen.getAllByRole("tree")).toHaveLength(1);
 	expect(rows.filter((b) => b.ownerId === null)).toEqual(original);
 	expect(client.getQueryData<Bind[]>(["shared-binds", "actor"])).toEqual(
 		original,
@@ -482,12 +459,8 @@ it("places a support move into a common folder only under the employee's persona
 	await act(async () => {
 		await client.invalidateQueries({ queryKey: ["shared-binds", "actor"] });
 	});
-	expect(
-		within(screen.getByRole("region", { name: "Личные материалы" })).getByRole(
-			"button",
-			{ name: "Ответ a" },
-		),
-	).toBeTruthy();
+	expect(children("Новая папка")).toContain("Ответ a");
+	expect(screen.getAllByRole("button", { name: "Ответ a" })).toHaveLength(1);
 });
 
 it("uses the current cloud location when a colleague moved a common bind after local hydration", async () => {

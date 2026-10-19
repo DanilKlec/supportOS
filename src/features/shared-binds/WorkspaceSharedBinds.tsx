@@ -1,12 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-	ChevronDown,
-	ChevronRight,
-	Copy,
-	Pencil,
-	RotateCcw,
-	Users,
-} from "lucide-react";
+import { Copy, Pencil, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -32,14 +25,14 @@ import { useAuthStore } from "@/store/auth.store";
 import { EMPTY_BIND_LINKS, useBindLinksStore } from "@/store/bind-links.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { Tree } from "@/widgets/Sidebar/Tree";
-import { countTreeBinds } from "@/widgets/Sidebar/tree-utils";
 import { can } from "../../../shared/access.js";
 import { BindLinkEditor } from "./BindLinkEditor";
 import { BindProposals } from "./BindProposals";
 import { reconcileBindLinks } from "./bind-links";
 import { SharedBindEditor } from "./SharedBindEditor";
 import { ShareRecipientPicker } from "./ShareRecipientPicker";
-import { buildSharedTree } from "./shared-tree";
+import { buildLibraryTree } from "./library-tree";
+import { workspaceTreeBinds } from "./workspace-tree";
 
 export function useWorkspaceSharedBinds({ poll = false } = {}) {
 	const user = useAuthStore((s) => s.session?.user);
@@ -204,7 +197,7 @@ export function WorkspaceSharedBindsSync() {
 	return null;
 }
 
-export function WorkspaceSharedTree({
+export function WorkspaceTree({
 	onNavigate,
 	filterNodes = (nodes) => nodes,
 	forceExpanded = false,
@@ -223,51 +216,35 @@ export function WorkspaceSharedTree({
 	const locals = useKnowledgeStore((s) => s.binds);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
-	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
-	const [expanded, setExpanded] = useState(true);
-	// Include newly created runtime binds until the common query refreshes.
-	// Conversely, never hide an existing common bind just because the snapshot contains it.
-	const items = [
-		...(common.data ?? []).filter(
-			(base) =>
-				!locals.some(
-					(local) => local.ownerId === user?.id && local.id === links[base.id],
+	const language = useKnowledgeStore((s) => s.language);
+	const tree = useMemo(
+		() =>
+			buildLibraryTree(
+				{ categories, folders },
+				workspaceTreeBinds(
+					common.data ?? [],
+					personal.data ?? [],
+					locals,
+					links,
+					user?.id,
 				),
-		),
-		...locals.filter(
-			(b) =>
-				b.ownerId === null &&
-				!(common.data ?? []).some((base) => base.id === b.id),
-		),
-	];
-	const nodes = filterNodes(
-		buildSharedTree(
+				language,
+				user?.id,
+			),
+		[
 			categories,
 			folders,
-			items.map((base) => ({
-				...base,
-				// Keep existing personal-link tab IDs while retaining the common location.
-				id: remoteBinds.find((b) => b.sourceBindId === base.id)?.id ?? base.id,
-			})),
-		),
+			common.data,
+			personal.data,
+			locals,
+			links,
+			user?.id,
+			language,
+		],
 	);
+	const nodes = filterNodes(tree);
 	return (
-		<section aria-label="Общие бинды" className="workspace-tree-section">
-			<button
-				type="button"
-				aria-expanded={expanded || forceExpanded}
-				onClick={() => setExpanded((value) => !value)}
-				className="workspace-tree-section-toggle"
-			>
-				{expanded || forceExpanded ? (
-					<ChevronDown size={14} />
-				) : (
-					<ChevronRight size={14} />
-				)}
-				<Users size={14} />
-				<span>Общие</span>
-				<small>{countTreeBinds(nodes)}</small>
-			</button>
+		<section aria-label="Материалы" className="workspace-tree-section">
 			{(common.error || personal.error) && (
 				<p role="alert" className="p-2 text-xs text-red-400">
 					{(common.error ?? personal.error)?.message}
@@ -276,25 +253,20 @@ export function WorkspaceSharedTree({
 			{common.isPending && (
 				<p className="p-2 text-xs text-muted">Загрузка биндов…</p>
 			)}
-			{(expanded || forceExpanded) && (
-				<Tree
-					nodes={nodes}
-					label="Дерево общих материалов"
-					forceExpanded={forceExpanded}
-					selectedBindIds={selectedBindIds}
-					onToggleBindSelection={onToggleBindSelection}
-					onClearBindSelection={onClearBindSelection}
-					onOpenItem={onNavigate}
-				/>
+			<Tree
+				nodes={nodes}
+				label="Дерево материалов"
+				forceExpanded={forceExpanded}
+				selectedBindIds={selectedBindIds}
+				onToggleBindSelection={onToggleBindSelection}
+				onClearBindSelection={onClearBindSelection}
+				onOpenItem={onNavigate}
+			/>
+			{!nodes.length && !common.isPending && !common.error && (
+				<p className="workspace-tree-empty">
+					{forceExpanded ? "Ничего не найдено" : "Пока нет материалов"}
+				</p>
 			)}
-			{(expanded || forceExpanded) &&
-				!nodes.length &&
-				!common.isPending &&
-				!common.error && (
-					<p className="workspace-tree-empty">
-						{forceExpanded ? "Ничего не найдено" : "В общей базе пока пусто"}
-					</p>
-				)}
 		</section>
 	);
 }
