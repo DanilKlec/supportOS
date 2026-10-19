@@ -49,6 +49,30 @@ function enqueueKnowledgeMutation(body: Record<string, unknown>) {
 
 // In-memory request sequencing, not a persistent/local fallback write queue.
 export const databaseKnowledgeService = {
+	setPersonalBindArchived(id: string, archived: boolean): Promise<Bind> {
+		const accountId = supabaseService.getSession()?.user.id;
+		const request = databaseMutationQueue.then(async () => {
+			if (!accountId || supabaseService.getSession()?.user.id !== accountId)
+				throw new Error("Аккаунт изменился. Повторите действие");
+			const bind = await knowledgeApi<Bind>({
+				action: "personal-archive",
+				id,
+				archived,
+			});
+			if (
+				bind.id !== id ||
+				bind.ownerId !== accountId ||
+				bind.archived !== archived
+			)
+				throw new Error("Сервер не подтвердил изменение личного архива");
+			return bind;
+		});
+		databaseMutationQueue = request.then(
+			() => undefined,
+			() => undefined,
+		);
+		return request;
+	},
 	transferBinds(payload: BindTransferPayload): Promise<BindTransferResult> {
 		const accountId = supabaseService.getSession()?.user.id;
 		const request = databaseMutationQueue.then(async () => {

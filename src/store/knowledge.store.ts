@@ -74,7 +74,19 @@ function unique(ids: string[]) {
 }
 
 function getBindIds(binds: Bind[]) {
-	return new Set(binds.filter((b) => !b.archived).map((b) => b.id));
+	const archived = new Set(binds.filter((b) => b.archived).map((b) => b.id));
+	return new Set(binds.filter((b) => !archived.has(b.id)).map((b) => b.id));
+}
+
+function getActiveBind(
+	state: Pick<KnowledgeState, "binds" | "remoteBinds">,
+	id: string,
+) {
+	if (state.binds.some((bind) => bind.id === id && bind.archived))
+		return undefined;
+	return [...state.remoteBinds, ...state.binds].find(
+		(bind) => bind.id === id && !bind.archived,
+	);
 }
 
 function getFolderAndCategoryIds(
@@ -235,9 +247,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
 	openBind: (id) => {
 		const state = get();
-		const bind = [...state.remoteBinds, ...state.binds].find(
-			(b) => b.id === id,
-		);
+		const bind = getActiveBind(state, id);
 		if (!bind) return;
 
 		const openedTabs = state.openedTabs.includes(id)
@@ -356,6 +366,5 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 			),
 		})),
 
-	getBind: (id) =>
-		[...get().remoteBinds, ...get().binds].find((b) => b.id === id),
+	getBind: (id) => getActiveBind(get(), id),
 }));

@@ -6,16 +6,21 @@ import { knowledgeService } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
 import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { useKnowledgeStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
 
 export const Route = createFileRoute("/archive")({
 	component: ArchivePage,
 });
 
-function ArchivePage() {
+export function ArchivePage() {
 	const navigate = useNavigate();
 	const { showToast } = useToast();
 	const [query, setQuery] = useState("");
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+	const [pendingRestoreId, setPendingRestoreId] = useState<string | null>(null);
+	const [error, setError] = useState("");
+	const [languages, setLanguages] = useState<Record<string, string>>({});
+	const actor = useAuthStore((state) => state.session?.user.id);
 	const binds = useKnowledgeStore((state) => state.binds);
 	const categories = useKnowledgeStore((state) => state.categories);
 	const folders = useKnowledgeStore((state) => state.folders);
@@ -23,13 +28,15 @@ function ArchivePage() {
 	const archivedBinds = useMemo(
 		() =>
 			binds
-				.filter((bind) => bind.archived)
+				.filter(
+					(bind) => bind.archived && bind.ownerId === actor && Boolean(actor),
+				)
 				.sort(
 					(first, second) =>
 						new Date(second.updatedAt).getTime() -
 						new Date(first.updatedAt).getTime(),
 				),
-		[binds],
+		[binds, actor],
 	);
 	const visibleBinds = query.trim()
 		? searchBinds(archivedBinds, query, {
@@ -39,12 +46,20 @@ function ArchivePage() {
 			})
 		: archivedBinds;
 
-	const restoreBind = (id: string) => {
-		const restored = knowledgeService.restoreArchivedBind(id);
-
-		if (restored) {
+	const restoreBind = async (id: string) => {
+		if (pendingRestoreId) return;
+		setPendingRestoreId(id);
+		setError("");
+		try {
+			await knowledgeService.setPersonalBindArchived(id, false);
 			showToast("Бинд восстановлен");
-			void navigate({ to: "/" });
+			await navigate({ to: "/" });
+		} catch (error) {
+			setError(
+				error instanceof Error ? error.message : "Не удалось восстановить бинд",
+			);
+		} finally {
+			setPendingRestoreId(null);
 		}
 	};
 
@@ -86,9 +101,10 @@ function ArchivePage() {
 							<Archive size={14} />
 							Архив
 						</div>
-						<h1 className="text-3xl font-bold">Архив биндов</h1>
+						<h1 className="text-2xl font-semibold">Личный архив</h1>
 						<p className="mt-2 max-w-2xl text-sm text-muted">
-							Восстановите архивные бинды или удалите ненужные материалы.
+							Здесь ваши архивные бинды. Восстановите нужный — он вернётся в
+							свою папку.
 						</p>
 					</div>
 
@@ -110,55 +126,107 @@ function ArchivePage() {
 					/>
 				</div>
 
+				{error && (
+					<p
+						role="alert"
+						className="mb-4 rounded-lg border border-red-500/30 p-3 text-sm text-red-400"
+					>
+						{error}
+					</p>
+				)}
 				{visibleBinds.length === 0 ? (
 					<div className="rounded-lg border border-border bg-surface p-10 text-center text-sm text-muted">
-						В архиве пока ничего нет
+						{query.trim()
+							? "По вашему запросу ничего не найдено"
+							: "В личном архиве пока ничего нет"}
 					</div>
 				) : (
 					<div className="space-y-3">
-						{visibleBinds.map((bind) => (
-							<div
-								key={bind.id}
-								className="rounded-lg border border-border bg-surface p-4"
-							>
-								<div className="flex flex-wrap items-start justify-between gap-3">
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2">
-											<FileText size={16} className="shrink-0 text-muted" />
-											<h2 className="truncate text-base font-semibold">
-												{getBindTitle(bind, language)}
-											</h2>
+						{visibleBinds.map((bind) => {
+							const translation =
+								bind.translations.find(
+									(item) => item.language === (languages[bind.id] ?? language),
+								) ?? bind.translations[0];
+							return (
+								<div
+									key={bind.id}
+									className="rounded-lg border border-border bg-surface p-4"
+								>
+									<div className="flex flex-wrap items-start justify-between gap-3">
+										<div className="min-w-0 flex-1">
+											<div className="flex items-center gap-2">
+												<FileText size={16} className="shrink-0 text-muted" />
+												<h2 className="truncate text-base font-semibold">
+													{getBindTitle(bind, language)}
+												</h2>
+											</div>
+											<div className="mt-1 truncate text-xs text-muted">
+												{bind.slug}
+												{bind.tags.length > 0
+													? ` - ${bind.tags.join(", ")}`
+													: ""}
+											</div>
+											<details className="mt-3 text-sm">
+												<summary className="w-fit cursor-pointer text-muted hover:text-foreground">
+													Посмотреть текст
+												</summary>
+												<div
+													className="mt-3 flex flex-wrap gap-1"
+													aria-label={`Языки: ${getBindTitle(bind, language)}`}
+												>
+													{bind.translations.map((item) => (
+														<button
+															key={item.language}
+															type="button"
+															aria-pressed={
+																translation?.language === item.language
+															}
+															className="rounded-md border border-border px-2 py-1 text-xs text-muted aria-pressed:bg-surface-elevated aria-pressed:text-foreground"
+															onClick={() =>
+																setLanguages((state) => ({
+																	...state,
+																	[bind.id]: item.language,
+																}))
+															}
+														>
+															{item.language === "el"
+																? "GR"
+																: item.language.toUpperCase()}
+														</button>
+													))}
+												</div>
+												<div className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-background p-3 leading-relaxed">
+													{translation?.content || "Нет содержимого"}
+												</div>
+											</details>
 										</div>
-										<div className="mt-1 truncate text-xs text-muted">
-											{bind.slug}
-											{bind.tags.length > 0 ? ` - ${bind.tags.join(", ")}` : ""}
-										</div>
-										<div className="mt-2 line-clamp-2 text-sm text-muted">
-											{bind.translations[0]?.content || "Нет содержимого"}
-										</div>
-									</div>
 
-									<div className="ui-actions items-center flex shrink-0 gap-2">
-										<button
-											type="button"
-											onClick={() => restoreBind(bind.id)}
-											className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
-										>
-											<RotateCcw size={15} />
-											Восстановить
-										</button>
-										<button
-											type="button"
-											onClick={() => setPendingDeleteId(bind.id)}
-											className="ui-button ui-button--danger border border-red-500/30 text-red-300 hover:bg-red-500/10"
-											title="Удалить навсегда"
-										>
-											<Trash2 size={15} />
-										</button>
+										<div className="ui-actions items-center flex shrink-0 gap-2">
+											<button
+												type="button"
+												onClick={() => restoreBind(bind.id)}
+												disabled={pendingRestoreId !== null}
+												className="ui-button ui-button--secondary inline-flex items-center gap-2 border border-border hover:bg-surface-elevated"
+											>
+												<RotateCcw size={15} />
+												{pendingRestoreId === bind.id
+													? "Восстанавливаем…"
+													: "Восстановить"}
+											</button>
+											<button
+												type="button"
+												onClick={() => setPendingDeleteId(bind.id)}
+												disabled={pendingRestoreId !== null}
+												className="ui-button ui-button--danger border border-red-500/30 text-red-300 hover:bg-red-500/10"
+												title="Удалить навсегда"
+											>
+												<Trash2 size={15} />
+											</button>
+										</div>
 									</div>
 								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</div>

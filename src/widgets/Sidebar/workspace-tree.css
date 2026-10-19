@@ -289,6 +289,10 @@
 .workspace-library-footer svg {
 	flex: none;
 }
+.workspace-library-bottom .workspace-library-footer {
+	border-top: 0;
+	padding: 6px 8px 2px;
+}
 .workspace-library :is(button, input, summary):focus-visible {
 	outline: 2px solid var(--color-accent);
 	outline-offset: -2px;

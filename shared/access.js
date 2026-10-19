@@ -28,7 +28,7 @@ export function routePermission(path, hash='') {
  if(path==='/import/google-sheets'||path.startsWith('/import/google-sheets/')) return 'knowledge.write';
  if(path==='/team')return 'monitor.read';
  if(path==='/health')return 'knowledge.write';
- if(path==='/archive')return 'knowledge.write';
+ if(path==='/archive')return 'binds.read';
  if(path==='/content')return 'knowledge.write';
  if(path==='/shared-binds')return 'knowledge.write';
  if(['/','/binds','/favorites','/recent'].includes(path))return 'binds.read';

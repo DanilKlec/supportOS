@@ -16,6 +16,24 @@ const bind = (id: string, slug = id, sourceBindId?: string) =>
 		updatedAt: "2026-01-01T00:00:00Z",
 	}) as Bind;
 describe("persistent one-to-one bind matching", () => {
+	it("keeps archived personal branches linked after reloading without saved browser links", () => {
+		expect(
+			reconcileBindLinks(
+				[bind("base")],
+				[{ ...bind("own", "renamed", "base"), archived: true }],
+				{},
+			),
+		).toEqual({ base: "own" });
+	});
+	it("replaces an old common self-link with its archived personal override but honors deliberate unlinking", () => {
+		const own = { ...bind("own", "renamed", "base"), archived: true };
+		expect(reconcileBindLinks([bind("base")], [own], { base: "base" })).toEqual(
+			{ base: "own" },
+		);
+		expect(reconcileBindLinks([bind("base")], [own], { base: null })).toEqual({
+			base: null,
+		});
+	});
 	it("keeps a saved link after either slug changes", () => {
 		const links = reconcileBindLinks(
 			[bind("base", "same")],

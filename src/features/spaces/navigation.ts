@@ -4,6 +4,7 @@ export const spaces = [
 		title: "Рабочее пространство",
 		items: [
 			{ label: "Бинды", to: "/" },
+			{ label: "Личный архив", to: "/archive" },
 			{
 				label: "Помощник ответа",
 				to: "/",
@@ -22,7 +23,6 @@ export const spaces = [
 			{ label: "Калькулятор", to: "/bonuses", hash: "content-calculator" },
 			{ label: "Предложения", to: "/qc", hash: "proposals" },
 			{ label: "Качество", to: "/health" },
-			{ label: "Архив", to: "/archive" },
 		],
 	},
 	{

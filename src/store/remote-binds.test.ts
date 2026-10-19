@@ -1,6 +1,37 @@
 import { expect, it } from "vitest";
 import { useKnowledgeStore } from "./knowledge.store";
 
+it("never opens an archived local bind through a stale remote copy and removes its tabs", () => {
+	const previous = useKnowledgeStore.getState();
+	const bind = {
+		id: "own",
+		slug: "own",
+		ownerId: "actor",
+		categoryId: "cat",
+		tags: [],
+		translations: [],
+		favorite: false,
+		archived: false,
+		createdAt: "",
+		updatedAt: "",
+	};
+	try {
+		useKnowledgeStore.setState({
+			binds: [bind],
+			remoteBinds: [bind],
+			openedTabs: [bind.id],
+			activeTab: bind.id,
+		});
+		useKnowledgeStore.getState().setBinds([{ ...bind, archived: true }]);
+		expect(useKnowledgeStore.getState().openedTabs).toEqual([]);
+		expect(useKnowledgeStore.getState().getBind(bind.id)).toBeUndefined();
+		useKnowledgeStore.getState().openBind(bind.id);
+		expect(useKnowledgeStore.getState().activeTab).toBeUndefined();
+	} finally {
+		useKnowledgeStore.setState(previous);
+	}
+});
+
 it("opens, switches and pins remote binds without adding them to the editable local snapshot", () => {
 	const previous = useKnowledgeStore.getState();
 	const remote = {

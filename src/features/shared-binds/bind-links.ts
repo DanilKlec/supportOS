@@ -13,8 +13,15 @@ export function reconcileBindLinks(
 	const bases = common.filter((b) => !b.archived);
 	const available = locals.filter((b) => !b.archived);
 	for (const base of bases) {
-		if (Object.hasOwn(next, base.id)) continue;
-		const exact = available.filter(
+		// A self-link belongs to the original common snapshot. Its personal
+		// replacement takes over once that snapshot record has been replaced.
+		if (
+			Object.hasOwn(next, base.id) &&
+			!(next[base.id] === base.id && !locals.some((b) => b.id === base.id))
+		)
+			continue;
+		// An archived personal branch still shadows its source until restored.
+		const exact = locals.filter(
 			(b) => b.id === base.id || b.sourceBindId === base.id,
 		);
 		if (exact.length === 1 && !reserved.has(exact[0].id)) {

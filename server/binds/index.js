@@ -247,6 +247,14 @@ export default async function handler(req,res) {
   const actor=await requireUser(req,{permission:'binds.read'});const env=config();
   const url=new URL(req.url,'http://localhost');
   const body=req.method==='POST'?(typeof req.body==='string'?JSON.parse(req.body):req.body??{}):{};
+  if(req.method==='POST'&&body.action==='personal-archive') {
+   if(!validId(body.id)||typeof body.archived!=='boolean')throw fail('Некорректное действие с личным архивом');
+   const rows=await rest(env,`supportos_binds?id=eq.${encodeURIComponent(body.id)}&owner_id=eq.${encodeURIComponent(actor.id)}&select=*`,{
+    method:'PATCH',body:{archived:body.archived,...(body.archived?{favorite:false}:{}),updated_at:new Date().toISOString()},prefer:'return=representation'
+   });
+   if(!Array.isArray(rows)||!rows[0])throw fail('Личный бинд не найден или недоступен',404);
+   return send(200,bindFromRow(rows[0]));
+  }
   if(req.method==='GET'&&url.searchParams.get('action')==='shared')return send(200,await sharedPage(env,url));
   if(req.method==='GET'&&url.searchParams.get('action')==='shared-structure') {
    const [categories,folders]=await Promise.all([allRows(env,'supportos_categories?select=*&owner_id=is.null&order=order_index.asc,id.asc'),allRows(env,'supportos_folders?select=*&owner_id=is.null&order=order_index.asc,id.asc')]);

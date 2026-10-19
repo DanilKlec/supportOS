@@ -13,10 +13,17 @@ it('uses effective database permissions and never infers access from a role labe
 
 it('blocks every QC entry for support while retaining working references',()=>{
  const support={status:'active',permissions:['work','binds.read','projects.read','bonuses.read']};
- for(const [path,hash] of [['/content',''],['/archive',''],['/health',''],['/shared-binds',''],['/shared-binds','proposals'],['/admin','qc'],['/project-emails','content'],['/bonuses','content'],['/bonuses','content-calculator'],['/bonus-tools','content-calculator']]) {
+ for(const [path,hash] of [['/content',''],['/health',''],['/shared-binds',''],['/shared-binds','proposals'],['/admin','qc'],['/project-emails','content'],['/bonuses','content'],['/bonuses','content-calculator'],['/bonus-tools','content-calculator']]) {
   expect(canAccessPage(support,path,hash),`${path}#${hash}`).toBe(false);
   expect(canAccessPage({...support,permissions:[...support.permissions,'knowledge.write']},path,hash),`${path}#${hash}`).toBe(true);
  }
  for(const [path,hash] of [['/',''],['/project-emails',''],['/bonuses',''],['/bonuses','calculator']]) expect(canAccessPage(support,path,hash)).toBe(true);
  expect(canAccessPage(support,'/content/','#')).toBe(false);
+});
+
+it('allows employees to reach their personal archive without access to the shared knowledge editor',()=>{
+ const support={status:'active',permissions:['binds.read']};
+ expect(canAccessPage(support,'/archive')).toBe(true);
+ expect(canAccessPage({...support,status:'disabled'},'/archive')).toBe(false);
+ expect(canAccessPage({status:'active',permissions:[]},'/archive')).toBe(false);
 });

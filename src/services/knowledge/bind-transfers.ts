@@ -13,7 +13,7 @@ export interface BindTransferResult {
 const listeners = new Set<
 	(actor: string, result: BindTransferResult) => void | Promise<void>
 >();
-export function subscribeBindTransfers(
+export function subscribeBindChanges(
 	listener: (actor: string, result: BindTransferResult) => void | Promise<void>,
 ) {
 	listeners.add(listener);
@@ -21,7 +21,7 @@ export function subscribeBindTransfers(
 		listeners.delete(listener);
 	};
 }
-export async function publishBindTransfer(
+export async function publishBindChanges(
 	actor: string,
 	result: BindTransferResult,
 ) {
@@ -29,3 +29,5 @@ export async function publishBindTransfer(
 		[...listeners].map((listener) => listener(actor, result)),
 	);
 }
+export const subscribeBindTransfers = subscribeBindChanges;
+export const publishBindTransfer = publishBindChanges;

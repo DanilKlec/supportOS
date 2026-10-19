@@ -7,6 +7,27 @@ const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-822
 beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read']}});});
 afterEach(()=>vi.unstubAllGlobals());
 async function run(req){const res={setHeader:vi.fn(),end:vi.fn(),statusCode:0};await handler({method:'GET',url:'/api/binds',headers:{host:'app.test',origin:'https://app.test'},...req},res);return {status:res.statusCode,data:JSON.parse(res.end.mock.calls[0][0])};}
+it.each([true,false])('changes only the verified actor personal archive flag (%s)',async(archived)=>{
+ const row={id:'own',owner_id:actor,source_bind_id:'common',category_id:'cat',slug:'own',archived,tags:[],translations:[],created_at:'2026-01-01',updated_at:'2026-10-19'};
+ const fetch=vi.fn(async()=>Response.json([row]));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'personal-archive',id:'own',archived,ownerId:other,translations:[{content:'forged'}]}});
+ expect(result.status).toBe(200);
+ expect(result.data).toMatchObject({id:'own',ownerId:actor,archived});
+ expect(fetch.mock.calls[0][0]).toBe(`https://example.test/rest/v1/supportos_binds?id=eq.own&owner_id=eq.${actor}&select=*`);
+ expect(fetch.mock.calls[0][1].method).toBe('PATCH');
+ expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({archived,...(archived?{favorite:false}:{}),updated_at:expect.any(String)});
+});
+it.each(['common','someone-elses-bind'])('cannot restore a shared or another employee bind (%s)',async(id)=>{
+ const fetch=vi.fn(async()=>Response.json([]));vi.stubGlobal('fetch',fetch);
+ const result=await run({method:'POST',body:{action:'personal-archive',id,archived:false,ownerId:other}});
+ expect(result.status).toBe(404);
+ expect(fetch.mock.calls[0][0]).toContain(`owner_id=eq.${actor}`);
+});
+it.each([{id:'own',archived:'false'},{id:'bad&id=other',archived:true}])('rejects malformed archive actions before writing',async(body)=>{
+ const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+ expect((await run({method:'POST',body:{action:'personal-archive',...body}})).status).toBe(400);
+ expect(fetch).not.toHaveBeenCalled();
+});
 it('loads workspace binds once, includes shadowed sources for cache consumers, and omits history',async()=>{
  mocks.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_binds')?[
   {id:'common',owner_id:null,translations:[],tags:[]},

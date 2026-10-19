@@ -30,6 +30,7 @@ import { useViewState } from "@/shared/hooks/useViewState";
 import { scoreTextSearch } from "@/shared/lib/bind-search";
 import { modalManager } from "@/shared/modals/modal.store";
 import { useKnowledgeStore, useWorkspaceStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
 import { Tree } from "./Tree";
 import { countTreeBinds } from "./tree-utils";
 import "./workspace-tree.css";
@@ -130,6 +131,10 @@ export function Sidebar({
 	const setLayout = useWorkspaceStore((s) => s.setLayout);
 	const tree = useKnowledgeStore((s) => s.tree);
 	const binds = useKnowledgeStore((s) => s.binds);
+	const actor = useAuthStore((s) => s.session?.user.id);
+	const archiveCount = binds.filter(
+		(bind) => bind.archived && bind.ownerId === actor,
+	).length;
 	const categories = useKnowledgeStore((s) => s.categories);
 	const favorites = useKnowledgeStore((s) => s.favorites);
 	const favoriteFolders = useKnowledgeStore((s) => s.favoriteFolders);
@@ -217,23 +222,51 @@ export function Sidebar({
 				: `Снято закрепление: ${changed.length}`,
 		);
 	};
-	const archiveSelected = () => {
+	const archiveSelected = async () => {
 		if (selectedBindIds.length === 0) return;
-
-		const ids = [...selectedBindIds];
-		const archived = knowledgeService.archiveManyBinds(ids);
-
-		setSelectedBindIds([]);
-		showToast(`Архивировано биндов: ${archived.length}`, {
-			action: {
-				label: "Отменить",
-				onClick: () => {
-					knowledgeService.updateManyBinds(ids, { archived: false });
-					showToast("Архивирование отменено");
+		try {
+			const archived: Bind[] = [];
+			for (const id of selectedBindIds) {
+				const bind = useKnowledgeStore
+					.getState()
+					.binds.find((item) => item.id === id);
+				archived.push(
+					bind?.ownerId === actor && actor
+						? await knowledgeService.setPersonalBindArchived(id, true)
+						: knowledgeService.archiveBind(id),
+				);
+			}
+			setSelectedBindIds([]);
+			showToast(`Архивировано биндов: ${archived.length}`, {
+				action: {
+					label: "Отменить",
+					onClick: () => {
+						void Promise.all(
+							archived.map((bind) =>
+								bind.ownerId === actor
+									? knowledgeService.setPersonalBindArchived(bind.id, false)
+									: knowledgeService.restoreArchivedBind(bind.id),
+							),
+						)
+							.then(() => showToast("Архивирование отменено"))
+							.catch((error) =>
+								showToast(
+									error instanceof Error
+										? error.message
+										: "Не удалось восстановить бинды",
+								),
+							);
+					},
 				},
-			},
-			duration: 7000,
-		});
+				duration: 7000,
+			});
+		} catch (error) {
+			showToast(
+				error instanceof Error
+					? error.message
+					: "Не удалось архивировать бинды",
+			);
+		}
 	};
 	const addTagToSelected = () => {
 		if (selectedBindIds.length === 0 || !bulkTag.trim()) return;
@@ -652,10 +685,25 @@ export function Sidebar({
 						</section>
 					)}
 				</div>
-				<footer className="workspace-library-footer">
-					<ListTree size={13} />
-					<span>Папки и бинды можно перетаскивать</span>
-				</footer>
+				<div className="workspace-library-bottom shrink-0 border-t border-border px-2 py-2">
+					<button
+						type="button"
+						aria-current={pathname === "/archive" ? "page" : undefined}
+						className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-xs text-muted hover:bg-surface-elevated hover:text-foreground aria-[current=page]:bg-surface-elevated aria-[current=page]:text-foreground"
+						onClick={() => {
+							void navigate({ to: "/archive" });
+							onNavigate?.();
+						}}
+					>
+						<Archive size={15} />
+						<span>Личный архив</span>
+						<span className="ml-auto tabular-nums">{archiveCount}</span>
+					</button>
+					<footer className="workspace-library-footer">
+						<ListTree size={13} />
+						<span>Папки и бинды можно перетаскивать</span>
+					</footer>
+				</div>
 			</div>
 		</aside>
 	);

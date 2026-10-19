@@ -3,7 +3,10 @@ import type { KnowledgeFolder } from "@/entities/knowledge";
 import { supabaseService } from "@/services/supabase.service";
 import { useKnowledgeStore } from "@/store";
 import { fetchBindWorkspace } from "./bind-workspace.service";
-import { publishBindTransfer } from "./knowledge/bind-transfers";
+import {
+	publishBindChanges,
+	publishBindTransfer,
+} from "./knowledge/bind-transfers";
 
 import { databaseKnowledgeService } from "./knowledge/knowledge-api";
 import {
@@ -29,6 +32,37 @@ export type {
 
 // Compatibility facade: existing callers keep the same runtime state and methods.
 class KnowledgeService extends KnowledgeMutations {
+	async setPersonalBindArchived(id: string, archived: boolean) {
+		const actor = supabaseService.getSession()?.user.id;
+		const existing = useKnowledgeStore
+			.getState()
+			.binds.find((bind) => bind.id === id);
+		if (!actor || existing?.ownerId !== actor)
+			throw new Error("Можно изменять только свой личный архив");
+		const saved = await databaseKnowledgeService.setPersonalBindArchived(
+			id,
+			archived,
+		);
+		if (supabaseService.getSession()?.user.id !== actor)
+			throw new Error("Аккаунт изменился");
+		const state = useKnowledgeStore.getState();
+		// Remove stale viewer copies before rebuilding tabs and the personal tree.
+		useKnowledgeStore.setState({
+			remoteBinds: state.remoteBinds.filter((bind) => bind.id !== id),
+		});
+		state.setKnowledge({
+			binds: state.binds.map((bind) => (bind.id === id ? saved : bind)),
+		});
+		await publishBindChanges(actor, { binds: [saved], replacements: {} });
+		if (supabaseService.getSession()?.user.id !== actor)
+			throw new Error("Аккаунт изменился");
+		if (!archived) {
+			this.revealLocation(saved.categoryId, saved.folderId);
+			useKnowledgeStore.getState().openBind(id);
+		}
+		this.saveKnowledge();
+		return saved;
+	}
 	async transferBinds(
 		ids: string[],
 		destination: { categoryId: string; folderId?: string },

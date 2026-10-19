@@ -19,7 +19,7 @@ import {
 	bindWorkspaceKey,
 	readBindWorkspace,
 } from "@/services/bind-workspace.service";
-import { subscribeBindTransfers } from "@/services/knowledge/bind-transfers";
+import { subscribeBindChanges } from "@/services/knowledge/bind-transfers";
 import { knowledgeService } from "@/services/knowledge.service";
 import type { BindBranches } from "@/services/shared-binds.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
@@ -131,7 +131,7 @@ export function WorkspaceSharedBindsSync() {
 	}, [client, workspace.isSuccess, workspace.dataUpdatedAt]);
 	useEffect(
 		() =>
-			subscribeBindTransfers(async (actor, result) => {
+			subscribeBindChanges(async (actor, result) => {
 				if (actor !== user?.id) return;
 				const commonKey = ["shared-binds", actor],
 					personalKey = ["personal-binds", actor, actor];
@@ -168,7 +168,9 @@ export function WorkspaceSharedBindsSync() {
 			.filter((b) => !b.archived)
 			.filter(
 				(b) =>
-					!locals.some((local) => local.id === links[b.id] && local.archived),
+					![...locals, ...(personal.data ?? [])].some(
+						(local) => local.id === links[b.id] && local.archived,
+					),
 			)
 			.map((base) => {
 				const own = (personal.data ?? []).find(
@@ -229,10 +231,7 @@ export function WorkspaceSharedTree({
 		...(common.data ?? []).filter(
 			(base) =>
 				!locals.some(
-					(local) =>
-						local.ownerId === user?.id &&
-						local.id === links[base.id] &&
-						!local.archived,
+					(local) => local.ownerId === user?.id && local.id === links[base.id],
 				),
 		),
 		...locals.filter(

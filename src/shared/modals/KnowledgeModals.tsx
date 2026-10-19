@@ -8,6 +8,7 @@ import {
 	type RestoreDeletedItemsInput,
 } from "@/services/knowledge.service";
 import { useToast } from "@/shared/hooks/useToast";
+import { supabaseService } from "@/services/supabase.service";
 import { useKnowledgeStore } from "@/store";
 
 import { BaseModal } from "./BaseModal";
@@ -383,7 +384,7 @@ export function DeleteModal({
 		binds,
 	);
 
-	const submit = (event: FormEvent) => {
+	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 
 		if (!payload.type || !payload.id || !target) {
@@ -395,6 +396,7 @@ export function DeleteModal({
 
 		try {
 			const deletedItems = deletePreview;
+			let archivedBind: Bind | undefined;
 
 			if (payload.type === "category") {
 				knowledgeService.deleteCategory(payload.id);
@@ -405,7 +407,12 @@ export function DeleteModal({
 			}
 
 			if (payload.type === "bind") {
-				knowledgeService.archiveBind(payload.id);
+				const bind = binds.find((item) => item.id === payload.id);
+				const actor = supabaseService.getSession()?.user.id;
+				archivedBind =
+					actor && bind?.ownerId === actor
+						? await knowledgeService.setPersonalBindArchived(payload.id, true)
+						: knowledgeService.archiveBind(payload.id);
 			}
 
 			showToast(payload.type === "bind" ? "Архивировано" : "Удалено", {
@@ -413,10 +420,21 @@ export function DeleteModal({
 					label: "Отменить",
 					onClick: () => {
 						if (payload.type === "bind") {
-							knowledgeService.updateBind(payload.id as string, {
-								archived: false,
-							});
-							showToast("Восстановлено");
+							if (
+								archivedBind?.ownerId &&
+								archivedBind.ownerId === supabaseService.getSession()?.user.id
+							) {
+								void knowledgeService
+									.setPersonalBindArchived(archivedBind.id, false)
+									.then(() => showToast("Восстановлено"))
+									.catch((error) => showToast(getErrorMessage(error)));
+							} else {
+								knowledgeService.updateBind(
+									archivedBind?.id ?? (payload.id as string),
+									{ archived: false },
+								);
+								showToast("Восстановлено");
+							}
 							return;
 						}
 

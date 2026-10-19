@@ -40,9 +40,13 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		]),
 	);
 	const previousPathnameRef = useRef(pathname);
-	const knowledgeRoute = ["/", "/binds", "/favorites", "/recent"].includes(
-		pathname.replace(/\/+$/, "") || "/",
-	);
+	const knowledgeRoute = [
+		"/",
+		"/binds",
+		"/favorites",
+		"/recent",
+		"/archive",
+	].includes(pathname.replace(/\/+$/, "") || "/");
 
 	useEffect(() => {
 		if (!mobileSidebarOpen) return undefined;
