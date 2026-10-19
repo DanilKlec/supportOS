@@ -729,9 +729,16 @@ export function Topbar() {
 													"/content",
 													"/shared-binds",
 													"/health",
-													"/archive",
 												].includes(pathname)
-											: pathname === item.to
+											: item.to === "/"
+												? [
+														"/",
+														"/binds",
+														"/favorites",
+														"/recent",
+														"/archive",
+													].includes(pathname)
+												: pathname === item.to
 									)
 										? "page"
 										: undefined

@@ -161,7 +161,14 @@ export function ArchivePage() {
 												</h2>
 											</div>
 											<div className="mt-1 truncate text-xs text-muted">
-												{bind.slug}
+												{[
+													categories.find((item) => item.id === bind.categoryId)
+														?.name,
+													folders.find((item) => item.id === bind.folderId)
+														?.name,
+												]
+													.filter(Boolean)
+													.join(" / ") || "Личные материалы"}
 												{bind.tags.length > 0
 													? ` - ${bind.tags.join(", ")}`
 													: ""}
