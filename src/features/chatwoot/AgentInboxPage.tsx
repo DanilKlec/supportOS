@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
-	Ban,
 	Archive,
+	Ban,
 	CalendarDays,
 	CheckCheck,
 	ChevronDown,
@@ -23,15 +24,14 @@ import {
 	Search,
 	Send,
 	Settings2,
+	Tag,
+	UserRound,
 	UsersRound,
 	Volume2,
 	VolumeX,
-	Tag,
-	UserRound,
 	X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { type CSSProperties, createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import {
@@ -583,7 +583,7 @@ export function AgentInboxPage() {
 					</button>
 					<div
 						data-chatwoot-split
-						className={`flex min-h-0 flex-1 ${layout === "rows" ? "flex-col" : "flex-row"}`}
+						className={`flex min-h-0 flex-1 overflow-hidden ${layout === "rows" ? "flex-col" : "flex-row"}`}
 					>
 						<ConversationPane
 							id={conversationIds[0]}
@@ -1167,9 +1167,9 @@ function ConversationPane({
 		<section
 			style={style}
 			onFocusCapture={onActivate}
-			className={`flex min-h-0 min-w-0 flex-1 ${active ? "" : ""}`}
+			className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${active ? "" : ""}`}
 		>
-			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 				<header className="flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border pl-12 pr-3 py-2">
 					<div className="flex min-w-0 items-center gap-2.5">
 						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
@@ -1573,12 +1573,29 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 	);
 }
 function MessageBubble({ message }: { message: ChatwootMessage }) {
-	const outgoing =
-		message.message_type === 1 || message.message_type === "outgoing";
+	const type = String(message.message_type ?? "").toLowerCase();
+	const activity = type === "2" || type === "activity";
+	const outgoing = type === "1" || type === "outgoing";
+	if (activity) {
+		return (
+			<div className="flex justify-center px-3 py-1">
+				<div className="max-w-[min(90%,42rem)] rounded-full border border-border/70 bg-surface-elevated/70 px-3 py-1.5 text-center text-[11px] leading-relaxed text-muted">
+					{message.content
+						? renderMessageContent(message.content)
+						: "Событие диалога"}
+					{message.created_at ? (
+						<span className="ml-2 whitespace-nowrap text-[10px] opacity-70">
+							{dateLabel(message.created_at)}
+						</span>
+					) : null}
+				</div>
+			</div>
+		);
+	}
 	return (
 		<div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
 			<article
-				className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "bg-accent/15" : "border border-border bg-surface"}`}
+				className={`max-w-[min(82%,42rem)] min-w-0 rounded-2xl px-3.5 py-2.5 ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "bg-accent/15" : "border border-border bg-surface"}`}
 			>
 				{message.private && (
 					<div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
@@ -1591,8 +1608,8 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 					</div>
 				)}
 				{message.content && (
-					<div className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
-						{plainMessageContent(message.content)}
+					<div className="chatwoot-message-content break-words text-[13px] leading-relaxed">
+						{renderMessageContent(message.content)}
 					</div>
 				)}
 				{message.attachments?.map((file) => (
@@ -1616,16 +1633,52 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 	);
 }
 
-function plainMessageContent(content: string) {
-	if (typeof DOMParser === "undefined" || !/<[a-z][\s\S]*>/i.test(content)) return content;
-	const withBreaks = content
-		.replace(/<br\s*\/?>/gi, "\n")
-		.replace(/<\/(?:p|div|li|blockquote|h[1-6])\s*>/gi, "\n");
-	const parsed = new DOMParser().parseFromString(withBreaks, "text/html");
-	parsed.querySelectorAll("script, style, iframe, object").forEach((element) => element.remove());
-	return (parsed.body.textContent ?? "").replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+function renderMessageContent(content: string): ReactNode {
+	if (typeof DOMParser === "undefined" || !/<[a-z][\s\S]*>/i.test(content)) {
+		return <span className="whitespace-pre-wrap">{content}</span>;
+	}
+	const parsed = new DOMParser().parseFromString(content, "text/html");
+	const blocked = new Set([
+		"SCRIPT",
+		"STYLE",
+		"IFRAME",
+		"OBJECT",
+		"EMBED",
+		"SVG",
+		"MATH",
+	]);
+	const supported = new Set([
+		"P", "BR", "STRONG", "B", "EM", "I", "U", "S", "DEL", "CODE", "PRE",
+		"UL", "OL", "LI", "BLOCKQUOTE", "DIV", "SPAN", "H1", "H2", "H3", "H4",
+		"H5", "H6", "A", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TD", "TH",
+	]);
+	const renderNode = (node: Node, path: string): ReactNode => {
+		if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+		if (!(node instanceof HTMLElement) || blocked.has(node.tagName)) return null;
+		const children = Array.from(node.childNodes).map((child, index) =>
+			renderNode(child, `${path}.${index}`),
+		);
+		if (!supported.has(node.tagName)) return children;
+		const tag = node.tagName.toLowerCase();
+		if (tag === "a") {
+			const href = node.getAttribute("href")?.trim();
+			if (!href || !/^(https?:|mailto:)/i.test(href)) return children;
+			return createElement(
+				"a",
+				{
+					key: path,
+					href,
+					target: "_blank",
+					rel: "noopener noreferrer",
+					className: "text-accent underline underline-offset-2",
+				},
+				children,
+			);
+		}
+		return createElement(tag, { key: path }, children);
+	};
+	return Array.from(parsed.body.childNodes).map((node, index) => renderNode(node, String(index)));
 }
-
 function SetupCard({
 	error,
 	onRetry,

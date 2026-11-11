@@ -254,6 +254,18 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
 .workspace-main :where(table) { border-collapse:collapse; font-size:13px; }
 .workspace-main :where(th) { color:var(--color-muted); font-weight:500; text-align:left; }
 .workspace-main :where(td,th) { vertical-align:middle; }
+.chatwoot-message-content { overflow-wrap:anywhere; white-space:normal; }
+.chatwoot-message-content :where(p,ul,ol,blockquote,pre,table) { margin-block:0.45em; }
+.chatwoot-message-content :where(p:first-child,ul:first-child,ol:first-child,blockquote:first-child,pre:first-child,table:first-child) { margin-top:0; }
+.chatwoot-message-content :where(p:last-child,ul:last-child,ol:last-child,blockquote:last-child,pre:last-child,table:last-child) { margin-bottom:0; }
+.chatwoot-message-content :where(ul,ol) { padding-left:1.4em; }
+.chatwoot-message-content :where(ul) { list-style:disc; }
+.chatwoot-message-content :where(ol) { list-style:decimal; }
+.chatwoot-message-content :where(blockquote) { border-left:2px solid var(--color-border); padding-left:.75em; color:var(--color-muted); }
+.chatwoot-message-content :where(pre,code) { border-radius:.35rem; background:color-mix(in srgb,var(--color-background) 75%,transparent); font-family:ui-monospace,SFMono-Regular,monospace; }
+.chatwoot-message-content :where(pre) { overflow-x:auto; padding:.6em .75em; white-space:pre-wrap; }
+.chatwoot-message-content :where(table) { display:block; max-width:100%; overflow-x:auto; }
+.chatwoot-message-content :where(td,th) { padding:.2em .45em; border:1px solid var(--color-border); }
 @media (max-width:639px) {
  .section-navigation-desktop { display:none; }
  .section-navigation-mobile { display:block; width:100%; }
