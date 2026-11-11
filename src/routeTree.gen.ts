@@ -18,6 +18,7 @@ import { Route as QcRouteImport } from './routes/qc'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LivechatRouteImport } from './routes/livechat'
+import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as ContentRouteImport } from './routes/content'
@@ -80,6 +81,11 @@ const LoginRoute = LoginRouteImport.update({
 const LivechatRoute = LivechatRouteImport.update({
   id: '/livechat',
   path: '/livechat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxRoute = InboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HealthRoute = HealthRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/content': typeof ContentRoute
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
+  '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/content'
     | '/favorites'
     | '/health'
+    | '/inbox'
     | '/livechat'
     | '/login'
     | '/project-emails'
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/content'
     | '/favorites'
     | '/health'
+    | '/inbox'
     | '/livechat'
     | '/login'
     | '/project-emails'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/content'
     | '/favorites'
     | '/health'
+    | '/inbox'
     | '/livechat'
     | '/login'
     | '/project-emails'
@@ -362,6 +374,7 @@ export interface RootRouteChildren {
   ContentRoute: typeof ContentRoute
   FavoritesRoute: typeof FavoritesRoute
   HealthRoute: typeof HealthRoute
+  InboxRoute: typeof InboxRoute
   LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
@@ -444,6 +457,13 @@ declare module '@tanstack/react-router' {
       path: '/livechat'
       fullPath: '/livechat'
       preLoaderRoute: typeof LivechatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox': {
+      id: '/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof InboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/health': {
@@ -586,6 +606,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContentRoute: ContentRoute,
   FavoritesRoute: FavoritesRoute,
   HealthRoute: HealthRoute,
+  InboxRoute: InboxRoute,
   LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,

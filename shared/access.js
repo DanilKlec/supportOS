@@ -14,6 +14,7 @@ export const qcPermissions={binds:'knowledge.write',emails:'projects.read',bonus
 export function routePermission(path, hash='') {
  path=path.replace(/\/+$/,'')||'/';
  hash=hash.replace(/^#/,'');if(path==='/qc')hash=hash.split('?')[0];
+ if(path==='/inbox')return 'work';
  if(path==='/qc')return qcPermissions[hash||'overview']??'knowledge.write';
  if(path==='/admin')return adminPermissions[hash] ?? (hash==='qc'?'knowledge.write':['integrations','system'].includes(hash)?'technical':'work');
  if(path==='/settings'&&hash.startsWith('integrations'))return 'technical';

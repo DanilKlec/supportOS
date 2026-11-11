@@ -4,6 +4,7 @@ export const spaces = [
 		title: "Рабочее пространство",
 		items: [
 			{ label: "Бинды", to: "/" },
+			{ label: "Чаты", to: "/inbox" },
 			{ label: "Личный архив", to: "/archive" },
 			{
 				label: "Помощник ответа",
@@ -109,6 +110,7 @@ export function canonicalPage(path: string, hash = "") {
 	return { to: path, hash };
 }
 export function spaceFor(path: string) {
+	if (path === "/inbox") return spaces[0];
 	if (path === "/bonus-tools") return spaces[1];
 	if (
 		["/settings/ai", "/settings/translator", "/import/google-sheets"].includes(
