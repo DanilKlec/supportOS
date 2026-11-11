@@ -172,7 +172,7 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
 		enabled: connection.data?.configured === true && activeSection !== "team",
-		refetchInterval: 15000,
+		refetchInterval: 5000,
 	});
 	const allLabels = useQuery({
 		queryKey: ["chatwoot", "labels"],
@@ -769,7 +769,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 						{soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} Звуковые уведомления {soundEnabled ? "включены" : "выключены"}
 					</button>
 					<button type="button" onClick={onOpenSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Личные настройки</button>
-					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Домены сайтов</button>}
+					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Источники чатов</button>}
 					<a href="/chatwoot-demo.html" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs hover:bg-surface-elevated"><ExternalLink size={15} /> Тестовый сайт с чатом</a>
 					<Link to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Headphones size={15} /> Настройки SupportOS</Link>
 				</div>
@@ -1038,15 +1038,22 @@ function ConversationPane({
 	const [showCustomer, setShowCustomer] = useState(true);
 	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
+	const messageViewport = useRef<HTMLDivElement>(null);
+	const followMessages = useRef(true);
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
 		queryFn: () => chatwootService.conversation(id as number),
 		enabled: id != null,
-		refetchInterval: 10000,
+		refetchInterval: 3000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
 	const messages =
 		conversation?.messages ?? query.data?.payload?.messages ?? [];
+	useEffect(() => {
+		const viewport = messageViewport.current;
+		if (!viewport || !followMessages.current || messages.length === 0) return;
+		viewport.scrollTop = viewport.scrollHeight;
+	}, [messages.length, messages.at(-1)?.id]);
 	const sender = conversation?.meta?.sender;
 	const contactId = sender?.id ?? conversation?.contact_id;
 	const contact = useQuery({
@@ -1302,7 +1309,14 @@ function ConversationPane({
 							"—"}
 					</span>
 				</div>
-				<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+				<div
+					ref={messageViewport}
+					onScroll={(event) => {
+						const viewport = event.currentTarget;
+						followMessages.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
+					}}
+					className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
+				>
 					{query.isLoading ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted">
 							<LoaderCircle className="mr-2 animate-spin" size={16} />
@@ -1578,7 +1592,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 				)}
 				{message.content && (
 					<div className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
-						{message.content}
+						{plainMessageContent(message.content)}
 					</div>
 				)}
 				{message.attachments?.map((file) => (
@@ -1601,6 +1615,17 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 		</div>
 	);
 }
+
+function plainMessageContent(content: string) {
+	if (typeof DOMParser === "undefined" || !/<[a-z][\s\S]*>/i.test(content)) return content;
+	const withBreaks = content
+		.replace(/<br\s*\/?>/gi, "\n")
+		.replace(/<\/(?:p|div|li|blockquote|h[1-6])\s*>/gi, "\n");
+	const parsed = new DOMParser().parseFromString(withBreaks, "text/html");
+	parsed.querySelectorAll("script, style, iframe, object").forEach((element) => element.remove());
+	return (parsed.body.textContent ?? "").replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function SetupCard({
 	error,
 	onRetry,

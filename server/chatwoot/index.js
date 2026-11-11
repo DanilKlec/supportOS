@@ -79,6 +79,50 @@ function normalizeAllowedDomains(values) {
 	return domains;
 }
 
+function websiteSourceInput(body) {
+	const name = typeof body.name === 'string' ? body.name.trim() : '';
+	const websiteUrl = typeof body.websiteUrl === 'string' ? body.websiteUrl.trim() : '';
+	const widgetColor = typeof body.widgetColor === 'string' ? body.widgetColor.trim() : '#2563eb';
+	const welcomeTitle = typeof body.welcomeTitle === 'string' ? body.welcomeTitle.trim() : '';
+	const welcomeTagline = typeof body.welcomeTagline === 'string' ? body.welcomeTagline.trim() : '';
+	const greetingMessage = typeof body.greetingMessage === 'string' ? body.greetingMessage.trim() : '';
+	if (!name || name.length > 120) throw chatwootError('Укажите название сайта (до 120 символов)', 400);
+	let url;
+	try { url = new URL(websiteUrl); } catch { throw chatwootError('Укажите корректный адрес сайта, например https://example.com', 400); }
+	if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw chatwootError('Адрес сайта должен начинаться с http:// или https://', 400);
+	if (!/^#[\da-f]{6}$/i.test(widgetColor)) throw chatwootError('Выберите корректный цвет виджета', 400);
+	if (welcomeTitle.length > 100 || welcomeTagline.length > 255 || greetingMessage.length > 5000) throw chatwootError('Текст приветствия превышает допустимую длину', 400);
+	if (typeof body.greetingEnabled !== 'boolean') throw chatwootError('Укажите, включено ли приветствие', 400);
+	const operatorIds = [...new Set((Array.isArray(body.operatorIds) ? body.operatorIds : []).map(Number))];
+	if (operatorIds.length > 200 || operatorIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw chatwootError('Выберите корректных операторов', 400);
+	return { name, websiteUrl: url.toString().replace(/\/$/, ''), widgetColor, welcomeTitle, welcomeTagline, greetingMessage, greetingEnabled: body.greetingEnabled, allowedDomains: normalizeAllowedDomains(body.allowedDomains ?? []), operatorIds };
+}
+
+function websiteSourcePayload(source) {
+	return {
+		name: source.name,
+		greeting_enabled: source.greetingEnabled,
+		greeting_message: source.greetingMessage,
+		channel: {
+			type: 'web_widget',
+			website_url: source.websiteUrl,
+			allowed_domains: source.allowedDomains.join(','),
+			widget_color: source.widgetColor,
+			welcome_title: source.welcomeTitle,
+			welcome_tagline: source.welcomeTagline,
+		},
+	};
+}
+
+async function websiteInboxMembers(cfg, inboxId) {
+	const result = await api(cfg, `/accounts/${cfg.accountId}/inbox_members/${inboxId}`);
+	return itemList(result).map((agent) => Number(agent.id)).filter(Number.isSafeInteger);
+}
+
+async function setWebsiteInboxMembers(cfg, inboxId, operatorIds) {
+	await api(cfg, `/accounts/${cfg.accountId}/inbox_members`, { method: 'PATCH', body: { inbox_id: inboxId, user_ids: operatorIds } });
+}
+
 function isWebsiteInbox(inbox) {
 	const channel = String(inbox.channel_type ?? inbox.channel?.type ?? '').toLowerCase();
 	return channel.includes('webwidget') || channel.includes('web_widget') || channel === 'website';
@@ -119,13 +163,26 @@ async function routeWaitingConversations(env, cfg) {
 	if (!activeIds.length) return { assigned: 0 };
 	const known = new Set(agents.map((agent) => Number(agent.id)));
 	const eligible = activeIds.filter((id) => known.has(id));
+	const inboxMembersCache = new Map();
 	let assigned = 0;
 	for (const status of ['open', 'pending']) {
 		for (let page = 1; page <= 10; page += 1) {
 			const active = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page}`);
 			const pageItems = itemList(active);
+			const inboxIds = [...new Set(pageItems.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
+			await Promise.all(inboxIds.filter((id) => !inboxMembersCache.has(id)).map(async (id) => {
+				const members = await websiteInboxMembers(cfg, id).catch(() => []);
+				inboxMembersCache.set(id, members);
+			}));
 			for (const conversation of pageItems) {
 				if (!validId(String(conversation.id))) continue;
+				const conversationInboxId = String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '');
+				let eligibleForInbox = eligible;
+				if (validId(conversationInboxId)) {
+					const memberIds = new Set(inboxMembersCache.get(conversationInboxId));
+					eligibleForInbox = eligible.filter((id) => memberIds.has(id));
+				}
+				if (!eligibleForInbox.length) continue;
 				const currentAssignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
 				const isUnassigned = !Number.isSafeInteger(currentAssignee) || currentAssignee <= 0;
 				if (!isUnassigned && eligible.includes(currentAssignee)) continue;
@@ -136,9 +193,9 @@ async function routeWaitingConversations(env, cfg) {
 				// Re-route fresh chats that Chatwoot auto-assigned outside the active SupportOS team.
 				// Older assigned conversations stay with their current owner; unassigned ones remain routable.
 				if (!isUnassigned && (!Number.isFinite(createdAt) || Date.now() - createdAt > 5 * 60_000)) continue;
-				const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route', { p_conversation_id: Number(conversation.id), p_agent_ids: eligible });
+				const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route', { p_conversation_id: Number(conversation.id), p_agent_ids: eligibleForInbox });
 				const agentId = Number(chosen);
-				if (!Number.isSafeInteger(agentId) || !eligible.includes(agentId)) continue;
+				if (!Number.isSafeInteger(agentId) || !eligibleForInbox.includes(agentId)) continue;
 				try {
 					await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
 					await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
@@ -187,7 +244,7 @@ export default async function handler(req, res) {
 			return json(res, 409, { error: inboxes.length ? 'У Website-канала не найден публичный токен виджета' : 'Создайте Website-канал в Chatwoot, чтобы включить тестовый виджет' });
 		}
 		const requestedScope = url.searchParams.get('scope');
-		const permission = ['website-inboxes', 'website-domains'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
+		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
 		const user = await requireUser(req, { permission });
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
@@ -297,16 +354,21 @@ export default async function handler(req, res) {
 			const inboxes = await Promise.all(source.map(async (item) => {
 				const detailResult = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${item.id}`);
 				const detail = detailResult?.payload ?? detailResult;
-				return { id: Number(item.id), name: detail.name ?? item.name ?? `Website #${item.id}`, website_url: detail.website_url ?? detail.channel?.website_url ?? item.website_url ?? null, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? item.allowed_domains ?? '' };
+				return { id: Number(item.id), name: detail.name ?? item.name ?? `Website #${item.id}`, website_url: detail.website_url ?? detail.channel?.website_url ?? item.website_url ?? null, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? item.allowed_domains ?? '', widget_color: detail.widget_color ?? detail.channel?.widget_color ?? null, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? null, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? null, greeting_enabled: detail.greeting_enabled ?? false, greeting_message: detail.greeting_message ?? '', website_token: detail.website_token ?? detail.channel?.website_token ?? null };
 			}));
-			return json(res, 200, { inboxes });
+			return json(res, 200, { baseUrl: cfg.base, inboxes });
+		}
+		if (action === 'website-inbox-members' && req.method === 'GET') {
+			const inboxId = url.searchParams.get('inboxId');
+			if (!validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
+			return json(res, 200, { operatorIds: await websiteInboxMembers(cfg, inboxId) });
 		}
 		if (action === 'contact' && req.method === 'GET') {
 			const contactId = url.searchParams.get('id');
 			if (!validId(contactId)) return json(res, 400, { error: 'Некорректный ID контакта' });
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`));
 		}
-		if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
+		if (req.method !== 'POST' && action !== 'website-source') return json(res, 405, { error: 'Метод не поддерживается' });
 		if (action === 'contact-block') {
 			if (!validId(String(body.contactId ?? '')) || typeof body.blocked !== 'boolean') return json(res, 400, { error: 'Некорректный контакт или статус блокировки' });
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${body.contactId}`, { method: 'PUT', body: { blocked: body.blocked } }));
@@ -317,6 +379,36 @@ export default async function handler(req, res) {
 			const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${body.inboxId}`, { method: 'PATCH', body: { channel: { allowed_domains: domains.join(',') } } });
 			const detail = result?.payload ?? result;
 			return json(res, 200, { id: Number(detail.id ?? body.inboxId), name: detail.name ?? '', website_url: detail.website_url ?? detail.channel?.website_url ?? null, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? domains.join(',') });
+		}
+		if (action === 'website-source') {
+			if (req.method === 'DELETE') {
+				const inboxId = String(body.inboxId ?? '');
+				if (!validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
+				return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'DELETE' }));
+			}
+			if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
+			const source = websiteSourceInput(body);
+			const inboxId = body.id == null ? null : String(body.id);
+			if (inboxId !== null && !validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
+			if (!inboxId && !source.operatorIds.length) return json(res, 400, { error: 'Назначьте хотя бы одного оператора источнику' });
+			let result;
+			if (inboxId) {
+				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'PATCH', body: websiteSourcePayload(source) });
+				await setWebsiteInboxMembers(cfg, inboxId, source.operatorIds);
+			} else {
+				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes`, { method: 'POST', body: websiteSourcePayload(source) });
+				const created = result?.payload ?? result;
+				const createdId = String(created.id ?? '');
+				if (!validId(createdId)) throw chatwootError('Chatwoot создал источник, но не вернул его ID', 502);
+				try {
+					await setWebsiteInboxMembers(cfg, createdId, source.operatorIds);
+				} catch (error) {
+					await api(cfg, `/accounts/${cfg.accountId}/inboxes/${createdId}`, { method: 'DELETE' }).catch(() => undefined);
+					throw error;
+				}
+			}
+			const detail = result?.payload ?? result;
+			return json(res, 200, { inbox: { id: Number(detail.id ?? inboxId), name: detail.name ?? source.name, website_url: detail.website_url ?? detail.channel?.website_url ?? source.websiteUrl, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? source.allowedDomains.join(','), widget_color: detail.widget_color ?? detail.channel?.widget_color ?? source.widgetColor, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? source.welcomeTitle, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? source.welcomeTagline, greeting_enabled: detail.greeting_enabled ?? source.greetingEnabled, greeting_message: detail.greeting_message ?? source.greetingMessage, website_token: detail.website_token ?? detail.channel?.website_token ?? null } });
 		}
 		if (!validId(String(body.conversationId ?? ''))) return json(res, 400, { error: 'Некорректный ID диалога' });
 		const id = String(body.conversationId);

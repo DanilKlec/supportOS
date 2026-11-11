@@ -69,6 +69,13 @@ export type ChatwootWebsiteInbox = {
 	name: string;
 	website_url?: string | null;
 	allowed_domains?: string | null;
+	widget_color?: string | null;
+	welcome_title?: string | null;
+	welcome_tagline?: string | null;
+	greeting_enabled?: boolean;
+	greeting_message?: string | null;
+	website_token?: string | null;
+	operator_ids?: number[];
 };
 export type ChatwootContact = {
 	id: number;
@@ -146,7 +153,38 @@ export const chatwootService = {
 			}>;
 		}>("agents"),
 	websiteInboxes: () =>
-		request<{ inboxes: ChatwootWebsiteInbox[] }>("website-inboxes"),
+		request<{ baseUrl: string; inboxes: ChatwootWebsiteInbox[] }>(
+			"website-inboxes",
+		),
+	websiteInboxMembers: (inboxId: number) =>
+		request<{ operatorIds: number[] }>(
+			"website-inbox-members",
+			undefined,
+			`&inboxId=${inboxId}`,
+		),
+	saveWebsiteSource: (source: {
+		id?: number;
+		name: string;
+		websiteUrl: string;
+		allowedDomains: string[];
+		widgetColor: string;
+		welcomeTitle: string;
+		welcomeTagline: string;
+		greetingEnabled: boolean;
+		greetingMessage: string;
+		operatorIds: number[];
+	}) =>
+		request<{ inbox: ChatwootWebsiteInbox }>("website-source", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(source),
+		}),
+	deleteWebsiteSource: (inboxId: number) =>
+		request("website-source", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ inboxId }),
+		}),
 	setWebsiteDomains: (inboxId: number, domains: string[]) =>
 		request<ChatwootWebsiteInbox>("website-domains", {
 			method: "POST",
