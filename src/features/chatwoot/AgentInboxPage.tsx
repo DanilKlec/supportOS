@@ -6,7 +6,7 @@ import {
 	CheckCheck,
 	ChevronDown,
 	Columns2,
-	Eye,
+	ExternalLink,
 	Globe2,
 	Headphones,
 	LoaderCircle,
@@ -30,7 +30,7 @@ import {
 	UserRound,
 	X,
 } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
@@ -51,8 +51,8 @@ import { useAuthStore } from "@/store/auth.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 
-type Scope = "mine" | "queue" | "history" | "supervised";
-type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor";
+type Scope = "mine" | "queue" | "history" | "active";
+type WorkspaceSection = "inbox" | "team" | "archive";
 type LayoutMode = "single" | "columns" | "rows";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
@@ -104,6 +104,7 @@ export function AgentInboxPage() {
 		try { return Number(localStorage.getItem("supportos:chatwoot:list-width")) || 320; } catch { return 320; }
 	});
 	const [paneSplit, setPaneSplit] = useState(50);
+	const [activePage, setActivePage] = useState(1);
 	const [activePane, setActivePane] = useState(0);
 	const [conversationIds, setConversationIds] = useState<Array<number | null>>([
 		null,
@@ -122,12 +123,17 @@ export function AgentInboxPage() {
 	const [soundEnabled, setSoundEnabled] = useState(() => {
 		try { return localStorage.getItem("supportos:chatwoot:sound") !== "off"; } catch { return true; }
 	});
+	const audioContext = useRef<AudioContext | null>(null);
+	const seenConversationActivity = useRef<Map<number, number | string> | null>(null);
 	const user = useAuthStore((s) => s.session?.user);
 	const canManageSites = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("technical") === true,
 	);
 	const canSupervise = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("monitor.read") === true,
+	);
+	const canWork = useAuthStore(
+		(s) => s.session?.user.access?.permissions.includes("work") === true,
 	);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
@@ -150,15 +156,11 @@ export function AgentInboxPage() {
 		enabled: connection.data?.configured === true,
 		refetchInterval: 30000,
 	});
-	const displayedScope: Scope = activeSection === "archive"
-		? "history"
-		: activeSection === "supervisor"
-			? "supervised"
-			: scope;
+	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
 	const request: ConversationSearch = {
 		scope: displayedScope,
 		status: displayedScope === "history" ? "resolved" : "open",
-		page: 1,
+		page: displayedScope === "active" ? activePage : 1,
 		...(inboxId ? { inboxId: Number(inboxId) } : {}),
 		...(displayedScope === "history" && agentId ? { agentId: Number(agentId) } : {}),
 		...(label ? { label } : {}),
@@ -199,6 +201,54 @@ export function AgentInboxPage() {
 		() => rowsFrom(conversations.data),
 		[conversations.data],
 	);
+	const unlockAudio = () => {
+		if (audioContext.current || typeof window === "undefined") return;
+		const Context = window.AudioContext;
+		if (!Context) return;
+		try {
+			audioContext.current = new Context();
+			void audioContext.current.resume().catch(() => undefined);
+		} catch { /* audio is optional */ }
+	};
+	useEffect(() => {
+		if (!conversations.data) return;
+		if (!seenConversationActivity.current) {
+			seenConversationActivity.current = new Map(rows.map((row) => [row.id, row.last_non_activity_message?.id ?? row.updated_at ?? 0]));
+			return;
+		}
+		const fresh = rows.filter((row) => {
+			const previous = seenConversationActivity.current?.get(row.id);
+			const latest = row.last_non_activity_message;
+			const activityId = latest?.id ?? row.updated_at ?? 0;
+			const timestamp = latest?.created_at ?? row.updated_at ?? row.created_at ?? 0;
+			const millis = timestamp > 1e12 ? timestamp : timestamp * 1000;
+			const isIncoming = latest && !latest.private && latest.message_type !== 1 && latest.message_type !== "outgoing";
+			const isRecent = Date.now() - millis < 120_000;
+			const isNewConversation = previous === undefined && isRecent;
+			const isNewMessage = previous !== undefined && previous !== activityId && isIncoming && isRecent;
+			seenConversationActivity.current?.set(row.id, activityId);
+			return isNewConversation || isNewMessage;
+		});
+		if (!fresh.length || !soundEnabled) return;
+		const context = audioContext.current;
+		if (context?.state === "running") {
+			const oscillator = context.createOscillator();
+			const gain = context.createGain();
+			oscillator.type = "sine";
+			oscillator.frequency.setValueAtTime(740, context.currentTime);
+			oscillator.frequency.setValueAtTime(988, context.currentTime + 0.11);
+			gain.gain.setValueAtTime(0.0001, context.currentTime);
+			gain.gain.exponentialRampToValueAtTime(0.14, context.currentTime + 0.02);
+			gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.28);
+			oscillator.connect(gain);
+			gain.connect(context.destination);
+			oscillator.start();
+			oscillator.stop(context.currentTime + 0.29);
+		}
+		if ("Notification" in window && Notification.permission === "granted") {
+			new Notification(fresh.length === 1 ? "Новый диалог" : `${fresh.length} новых диалогов`, { body: "Новое обращение в рабочем пространстве SupportOS" });
+		}
+	}, [conversations.data, rows, soundEnabled]);
 	const placeConversation = (id: number) => {
 		const existing = conversationIds.indexOf(id);
 		if (existing >= 0) {
@@ -230,12 +280,20 @@ export function AgentInboxPage() {
 		setProfileOpen(false);
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
-		if (section === "supervisor") setScope("supervised");
+		setActivePage(1);
+	};
+	const selectScope = (next: Scope) => {
+		setScope(next);
+		setActivePage(1);
 	};
 	const toggleSound = () => {
 		setSoundEnabled((current) => {
 			const next = !current;
 			try { localStorage.setItem("supportos:chatwoot:sound", next ? "on" : "off"); } catch { /* preference remains in session */ }
+			if (next) {
+				unlockAudio();
+				if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
+			}
 			return next;
 		});
 	};
@@ -274,12 +332,11 @@ export function AgentInboxPage() {
 			/>
 		);
 	return (
-		<div className="flex h-full min-h-0 bg-background text-foreground">
+		<div className="flex h-full min-h-0 bg-background text-foreground" onPointerDownCapture={unlockAudio}>
 			<InboxRail
 				activeSection={activeSection}
 				collapsed={railCollapsed}
 				onToggleCollapsed={() => setRailCollapsed((value) => !value)}
-				canSupervise={canSupervise}
 				userEmail={user?.email ?? ""}
 				accepting={presence.data?.current.accepting === true}
 				acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
@@ -293,7 +350,7 @@ export function AgentInboxPage() {
 				onManageSites={canManageSites ? () => { setSitesOpen(true); setProfileOpen(false); } : undefined}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex min-h-[62px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
+			{activeSection !== "team" && <header className="flex min-h-[62px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
 				<div className="flex min-w-0 items-center gap-3">
 					<div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-accent">
 						<MessageCircle size={18} />
@@ -348,7 +405,7 @@ export function AgentInboxPage() {
 						/>
 					</button>
 				</div>
-			</header>
+			</header>}
 			{(presence.isError || accepting.isError) && (
 				<div
 					role="alert"
@@ -361,7 +418,16 @@ export function AgentInboxPage() {
 							: "Не удалось проверить статус агента"}
 				</div>
 			)}
-			<div className="flex min-h-0 flex-1">
+			<div className="flex min-h-0 flex-1 flex-col">
+				{activeSection === "inbox" && <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-2">
+					{(["mine", "queue", ...(canSupervise ? ["active" as const] : [])] as const).map((item) => (
+						<button key={item} type="button" onClick={() => selectScope(item)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
+							{item === "mine" ? "Мои" : item === "queue" ? "Очередь" : "Активные"}
+							{item === "active" && <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">все агенты</span>}
+						</button>
+					))}
+				</div>}
+				<div className="flex min-h-0 flex-1">
 				{activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
@@ -370,23 +436,9 @@ export function AgentInboxPage() {
 						currentAgentId={presence.data?.current.agentId}
 					/>
 				) : <>
-				{queueOpen && (
+				{queueOpen && scope !== "active" && (
 					<aside style={{ width: listWidth }} className="flex min-w-[260px] max-w-[520px] shrink-0 flex-col border-r border-border bg-surface/40">
 						<div className="border-b border-border p-3">
-							{activeSection === "inbox" && <div className="grid grid-cols-2 rounded-lg border border-border bg-background p-1">
-								{(["mine", "queue"] as const).map((item) => (
-									<button
-										key={item}
-										type="button"
-										onClick={() => setScope(item)}
-										className={`rounded-md px-1.5 py-2 text-xs font-medium ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
-									>
-										{item === "mine"
-											? "Мои"
-											: "Очередь"}
-									</button>
-								))}
-							</div>}
 							<div className="relative mt-3">
 								<Search
 									size={14}
@@ -468,7 +520,7 @@ export function AgentInboxPage() {
 									? "Мои активные"
 									: displayedScope === "queue"
 										? "Нераспределённые"
-										: displayedScope === "supervised" ? "Активные диалоги" : "История диалогов"}
+										: displayedScope === "active" ? "Активные диалоги" : "История диалогов"}
 							</span>
 							<span>{rows.length}</span>
 						</div>
@@ -515,8 +567,9 @@ export function AgentInboxPage() {
 						</div>
 					</aside>
 				)}
-				{queueOpen && <ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} />}
+				{queueOpen && scope !== "active" && <ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} />}
 				<main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+					{scope === "active" ? <ActiveChatsTable rows={rows} isLoading={conversations.isLoading} isError={conversations.isError} error={conversations.error} canOpen={canWork} page={activePage} hasMore={conversations.data?.hasMore === true} onPage={setActivePage} onOpen={(id) => { placeConversation(id); setScope("mine"); }} inboxes={inboxes} labels={labels} inboxId={inboxId} onInbox={setInboxId} label={label} onLabel={setLabel} search={search} onSearch={setSearch} /> : <>
 					<button
 						type="button"
 						aria-label={queueOpen ? "Скрыть список" : "Показать список"}
@@ -577,8 +630,10 @@ export function AgentInboxPage() {
 							/>
 						)}
 					</div>
+					</>}
 				</main>
 				</>}
+			</div>
 			</div>
 			</div>
 			{sitesOpen && (
@@ -600,11 +655,11 @@ export function AgentInboxPage() {
 }
 
 function sectionTitle(section: WorkspaceSection) {
-	return section === "team" ? "Команда" : section === "archive" ? "Архив" : section === "supervisor" ? "Супервизор" : "Диалоги";
+	return section === "team" ? "Команда" : section === "archive" ? "Архив" : "Диалоги";
 }
 
 function sectionDescription(section: WorkspaceSection) {
-	return section === "team" ? "Агенты и команды Chatwoot" : section === "archive" ? "Завершённые диалоги и фильтры" : section === "supervisor" ? "Активные диалоги команды" : "Входящие, очередь и рабочие диалоги";
+	return section === "team" ? "Агенты и команды Chatwoot" : section === "archive" ? "Завершённые диалоги и фильтры" : "Входящие, очередь и рабочие диалоги";
 }
 
 function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEnd = false }: {
@@ -654,11 +709,10 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, canSupervise, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
-	canSupervise: boolean;
 	userEmail: string;
 	accepting: boolean;
 	acceptingPending: boolean;
@@ -675,7 +729,6 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, canSupervise, 
 		{ id: "inbox", label: "Диалоги", icon: MessagesSquare },
 		{ id: "team", label: "Команда", icon: UsersRound },
 		{ id: "archive", label: "Архив", icon: Archive },
-		...(canSupervise ? [{ id: "supervisor" as const, label: "Супервизор", icon: Eye }] : []),
 	];
 	return (
 		<aside className={`relative z-30 flex shrink-0 flex-col border-r border-border bg-surface/75 py-3 transition-[width] duration-200 ${collapsed ? "w-[62px] items-center" : "w-[208px]"}`}>
@@ -717,6 +770,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, canSupervise, 
 					</button>
 					<button type="button" onClick={onOpenSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Личные настройки</button>
 					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Домены сайтов</button>}
+					<a href="/chatwoot-demo.html" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs hover:bg-surface-elevated"><ExternalLink size={15} /> Тестовый сайт с чатом</a>
 					<Link to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Headphones size={15} /> Настройки SupportOS</Link>
 				</div>
 			)}
@@ -788,6 +842,78 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId }: {
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
 	return <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-4"><div className="grid size-9 place-items-center rounded-lg bg-accent/10 text-accent">{icon}</div><div><div className="text-lg font-semibold">{value}</div><div className="text-[11px] text-muted">{label}</div></div></div>;
+}
+
+type ActiveSort = "player" | "email" | "agent" | "project" | "updated";
+function ActiveChatsTable({ rows, isLoading, isError, error, canOpen, page, hasMore, onPage, onOpen, inboxes, labels, inboxId, onInbox, label, onLabel, search, onSearch }: {
+	rows: ChatwootConversation[];
+	isLoading: boolean;
+	isError: boolean;
+	error: unknown;
+	canOpen: boolean;
+	page: number;
+	hasMore: boolean;
+	onPage: (page: number) => void;
+	onOpen: (id: number) => void;
+	inboxes: Array<{ id: number; name: string }>;
+	labels: string[];
+	inboxId: string;
+	onInbox: (value: string) => void;
+	label: string;
+	onLabel: (value: string) => void;
+	search: string;
+	onSearch: (value: string) => void;
+}) {
+	const [sort, setSort] = useState<ActiveSort>("updated");
+	const [direction, setDirection] = useState<"asc" | "desc">("desc");
+	const sorted = [...rows].sort((left, right) => {
+		const value = (item: ChatwootConversation) => {
+			if (sort === "player") return item.meta?.sender?.name ?? "";
+			if (sort === "email") return item.meta?.sender?.email ?? "";
+			if (sort === "agent") return item.meta?.assignee?.name ?? "";
+			if (sort === "project") return item.meta?.inbox?.name ?? "";
+			return item.updated_at ?? item.created_at ?? 0;
+		};
+		const a = value(left);
+		const b = value(right);
+		const compare = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "ru", { sensitivity: "base" });
+		return direction === "asc" ? compare : -compare;
+	});
+	const sortBy = (column: ActiveSort) => {
+		if (sort === column) setDirection((value) => value === "asc" ? "desc" : "asc");
+		else { setSort(column); setDirection(column === "updated" ? "desc" : "asc"); }
+	};
+	const dateTime = (value?: number) => value ? new Date(value > 1e12 ? value : value * 1000).toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+	const heading = (key: ActiveSort, title: string) => <button type="button" onClick={() => sortBy(key)} className="inline-flex items-center gap-1.5 text-left hover:text-foreground">{title}<span className={sort === key ? "text-accent" : "text-muted/60"}>{sort === key ? direction === "asc" ? "↑" : "↓" : "↕"}</span></button>;
+	return (
+		<section className="flex min-h-0 min-w-0 flex-1 flex-col">
+			<div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/20 px-4 py-3">
+				<div className="relative min-w-[200px] flex-1 sm:max-w-sm"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Игрок, почта или диалог" className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
+				<select value={inboxId} onChange={(event) => onInbox(event.target.value)} className="h-9 min-w-32 rounded-lg border border-border bg-background px-2.5 text-xs"><option value="">Все проекты</option>{inboxes.map((inbox) => <option key={inbox.id} value={inbox.id}>{inbox.name}</option>)}</select>
+				<select value={label} onChange={(event) => onLabel(event.target.value)} className="h-9 min-w-28 rounded-lg border border-border bg-background px-2.5 text-xs"><option value="">Все теги</option>{labels.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
+				<div className="ml-auto rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] text-muted">Все активные диалоги · Chatwoot</div>
+			</div>
+			<div className="supportos-scroll min-h-0 flex-1 overflow-auto">
+				<table className="w-full min-w-[960px] border-collapse text-left text-xs">
+					<thead className="sticky top-0 z-10 border-b border-border bg-surface text-[10px] font-semibold uppercase tracking-wide text-muted"><tr>
+						<th className="px-4 py-3">{heading("player", "Игрок")}</th><th className="px-4 py-3">{heading("email", "Email")}</th><th className="px-4 py-3">{heading("agent", "Агент")}</th><th className="px-4 py-3">{heading("project", "Проект")}</th><th className="px-4 py-3">Теги</th><th className="px-4 py-3">Статус</th><th className="px-4 py-3">{heading("updated", "Последняя активность")}</th>
+					</tr></thead>
+					<tbody className="divide-y divide-border/70">
+						{isLoading ? <tr><td colSpan={7} className="p-10 text-center text-muted"><LoaderCircle size={16} className="mr-2 inline animate-spin" />Загружаем активные чаты…</td></tr> : isError ? <tr><td colSpan={7} className="p-8 text-center text-red-400">{error instanceof Error ? error.message : "Не удалось загрузить чаты"}</td></tr> : sorted.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-muted">Активных чатов не найдено</td></tr> : sorted.map((item) => {
+							const sender = item.meta?.sender;
+							return <tr key={item.id} className="transition hover:bg-surface-elevated/50">
+								<td className="px-4 py-3"><div className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface text-[10px] font-semibold">{initials(sender?.name || sender?.email)}</span>{canOpen ? <button type="button" onClick={() => onOpen(item.id)} className="max-w-48 truncate text-left font-medium hover:text-accent">{sender?.name || `Диалог #${item.id}`}</button> : <span className="max-w-48 truncate font-medium">{sender?.name || `Диалог #${item.id}`}</span>}</div></td>
+								<td className="px-4 py-3 text-muted">{sender?.email || "—"}</td><td className="px-4 py-3">{item.meta?.assignee?.name || <span className="text-amber-300">Не назначен</span>}</td><td className="px-4 py-3 text-muted">{item.meta?.inbox?.name || "—"}</td>
+								<td className="px-4 py-3"><div className="flex max-w-52 flex-wrap gap-1">{item.labels?.length ? item.labels.map((tag) => <span key={tag} className="max-w-24 truncate rounded-full bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tag}</span>) : <span className="text-muted">—</span>}</div></td>
+								<td className="px-4 py-3"><span className="inline-flex items-center gap-1.5 text-[10px] text-muted"><i className={`size-1.5 rounded-full ${item.status === "pending" ? "bg-amber-300" : "bg-emerald-400"}`} />{item.status === "pending" ? "Ожидает" : "Открыт"}</span></td><td className="px-4 py-3 text-muted">{dateTime(item.last_non_activity_message?.created_at ?? item.updated_at)}</td>
+							</tr>;
+						})}
+					</tbody>
+				</table>
+			</div>
+			<footer className="flex shrink-0 items-center justify-between border-t border-border px-4 py-2.5 text-[11px] text-muted"><span>Страница {page} · {rows.length} диалогов</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">Назад</button><button type="button" disabled={!hasMore} onClick={() => onPage(page + 1)} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">Дальше</button></div></footer>
+		</section>
+	);
 }
 
 function ConversationRow({
@@ -1127,7 +1253,7 @@ function ConversationPane({
 						</button>
 					</div>
 				</header>
-				<div className="flex min-h-8 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1.5">
+				<div className="relative z-20 flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-border px-3 py-1.5">
 					{tags.map((tag) => (
 						<button
 							key={tag}
@@ -1141,7 +1267,7 @@ function ConversationPane({
 							{tag} ×
 						</button>
 					))}
-					<div className="relative">
+					<div className="relative z-30">
 						<button
 							type="button"
 							onClick={() => setTagOpen(!tagOpen)}
@@ -1150,7 +1276,7 @@ function ConversationPane({
 							<Tag size={11} /> Добавить тег
 						</button>
 						{tagOpen && (
-							<div className="absolute left-0 top-7 z-20 max-h-48 w-48 overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-xl">
+							<div className="supportos-scroll absolute left-0 top-[calc(100%+8px)] z-[90] max-h-64 w-60 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl">
 								{labels
 									.filter((tag) => !tags.includes(tag))
 									.map((tag) => (

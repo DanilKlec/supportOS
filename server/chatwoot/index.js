@@ -120,24 +120,36 @@ async function routeWaitingConversations(env, cfg) {
 	const known = new Set(agents.map((agent) => Number(agent.id)));
 	const eligible = activeIds.filter((id) => known.has(id));
 	let assigned = 0;
-	for (let page = 1; page <= 10; page += 1) {
-		const waiting = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=open&assignee_type=unassigned&page=${page}`);
-		const pageItems = itemList(waiting);
-		for (const conversation of pageItems) {
-		if (!validId(String(conversation.id))) continue;
-		const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route', { p_conversation_id: Number(conversation.id), p_agent_ids: eligible });
-		const agentId = Number(chosen);
-		if (!Number.isSafeInteger(agentId) || !eligible.includes(agentId)) continue;
-		try {
-			await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
-			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
-			assigned += 1;
-		} catch (error) {
-			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
-			if (error.status === 401 || error.status === 403) throw error;
+	for (const status of ['open', 'pending']) {
+		for (let page = 1; page <= 10; page += 1) {
+			const active = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page}`);
+			const pageItems = itemList(active);
+			for (const conversation of pageItems) {
+				if (!validId(String(conversation.id))) continue;
+				const currentAssignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
+				const isUnassigned = !Number.isSafeInteger(currentAssignee) || currentAssignee <= 0;
+				if (!isUnassigned && eligible.includes(currentAssignee)) continue;
+				const rawCreatedAt = conversation.created_at;
+				const createdAt = typeof rawCreatedAt === 'string' && !/^\d+$/.test(rawCreatedAt)
+					? Date.parse(rawCreatedAt)
+					: Number(rawCreatedAt) * (Number(rawCreatedAt) > 1e12 ? 1 : 1000);
+				// Re-route fresh chats that Chatwoot auto-assigned outside the active SupportOS team.
+				// Older assigned conversations stay with their current owner; unassigned ones remain routable.
+				if (!isUnassigned && (!Number.isFinite(createdAt) || Date.now() - createdAt > 5 * 60_000)) continue;
+				const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route', { p_conversation_id: Number(conversation.id), p_agent_ids: eligible });
+				const agentId = Number(chosen);
+				if (!Number.isSafeInteger(agentId) || !eligible.includes(agentId)) continue;
+				try {
+					await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
+					await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
+					assigned += 1;
+				} catch (error) {
+					await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
+					if (error.status === 401 || error.status === 403) throw error;
+				}
+			}
+			if (pageItems.length < 25) break;
 		}
-		}
-		if (pageItems.length < 25) break;
 	}
 	return { assigned };
 }
@@ -160,8 +172,22 @@ export default async function handler(req, res) {
 	try {
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		const action = url.searchParams.get('action') ?? 'health';
+		if (action === 'widget-config' && req.method === 'GET') {
+			// Website tokens are designed to be public in widget snippets; never return the Chatwoot API token here.
+			const cfg = config();
+			if (!cfg) return json(res, 503, { error: 'Chatwoot не настроен на сервере' });
+			const inboxes = itemList(await api(cfg, `/accounts/${cfg.accountId}/inboxes`)).filter(isWebsiteInbox);
+			for (const inbox of inboxes) {
+				const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inbox.id}`);
+				const detail = result?.payload ?? result;
+				const websiteToken = detail.website_token ?? detail.channel?.website_token ?? inbox.website_token;
+				if (typeof websiteToken === 'string' && websiteToken.length > 0)
+					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxName: detail.name ?? inbox.name ?? 'Поддержка' });
+			}
+			return json(res, 409, { error: inboxes.length ? 'У Website-канала не найден публичный токен виджета' : 'Создайте Website-канал в Chatwoot, чтобы включить тестовый виджет' });
+		}
 		const requestedScope = url.searchParams.get('scope');
-		const permission = ['website-inboxes', 'website-domains'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'supervised' ? 'monitor.read' : 'work';
+		const permission = ['website-inboxes', 'website-domains'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
 		const user = await requireUser(req, { permission });
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
@@ -188,7 +214,7 @@ export default async function handler(req, res) {
 		}
 		if (action === 'conversations' && req.method === 'GET') {
 			const scope = url.searchParams.get('scope') ?? 'queue';
-			if (!['queue', 'mine', 'history', 'supervised'].includes(scope)) return json(res, 400, { error: 'Некорректный раздел диалогов' });
+			if (!['queue', 'mine', 'history', 'active'].includes(scope)) return json(res, 400, { error: 'Некорректный раздел диалогов' });
 			const page = Math.min(10000, Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1));
 			const status = url.searchParams.get('status') ?? (scope === 'history' ? 'resolved' : scope === 'mine' ? 'open' : 'open');
 			if (!['open', 'resolved', 'pending', 'snoozed', 'all'].includes(status)) return json(res, 400, { error: 'Некорректный статус' });
@@ -202,21 +228,40 @@ export default async function handler(req, res) {
 			const validDate = (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
 			if (!validDate(from) || !validDate(to)) return json(res, 400, { error: 'Некорректный диапазон дат' });
 			if (scope === 'queue') {
-				const query = new URLSearchParams({ status, assignee_type: 'unassigned', page: String(page) });
-				if (inboxId) query.set('inbox_id', inboxId);
-				if (label) query.set('labels', label);
-				const q = url.searchParams.get('q');
-				if (q) query.set('q', q.slice(0, 150));
-				const result = await api(cfg, `${prefix}?${query}`);
-				return json(res, 200, result);
+				const paramsFor = (nextStatus) => {
+					const query = new URLSearchParams({ status: nextStatus, assignee_type: 'unassigned', page: String(page) });
+					if (inboxId) query.set('inbox_id', inboxId);
+					if (label) query.set('labels', label);
+					const q = url.searchParams.get('q');
+					if (q) query.set('q', q.slice(0, 150));
+					return query;
+				};
+				const [open, pending] = await Promise.all([
+					api(cfg, `${prefix}?${paramsFor(status === 'pending' ? 'pending' : 'open')}`),
+					api(cfg, `${prefix}?${paramsFor('pending')}`),
+				]);
+				const openItems = itemList(open);
+				const pendingItems = itemList(pending);
+				const unique = new Map([...openItems, ...pendingItems].map((conversation) => [conversation.id, conversation]));
+				return json(res, 200, { payload: [...unique.values()], hasMore: openItems.length >= 25 || pendingItems.length >= 25 });
 			}
-			if (scope === 'supervised') {
-				const query = new URLSearchParams({ status: 'open', page: String(page) });
-				if (inboxId) query.set('inbox_id', inboxId);
-				if (label) query.set('labels', label);
-				const q = url.searchParams.get('q');
-				if (q) query.set('q', q.slice(0, 150));
-				return json(res, 200, await api(cfg, `${prefix}?${query}`));
+			if (scope === 'active') {
+				const paramsFor = (status) => {
+					const query = new URLSearchParams({ status, page: String(page) });
+					if (inboxId) query.set('inbox_id', inboxId);
+					if (label) query.set('labels', label);
+					const q = url.searchParams.get('q');
+					if (q) query.set('q', q.slice(0, 150));
+					return query;
+				};
+				const [open, pending] = await Promise.all([
+					api(cfg, `${prefix}?${paramsFor('open')}`),
+					api(cfg, `${prefix}?${paramsFor('pending')}`),
+				]);
+				const openItems = itemList(open);
+				const pendingItems = itemList(pending);
+				const unique = new Map([...openItems, ...pendingItems].map((conversation) => [conversation.id, conversation]));
+				return json(res, 200, { payload: [...unique.values()], hasMore: openItems.length >= 25 || pendingItems.length >= 25 });
 			}
 			let assigneeId = agentId;
 			if (scope === 'mine') {

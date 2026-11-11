@@ -39,6 +39,8 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 	const selected =
 		inboxes.find((inbox) => inbox.id === selectedId) ?? inboxes[0];
 	const savedDomains = parseDomains(selected?.allowed_domains);
+	const testHost = typeof window === "undefined" ? "" : window.location.hostname;
+	const testHostAllowed = domains.some((domain) => domain === testHost || (domain.startsWith("*.") && testHost.endsWith(domain.slice(1))));
 	useEffect(() => {
 		if (!selected) return;
 		setSelectedId(selected.id);
@@ -209,6 +211,18 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 										<Plus size={14} /> Добавить
 									</button>
 								</div>
+								{selected?.allowed_domains?.trim() && testHost && !testHostAllowed && (
+									<button
+										type="button"
+										onClick={() => {
+										setDomains((current) => [...new Set([...current, testHost])]);
+										setSaved(false);
+									}}
+										className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-accent hover:underline"
+									>
+										<Globe2 size={12} /> Разрешить тестовую страницу ({testHost})
+									</button>
+								)}
 							</div>
 							<div className="mt-5">
 								<div className="mb-2 text-xs font-semibold">

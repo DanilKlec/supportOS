@@ -85,7 +85,7 @@ export type ChatwootContact = {
 };
 
 export type ConversationSearch = {
-	scope: "queue" | "mine" | "history" | "supervised";
+	scope: "queue" | "mine" | "history" | "active";
 	status?: string;
 	page?: number;
 	inboxId?: number;
@@ -121,6 +121,7 @@ export const chatwootService = {
 		request<{
 			data?: { payload?: ChatwootConversation[]; meta?: unknown };
 			payload?: ChatwootConversation[];
+			hasMore?: boolean;
 		}>(
 			"conversations",
 			undefined,
