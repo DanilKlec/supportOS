@@ -56,6 +56,13 @@ export type ChatwootAgent = {
 	role?: string;
 	availability_status?: string;
 };
+export type ChatwootTeam = {
+	id: number;
+	name: string;
+	description?: string;
+	allow_auto_assign?: boolean;
+	agents?: ChatwootAgent[];
+};
 export type ChatwootInbox = { id: number; name: string; channel_type?: string };
 export type ChatwootWebsiteInbox = {
 	id: number;
@@ -78,7 +85,7 @@ export type ChatwootContact = {
 };
 
 export type ConversationSearch = {
-	scope: "queue" | "mine" | "history";
+	scope: "queue" | "mine" | "history" | "supervised";
 	status?: string;
 	page?: number;
 	inboxId?: number;
@@ -130,6 +137,7 @@ export const chatwootService = {
 		request<{
 			agents: ChatwootAgent[];
 			inboxes: ChatwootInbox[];
+			teams: ChatwootTeam[];
 			presence: Array<{
 				chatwoot_agent_id: number;
 				accepting: boolean;

@@ -1,25 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Ban,
+	Archive,
 	CalendarDays,
 	CheckCheck,
 	ChevronDown,
 	Columns2,
+	Eye,
 	Globe2,
+	Headphones,
 	LoaderCircle,
+	Maximize2,
 	MessageCircle,
 	MessageSquareText,
+	MessagesSquare,
+	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
 	Plus,
 	RefreshCw,
+	Rows2,
 	Search,
 	Send,
+	Settings2,
+	UsersRound,
+	Volume2,
+	VolumeX,
 	Tag,
 	UserRound,
 	X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import {
@@ -27,6 +39,7 @@ import {
 	type ChatwootContact,
 	type ChatwootConversation,
 	type ChatwootMessage,
+	type ChatwootTeam,
 	type ConversationSearch,
 	chatwootService,
 } from "@/services/chatwoot.service";
@@ -38,8 +51,10 @@ import { useAuthStore } from "@/store/auth.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 
-type Scope = "mine" | "queue" | "history";
+type Scope = "mine" | "queue" | "history" | "supervised";
+type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor";
 type LayoutMode = "single" | "columns" | "rows";
+type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
 	{ id: "en", label: "EN" },
@@ -82,7 +97,13 @@ function dateLabel(timestamp?: number) {
 export function AgentInboxPage() {
 	const client = useQueryClient();
 	const [scope, setScope] = useState<Scope>("mine");
+	const [activeSection, setActiveSection] = useState<WorkspaceSection>("inbox");
+	const [railCollapsed, setRailCollapsed] = useState(false);
 	const [layout, setLayout] = useState<LayoutMode>("columns");
+	const [listWidth, setListWidth] = useState(() => {
+		try { return Number(localStorage.getItem("supportos:chatwoot:list-width")) || 320; } catch { return 320; }
+	});
+	const [paneSplit, setPaneSplit] = useState(50);
 	const [activePane, setActivePane] = useState(0);
 	const [conversationIds, setConversationIds] = useState<Array<number | null>>([
 		null,
@@ -96,8 +117,17 @@ export function AgentInboxPage() {
 	const [from, setFrom] = useState("");
 	const [to, setTo] = useState("");
 	const [sitesOpen, setSitesOpen] = useState(false);
+	const [profileOpen, setProfileOpen] = useState(false);
+	const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
+	const [soundEnabled, setSoundEnabled] = useState(() => {
+		try { return localStorage.getItem("supportos:chatwoot:sound") !== "off"; } catch { return true; }
+	});
+	const user = useAuthStore((s) => s.session?.user);
 	const canManageSites = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("technical") === true,
+	);
+	const canSupervise = useAuthStore(
+		(s) => s.session?.user.access?.permissions.includes("monitor.read") === true,
 	);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
@@ -120,21 +150,26 @@ export function AgentInboxPage() {
 		enabled: connection.data?.configured === true,
 		refetchInterval: 30000,
 	});
+	const displayedScope: Scope = activeSection === "archive"
+		? "history"
+		: activeSection === "supervisor"
+			? "supervised"
+			: scope;
 	const request: ConversationSearch = {
-		scope,
-		status: scope === "history" ? "resolved" : "open",
+		scope: displayedScope,
+		status: displayedScope === "history" ? "resolved" : "open",
 		page: 1,
 		...(inboxId ? { inboxId: Number(inboxId) } : {}),
-		...(scope === "history" && agentId ? { agentId: Number(agentId) } : {}),
+		...(displayedScope === "history" && agentId ? { agentId: Number(agentId) } : {}),
 		...(label ? { label } : {}),
-		...(scope === "history" && from ? { from } : {}),
-		...(scope === "history" && to ? { to } : {}),
+		...(displayedScope === "history" && from ? { from } : {}),
+		...(displayedScope === "history" && to ? { to } : {}),
 		...(search.trim() ? { query: search.trim() } : {}),
 	};
 	const conversations = useQuery({
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
-		enabled: connection.data?.configured === true,
+		enabled: connection.data?.configured === true && activeSection !== "team",
 		refetchInterval: 15000,
 	});
 	const allLabels = useQuery({
@@ -190,6 +225,36 @@ export function AgentInboxPage() {
 		setLayout("columns");
 		setQueueOpen(true);
 	};
+	const selectSection = (section: WorkspaceSection) => {
+		setActiveSection(section);
+		setProfileOpen(false);
+		if (section === "inbox") setScope("mine");
+		if (section === "archive") setScope("history");
+		if (section === "supervisor") setScope("supervised");
+	};
+	const toggleSound = () => {
+		setSoundEnabled((current) => {
+			const next = !current;
+			try { localStorage.setItem("supportos:chatwoot:sound", next ? "on" : "off"); } catch { /* preference remains in session */ }
+			return next;
+		});
+	};
+	const resizeList = (width: number) => {
+		const next = Math.min(520, Math.max(260, width));
+		setListWidth(next);
+		try { localStorage.setItem("supportos:chatwoot:list-width", String(next)); } catch { /* preference remains in session */ }
+	};
+	const toggleMaximizePane = (index: number) => {
+		if (layout === "single") {
+			setLayout("columns");
+			return;
+		}
+		if (index === 1) {
+			setConversationIds(([first, second]) => [second, first]);
+			setActivePane(0);
+		}
+		setLayout("single");
+	};
 	if (connection.isLoading)
 		return (
 			<div className="flex h-full items-center justify-center text-muted">
@@ -209,7 +274,25 @@ export function AgentInboxPage() {
 			/>
 		);
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+		<div className="flex h-full min-h-0 bg-background text-foreground">
+			<InboxRail
+				activeSection={activeSection}
+				collapsed={railCollapsed}
+				onToggleCollapsed={() => setRailCollapsed((value) => !value)}
+				canSupervise={canSupervise}
+				userEmail={user?.email ?? ""}
+				accepting={presence.data?.current.accepting === true}
+				acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
+				profileOpen={profileOpen}
+				soundEnabled={soundEnabled}
+				onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
+				onSelect={selectSection}
+				onToggleProfile={() => setProfileOpen(!profileOpen)}
+				onToggleSound={toggleSound}
+				onOpenSettings={() => { setAgentSettingsOpen(true); setProfileOpen(false); }}
+				onManageSites={canManageSites ? () => { setSitesOpen(true); setProfileOpen(false); } : undefined}
+			/>
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			<header className="flex min-h-[62px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
 				<div className="flex min-w-0 items-center gap-3">
 					<div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-accent">
@@ -217,54 +300,15 @@ export function AgentInboxPage() {
 					</div>
 					<div className="min-w-0">
 						<h1 className="truncate text-base font-semibold">
-							Рабочее место агента
+							{sectionTitle(activeSection)}
 						</h1>
 						<p className="truncate text-[11px] text-muted">
-							Чаты, очередь и база быстрых ответов
+							{sectionDescription(activeSection)}
 						</p>
 					</div>
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
-					<div
-						className={`hidden rounded-full px-2.5 py-1 text-[11px] sm:block ${presence.data?.current.accepting ? "bg-emerald-500/10 text-emerald-400" : "bg-surface-elevated text-muted"}`}
-					>
-						{presence.data?.current.accepting ? "Принимаю чаты" : "Не принимаю"}
-					</div>
-					<button
-						type="button"
-						disabled={
-							accepting.isPending || presence.isLoading || !presence.data
-						}
-						onClick={() => accepting.mutate(!presence.data?.current.accepting)}
-						className={`h-8 rounded-lg border px-3 text-xs font-medium disabled:opacity-50 ${presence.data?.current.accepting ? "border-emerald-500/30 text-emerald-400" : "border-border hover:bg-surface-elevated"}`}
-					>
-						{accepting.isPending
-							? "Сохраняю…"
-							: presence.data?.current.accepting
-								? "Приём включён"
-								: "Принимать чаты"}
-					</button>
-					{presence.data && (
-						<span className="hidden text-[10px] text-muted xl:inline">
-							{
-								presence.data.team.filter(
-									(member) => member.accepting && member.active,
-								).length
-							}{" "}
-							агентов на приёме
-						</span>
-					)}
-					{canManageSites && (
-						<button
-							type="button"
-							onClick={() => setSitesOpen(true)}
-							className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium hover:bg-surface-elevated"
-							title="Настроить подключённые сайты"
-						>
-							<Globe2 size={14} />
-							<span className="hidden lg:inline">Сайты</span>
-						</button>
-					)}
+					{activeSection !== "team" && (
 					<div className="hidden rounded-lg border border-border bg-surface p-1 sm:flex">
 						<button
 							type="button"
@@ -272,7 +316,7 @@ export function AgentInboxPage() {
 							title="Одна панель"
 							className={`rounded-md p-1.5 ${layout === "single" ? "bg-surface-elevated" : "text-muted"}`}
 						>
-							<PanelLeftOpen size={15} />
+							<Maximize2 size={15} />
 						</button>
 						<button
 							type="button"
@@ -288,9 +332,10 @@ export function AgentInboxPage() {
 							title="Разделить по горизонтали"
 							className={`rounded-md px-2 py-1 text-xs ${layout === "rows" ? "bg-surface-elevated" : "text-muted"}`}
 						>
-							↕
+							<Rows2 size={15} />
 						</button>
 					</div>
+					)}
 					<button
 						type="button"
 						onClick={reload}
@@ -317,11 +362,19 @@ export function AgentInboxPage() {
 				</div>
 			)}
 			<div className="flex min-h-0 flex-1">
+				{activeSection === "team" ? (
+					<TeamWorkspace
+						agents={agents}
+						teams={directory.data?.teams ?? []}
+						presence={directory.data?.presence ?? []}
+						currentAgentId={presence.data?.current.agentId}
+					/>
+				) : <>
 				{queueOpen && (
-					<aside className="flex w-[min(360px,38vw)] min-w-[260px] shrink-0 flex-col border-r border-border bg-surface/40">
+					<aside style={{ width: listWidth }} className="flex min-w-[260px] max-w-[520px] shrink-0 flex-col border-r border-border bg-surface/40">
 						<div className="border-b border-border p-3">
-							<div className="grid grid-cols-3 rounded-lg border border-border bg-background p-1">
-								{(["mine", "queue", "history"] as const).map((item) => (
+							{activeSection === "inbox" && <div className="grid grid-cols-2 rounded-lg border border-border bg-background p-1">
+								{(["mine", "queue"] as const).map((item) => (
 									<button
 										key={item}
 										type="button"
@@ -330,12 +383,10 @@ export function AgentInboxPage() {
 									>
 										{item === "mine"
 											? "Мои"
-											: item === "queue"
-												? "Очередь"
-												: "Архив"}
+											: "Очередь"}
 									</button>
 								))}
-							</div>
+							</div>}
 							<div className="relative mt-3">
 								<Search
 									size={14}
@@ -374,7 +425,7 @@ export function AgentInboxPage() {
 									))}
 								</select>
 							</div>
-							{scope === "history" && (
+							{displayedScope === "history" && (
 								<div className="mt-2 grid grid-cols-2 gap-2">
 									<select
 										value={agentId}
@@ -413,11 +464,11 @@ export function AgentInboxPage() {
 						</div>
 						<div className="flex items-center justify-between px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-muted">
 							<span>
-								{scope === "mine"
+								{displayedScope === "mine"
 									? "Мои активные"
-									: scope === "queue"
+									: displayedScope === "queue"
 										? "Нераспределённые"
-										: "История диалогов"}
+										: displayedScope === "supervised" ? "Активные диалоги" : "История диалогов"}
 							</span>
 							<span>{rows.length}</span>
 						</div>
@@ -448,7 +499,7 @@ export function AgentInboxPage() {
 										active={conversationIds.includes(item.id)}
 										onClick={() => placeConversation(item.id)}
 										onTake={
-											scope === "queue"
+											displayedScope === "queue"
 												? () =>
 														chatwootService
 															.assign(
@@ -464,6 +515,7 @@ export function AgentInboxPage() {
 						</div>
 					</aside>
 				)}
+				{queueOpen && <ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} />}
 				<main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
 					<button
 						type="button"
@@ -477,10 +529,12 @@ export function AgentInboxPage() {
 						/>
 					</button>
 					<div
+						data-chatwoot-split
 						className={`flex min-h-0 flex-1 ${layout === "rows" ? "flex-col" : "flex-row"}`}
 					>
 						<ConversationPane
 							id={conversationIds[0]}
+							style={layout === "single" ? undefined : { flexBasis: `${paneSplit}%`, flexGrow: 0 }}
 							agents={agents}
 							inboxes={inboxes}
 							labels={labels}
@@ -492,19 +546,21 @@ export function AgentInboxPage() {
 							onClose={() => setConversationIds((ids) => [null, ids[1]])}
 							onChanged={reload}
 							onChoose={openEmptyPane}
+							onToggleMaximize={() => toggleMaximizePane(0)}
+							maximized={layout === "single"}
 						/>
 						{layout !== "single" && (
-							<div
-								className={
-									layout === "rows"
-										? "h-px shrink-0 bg-border"
-										: "w-px shrink-0 bg-border"
-								}
-							/>
+							<ResizeHandle axis={layout === "rows" ? "y" : "x"} label="Изменить размер диалогов" value={paneSplit} min={25} max={75} onResize={(value) => {
+								const container = document.querySelector("[data-chatwoot-split]");
+								if (!container) return;
+								const rect = container.getBoundingClientRect();
+								setPaneSplit(Math.min(75, Math.max(25, (value / (layout === "rows" ? rect.height : rect.width)) * 100)));
+							}} />
 						)}
 						{layout !== "single" && (
 							<ConversationPane
 								id={conversationIds[1]}
+								style={{ flexBasis: `${100 - paneSplit}%`, flexGrow: 0 }}
 								agents={agents}
 								inboxes={inboxes}
 								labels={labels}
@@ -516,16 +572,222 @@ export function AgentInboxPage() {
 								onClose={() => setConversationIds((ids) => [ids[0], null])}
 								onChanged={reload}
 								onChoose={openEmptyPane}
+								onToggleMaximize={() => toggleMaximizePane(1)}
+								maximized={false}
 							/>
 						)}
 					</div>
 				</main>
+				</>}
+			</div>
 			</div>
 			{sitesOpen && (
 				<WebsiteDomainsDialog onClose={() => setSitesOpen(false)} />
 			)}
+			{agentSettingsOpen && (
+				<AgentSettingsDialog
+					email={user?.email ?? ""}
+					accepting={presence.data?.current.accepting === true}
+					acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
+					soundEnabled={soundEnabled}
+					onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
+					onToggleSound={toggleSound}
+					onClose={() => setAgentSettingsOpen(false)}
+				/>
+			)}
 		</div>
 	);
+}
+
+function sectionTitle(section: WorkspaceSection) {
+	return section === "team" ? "Команда" : section === "archive" ? "Архив" : section === "supervisor" ? "Супервизор" : "Диалоги";
+}
+
+function sectionDescription(section: WorkspaceSection) {
+	return section === "team" ? "Агенты и команды Chatwoot" : section === "archive" ? "Завершённые диалоги и фильтры" : section === "supervisor" ? "Активные диалоги команды" : "Входящие, очередь и рабочие диалоги";
+}
+
+function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEnd = false }: {
+	axis: ResizeAxis;
+	label: string;
+	value: number;
+	min?: number;
+	max?: number;
+	onResize: (coordinate: number) => void;
+	fromEnd?: boolean;
+}) {
+	return (
+		<hr
+			aria-label={label}
+			aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+			aria-valuemin={min}
+			aria-valuemax={max}
+			aria-valuenow={Math.round(value)}
+			tabIndex={0}
+			onKeyDown={(event) => {
+				if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+				event.preventDefault();
+				const parent = event.currentTarget.parentElement?.getBoundingClientRect();
+				if (!parent) return;
+				const bar = event.currentTarget.getBoundingClientRect();
+				const local = axis === "x" ? (bar.left + bar.width / 2) - parent.left : (bar.top + bar.height / 2) - parent.top;
+				const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -24 : 24;
+				onResize((fromEnd ? (axis === "x" ? parent.width : parent.height) - local : local) + direction);
+			}}
+			onPointerDown={(event) => {
+				event.currentTarget.setPointerCapture(event.pointerId);
+			(event.currentTarget as HTMLHRElement).dataset.dragging = "true";
+			}}
+			onPointerMove={(event) => {
+				if (event.currentTarget.dataset.dragging !== "true") return;
+				const parent = event.currentTarget.parentElement?.getBoundingClientRect();
+				if (!parent) return;
+				const coordinate = axis === "x" ? event.clientX - parent.left : event.clientY - parent.top;
+				onResize(fromEnd ? (axis === "x" ? parent.width : parent.height) - coordinate : coordinate);
+			}}
+			onPointerUp={(event) => {
+				event.currentTarget.dataset.dragging = "false";
+				if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+			}}
+			className={`m-0 border-0 bg-transparent p-0 outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 ${axis === "x" ? "w-2 cursor-col-resize" : "h-2 cursor-row-resize"} ${fromEnd ? "-mr-1" : ""}`}
+		/>
+	);
+}
+
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, canSupervise, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites }: {
+	activeSection: WorkspaceSection;
+	collapsed: boolean;
+	onToggleCollapsed: () => void;
+	canSupervise: boolean;
+	userEmail: string;
+	accepting: boolean;
+	acceptingPending: boolean;
+	profileOpen: boolean;
+	soundEnabled: boolean;
+	onAccept: () => void;
+	onSelect: (section: WorkspaceSection) => void;
+	onToggleProfile: () => void;
+	onToggleSound: () => void;
+	onOpenSettings: () => void;
+	onManageSites?: () => void;
+}) {
+	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
+		{ id: "inbox", label: "Диалоги", icon: MessagesSquare },
+		{ id: "team", label: "Команда", icon: UsersRound },
+		{ id: "archive", label: "Архив", icon: Archive },
+		...(canSupervise ? [{ id: "supervisor" as const, label: "Супервизор", icon: Eye }] : []),
+	];
+	return (
+		<aside className={`relative z-30 flex shrink-0 flex-col border-r border-border bg-surface/75 py-3 transition-[width] duration-200 ${collapsed ? "w-[62px] items-center" : "w-[208px]"}`}>
+			<div className={`mb-5 flex w-full items-center gap-2.5 px-3 ${collapsed ? "justify-center px-0" : ""}`}>
+				<div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-accent"><MessagesSquare size={18} /></div>
+				{!collapsed && <div className="min-w-0 flex-1"><div className="truncate text-xs font-semibold">SupportOS</div><div className="truncate text-[10px] text-muted">Рабочее место агента</div></div>}
+				{!collapsed && <button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="grid size-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button>}
+			</div>
+			{collapsed && <button type="button" title="Развернуть меню" onClick={onToggleCollapsed} className="mb-3 grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftOpen size={15} /></button>}
+			{!collapsed && <div className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">Рабочие разделы</div>}
+			<nav className={`flex w-full flex-col gap-1.5 ${collapsed ? "items-center px-2" : "px-2"}`}>
+				{items.map(({ id, label, icon: Icon }) => (
+					<button key={id} type="button" title={collapsed ? label : undefined} aria-label={label} onClick={() => onSelect(id)} className={`flex h-10 items-center gap-3 rounded-xl px-3 text-left text-xs font-medium transition ${collapsed ? "w-10 justify-center px-0" : "w-full"} ${activeSection === id ? "bg-accent/15 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
+						<Icon size={16} className="shrink-0" />
+						{!collapsed && <span>{label}</span>}
+					</button>
+				))}
+			</nav>
+			{!collapsed && <div className="mt-auto mx-3 mb-2 rounded-xl border border-border bg-background/60 p-3"><div className="flex items-center gap-2"><span className={`size-2 rounded-full ${accepting ? "bg-emerald-400" : "bg-muted"}`} /><span className="text-[11px] font-medium">{accepting ? "Принимаю чаты" : "Приём выключен"}</span></div><div className="mt-1 pl-4 text-[10px] text-muted">Управление в профиле</div></div>}
+			<div className={`mt-auto flex w-full items-center px-2 ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
+				<button type="button" title={collapsed ? "Профиль агента" : undefined} aria-label="Профиль агента" onClick={onToggleProfile} className="relative grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold hover:border-accent/60">
+					{initials(userEmail)}
+					<span className={`absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-surface ${accepting ? "bg-emerald-400" : "bg-muted"}`} />
+				</button>
+				{!collapsed && <button type="button" onClick={onToggleProfile} className="min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[10px] text-muted">{userEmail || "Открыть настройки"}</span></button>}
+			</div>
+			{profileOpen && (
+				<div className="absolute bottom-3 left-[calc(100%+8px)] z-50 w-64 rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+					<div className="border-b border-border px-3 py-2.5">
+						<div className="text-xs font-semibold">Настройки агента</div>
+						<div className="mt-1 truncate text-[11px] text-muted">{userEmail || "Аккаунт SupportOS"}</div>
+					</div>
+					<button type="button" disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
+						<span><span className="block text-xs font-medium">Приём чатов</span><span className="mt-0.5 block text-[10px] text-muted">{accepting ? "Вы в очереди распределения" : "Новые диалоги не назначаются"}</span></span>
+						<span className={`h-5 w-9 rounded-full p-0.5 transition ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white transition ${accepting ? "translate-x-4" : ""}`} /></span>
+					</button>
+					<button type="button" onClick={onToggleSound} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated">
+						{soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} Звуковые уведомления {soundEnabled ? "включены" : "выключены"}
+					</button>
+					<button type="button" onClick={onOpenSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Личные настройки</button>
+					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Домены сайтов</button>}
+					<Link to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Headphones size={15} /> Настройки SupportOS</Link>
+				</div>
+			)}
+		</aside>
+	);
+}
+
+function AgentSettingsDialog({ email, accepting, acceptingPending, soundEnabled, onAccept, onToggleSound, onClose }: {
+	email: string;
+	accepting: boolean;
+	acceptingPending: boolean;
+	soundEnabled: boolean;
+	onAccept: () => void;
+	onToggleSound: () => void;
+	onClose: () => void;
+}) {
+	return (
+					<div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4">
+			<section role="dialog" aria-modal="true" aria-labelledby="agent-settings-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+				<div className="flex items-start justify-between"><div><h2 id="agent-settings-title" className="text-base font-semibold">Настройки агента</h2><p className="mt-1 text-xs text-muted">{email || "Личные параметры рабочего места"}</p></div><button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-elevated"><X size={16} /></button></div>
+				<div className="mt-4 divide-y divide-border rounded-xl border border-border">
+					<button type="button" disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-4 p-3 text-left disabled:opacity-50"><span><span className="block text-xs font-medium">Принимать новые чаты</span><span className="mt-1 block text-[11px] text-muted">{accepting ? "Включено — очередь распределяется автоматически" : "Выключено — новые диалоги не назначаются"}</span></span><span className={`h-5 w-9 shrink-0 rounded-full p-0.5 ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white ${accepting ? "translate-x-4" : ""}`} /></span></button>
+					<button type="button" onClick={onToggleSound} className="flex w-full items-center justify-between gap-4 p-3 text-left"><span><span className="block text-xs font-medium">Звуковые уведомления</span><span className="mt-1 block text-[11px] text-muted">Сигнал при новых событиях в диалогах</span></span>{soundEnabled ? <Volume2 size={16} className="text-accent" /> : <VolumeX size={16} className="text-muted" />}</button>
+				</div>
+				<div className="mt-4 flex justify-end"><button type="button" onClick={onClose} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white">Готово</button></div>
+			</section>
+		</div>
+	);
+}
+
+function TeamWorkspace({ agents, teams, presence, currentAgentId }: {
+	agents: ChatwootAgent[];
+	teams: ChatwootTeam[];
+	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; heartbeat_at: string }>;
+	currentAgentId?: number;
+}) {
+	const [tab, setTab] = useState<"agents" | "teams">("agents");
+	const [search, setSearch] = useState("");
+	const online = presence.filter((item) => Date.now() - Date.parse(item.heartbeat_at) < 90_000);
+	const filteredAgents = agents.filter((agent) => `${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+	const filteredTeams = teams.filter((team) => team.name.toLowerCase().includes(search.toLowerCase()));
+	return (
+		<section className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+			<div className="mx-auto max-w-5xl">
+				<div className="grid gap-3 sm:grid-cols-3">
+					<StatCard label="Агенты" value={agents.length} icon={<UsersRound size={16} />} />
+					<StatCard label="В SupportOS" value={online.length} icon={<Headphones size={16} />} />
+					<StatCard label="Команды" value={teams.length} icon={<MessagesSquare size={16} />} />
+				</div>
+				<div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface/40">
+					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3">
+						<div className="flex gap-1 rounded-lg bg-background p-1">
+							<button type="button" onClick={() => setTab("agents")} className={`rounded-md px-3 py-2 text-xs ${tab === "agents" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Агенты</button>
+							<button type="button" onClick={() => setTab("teams")} className={`rounded-md px-3 py-2 text-xs ${tab === "teams" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Команды</button>
+						</div>
+						<div className="relative min-w-[220px] flex-1 sm:max-w-xs"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "agents" ? "Найти агента…" : "Найти команду…"} className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
+					</div>
+					{tab === "agents" ? filteredAgents.map((agent) => {
+						const state = presence.find((item) => item.chatwoot_agent_id === agent.id);
+						const isOnline = state && Date.now() - Date.parse(state.heartbeat_at) < 90_000;
+						return <div key={agent.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-3 last:border-0"><div className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold">{initials(agent.name)}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div><div className="truncate text-xs text-muted">{agent.email || "Почта не указана"}</div></div><span className="hidden rounded-full bg-background px-2 py-1 text-[10px] text-muted sm:block">{agent.role || "Агент"}</span><span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-2 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{state?.accepting && isOnline ? "Принимает чаты" : isOnline ? "В SupportOS" : agent.availability_status || "Не в сети"}</span></div>;
+					}) : filteredTeams.map((team) => <div key={team.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-4 last:border-0"><div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-accent"><UsersRound size={17} /></div><div className="min-w-0 flex-1"><div className="text-sm font-medium">{team.name}</div><div className="text-xs text-muted">{team.agents?.length ?? 0} агентов{team.description ? ` · ${team.description}` : ""}</div></div><span className="rounded-full bg-background px-2.5 py-1 text-[10px] text-muted">{team.allow_auto_assign ? "Автоназначение" : "Ручное назначение"}</span></div>)}
+					{((tab === "agents" && filteredAgents.length === 0) || (tab === "teams" && filteredTeams.length === 0)) && <div className="p-10 text-center text-sm text-muted">Ничего не найдено</div>}
+				</div>
+			</div>
+		</section>
+	);
+}
+
+function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+	return <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-4"><div className="grid size-9 place-items-center rounded-lg bg-accent/10 text-accent">{icon}</div><div><div className="text-lg font-semibold">{value}</div><div className="text-[11px] text-muted">{label}</div></div></div>;
 }
 
 function ConversationRow({
@@ -609,6 +871,7 @@ function ConversationRow({
 
 function ConversationPane({
 	id,
+	style,
 	active,
 	agents,
 	inboxes,
@@ -620,8 +883,11 @@ function ConversationPane({
 	onClose,
 	onChanged,
 	onChoose,
+	onToggleMaximize,
+	maximized,
 }: {
 	id: number | null;
+	style?: CSSProperties;
 	active: boolean;
 	agents: ChatwootAgent[];
 	inboxes: Array<{ id: number; name: string }>;
@@ -633,6 +899,8 @@ function ConversationPane({
 	onClose: () => void;
 	onChanged: () => void;
 	onChoose: () => void;
+	onToggleMaximize: () => void;
+	maximized: boolean;
 }) {
 	const client = useQueryClient();
 	const [text, setText] = useState("");
@@ -642,6 +910,7 @@ function ConversationPane({
 	const [showBinds, setShowBinds] = useState(false);
 	const [tagOpen, setTagOpen] = useState(false);
 	const [showCustomer, setShowCustomer] = useState(true);
+	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
@@ -763,6 +1032,7 @@ function ConversationPane({
 	const tags = conversation?.labels ?? [];
 	return (
 		<section
+			style={style}
 			onFocusCapture={onActivate}
 			className={`flex min-h-0 min-w-0 flex-1 ${active ? "" : ""}`}
 		>
@@ -824,6 +1094,14 @@ function ConversationPane({
 							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
 						>
 							<UserRound size={14} />
+						</button>
+						<button
+							type="button"
+							onClick={onToggleMaximize}
+							title={maximized ? "Вернуть разделение" : "Развернуть диалог"}
+							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
+						>
+							{maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
 						</button>
 						<button
 							type="button"
@@ -1035,7 +1313,9 @@ function ConversationPane({
 				</footer>
 			</div>
 			{showCustomer && (
-				<aside className="supportos-scroll hidden w-[230px] shrink-0 overflow-y-auto border-l border-border bg-surface/30 p-3 xl:block">
+				<>
+				<ResizeHandle axis="x" label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={(width) => setCustomerWidth(Math.min(420, Math.max(200, width)))} />
+				<aside style={{ width: customerWidth }} className="supportos-scroll hidden shrink-0 overflow-y-auto border-l border-border bg-surface/30 p-3 xl:block">
 					<div className="mb-3 flex items-center justify-between">
 						<h3 className="text-xs font-semibold">Игрок</h3>
 						<button
@@ -1137,6 +1417,7 @@ function ConversationPane({
 						)}
 					</div>
 				</aside>
+				</>
 			)}
 		</section>
 	);

@@ -160,7 +160,9 @@ export default async function handler(req, res) {
 	try {
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		const action = url.searchParams.get('action') ?? 'health';
-		const user = await requireUser(req, { permission: ['website-inboxes', 'website-domains'].includes(action) ? 'technical' : 'work' });
+		const requestedScope = url.searchParams.get('scope');
+		const permission = ['website-inboxes', 'website-domains'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'supervised' ? 'monitor.read' : 'work';
+		const user = await requireUser(req, { permission });
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
 			const cfg = config();
@@ -186,7 +188,7 @@ export default async function handler(req, res) {
 		}
 		if (action === 'conversations' && req.method === 'GET') {
 			const scope = url.searchParams.get('scope') ?? 'queue';
-			if (!['queue', 'mine', 'history'].includes(scope)) return json(res, 400, { error: 'Некорректный раздел диалогов' });
+			if (!['queue', 'mine', 'history', 'supervised'].includes(scope)) return json(res, 400, { error: 'Некорректный раздел диалогов' });
 			const page = Math.min(10000, Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1));
 			const status = url.searchParams.get('status') ?? (scope === 'history' ? 'resolved' : scope === 'mine' ? 'open' : 'open');
 			if (!['open', 'resolved', 'pending', 'snoozed', 'all'].includes(status)) return json(res, 400, { error: 'Некорректный статус' });
@@ -208,6 +210,14 @@ export default async function handler(req, res) {
 				const result = await api(cfg, `${prefix}?${query}`);
 				return json(res, 200, result);
 			}
+			if (scope === 'supervised') {
+				const query = new URLSearchParams({ status: 'open', page: String(page) });
+				if (inboxId) query.set('inbox_id', inboxId);
+				if (label) query.set('labels', label);
+				const q = url.searchParams.get('q');
+				if (q) query.set('q', q.slice(0, 150));
+				return json(res, 200, await api(cfg, `${prefix}?${query}`));
+			}
 			let assigneeId = agentId;
 			if (scope === 'mine') {
 				const agent = await matchAgent(cfg, user.email);
@@ -225,12 +235,13 @@ export default async function handler(req, res) {
 			return json(res, 200, await api(cfg, `${prefix}/${id}`));
 		}
 		if (action === 'agents' && req.method === 'GET') {
-			const [agents, inboxes, presence] = await Promise.all([
+			const [agents, inboxes, teams, presence] = await Promise.all([
 				api(cfg, `/accounts/${cfg.accountId}/agents`),
 				api(cfg, `/accounts/${cfg.accountId}/inboxes`),
+				api(cfg, `/accounts/${cfg.accountId}/teams`).catch(() => []),
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 			]);
-			return json(res, 200, { agents: itemList(agents), inboxes: itemList(inboxes), presence });
+			return json(res, 200, { agents: itemList(agents), inboxes: itemList(inboxes), teams: itemList(teams), presence });
 		}
 		if (action === 'labels' && req.method === 'GET')
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/labels`));
