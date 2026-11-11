@@ -712,6 +712,7 @@ export function Topbar() {
 				<nav className="product-spaces" aria-label="Пространства">
 					{[
 						{ to: "/", label: "Бинды" },
+						{ to: "/inbox", label: "Чаты" },
 						{ to: "/qc", label: "QC" },
 						{ to: "/admin", label: "Администрирование" },
 					]
