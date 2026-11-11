@@ -37,8 +37,14 @@ async function api(cfg, path, { method = 'GET', body } = {}) {
 	let data;
 	try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
 	if (!response.ok) {
-		const message = response.status === 401 ? 'Токен Chatwoot недействителен' : response.status === 404 ? 'Диалог или ресурс Chatwoot не найден' : 'Ошибка Chatwoot';
-		throw Object.assign(new Error(message), { status: response.status === 401 ? 502 : response.status === 404 ? 404 : 502 });
+		const upstreamMessage = [data?.message, data?.error]
+			.filter((value) => typeof value === 'string' && value.trim())
+			.join('; ')
+			|| (text && !/<(?:!doctype|html|head|body)/i.test(text) ? text.slice(0, 400).trim() : '');
+		const safeMessage = upstreamMessage.replaceAll(cfg.token, '[токен скрыт]');
+		const statusText = response.statusText ? ` ${response.statusText}` : '';
+		const message = `Chatwoot API ${method} ${path}: HTTP ${response.status}${statusText}${safeMessage ? ` — ${safeMessage}` : ''}`;
+		throw Object.assign(new Error(message), { status: response.status === 404 ? 404 : 502, chatwootStatus: response.status });
 	}
 	return data;
 }
