@@ -49,6 +49,7 @@ const languages: Array<{ id: LanguageCode; label: string }> = [
 ];
 
 function rowsFrom(result: unknown): ChatwootConversation[] {
+	if (!result || typeof result !== "object") return [];
 	if (Array.isArray(result)) return result as ChatwootConversation[];
 	const value = result as {
 		data?: { payload?: ChatwootConversation[] };
@@ -57,6 +58,7 @@ function rowsFrom(result: unknown): ChatwootConversation[] {
 	return value.data?.payload ?? value.payload ?? [];
 }
 function listFrom<T>(result: unknown): T[] {
+	if (!result || typeof result !== "object") return [];
 	if (Array.isArray(result)) return result as T[];
 	const value = result as { payload?: T[]; data?: { payload?: T[] } };
 	return value.payload ?? value.data?.payload ?? [];
