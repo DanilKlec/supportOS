@@ -26,7 +26,11 @@ async function api(cfg, path, { method = 'GET', body } = {}) {
 	try {
 		response = await fetch(`${cfg.base}/api/v1${path}`, {
 			method,
-			headers: { 'api-access-token': cfg.token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+			headers: {
+				Authorization: `Bearer ${cfg.token}`,
+				'api-access-token': cfg.token,
+				...(body ? { 'Content-Type': 'application/json' } : {}),
+			},
 			body: body ? JSON.stringify(body) : undefined,
 			signal: AbortSignal.timeout(15000),
 		});
