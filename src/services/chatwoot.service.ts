@@ -141,6 +141,12 @@ export const chatwootService = {
 			payload?: { messages?: ChatwootMessage[] };
 			meta?: ChatwootConversation["meta"];
 		}>("conversation", undefined, `&id=${id}`),
+	conversationMessages: (id: number, before?: number) =>
+		request<{
+			payload?: ChatwootMessage[];
+			messages?: ChatwootMessage[];
+			data?: { payload?: ChatwootMessage[] };
+		}>("messages", undefined, `&id=${id}${before ? `&before=${before}` : ""}`),
 	inboxDirectory: () =>
 		request<{
 			agents: ChatwootAgent[];

@@ -364,47 +364,6 @@ export function AgentInboxPage() {
 						</p>
 					</div>
 				</div>
-				<div className="flex shrink-0 items-center gap-2">
-					{activeSection !== "team" && (
-					<div className="hidden rounded-lg border border-border bg-surface p-1 sm:flex">
-						<button
-							type="button"
-							onClick={() => setLayout("single")}
-							title="Одна панель"
-							className={`rounded-md p-1.5 ${layout === "single" ? "bg-surface-elevated" : "text-muted"}`}
-						>
-							<Maximize2 size={15} />
-						</button>
-						<button
-							type="button"
-							onClick={() => setLayout("columns")}
-							title="Разделить по вертикали"
-							className={`rounded-md p-1.5 ${layout === "columns" ? "bg-surface-elevated" : "text-muted"}`}
-						>
-							<Columns2 size={15} />
-						</button>
-						<button
-							type="button"
-							onClick={() => setLayout("rows")}
-							title="Разделить по горизонтали"
-							className={`rounded-md px-2 py-1 text-xs ${layout === "rows" ? "bg-surface-elevated" : "text-muted"}`}
-						>
-							<Rows2 size={15} />
-						</button>
-					</div>
-					)}
-					<button
-						type="button"
-						onClick={reload}
-						title="Обновить"
-						className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"
-					>
-						<RefreshCw
-							size={15}
-							className={conversations.isFetching ? "animate-spin" : ""}
-						/>
-					</button>
-				</div>
 			</header>}
 			{(presence.isError || accepting.isError) && (
 				<div
@@ -595,6 +554,13 @@ export function AgentInboxPage() {
 							language={language}
 							onLanguage={setLanguage}
 							active={activePane === 0}
+							layout={layout}
+							showWorkspaceControls
+							onLayout={setLayout}
+							onReload={() => {
+								void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", conversationIds[0]] });
+								void client.invalidateQueries({ queryKey: ["chatwoot", "messages", conversationIds[0], "latest"] });
+							}}
 							onActivate={() => setActivePane(0)}
 							onClose={() => setConversationIds((ids) => [null, ids[1]])}
 							onChanged={reload}
@@ -621,6 +587,13 @@ export function AgentInboxPage() {
 								language={language}
 								onLanguage={setLanguage}
 								active={activePane === 1}
+								layout={layout}
+								showWorkspaceControls={false}
+								onLayout={setLayout}
+								onReload={() => {
+									void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", conversationIds[1]] });
+									void client.invalidateQueries({ queryKey: ["chatwoot", "messages", conversationIds[1], "latest"] });
+								}}
 								onActivate={() => setActivePane(1)}
 								onClose={() => setConversationIds((ids) => [ids[0], null])}
 								onChanged={reload}
@@ -999,6 +972,10 @@ function ConversationPane({
 	id,
 	style,
 	active,
+	layout,
+	showWorkspaceControls,
+	onLayout,
+	onReload,
 	agents,
 	inboxes,
 	labels,
@@ -1015,6 +992,10 @@ function ConversationPane({
 	id: number | null;
 	style?: CSSProperties;
 	active: boolean;
+	layout: LayoutMode;
+	showWorkspaceControls: boolean;
+	onLayout: (layout: LayoutMode) => void;
+	onReload: () => void;
 	agents: ChatwootAgent[];
 	inboxes: Array<{ id: number; name: string }>;
 	labels: string[];
@@ -1038,22 +1019,82 @@ function ConversationPane({
 	const [showCustomer, setShowCustomer] = useState(true);
 	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
+	const [olderMessages, setOlderMessages] = useState<ChatwootMessage[]>([]);
+	const [hasOlderMessages, setHasOlderMessages] = useState(true);
+	const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+	const [olderMessagesError, setOlderMessagesError] = useState("");
 	const messageViewport = useRef<HTMLDivElement>(null);
+	const previousScrollHeight = useRef<number | null>(null);
 	const followMessages = useRef(true);
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
 		queryFn: () => chatwootService.conversation(id as number),
 		enabled: id != null,
-		refetchInterval: 3000,
+		refetchInterval: 15000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
-	const messages =
-		conversation?.messages ?? query.data?.payload?.messages ?? [];
+	const latestMessagesQuery = useQuery({
+		queryKey: ["chatwoot", "messages", id, "latest"],
+		queryFn: () => chatwootService.conversationMessages(id as number),
+		enabled: id != null,
+		refetchInterval: 3000,
+	});
+	const latestMessages = latestMessagesQuery.data
+		? latestMessagesQuery.data.payload ??
+			latestMessagesQuery.data.data?.payload ??
+			latestMessagesQuery.data.messages ??
+			[]
+		: (conversation?.messages ?? query.data?.payload?.messages ?? []);
+	const messages = useMemo(() => {
+		const unique = new Map<number, ChatwootMessage>();
+		for (const message of [...olderMessages, ...latestMessages]) unique.set(message.id, message);
+		return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+	}, [olderMessages, latestMessages]);
+	const latestMessageId = messages.at(-1)?.id;
+	useEffect(() => {
+		setOlderMessages([]);
+		setHasOlderMessages(true);
+		setOlderMessagesError("");
+		followMessages.current = true;
+	}, [id]);
+	useEffect(() => {
+		if (!latestMessagesQuery.data) return;
+		const page = latestMessagesQuery.data.payload ?? latestMessagesQuery.data.data?.payload ?? latestMessagesQuery.data.messages ?? [];
+		if (page.length < 20) setHasOlderMessages(false);
+	}, [latestMessagesQuery.data]);
 	useEffect(() => {
 		const viewport = messageViewport.current;
-		if (!viewport || !followMessages.current || messages.length === 0) return;
+		if (!viewport || latestMessageId == null) return;
+		if (previousScrollHeight.current !== null) {
+			viewport.scrollTop += viewport.scrollHeight - previousScrollHeight.current;
+			previousScrollHeight.current = null;
+			return;
+		}
+		if (!followMessages.current) return;
 		viewport.scrollTop = viewport.scrollHeight;
-	}, [messages.length, messages.at(-1)?.id]);
+	}, [latestMessageId, messages.length]);
+	const loadOlderMessages = async () => {
+		const firstId = messages[0]?.id;
+		if (!id || !firstId || loadingOlderMessages || !hasOlderMessages) return;
+		setLoadingOlderMessages(true);
+		setOlderMessagesError("");
+		try {
+			const viewport = messageViewport.current;
+			if (viewport) previousScrollHeight.current = viewport.scrollHeight;
+			const result = await chatwootService.conversationMessages(id, firstId);
+			const page = result.payload ?? result.data?.payload ?? result.messages ?? [];
+			setOlderMessages((current) => {
+				const unique = new Map(current.map((message) => [message.id, message]));
+				for (const message of page) unique.set(message.id, message);
+				return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+			});
+			setHasOlderMessages(page.length >= 20);
+		} catch (error) {
+			setOlderMessagesError(error instanceof Error ? error.message : "Не удалось загрузить историю");
+		} finally {
+			setLoadingOlderMessages(false);
+		}
+	};
 	const sender = conversation?.meta?.sender;
 	const contactId = sender?.id ?? conversation?.contact_id;
 	const contact = useQuery({
@@ -1186,6 +1227,46 @@ function ConversationPane({
 						</div>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
+						{showWorkspaceControls && (
+							<div className="mr-1 flex items-center rounded-lg border border-border bg-surface p-0.5">
+								<button
+									type="button"
+									onClick={() => onLayout("single")}
+									title="Одно окно"
+									aria-label="Одно окно"
+									className={`grid size-7 place-items-center rounded-md ${layout === "single" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
+								>
+									<Maximize2 size={13} />
+								</button>
+								<button
+									type="button"
+									onClick={() => onLayout("columns")}
+									title="Два окна рядом"
+									aria-label="Два окна рядом"
+									className={`grid size-7 place-items-center rounded-md ${layout === "columns" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
+								>
+									<Columns2 size={13} />
+								</button>
+								<button
+									type="button"
+									onClick={() => onLayout("rows")}
+									title="Два окна одно над другим"
+									aria-label="Два окна одно над другим"
+									className={`grid size-7 place-items-center rounded-md ${layout === "rows" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
+								>
+									<Rows2 size={13} />
+								</button>
+								<button
+									type="button"
+									onClick={onReload}
+									title="Обновить переписку"
+									aria-label="Обновить переписку"
+									className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-elevated hover:text-foreground"
+								>
+									<RefreshCw size={13} className={latestMessagesQuery.isFetching ? "animate-spin" : ""} />
+								</button>
+							</div>
+						)}
 						<div className="relative">
 							<button
 								type="button"
@@ -1317,15 +1398,33 @@ function ConversationPane({
 					}}
 					className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
 				>
-					{query.isLoading ? (
+					{hasOlderMessages && messages.length > 0 && (
+						<div className="sticky top-0 z-10 mb-4 flex justify-center">
+							<button
+								type="button"
+								disabled={loadingOlderMessages}
+								onClick={() => void loadOlderMessages()}
+								className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-medium text-muted shadow-sm hover:text-foreground disabled:opacity-60"
+							>
+								{loadingOlderMessages ? <LoaderCircle size={12} className="animate-spin" /> : null}
+								{loadingOlderMessages ? "Загружаем историю…" : "Загрузить более ранние сообщения"}
+							</button>
+						</div>
+					)}
+					{olderMessagesError && (
+						<p role="alert" className="mb-3 text-center text-xs text-red-400">
+							{olderMessagesError}
+						</p>
+					)}
+					{query.isLoading || latestMessagesQuery.isLoading ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted">
 							<LoaderCircle className="mr-2 animate-spin" size={16} />
 							Загружаем переписку
 						</div>
-					) : query.isError ? (
+					) : query.isError || latestMessagesQuery.isError ? (
 						<div className="m-auto max-w-sm rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
-							{query.error instanceof Error
-								? query.error.message
+							{(latestMessagesQuery.error ?? query.error) instanceof Error
+								? (latestMessagesQuery.error ?? query.error)?.message
 								: "Не удалось загрузить диалог"}
 						</div>
 					) : messages.length === 0 ? (
@@ -1333,12 +1432,10 @@ function ConversationPane({
 							Сообщений пока нет
 						</div>
 					) : (
-						<div className="mx-auto flex max-w-3xl flex-col gap-3">
-							{[...messages]
-								.sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0))
-								.map((message) => (
-									<MessageBubble key={message.id} message={message} />
-								))}
+						<div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+							{messages.map((message) => (
+								<MessageBubble key={message.id} message={message} />
+							))}
 						</div>
 					)}
 				</div>

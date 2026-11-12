@@ -336,6 +336,14 @@ export default async function handler(req, res) {
 			if (!validId(id)) return json(res, 400, { error: 'Некорректный ID диалога' });
 			return json(res, 200, await api(cfg, `${prefix}/${id}`));
 		}
+		if (action === 'messages' && req.method === 'GET') {
+			const id = url.searchParams.get('id');
+			const before = url.searchParams.get('before');
+			if (!validId(id)) return json(res, 400, { error: 'Некорректный ID диалога' });
+			if (before && !validId(before)) return json(res, 400, { error: 'Некорректный курсор истории' });
+			const cursor = before ? `?before=${encodeURIComponent(before)}` : '';
+			return json(res, 200, await api(cfg, `${prefix}/${id}/messages${cursor}`));
+		}
 		if (action === 'agents' && req.method === 'GET') {
 			const [agents, inboxes, teams, presence] = await Promise.all([
 				api(cfg, `/accounts/${cfg.accountId}/agents`),
