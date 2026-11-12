@@ -69,6 +69,19 @@ function rowsFrom(result: unknown): ChatwootConversation[] {
 	};
 	return value.data?.payload ?? value.payload ?? [];
 }
+function withoutConversation(result: unknown, id: number) {
+	if (Array.isArray(result)) return result.filter((item) => (item as ChatwootConversation).id !== id);
+	if (!result || typeof result !== "object") return result;
+	const value = result as {
+		data?: { payload?: ChatwootConversation[]; [key: string]: unknown };
+		payload?: ChatwootConversation[];
+		[key: string]: unknown;
+	};
+	if (Array.isArray(value.data?.payload))
+		return { ...value, data: { ...value.data, payload: value.data.payload.filter((item) => item.id !== id) } };
+	if (Array.isArray(value.payload)) return { ...value, payload: value.payload.filter((item) => item.id !== id) };
+	return result;
+}
 function listFrom<T>(result: unknown): T[] {
 	if (!result || typeof result !== "object") return [];
 	if (Array.isArray(result)) return result as T[];
@@ -150,7 +163,7 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "presence"],
 		queryFn: () => chatwootService.presence(),
 		enabled: connection.data?.configured === true,
-		refetchInterval: 12000,
+		refetchInterval: 5000,
 	});
 	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
 	const request: ConversationSearch = {
@@ -1063,7 +1076,14 @@ function ConversationPane({
 	const status = useMutation({
 		mutationFn: (value: "open" | "resolved") =>
 			chatwootService.setStatus(id as number, value),
-		onSuccess: () => {
+		onSuccess: (_result, value) => {
+			if (value === "resolved" && id != null) {
+				for (const [key, cached] of client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })) {
+					const request = key[2] as ConversationSearch | undefined;
+					if (request?.scope !== "history") client.setQueryData(key, withoutConversation(cached, id));
+				}
+				void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
+			}
 			void client.invalidateQueries({
 				queryKey: ["chatwoot", "conversation", id],
 			});

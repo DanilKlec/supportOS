@@ -63,6 +63,12 @@ function itemList(data) {
 	return [];
 }
 
+function conversationTotal(data) {
+	const meta = data?.data?.meta ?? data?.meta ?? {};
+	const value = Number(meta.all_count ?? meta.count?.all_count ?? meta.count);
+	return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 function chatwootError(message, status = 502) {
 	return Object.assign(new Error(message), { status });
 }
@@ -183,7 +189,7 @@ async function matchAgent(cfg, email) {
 }
 
 async function routeWaitingConversations(env, cfg) {
-	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 8 });
+	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 4 });
 	if (routerLease !== true) return { assigned: 0, skipped: true };
 	const [agents, presenceRows, limits] = await Promise.all([
 		listAgents(cfg),
@@ -201,28 +207,47 @@ async function routeWaitingConversations(env, cfg) {
 		const limit = limits.find((item) => Number(item.chatwoot_agent_id) === agentId)?.max_active_chats;
 		return [String(agentId), Math.max(1, Math.min(50, Number(limit) || 4))];
 	}));
-	const activeCounts = Object.fromEntries(eligible.map((id) => [String(id), 0]));
 	const conversationById = new Map();
 	const inboxMembersCache = new Map();
-	const statusPages = await Promise.all(['open', 'pending'].map(async (status) => {
-		const firstPage = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=1`);
-		const firstItems = itemList(firstPage);
-		if (firstItems.length < 25) return firstItems;
-		const remainingPages = [];
-		for (let page = 2; page <= 10; page += 4) {
-			const batch = await Promise.all(Array.from({ length: Math.min(4, 11 - page) }, (_, index) =>
-				api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page + index}`).then(itemList),
-			));
-			remainingPages.push(...batch);
-		}
-		return [...firstItems, ...remainingPages.flat()];
+	const firstPages = await Promise.all(['open', 'pending'].map(async (status) => {
+		const [active, waiting] = await Promise.all([
+			api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=1`).then(itemList),
+			api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&assignee_type=unassigned&page=1`).then(itemList),
+		]);
+		return [...active, ...waiting];
 	}));
-	for (const conversation of statusPages.flat()) conversationById.set(Number(conversation.id), conversation);
-	const conversations = [...conversationById.values()];
-	for (const conversation of conversations) {
-		const assignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
-		if (Number.isSafeInteger(assignee) && Object.hasOwn(activeCounts, String(assignee))) activeCounts[String(assignee)] += 1;
+	for (const conversation of firstPages.flat()) conversationById.set(Number(conversation.id), conversation);
+	const countResults = await Promise.all(eligible.map(async (agentId) => {
+		const filtered = await api(cfg, `/accounts/${cfg.accountId}/conversations/filter?page=1`, {
+			method: 'POST',
+			body: { payload: conversationFilters({ status: ['open', 'pending'], assigneeId: String(agentId) }) },
+		});
+		return [String(agentId), conversationTotal(filtered)];
+	}));
+	let fallbackConversations = [];
+	if (countResults.some(([, count]) => count === null)) {
+		const statusPages = await Promise.all(['open', 'pending'].map(async (status) => {
+			const firstItems = firstPages[['open', 'pending'].indexOf(status)];
+			if (firstItems.length < 25) return firstItems;
+			const remainingPages = [];
+			for (let page = 2; page <= 10; page += 4) {
+				const batch = await Promise.all(Array.from({ length: Math.min(4, 11 - page) }, (_, index) =>
+					api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page + index}`).then(itemList),
+				));
+				remainingPages.push(...batch);
+			}
+			return [...firstItems, ...remainingPages.flat()];
+		}));
+		fallbackConversations = statusPages.flat();
+		for (const conversation of fallbackConversations) conversationById.set(Number(conversation.id), conversation);
 	}
+	const conversations = [...conversationById.values()];
+	const fallbackCounts = Object.fromEntries(eligible.map((id) => [String(id), 0]));
+	for (const conversation of (fallbackConversations.length ? fallbackConversations : firstPages.flat())) {
+		const assignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
+		if (Number.isSafeInteger(assignee) && Object.hasOwn(fallbackCounts, String(assignee))) fallbackCounts[String(assignee)] += 1;
+	}
+	const activeCounts = Object.fromEntries(countResults.map(([id, count]) => [id, count ?? fallbackCounts[id]]));
 	const baselineCounts = { ...activeCounts };
 	const inboxIds = [...new Set(conversations.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
 	await Promise.all(inboxIds.map(async (id) => {
@@ -599,7 +624,10 @@ export default async function handler(req, res) {
 		}
 		if (action === 'status') {
 			if (!['open', 'resolved', 'snoozed'].includes(body.status)) return json(res, 400, { error: 'Некорректный статус' });
-			return json(res, 200, await api(cfg, `${prefix}/${id}/toggle_status`, { method: 'POST', body: { status: body.status } }));
+			const result = await api(cfg, `${prefix}/${id}/toggle_status`, { method: 'POST', body: { status: body.status } });
+			if (body.status === 'resolved')
+				await db(env, `supportos_chatwoot_routing?conversation_id=eq.${id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
+			return json(res, 200, result);
 		}
 		if (action === 'assign') {
 			const assigneeId = body.assigneeId == null ? null : Number(body.assigneeId);
