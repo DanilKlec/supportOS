@@ -311,21 +311,6 @@ export function AgentInboxPage() {
 				onManageSites={canManageSites ? () => { setSitesOpen(true); setProfileOpen(false); } : undefined}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			{activeSection !== "team" && <header className="flex min-h-[62px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
-				<div className="flex min-w-0 items-center gap-3">
-					<div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-accent">
-						<MessageCircle size={18} />
-					</div>
-					<div className="min-w-0">
-						<h1 className="truncate text-base font-semibold">
-							{sectionTitle(activeSection)}
-						</h1>
-						<p className="truncate text-[11px] text-muted">
-							{sectionDescription(activeSection)}
-						</p>
-					</div>
-				</div>
-			</header>}
 			{(presence.isError || accepting.isError) && (
 				<div
 					role="alert"
@@ -537,14 +522,6 @@ export function AgentInboxPage() {
 			)}
 		</div>
 	);
-}
-
-function sectionTitle(section: WorkspaceSection) {
-	return section === "team" ? "Команда" : section === "archive" ? "Архив" : "Диалоги";
-}
-
-function sectionDescription(section: WorkspaceSection) {
-	return section === "team" ? "Агенты и команды Chatwoot" : section === "archive" ? "Завершённые диалоги и фильтры" : "Входящие, очередь и рабочие диалоги";
 }
 
 function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEnd = false }: {
