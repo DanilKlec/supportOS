@@ -15,7 +15,7 @@ export function chatwootPlugin() {
 					let raw = '';
 					for await (const chunk of req) {
 						raw += chunk.toString();
-						if (Buffer.byteLength(raw) > 30000) { res.statusCode = 413; res.end('{"error":"Request too large"}'); return; }
+						if (Buffer.byteLength(raw) > 4000000) { res.statusCode = 413; res.end('{"error":"Request too large"}'); return; }
 					}
 					req.body = raw ? JSON.parse(raw) : {};
 					await handler(req, res);

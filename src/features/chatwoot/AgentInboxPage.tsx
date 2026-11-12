@@ -7,6 +7,7 @@ import {
 	CheckCheck,
 	ChevronDown,
 	ExternalLink,
+	FileText,
 	Globe2,
 	Headphones,
 	LoaderCircle,
@@ -15,6 +16,7 @@ import {
 	MessagesSquare,
 	PanelLeftClose,
 	PanelLeftOpen,
+	Paperclip,
 	Plus,
 	RefreshCw,
 	Search,
@@ -1025,6 +1027,9 @@ function ConversationPane({
 }) {
 	const client = useQueryClient();
 	const [text, setText] = useState("");
+	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+	const [attachmentError, setAttachmentError] = useState("");
+	const fileInput = useRef<HTMLInputElement>(null);
 	const [privateNote, setPrivateNote] = useState(false);
 	const [assignOpen, setAssignOpen] = useState(false);
 	const [bindSearch, setBindSearch] = useState("");
@@ -1084,6 +1089,8 @@ function ConversationPane({
 	const latestMessageId = messages.at(-1)?.id;
 	useEffect(() => {
 		currentConversationId.current = id;
+		setSelectedFiles([]);
+		setAttachmentError("");
 		setOlderMessages([]);
 		setHasOlderMessages(true);
 		setOlderMessagesError("");
@@ -1144,16 +1151,26 @@ function ConversationPane({
 		staleTime: 60000,
 	});
 	const send = useMutation({
-		mutationFn: () =>
-			chatwootService.sendMessage(id as number, text.trim(), privateNote),
+		mutationFn: async () => {
+			const attachments = await Promise.all(selectedFiles.map(async (file) => {
+				const bytes = new Uint8Array(await file.arrayBuffer());
+				let binary = "";
+				for (let offset = 0; offset < bytes.length; offset += 0x8000)
+					binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+				return { name: file.name, type: file.type || "application/octet-stream", contentBase64: btoa(binary) };
+			}));
+			return chatwootService.sendMessage(id as number, text.trim(), privateNote, attachments);
+		},
 		onMutate: () => {
-			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: privateNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000) });
+			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: privateNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: selectedFiles.map((file) => ({ file_name: file.name, file_type: file.type })) });
 			return { conversationId: id };
 		},
 		onSuccess: (_result, _variables, context) => {
 			if (currentConversationId.current === context?.conversationId) {
 				setOptimisticMessage(null);
 				setText("");
+				setSelectedFiles([]);
+				setAttachmentError("");
 			}
 			void client.invalidateQueries({ queryKey: ["chatwoot", "messages", id, "latest"] });
 			void client.invalidateQueries({
@@ -1167,6 +1184,21 @@ function ConversationPane({
 			if (currentConversationId.current === context?.conversationId) setOptimisticMessage(null);
 		},
 	});
+	const addFiles = (files: FileList | null) => {
+		if (!files?.length) return;
+		const next = [...selectedFiles, ...Array.from(files)];
+		const totalSize = next.reduce((sum, file) => sum + file.size, 0);
+		if (next.length > 5) {
+			setAttachmentError("Можно прикрепить не более 5 файлов");
+			return;
+		}
+		if (totalSize > 2_800_000) {
+			setAttachmentError("Общий размер вложений не должен превышать 2,8 МБ");
+			return;
+		}
+		setSelectedFiles(next);
+		setAttachmentError("");
+	};
 	const status = useMutation({
 		mutationFn: (value: "open" | "resolved") =>
 			chatwootService.setStatus(id as number, value),
@@ -1457,6 +1489,19 @@ function ConversationPane({
 					)}
 				</div>
 				<footer className="shrink-0 border-t border-border bg-surface/40 p-3">
+					<input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ""; }} />
+					{selectedFiles.length > 0 && (
+						<div className="mb-2 flex flex-wrap gap-2">
+							{selectedFiles.map((file, index) => (
+								<div key={`${file.name}-${file.lastModified}-${index}`} className="flex max-w-full items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs">
+									<FileText size={13} className="shrink-0 text-accent" />
+									<span className="max-w-56 truncate">{file.name}</span>
+									<span className="shrink-0 text-muted">{(file.size / 1024).toFixed(0)} КБ</span>
+									<button type="button" aria-label={`Удалить файл ${file.name}`} onClick={() => { setSelectedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index)); setAttachmentError(""); }} className="text-muted hover:text-foreground"><X size={13} /></button>
+								</div>
+							))}
+						</div>
+					)}
 					<div className="mb-2 flex items-center justify-between gap-2">
 						<div className="flex items-center gap-1.5">
 							<button
@@ -1522,12 +1567,13 @@ function ConversationPane({
 							</div>
 						</div>
 						<div className="flex items-center gap-2">
+							<button type="button" title="Прикрепить файл" aria-label="Прикрепить файл" onClick={() => fileInput.current?.click()} disabled={send.isPending || selectedFiles.length >= 5} className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"><Paperclip size={14} /></button>
 							<span className="hidden text-[10px] text-muted sm:block">
 								Enter · Shift+Enter — перенос
 							</span>
 							<button
 								type="button"
-								disabled={!text.trim() || send.isPending}
+							disabled={(!text.trim() && !selectedFiles.length) || send.isPending}
 								onClick={() => send.mutate()}
 								className="inline-flex h-8 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
 							>
@@ -1545,7 +1591,7 @@ function ConversationPane({
 								!event.shiftKey &&
 								!event.nativeEvent.isComposing &&
 								event.keyCode !== 229 &&
-								text.trim() &&
+								(text.trim() || selectedFiles.length > 0) &&
 								!send.isPending
 							) {
 								event.preventDefault();
@@ -1560,6 +1606,7 @@ function ConversationPane({
 						rows={3}
 						className="supportos-scroll block max-h-36 min-h-[76px] w-full resize-y rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none placeholder:text-muted focus:border-accent/60"
 					/>
+					{attachmentError && <p role="alert" className="mt-1 text-xs text-red-400">{attachmentError}</p>}
 					{send.isError && (
 						<p role="alert" className="mt-1 text-xs text-red-400">
 							{send.error instanceof Error
@@ -1819,15 +1866,15 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 				)}
 				{message.attachments?.map((file) => (
 					<a
-						key={`${file.data_url}-${file.file_size}`}
+						key={`${file.file_name}-${file.data_url}-${file.file_size}`}
 						href={
-							file.data_url?.startsWith("https://") ? file.data_url : undefined
+							file.data_url && /^https?:\/\//i.test(file.data_url) ? file.data_url : undefined
 						}
-						target="_blank"
+						target={file.data_url && /^https?:\/\//i.test(file.data_url) ? "_blank" : undefined}
 						rel="noreferrer"
-						className="mt-2 block text-xs text-accent underline"
+						className={`mt-2 block text-xs ${file.data_url && /^https?:\/\//i.test(file.data_url) ? "text-accent underline" : "text-muted"}`}
 					>
-						Открыть вложение
+						{file.file_name || "Открыть вложение"}
 					</a>
 				))}
 				<div className="mt-1 text-right text-[10px] text-muted">

@@ -23,15 +23,16 @@ function config(env = process.env) {
 
 async function api(cfg, path, { method = 'GET', body } = {}) {
 	let response;
+	const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
 	try {
 		response = await fetch(`${cfg.base}/api/v1${path}`, {
 			method,
 			headers: {
 				Authorization: `Bearer ${cfg.token}`,
 				'api-access-token': cfg.token,
-				...(body ? { 'Content-Type': 'application/json' } : {}),
+				...(body && !multipart ? { 'Content-Type': 'application/json' } : {}),
 			},
-			body: body ? JSON.stringify(body) : undefined,
+			body: body ? multipart ? body : JSON.stringify(body) : undefined,
 			signal: AbortSignal.timeout(15000),
 		});
 	} catch {
@@ -613,8 +614,37 @@ export default async function handler(req, res) {
 		const id = String(body.conversationId);
 		if (action === 'message') {
 			const content = typeof body.content === 'string' ? body.content.trim() : '';
-			if (!content || content.length > 20000) return json(res, 400, { error: 'Введите сообщение (до 20 000 символов)' });
-			const result = await api(cfg, `${prefix}/${id}/messages`, { method: 'POST', body: { content, message_type: 'outgoing', private: body.private === true } });
+			const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+			if ((!content && !attachments.length) || content.length > 20000 || attachments.length > 5)
+				return json(res, 400, { error: 'Введите сообщение или прикрепите до 5 файлов' });
+			let totalBytes = 0;
+			const files = [];
+			for (const attachment of attachments) {
+				if (!attachment || typeof attachment.name !== 'string' || typeof attachment.contentBase64 !== 'string' || attachment.contentBase64.length > 3700000)
+					return json(res, 400, { error: 'Один из файлов не удалось прочитать' });
+				const name = attachment.name.replace(/[\\/\u0000-\u001f]/g, '_').slice(0, 180) || 'attachment';
+				const bytes = Buffer.from(attachment.contentBase64, 'base64');
+				if (!bytes.length || bytes.toString('base64') !== attachment.contentBase64)
+					return json(res, 400, { error: `Файл «${name}» имеет некорректный формат` });
+				totalBytes += bytes.length;
+				if (bytes.length > 2600000 || totalBytes > 2800000)
+					return json(res, 413, { error: 'Размер вложений превышает лимит 2,8 МБ' });
+				const type = typeof attachment.type === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(attachment.type)
+					? attachment.type.slice(0, 120)
+					: 'application/octet-stream';
+				files.push({ name, type, bytes });
+			}
+			let payload = { content, message_type: 'outgoing', private: body.private === true };
+			if (files.length) {
+				const form = new FormData();
+				form.append('content', content);
+				form.append('message_type', 'outgoing');
+				form.append('private', String(body.private === true));
+				for (const file of files)
+					form.append('attachments[]', new Blob([file.bytes], { type: file.type }), file.name);
+				payload = form;
+			}
+			const result = await api(cfg, `${prefix}/${id}/messages`, { method: 'POST', body: payload });
 			return json(res, 200, result);
 		}
 		if (action === 'status') {

@@ -43,6 +43,7 @@ export type ChatwootMessage = {
 	sender?: { name?: string; type?: string; avatar_url?: string };
 	attachments?: Array<{
 		data_url?: string;
+		file_name?: string;
 		file_type?: string;
 		file_size?: number;
 		extension?: string;
@@ -116,6 +117,12 @@ export type ConversationSearch = {
 	from?: string;
 	to?: string;
 	query?: string;
+};
+
+export type ChatwootUpload = {
+	name: string;
+	type: string;
+	contentBase64: string;
 };
 
 async function request<T>(
@@ -253,11 +260,11 @@ export const chatwootService = {
 		>("labels"),
 	inboxes: () =>
 		request<{ payload?: ChatwootInbox[] } | ChatwootInbox[]>("inboxes"),
-	sendMessage: (conversationId: number, content: string, isPrivate: boolean) =>
+	sendMessage: (conversationId: number, content: string, isPrivate: boolean, attachments: ChatwootUpload[] = []) =>
 		request("message", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ conversationId, content, private: isPrivate }),
+			body: JSON.stringify({ conversationId, content, private: isPrivate, attachments }),
 		}),
 	setStatus: (
 		conversationId: number,
