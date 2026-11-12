@@ -377,7 +377,7 @@ export default async function handler(req, res) {
 			return json(res, 400, { error: 'Укажите корректный ID диалога или контакта' });
 		}
 		if (action === 'agent-capacity' && req.method === 'POST') {
-			const allowedRole = user.access?.roles?.some((role) => ['admin', 'qc'].includes(role.id));
+			const allowedRole = user.access?.roles?.some((role) => ['admin', 'qc', 'creator'].includes(role.id));
 			if (!allowedRole) return json(res, 403, { error: 'Лимиты чатов может менять только администратор или QC' });
 			const agentId = Number(body.agentId);
 			const maxActiveChats = Number(body.maxActiveChats);

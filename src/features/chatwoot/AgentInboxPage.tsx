@@ -122,7 +122,7 @@ export function AgentInboxPage() {
 		(s) => s.session?.user.access?.permissions.includes("technical") === true,
 	);
 	const canManageChatCapacity = useAuthStore(
-		(s) => s.session?.user.access?.roles.some((role) => role.id === "admin" || role.id === "qc") === true,
+		(s) => s.session?.user.access?.roles.some((role) => ["admin", "qc", "creator"].includes(role.id)) === true,
 	);
 	const canSupervise = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("monitor.read") === true,
