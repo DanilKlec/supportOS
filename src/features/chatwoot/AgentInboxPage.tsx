@@ -1025,6 +1025,7 @@ function ConversationPane({
 	const [olderMessagesError, setOlderMessagesError] = useState("");
 	const messageViewport = useRef<HTMLDivElement>(null);
 	const previousScrollHeight = useRef<number | null>(null);
+	const olderMessagesRequest = useRef(false);
 	const followMessages = useRef(true);
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
@@ -1075,7 +1076,8 @@ function ConversationPane({
 	}, [latestMessageId, messages.length]);
 	const loadOlderMessages = async () => {
 		const firstId = messages[0]?.id;
-		if (!id || !firstId || loadingOlderMessages || !hasOlderMessages) return;
+		if (!id || !firstId || olderMessagesRequest.current || !hasOlderMessages) return;
+		olderMessagesRequest.current = true;
 		setLoadingOlderMessages(true);
 		setOlderMessagesError("");
 		try {
@@ -1092,6 +1094,7 @@ function ConversationPane({
 		} catch (error) {
 			setOlderMessagesError(error instanceof Error ? error.message : "Не удалось загрузить историю");
 		} finally {
+			olderMessagesRequest.current = false;
 			setLoadingOlderMessages(false);
 		}
 	};
@@ -1395,6 +1398,7 @@ function ConversationPane({
 					onScroll={(event) => {
 						const viewport = event.currentTarget;
 						followMessages.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
+						if (viewport.scrollTop < 48) void loadOlderMessages();
 					}}
 					className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
 				>
