@@ -189,8 +189,17 @@ async function matchAgent(cfg, email) {
 }
 
 async function routeWaitingConversations(env, cfg) {
-	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 4 });
+	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 5 });
 	if (routerLease !== true) return { assigned: 0, skipped: true };
+	const queueMeta = await Promise.all(['open', 'pending'].map((status) =>
+		api(cfg, `/accounts/${cfg.accountId}/conversations/meta?status=${status}`),
+	));
+	const queueCounts = queueMeta.map((result) => {
+		const value = Number((result?.data?.meta ?? result?.meta)?.unassigned_count);
+		return Number.isSafeInteger(value) && value >= 0 ? value : null;
+	});
+	if (queueCounts.every((count) => count !== null) && queueCounts.every((count) => count === 0))
+		return { assigned: 0, skipped: true };
 	const [agents, presenceRows, limits] = await Promise.all([
 		listAgents(cfg),
 		allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
@@ -202,21 +211,17 @@ async function routeWaitingConversations(env, cfg) {
 	if (!activeIds.length) return { assigned: 0 };
 	const known = new Set(agents.map((agent) => Number(agent.id)));
 	const eligible = activeIds.filter((id) => known.has(id));
+	if (!eligible.length) return { assigned: 0 };
+	const queuePages = await Promise.all(['open', 'pending'].map((status) =>
+		api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&assignee_type=unassigned&page=1`).then(itemList),
+	));
+	const conversations = [...new Map(queuePages.flat().map((conversation) => [Number(conversation.id), conversation])).values()];
+	if (!conversations.length) return { assigned: 0, skipped: true };
 	const capacities = Object.fromEntries(activePresence.map((row) => {
 		const agentId = Number(row.chatwoot_agent_id);
 		const limit = limits.find((item) => Number(item.chatwoot_agent_id) === agentId)?.max_active_chats;
 		return [String(agentId), Math.max(1, Math.min(50, Number(limit) || 4))];
 	}));
-	const conversationById = new Map();
-	const inboxMembersCache = new Map();
-	const firstPages = await Promise.all(['open', 'pending'].map(async (status) => {
-		const [active, waiting] = await Promise.all([
-			api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=1`).then(itemList),
-			api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&assignee_type=unassigned&page=1`).then(itemList),
-		]);
-		return [...active, ...waiting];
-	}));
-	for (const conversation of firstPages.flat()) conversationById.set(Number(conversation.id), conversation);
 	const countResults = await Promise.all(eligible.map(async (agentId) => {
 		const filtered = await api(cfg, `/accounts/${cfg.accountId}/conversations/filter?page=1`, {
 			method: 'POST',
@@ -224,36 +229,11 @@ async function routeWaitingConversations(env, cfg) {
 		});
 		return [String(agentId), conversationTotal(filtered)];
 	}));
-	let fallbackConversations = [];
-	if (countResults.some(([, count]) => count === null)) {
-		const statusPages = await Promise.all(['open', 'pending'].map(async (status) => {
-			const firstItems = firstPages[['open', 'pending'].indexOf(status)];
-			if (firstItems.length < 25) return firstItems;
-			const remainingPages = [];
-			for (let page = 2; page <= 10; page += 4) {
-				const batch = await Promise.all(Array.from({ length: Math.min(4, 11 - page) }, (_, index) =>
-					api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page + index}`).then(itemList),
-				));
-				remainingPages.push(...batch);
-			}
-			return [...firstItems, ...remainingPages.flat()];
-		}));
-		fallbackConversations = statusPages.flat();
-		for (const conversation of fallbackConversations) conversationById.set(Number(conversation.id), conversation);
-	}
-	const conversations = [...conversationById.values()];
-	const fallbackCounts = Object.fromEntries(eligible.map((id) => [String(id), 0]));
-	for (const conversation of (fallbackConversations.length ? fallbackConversations : firstPages.flat())) {
-		const assignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
-		if (Number.isSafeInteger(assignee) && Object.hasOwn(fallbackCounts, String(assignee))) fallbackCounts[String(assignee)] += 1;
-	}
-	const activeCounts = Object.fromEntries(countResults.map(([id, count]) => [id, count ?? fallbackCounts[id]]));
+	if (countResults.some(([, count]) => count === null)) return { assigned: 0, skipped: true };
+	const activeCounts = Object.fromEntries(countResults);
 	const baselineCounts = { ...activeCounts };
 	const inboxIds = [...new Set(conversations.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
-	await Promise.all(inboxIds.map(async (id) => {
-		const members = await websiteInboxMembers(cfg, id).catch(() => []);
-		inboxMembersCache.set(id, members);
-	}));
+	const inboxMembers = new Map(await Promise.all(inboxIds.map(async (id) => [id, await websiteInboxMembers(cfg, id).catch(() => [])])));
 	const createdAtOf = (conversation) => {
 		const raw = conversation.created_at;
 		return typeof raw === 'string' && !/^\d+$/.test(raw) ? Date.parse(raw) : Number(raw) * (Number(raw) > 1e12 ? 1 : 1000);
@@ -263,14 +243,9 @@ async function routeWaitingConversations(env, cfg) {
 	for (const conversation of conversations) {
 		if (!validId(String(conversation.id))) continue;
 		const conversationInboxId = String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '');
-		const currentAssignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
-		const isUnassigned = !Number.isSafeInteger(currentAssignee) || currentAssignee <= 0;
-		if (!isUnassigned && eligible.includes(currentAssignee)) continue;
-		// Only redirect fresh chats that Chatwoot assigned outside the active SupportOS team.
-		if (!isUnassigned && (!Number.isFinite(createdAtOf(conversation)) || Date.now() - createdAtOf(conversation) > 5 * 60_000)) continue;
 		let eligibleForInbox = eligible.filter((id) => activeCounts[String(id)] < capacities[String(id)]);
 		if (validId(conversationInboxId)) {
-			const memberIds = new Set(inboxMembersCache.get(conversationInboxId));
+			const memberIds = new Set(inboxMembers.get(conversationInboxId));
 			eligibleForInbox = eligibleForInbox.filter((id) => memberIds.has(id));
 		}
 		if (!eligibleForInbox.length) continue;

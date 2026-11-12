@@ -181,6 +181,7 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
 		enabled: connection.data?.configured === true && activeSection !== "team",
+		staleTime: displayedScope === "queue" ? 8000 : 0,
 		refetchInterval: displayedScope === "active" ? 5000 : displayedScope === "queue" ? 7000 : 8000,
 		retry: 1,
 	});
@@ -310,6 +311,21 @@ export function AgentInboxPage() {
 		setListWidth(next);
 		try { localStorage.setItem("supportos:chatwoot:list-width", String(next)); } catch { /* preference remains in session */ }
 	};
+	const prefetchQueue = () => {
+		if (scope === "queue" || activeSection !== "inbox") return;
+		const queueRequest: ConversationSearch = {
+			scope: "queue",
+			status: "open",
+			...(inboxId ? { inboxId: Number(inboxId) } : {}),
+			...(label ? { label } : {}),
+			...(search.trim() ? { query: search.trim() } : {}),
+		};
+		void client.prefetchQuery({
+			queryKey: ["chatwoot", "conversations", queueRequest],
+			queryFn: () => chatwootService.conversations(queueRequest),
+			staleTime: 8000,
+		});
+	};
 	if (connection.isLoading)
 		return (
 			<div className="flex h-full items-center justify-center text-muted">
@@ -365,7 +381,7 @@ export function AgentInboxPage() {
 			<div className="flex min-h-0 flex-1 flex-col">
 				{activeSection === "inbox" && <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-2">
 					{(["mine", "queue", ...(canSupervise ? ["active" as const] : [])] as const).map((item) => (
-						<button key={item} type="button" onClick={() => selectScope(item)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
+						<button key={item} type="button" onPointerEnter={item === "queue" ? prefetchQueue : undefined} onFocus={item === "queue" ? prefetchQueue : undefined} onClick={() => selectScope(item)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
 							{item === "mine" ? "Мои" : item === "queue" ? "Очередь" : "Активные"}
 							{item === "queue" && <span aria-label={`${queueCount.data?.count ?? 0} чатов в очереди`} className="ml-1.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-300">{queueCount.isLoading ? "…" : queueCount.isError ? "—" : queueCount.data?.count ?? 0}</span>}
 							{item === "active" && <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">все агенты</span>}
