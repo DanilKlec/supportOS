@@ -594,11 +594,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	];
 	return (
 		<aside className={`relative z-30 flex shrink-0 flex-col border-r border-border bg-surface/75 py-3 transition-[width] duration-200 ${collapsed ? "w-[62px] items-center" : "w-[208px]"}`}>
-			<div className={`mb-5 flex w-full items-center gap-2.5 px-3 ${collapsed ? "justify-center px-0" : ""}`}>
-				<div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-accent"><MessagesSquare size={18} /></div>
-				{!collapsed && <div className="min-w-0 flex-1"><div className="truncate text-xs font-semibold">SupportOS</div><div className="truncate text-[10px] text-muted">Рабочее место агента</div></div>}
-				{!collapsed && <button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="grid size-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button>}
-			</div>
+			{!collapsed && <div className="mb-3 flex w-full justify-end px-3"><button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="grid size-7 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button></div>}
 			{collapsed && <button type="button" title="Развернуть меню" onClick={onToggleCollapsed} className="mb-3 grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftOpen size={15} /></button>}
 			{!collapsed && <div className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">Рабочие разделы</div>}
 			<nav className={`flex w-full flex-col gap-1.5 ${collapsed ? "items-center px-2" : "px-2"}`}>
