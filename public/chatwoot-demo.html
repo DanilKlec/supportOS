@@ -27,9 +27,9 @@
       <div class="eyebrow"><span class="dot"></span><span class="test-label">Демо-сайт · SupportOS</span></div>
       <h1>Помощь рядом,<br>когда она нужна.</h1>
       <p class="lead">Это тестовая страница для проверки обращения в поддержку. Нажмите на виджет в правом нижнем углу и отправьте сообщение — оно появится в активных чатах SupportOS.</p>
-      <div class="actions"><button id="open-chat" class="button primary" type="button">Открыть чат <span aria-hidden="true">↗</span></button><a class="button" href="#support">Как проверить</a></div>
+      <div class="actions"><button id="open-chat" class="button primary" type="button">Открыть чат <span aria-hidden="true">↗</span></button><button id="new-visitor" class="button" type="button">Новый тестовый посетитель ↻</button><a class="button" href="#support">Как проверить</a></div>
       <div class="grid" id="support">
-        <section class="card"><h2>Проверка связи</h2><p>Отправьте короткое сообщение, например «Проверка тестового чата». Затем откройте SupportOS → Чаты → Активные и проверьте имя, email, проект и назначенного агента.</p><div id="widget-state" class="state" data-kind="loading"><span class="dot"></span><span>Подключаем виджет Chatwoot…</span></div><div class="chat-hint">Виджет загружается из подключённого Website-канала Chatwoot.</div></section>
+        <section class="card"><h2>Проверка связи</h2><p>Отправьте короткое сообщение, например «Проверка тестового чата». Затем откройте SupportOS → Чаты → Активные и проверьте имя, email, проект и назначенного агента.</p><div id="widget-state" class="state" data-kind="loading"><span class="dot"></span><span>Подключаем виджет Chatwoot…</span></div><div class="chat-hint">Chatwoot сохраняет сессию посетителя в браузере. Перед повторной проверкой нажмите «Новый тестовый посетитель»: это сбросит локальную сессию виджета, после чего можно создать отдельный диалог.</div></section>
         <section class="card" id="games"><h2>Что здесь можно проверить</h2><div class="steps"><div class="step"><span class="num">01</span><p>Появление нового обращения в рабочем пространстве.</p></div><div class="step"><span class="num">02</span><p>Автораспределение между сотрудниками SupportOS, включившими приём чатов.</p></div><div class="step"><span class="num">03</span><p>Ответ агента, теги и обновление переписки в реальном времени.</p></div></div><p class="fine">Если виджет не появился, добавьте домен этой страницы в разрешённые домены Website-канала Chatwoot. <a href="/inbox">Открыть рабочее место</a></p></section>
       </div>
     </main>
@@ -39,10 +39,35 @@
     (() => {
       const state = document.getElementById('widget-state');
       const button = document.getElementById('open-chat');
+      const newVisitor = document.getElementById('new-visitor');
+      let widgetReady = false;
       const setState = (kind, text) => { state.dataset.kind = kind; state.lastElementChild.textContent = text; };
+      const hostAllowed = (allowedDomains) => {
+        const patterns = (Array.isArray(allowedDomains) ? allowedDomains : String(allowedDomains || '').split(','))
+          .map((value) => String(value).trim().toLowerCase()).filter(Boolean);
+        if (!patterns.length) return true;
+        const host = location.hostname.toLowerCase();
+        return patterns.some((pattern) => {
+          const domain = pattern.replace(/^https?:\/\//, '').split(/[/?#]/, 1)[0];
+          return domain === '*' || domain === host || domain.startsWith('*.') && host.endsWith(domain.slice(1));
+        });
+      };
+      window.addEventListener('chatwoot:ready', () => {
+        widgetReady = true;
+        setState('ready', 'Виджет подключён. Откройте чат и отправьте тестовое сообщение.');
+      }, { once: true });
       button.addEventListener('click', () => {
-        if (window.$chatwoot) window.$chatwoot.toggle('open');
+        if (widgetReady && window.$chatwoot) window.$chatwoot.toggle('open');
         else setState('loading', 'Виджет ещё загружается…');
+      });
+      newVisitor.addEventListener('click', () => {
+        if (!widgetReady || !window.$chatwoot || typeof window.$chatwoot.reset !== 'function') {
+          setState('loading', 'Виджет ещё загружается — попробуйте через несколько секунд.');
+          return;
+        }
+        window.$chatwoot.reset();
+        setState('ready', 'Сессия сброшена. Нажмите «Start Conversation» в виджете, чтобы открыть отдельный тестовый диалог.');
+        window.$chatwoot.toggle('open');
       });
       fetch('/api/chatwoot?action=widget-config', { credentials: 'omit' })
         .then(async (response) => {
@@ -50,14 +75,20 @@
           if (!response.ok) throw new Error(result.error || 'Не удалось получить настройки виджета');
           return result;
         })
-        .then(({ baseUrl, websiteToken, inboxName }) => {
+        .then(({ baseUrl, websiteToken, inboxName, allowedDomains }) => {
+          if (!hostAllowed(allowedDomains)) {
+            throw new Error(`Домен ${location.hostname} не разрешён для источника «${inboxName}». Добавьте его в «Источники чатов» → домены.`);
+          }
           window.chatwootSettings = { locale: 'ru', position: 'right', type: 'standard', hideMessageBubble: false, darkMode: 'auto' };
           const sdk = document.createElement('script');
           sdk.src = `${baseUrl.replace(/\/$/, '')}/packs/js/sdk.js`;
           sdk.async = true;
           sdk.onload = () => {
             window.chatwootSDK.run({ websiteToken, baseUrl });
-            setState('ready', `Виджет подключён · ${inboxName}`);
+            setState('loading', `Ожидаем готовность виджета · ${inboxName}`);
+            window.setTimeout(() => {
+              if (!widgetReady) setState('error', 'Chatwoot SDK загрузился, но виджет не ответил. Проверьте разрешённый домен и настройки Website-источника.');
+            }, 12000);
           };
           sdk.onerror = () => setState('error', 'Не удалось загрузить SDK Chatwoot. Проверьте адрес Chatwoot.');
           document.head.appendChild(sdk);

@@ -91,6 +91,16 @@ export type ChatwootContact = {
 	label_list?: string[];
 };
 
+export type ChatwootCustomAttributeDefinition = {
+	id: number;
+	attribute_display_name: string;
+	attribute_key: string;
+	attribute_display_type: number;
+	attribute_description?: string | null;
+	attribute_values?: string[] | null;
+	attribute_model: 0 | 1;
+};
+
 export type ConversationSearch = {
 	scope: "queue" | "mine" | "history" | "active";
 	status?: string;
@@ -257,5 +267,33 @@ export const chatwootService = {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ contactId, blocked }),
+		}),
+	customAttributes: (model: 0 | 1) =>
+		request<{ payload?: ChatwootCustomAttributeDefinition[] }>(
+			"custom-attributes",
+			undefined,
+			`&model=${model}`,
+		),
+	saveCustomAttribute: (definition: Omit<ChatwootCustomAttributeDefinition, "id"> & { id?: number }) =>
+		request("custom-attributes", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(definition),
+		}),
+	deleteCustomAttribute: (id: number, model: 0 | 1) =>
+		request("custom-attributes", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, model }),
+		}),
+	setCustomAttributeValues: (values: {
+		conversationId?: number;
+		contactId?: number;
+		attributes: Record<string, string | number | boolean | null>;
+	}) =>
+		request("custom-attribute-values", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(values),
 		}),
 };

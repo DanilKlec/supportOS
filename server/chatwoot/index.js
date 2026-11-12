@@ -239,12 +239,12 @@ export default async function handler(req, res) {
 				const detail = result?.payload ?? result;
 				const websiteToken = detail.website_token ?? detail.channel?.website_token ?? inbox.website_token;
 				if (typeof websiteToken === 'string' && websiteToken.length > 0)
-					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxName: detail.name ?? inbox.name ?? 'Поддержка' });
+					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxName: detail.name ?? inbox.name ?? 'Поддержка', allowedDomains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? inbox.allowed_domains ?? '' });
 			}
 			return json(res, 409, { error: inboxes.length ? 'У Website-канала не найден публичный токен виджета' : 'Создайте Website-канал в Chatwoot, чтобы включить тестовый виджет' });
 		}
 		const requestedScope = url.searchParams.get('scope');
-		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
+		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) || action === 'custom-attributes' && req.method !== 'GET' ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
 		const user = await requireUser(req, { permission });
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
@@ -257,6 +257,52 @@ export default async function handler(req, res) {
 		if (!cfg) return json(res, 503, { error: 'Добавьте CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID и CHATWOOT_ACCESS_TOKEN в серверные переменные окружения' });
 		const env = serverConfig(process.env);
 		const prefix = `/accounts/${cfg.accountId}/conversations`;
+		if (action === 'custom-attributes') {
+			const model = Number(url.searchParams.get('model') ?? body.model);
+			if (![0, 1].includes(model)) return json(res, 400, { error: 'Некорректный тип полей' });
+			const definitionsPath = `/accounts/${cfg.accountId}/custom_attribute_definitions`;
+			if (req.method === 'GET') {
+				const result = await api(cfg, `${definitionsPath}?attribute_model=${model}`);
+				return json(res, 200, { payload: itemList(result) });
+			}
+			if (req.method === 'POST') {
+				const name = typeof body.attribute_display_name === 'string' ? body.attribute_display_name.trim() : '';
+				const key = typeof body.attribute_key === 'string' ? body.attribute_key.trim() : '';
+				const type = Number(body.attribute_display_type);
+				const description = typeof body.attribute_description === 'string' ? body.attribute_description.trim() : '';
+				const values = Array.isArray(body.attribute_values) ? body.attribute_values.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean) : [];
+				if (!name || name.length > 80 || !/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(key) || !Number.isInteger(type) || type < 0 || type > 7 || description.length > 500 || values.length > 100 || values.some((value) => value.length > 100))
+					return json(res, 400, { error: 'Проверьте название, ключ, тип и варианты поля' });
+				const payload = { attribute_display_name: name, attribute_key: key, attribute_display_type: type, attribute_description: description, attribute_values: type === 6 ? values : [], attribute_model: model };
+				const definitionId = body.id == null ? '' : String(body.id);
+				if (definitionId && !validId(definitionId)) return json(res, 400, { error: 'Некорректный ID поля' });
+				const result = await api(cfg, definitionId ? `${definitionsPath}/${definitionId}` : definitionsPath, { method: definitionId ? 'PUT' : 'POST', body: payload });
+				return json(res, 200, result);
+			}
+			if (req.method === 'DELETE') {
+				const definitionId = String(body.id ?? '');
+				if (!validId(definitionId)) return json(res, 400, { error: 'Некорректный ID поля' });
+				return json(res, 200, await api(cfg, `${definitionsPath}/${definitionId}`, { method: 'DELETE' }));
+			}
+			return json(res, 405, { error: 'Метод не поддерживается' });
+		}
+		if (action === 'custom-attribute-values' && req.method === 'POST') {
+			const conversationId = String(body.conversationId ?? '');
+			const contactId = String(body.contactId ?? '');
+			const attributes = body.attributes;
+			if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes) || Object.keys(attributes).length > 50 || Object.values(attributes).some((value) => value !== null && !['string', 'number', 'boolean'].includes(typeof value)))
+				return json(res, 400, { error: 'Передайте значения пользовательских полей' });
+			if (conversationId && validId(conversationId)) {
+				return json(res, 200, await api(cfg, `${prefix}/${conversationId}/custom_attributes`, { method: 'POST', body: { custom_attributes: attributes, merge: true } }));
+			}
+			if (contactId && validId(contactId)) {
+				const existingResult = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`);
+				const existing = existingResult?.payload ?? existingResult;
+				const merged = { ...(existing.custom_attributes ?? {}), ...attributes };
+				return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`, { method: 'PUT', body: { custom_attributes: merged } }));
+			}
+			return json(res, 400, { error: 'Укажите корректный ID диалога или контакта' });
+		}
 		if (action === 'presence' && ['GET', 'POST'].includes(req.method)) {
 			const agent = await matchAgent(cfg, user.email);
 			if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot, чтобы подключить приём чатов' });

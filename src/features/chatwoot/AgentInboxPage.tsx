@@ -30,10 +30,12 @@ import {
 import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
+import { CustomAttributesDialog } from "@/features/chatwoot/CustomAttributesDialog";
 import {
 	type ChatwootAgent,
 	type ChatwootContact,
 	type ChatwootConversation,
+	type ChatwootCustomAttributeDefinition,
 	type ChatwootMessage,
 	type ChatwootTeam,
 	type ConversationSearch,
@@ -107,6 +109,7 @@ export function AgentInboxPage() {
 	const [from, setFrom] = useState("");
 	const [to, setTo] = useState("");
 	const [sitesOpen, setSitesOpen] = useState(false);
+	const [attributesOpen, setAttributesOpen] = useState(false);
 	const [profileOpen, setProfileOpen] = useState(false);
 	const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
 	const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -309,6 +312,7 @@ export function AgentInboxPage() {
 				onToggleSound={toggleSound}
 				onOpenSettings={() => { setAgentSettingsOpen(true); setProfileOpen(false); }}
 				onManageSites={canManageSites ? () => { setSitesOpen(true); setProfileOpen(false); } : undefined}
+				onManageAttributes={canManageSites ? () => { setAttributesOpen(true); setProfileOpen(false); } : undefined}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			{(presence.isError || accepting.isError) && (
@@ -489,6 +493,7 @@ export function AgentInboxPage() {
 					<div className="flex min-h-0 flex-1 overflow-hidden">
 						<ConversationPane
 							id={conversationId}
+							canEditCustomAttributes={canWork}
 							agents={agents}
 							inboxes={inboxes}
 							labels={labels}
@@ -508,6 +513,9 @@ export function AgentInboxPage() {
 			</div>
 			{sitesOpen && (
 				<WebsiteDomainsDialog onClose={() => setSitesOpen(false)} />
+			)}
+			{attributesOpen && (
+				<CustomAttributesDialog onClose={() => setAttributesOpen(false)} />
 			)}
 			{agentSettingsOpen && (
 				<AgentSettingsDialog
@@ -571,7 +579,7 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites, onManageAttributes }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
@@ -586,6 +594,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	onToggleSound: () => void;
 	onOpenSettings: () => void;
 	onManageSites?: () => void;
+	onManageAttributes?: () => void;
 }) {
 	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
 		{ id: "inbox", label: "Диалоги", icon: MessagesSquare },
@@ -627,6 +636,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 					</button>
 					<button type="button" onClick={onOpenSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Личные настройки</button>
 					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Источники чатов</button>}
+					{onManageAttributes && <button type="button" onClick={onManageAttributes} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Поля Chatwoot</button>}
 					<a href="/chatwoot-demo.html" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs hover:bg-surface-elevated"><ExternalLink size={15} /> Тестовый сайт с чатом</a>
 					<Link to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Headphones size={15} /> Настройки SupportOS</Link>
 				</div>
@@ -854,6 +864,7 @@ function ConversationRow({
 
 function ConversationPane({
 	id,
+	canEditCustomAttributes,
 	agents,
 	inboxes,
 	labels,
@@ -865,6 +876,7 @@ function ConversationPane({
 	onChoose,
 }: {
 	id: number | null;
+	canEditCustomAttributes: boolean;
 	agents: ChatwootAgent[];
 	inboxes: Array<{ id: number; name: string }>;
 	labels: string[];
@@ -1412,10 +1424,20 @@ function ConversationPane({
 							label="Ответственный"
 							value={conversation?.meta?.assignee?.name}
 						/>
-						{Object.entries({
-							...currentContact?.custom_attributes,
-							...currentContact?.additional_attributes,
-						})
+						<CustomFieldsEditor
+							conversationId={id}
+							contactId={contactId}
+							conversationValues={conversation?.custom_attributes ?? {}}
+							contactValues={currentContact?.custom_attributes ?? {}}
+							canEdit={canEditCustomAttributes}
+						/>
+						<details className="rounded-lg border border-border/70 px-2.5 py-2">
+							<summary className="cursor-pointer text-[11px] font-medium text-muted">Исходные данные Chatwoot</summary>
+							<div className="mt-3 space-y-3">
+							{Object.entries({
+								...currentContact?.additional_attributes,
+								...currentContact?.custom_attributes,
+							})
 							.filter(
 								([key, value]) =>
 									value != null &&
@@ -1434,6 +1456,8 @@ function ConversationPane({
 									}
 								/>
 							))}
+							</div>
+						</details>
 					</div>
 					<div className="mt-4 border-t border-border pt-3">
 						<button
@@ -1477,6 +1501,82 @@ function ConversationPane({
 				</>
 			)}
 		</section>
+	);
+}
+
+function CustomFieldsEditor({ conversationId, contactId, conversationValues, contactValues, canEdit }: {
+	conversationId: number;
+	contactId?: number;
+	conversationValues: Record<string, unknown>;
+	contactValues: Record<string, unknown>;
+	canEdit: boolean;
+}) {
+	const conversationFields = useQuery({
+		queryKey: ["chatwoot", "custom-attributes", 0],
+		queryFn: () => chatwootService.customAttributes(0),
+	});
+	const contactFields = useQuery({
+		queryKey: ["chatwoot", "custom-attributes", 1],
+		queryFn: () => chatwootService.customAttributes(1),
+	});
+	const chats = conversationFields.data?.payload ?? [];
+	const contacts = contactFields.data?.payload ?? [];
+	if (!conversationFields.isLoading && !contactFields.isLoading && chats.length === 0 && contacts.length === 0) return null;
+	return (
+		<div className="space-y-3 border-t border-border pt-3">
+			<h4 className="text-[11px] font-semibold">Пользовательские поля</h4>
+			{conversationFields.isError || contactFields.isError ? <p className="text-[10px] text-red-300">Не удалось загрузить поля Chatwoot</p> : null}
+			{conversationFields.isLoading || contactFields.isLoading ? <p className="text-[10px] text-muted">Загружаем поля…</p> : null}
+			{chats.length > 0 && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted">Диалог</p>{chats.map((field) => <CustomFieldValue key={field.id} definition={field} value={conversationValues[field.attribute_key]} subjectId={conversationId} conversationId={conversationId} canEdit={canEdit} />)}</div>}
+			{contacts.length > 0 && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted">Игрок</p>{contacts.map((field) => <CustomFieldValue key={field.id} definition={field} value={contactValues[field.attribute_key]} subjectId={contactId} contactId={contactId} canEdit={canEdit} />)}</div>}
+		</div>
+	);
+}
+
+function CustomFieldValue({ definition, value, subjectId, conversationId, contactId, canEdit }: {
+	definition: ChatwootCustomAttributeDefinition;
+	value: unknown;
+	subjectId?: number;
+	conversationId?: number;
+	contactId?: number;
+	canEdit: boolean;
+}) {
+	const client = useQueryClient();
+	const [draft, setDraft] = useState(value == null ? "" : String(value));
+	useEffect(() => setDraft(value == null ? "" : String(value)), [value]);
+	const save = useMutation({
+		mutationFn: () => {
+			if (!subjectId) throw new Error("Не найден контакт или диалог");
+			let normalized: string | number | boolean | null = draft.trim() || null;
+			if (definition.attribute_display_type === 7) normalized = draft === "true";
+			else if ([1, 2, 3].includes(definition.attribute_display_type) && normalized != null) {
+				const number = Number(normalized);
+				if (!Number.isFinite(number)) throw new Error("Введите корректное число");
+				normalized = number;
+			}
+			return chatwootService.setCustomAttributeValues({
+				...(conversationId ? { conversationId } : { contactId }),
+				attributes: { [definition.attribute_key]: normalized },
+			});
+		},
+		onSuccess: async () => {
+			await Promise.all([
+				client.invalidateQueries({ queryKey: ["chatwoot", "conversation", conversationId] }),
+				client.invalidateQueries({ queryKey: ["chatwoot", "contact", contactId] }),
+			]);
+		},
+	});
+	const className = "h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-[11px] outline-none focus:border-accent/60 disabled:opacity-60";
+	const type = definition.attribute_display_type;
+	return (
+		<div className="min-w-0">
+			<label className="mb-1 block truncate text-[10px] text-muted" title={definition.attribute_description ?? undefined}>{definition.attribute_display_name}</label>
+			<div className="flex min-w-0 items-center gap-1.5">
+				{type === 7 ? <select disabled={!canEdit} value={draft || "false"} onChange={(event) => setDraft(event.target.value)} className={className}><option value="false">Нет</option><option value="true">Да</option></select> : type === 6 ? <select disabled={!canEdit} value={draft} onChange={(event) => setDraft(event.target.value)} className={className}><option value="">Не выбрано</option>{(definition.attribute_values ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input disabled={!canEdit} type={type === 5 ? "date" : [1, 2, 3].includes(type) ? "number" : type === 4 ? "url" : "text"} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Не заполнено" className={className} />}
+				{canEdit && draft !== (value == null ? (type === 7 ? "false" : "") : String(value)) && <button type="button" disabled={save.isPending} onClick={() => save.mutate()} className="shrink-0 rounded-md border border-border px-2 py-1.5 text-[10px] hover:bg-surface-elevated disabled:opacity-50">{save.isPending ? "…" : "Сохранить"}</button>}
+			</div>
+			{save.isError && <p role="alert" className="mt-1 text-[10px] text-red-300">{save.error instanceof Error ? save.error.message : "Не удалось сохранить"}</p>}
+		</div>
 	);
 }
 
