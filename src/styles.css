@@ -254,6 +254,20 @@ html[data-ambient-paused="true"] .ambient-glow { animation-play-state: paused; }
 .workspace-main :where(table) { border-collapse:collapse; font-size:13px; }
 .workspace-main :where(th) { color:var(--color-muted); font-weight:500; text-align:left; }
 .workspace-main :where(td,th) { vertical-align:middle; }
+.supportos-inbox { background:var(--color-background); }
+.dark .supportos-inbox {
+  --color-background:#15181d;
+  --color-surface:#1d2127;
+  --color-surface-elevated:#272c34;
+  --color-border:#353b45;
+  --color-foreground:#f2f4f7;
+  --color-muted:#a4acb8;
+  --color-accent:#8b9cff;
+  --color-accent-foreground:#101426;
+  background:radial-gradient(ellipse at 55% -20%,#303b4a 0%,transparent 48%),var(--color-background);
+}
+.supportos-inbox :where(textarea,input,select) { color:var(--color-foreground); }
+.supportos-inbox :where(textarea, input, select)::placeholder { color:var(--color-muted); }
 .chatwoot-message-content { overflow-wrap:anywhere; white-space:normal; }
 .chatwoot-message-content :where(p,ul,ol,blockquote,pre,table) { margin-block:0.45em; }
 .chatwoot-message-content :where(p:first-child,ul:first-child,ol:first-child,blockquote:first-child,pre:first-child,table:first-child) { margin-top:0; }

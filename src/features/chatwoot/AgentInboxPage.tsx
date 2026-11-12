@@ -6,21 +6,17 @@ import {
 	CalendarDays,
 	CheckCheck,
 	ChevronDown,
-	Columns2,
 	ExternalLink,
 	Globe2,
 	Headphones,
 	LoaderCircle,
-	Maximize2,
 	MessageCircle,
 	MessageSquareText,
 	MessagesSquare,
-	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
 	Plus,
 	RefreshCw,
-	Rows2,
 	Search,
 	Send,
 	Settings2,
@@ -31,7 +27,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { type CSSProperties, createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import {
@@ -53,7 +49,6 @@ import { useKnowledgeStore } from "@/store/knowledge.store";
 
 type Scope = "mine" | "queue" | "history" | "active";
 type WorkspaceSection = "inbox" | "team" | "archive";
-type LayoutMode = "single" | "columns" | "rows";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
@@ -99,17 +94,11 @@ export function AgentInboxPage() {
 	const [scope, setScope] = useState<Scope>("mine");
 	const [activeSection, setActiveSection] = useState<WorkspaceSection>("inbox");
 	const [railCollapsed, setRailCollapsed] = useState(false);
-	const [layout, setLayout] = useState<LayoutMode>("columns");
 	const [listWidth, setListWidth] = useState(() => {
 		try { return Number(localStorage.getItem("supportos:chatwoot:list-width")) || 320; } catch { return 320; }
 	});
-	const [paneSplit, setPaneSplit] = useState(50);
 	const [activePage, setActivePage] = useState(1);
-	const [activePane, setActivePane] = useState(0);
-	const [conversationIds, setConversationIds] = useState<Array<number | null>>([
-		null,
-		null,
-	]);
+	const [conversationId, setConversationId] = useState<number | null>(null);
 	const [search, setSearch] = useState("");
 	const [queueOpen, setQueueOpen] = useState(true);
 	const [inboxId, setInboxId] = useState("");
@@ -250,29 +239,12 @@ export function AgentInboxPage() {
 		}
 	}, [conversations.data, rows, soundEnabled]);
 	const placeConversation = (id: number) => {
-		const existing = conversationIds.indexOf(id);
-		if (existing >= 0) {
-			setActivePane(existing);
-			return;
-		}
-		const target =
-			conversationIds[activePane] == null
-				? activePane
-				: conversationIds[1 - activePane] == null
-					? 1 - activePane
-					: activePane;
-		const next = [...conversationIds];
-		next[target] = id;
-		setConversationIds(next);
-		setActivePane(target);
+		setConversationId(id);
 	};
 	const reload = () => {
 		void client.invalidateQueries({ queryKey: ["chatwoot"] });
 	};
 	const openEmptyPane = () => {
-		const target = conversationIds[0] == null ? 0 : 1;
-		setActivePane(target);
-		setLayout("columns");
 		setQueueOpen(true);
 	};
 	const selectSection = (section: WorkspaceSection) => {
@@ -302,17 +274,6 @@ export function AgentInboxPage() {
 		setListWidth(next);
 		try { localStorage.setItem("supportos:chatwoot:list-width", String(next)); } catch { /* preference remains in session */ }
 	};
-	const toggleMaximizePane = (index: number) => {
-		if (layout === "single") {
-			setLayout("columns");
-			return;
-		}
-		if (index === 1) {
-			setConversationIds(([first, second]) => [second, first]);
-			setActivePane(0);
-		}
-		setLayout("single");
-	};
 	if (connection.isLoading)
 		return (
 			<div className="flex h-full items-center justify-center text-muted">
@@ -332,7 +293,7 @@ export function AgentInboxPage() {
 			/>
 		);
 	return (
-		<div className="flex h-full min-h-0 bg-background text-foreground" onPointerDownCapture={unlockAudio}>
+		<div className="supportos-inbox flex h-full min-h-0 text-foreground" onPointerDownCapture={unlockAudio}>
 			<InboxRail
 				activeSection={activeSection}
 				collapsed={railCollapsed}
@@ -507,7 +468,7 @@ export function AgentInboxPage() {
 									<ConversationRow
 										key={item.id}
 										conversation={item}
-										active={conversationIds.includes(item.id)}
+										active={conversationId === item.id}
 										onClick={() => placeConversation(item.id)}
 										onTake={
 											displayedScope === "queue"
@@ -540,68 +501,19 @@ export function AgentInboxPage() {
 							className={queueOpen ? "" : "rotate-180"}
 						/>
 					</button>
-					<div
-						data-chatwoot-split
-						className={`flex min-h-0 flex-1 overflow-hidden ${layout === "rows" ? "flex-col" : "flex-row"}`}
-					>
+					<div className="flex min-h-0 flex-1 overflow-hidden">
 						<ConversationPane
-							id={conversationIds[0]}
-							style={layout === "single" ? undefined : { flexBasis: `${paneSplit}%`, flexGrow: 0 }}
+							id={conversationId}
 							agents={agents}
 							inboxes={inboxes}
 							labels={labels}
 							binds={[...remoteBinds, ...binds]}
 							language={language}
 							onLanguage={setLanguage}
-							active={activePane === 0}
-							layout={layout}
-							showWorkspaceControls
-							onLayout={setLayout}
-							onReload={() => {
-								void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", conversationIds[0]] });
-								void client.invalidateQueries({ queryKey: ["chatwoot", "messages", conversationIds[0], "latest"] });
-							}}
-							onActivate={() => setActivePane(0)}
-							onClose={() => setConversationIds((ids) => [null, ids[1]])}
+							onClose={() => setConversationId(null)}
 							onChanged={reload}
 							onChoose={openEmptyPane}
-							onToggleMaximize={() => toggleMaximizePane(0)}
-							maximized={layout === "single"}
 						/>
-						{layout !== "single" && (
-							<ResizeHandle axis={layout === "rows" ? "y" : "x"} label="Изменить размер диалогов" value={paneSplit} min={25} max={75} onResize={(value) => {
-								const container = document.querySelector("[data-chatwoot-split]");
-								if (!container) return;
-								const rect = container.getBoundingClientRect();
-								setPaneSplit(Math.min(75, Math.max(25, (value / (layout === "rows" ? rect.height : rect.width)) * 100)));
-							}} />
-						)}
-						{layout !== "single" && (
-							<ConversationPane
-								id={conversationIds[1]}
-								style={{ flexBasis: `${100 - paneSplit}%`, flexGrow: 0 }}
-								agents={agents}
-								inboxes={inboxes}
-								labels={labels}
-								binds={[...remoteBinds, ...binds]}
-								language={language}
-								onLanguage={setLanguage}
-								active={activePane === 1}
-								layout={layout}
-								showWorkspaceControls={false}
-								onLayout={setLayout}
-								onReload={() => {
-									void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", conversationIds[1]] });
-									void client.invalidateQueries({ queryKey: ["chatwoot", "messages", conversationIds[1], "latest"] });
-								}}
-								onActivate={() => setActivePane(1)}
-								onClose={() => setConversationIds((ids) => [ids[0], null])}
-								onChanged={reload}
-								onChoose={openEmptyPane}
-								onToggleMaximize={() => toggleMaximizePane(1)}
-								maximized={false}
-							/>
-						)}
 					</div>
 					</>}
 				</main>
@@ -970,44 +882,26 @@ function ConversationRow({
 
 function ConversationPane({
 	id,
-	style,
-	active,
-	layout,
-	showWorkspaceControls,
-	onLayout,
-	onReload,
 	agents,
 	inboxes,
 	labels,
 	binds,
 	language,
 	onLanguage,
-	onActivate,
 	onClose,
 	onChanged,
 	onChoose,
-	onToggleMaximize,
-	maximized,
 }: {
 	id: number | null;
-	style?: CSSProperties;
-	active: boolean;
-	layout: LayoutMode;
-	showWorkspaceControls: boolean;
-	onLayout: (layout: LayoutMode) => void;
-	onReload: () => void;
 	agents: ChatwootAgent[];
 	inboxes: Array<{ id: number; name: string }>;
 	labels: string[];
 	binds: Bind[];
 	language: LanguageCode;
 	onLanguage: (language: LanguageCode) => void;
-	onActivate: () => void;
 	onClose: () => void;
 	onChanged: () => void;
 	onChoose: () => void;
-	onToggleMaximize: () => void;
-	maximized: boolean;
 }) {
 	const client = useQueryClient();
 	const [text, setText] = useState("");
@@ -1016,7 +910,7 @@ function ConversationPane({
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
 	const [tagOpen, setTagOpen] = useState(false);
-	const [showCustomer, setShowCustomer] = useState(true);
+	const [showCustomer, setShowCustomer] = useState(false);
 	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
 	const [olderMessages, setOlderMessages] = useState<ChatwootMessage[]>([]);
@@ -1209,12 +1103,10 @@ function ConversationPane({
 	const tags = conversation?.labels ?? [];
 	return (
 		<section
-			style={style}
-			onFocusCapture={onActivate}
-			className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${active ? "" : ""}`}
+			className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
 		>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				<header className="flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border pl-12 pr-3 py-2">
+				<header className="flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border bg-surface/60 pl-12 pr-4 py-2.5">
 					<div className="flex min-w-0 items-center gap-2.5">
 						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
 							{initials(sender?.name)}
@@ -1229,47 +1121,7 @@ function ConversationPane({
 							</p>
 						</div>
 					</div>
-					<div className="flex shrink-0 items-center gap-1">
-						{showWorkspaceControls && (
-							<div className="mr-1 flex items-center rounded-lg border border-border bg-surface p-0.5">
-								<button
-									type="button"
-									onClick={() => onLayout("single")}
-									title="Одно окно"
-									aria-label="Одно окно"
-									className={`grid size-7 place-items-center rounded-md ${layout === "single" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
-								>
-									<Maximize2 size={13} />
-								</button>
-								<button
-									type="button"
-									onClick={() => onLayout("columns")}
-									title="Два окна рядом"
-									aria-label="Два окна рядом"
-									className={`grid size-7 place-items-center rounded-md ${layout === "columns" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
-								>
-									<Columns2 size={13} />
-								</button>
-								<button
-									type="button"
-									onClick={() => onLayout("rows")}
-									title="Два окна одно над другим"
-									aria-label="Два окна одно над другим"
-									className={`grid size-7 place-items-center rounded-md ${layout === "rows" ? "bg-surface-elevated text-foreground" : "text-muted hover:text-foreground"}`}
-								>
-									<Rows2 size={13} />
-								</button>
-								<button
-									type="button"
-									onClick={onReload}
-									title="Обновить переписку"
-									aria-label="Обновить переписку"
-									className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-elevated hover:text-foreground"
-								>
-									<RefreshCw size={13} className={latestMessagesQuery.isFetching ? "animate-spin" : ""} />
-								</button>
-							</div>
-						)}
+					<div className="flex shrink-0 items-center gap-1.5">
 						<div className="relative">
 							<button
 								type="button"
@@ -1311,14 +1163,6 @@ function ConversationPane({
 							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
 						>
 							<UserRound size={14} />
-						</button>
-						<button
-							type="button"
-							onClick={onToggleMaximize}
-							title={maximized ? "Вернуть разделение" : "Развернуть диалог"}
-							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
-						>
-							{maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
 						</button>
 						<button
 							type="button"
@@ -1436,7 +1280,7 @@ function ConversationPane({
 							Сообщений пока нет
 						</div>
 					) : (
-						<div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+						<div className="flex w-full flex-col gap-3 px-1 sm:px-3">
 							{messages.map((message) => (
 								<MessageBubble key={message.id} message={message} />
 							))}
@@ -1696,7 +1540,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 	return (
 		<div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
 			<article
-				className={`max-w-[min(82%,42rem)] min-w-0 rounded-2xl px-3.5 py-2.5 ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "bg-accent/15" : "border border-border bg-surface"}`}
+				className={`max-w-[88%] min-w-0 rounded-2xl px-4 py-3 shadow-sm ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "border border-accent/15 bg-accent/15" : "border border-border/80 bg-surface"}`}
 			>
 				{message.private && (
 					<div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
