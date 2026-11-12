@@ -1523,7 +1523,7 @@ function ConversationPane({
 						</div>
 						<div className="flex items-center gap-2">
 							<span className="hidden text-[10px] text-muted sm:block">
-								Ctrl + Enter
+								Enter · Shift+Enter — перенос
 							</span>
 							<button
 								type="button"
@@ -1542,8 +1542,11 @@ function ConversationPane({
 						onKeyDown={(event) => {
 							if (
 								event.key === "Enter" &&
-								(event.ctrlKey || event.metaKey) &&
-								text.trim()
+								!event.shiftKey &&
+								!event.nativeEvent.isComposing &&
+								event.keyCode !== 229 &&
+								text.trim() &&
+								!send.isPending
 							) {
 								event.preventDefault();
 								send.mutate();
