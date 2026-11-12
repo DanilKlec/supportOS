@@ -24,6 +24,7 @@ export interface AppearanceSettings {
 }
 
 export const ACCENT_COLORS = [
+	{ name: "Индиго", value: "#8b9cff" },
 	{ name: "Графит", value: "#a1a1aa" },
 	{ name: "Синий", value: "#3b82f6" },
 	{ name: "Голубой", value: "#06b6d4" },
@@ -34,9 +35,9 @@ export const ACCENT_COLORS = [
 
 export const PALETTE_OPTIONS = [
 	{
-		name: "Обсидиан",
+		name: "Графитовый",
 		value: "slate",
-		description: "Чёрный фон и графитовые поверхности.",
+		description: "Мягкий графитовый фон и выразительные поверхности.",
 	},
 	{
 		name: "Нейтральный",
@@ -97,12 +98,12 @@ const RADIUS_KEY = "supportos-radius";
 const FONT_SCALE_KEY = "supportos-font-scale";
 
 const DEFAULT_CUSTOM_PALETTE: PaletteColors = {
-	background: "#000000",
-	foreground: "#f4f4f5",
-	surface: "#0d0d0f",
-	surfaceElevated: "#18181b",
-	border: "#27272a",
-	muted: "#a1a1aa",
+	background: "#15181d",
+	foreground: "#f2f4f7",
+	surface: "#1d2127",
+	surfaceElevated: "#272c34",
+	border: "#353b45",
+	muted: "#a4acb8",
 };
 
 const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -128,20 +129,20 @@ const PALETTES: Record<
 > = {
 	slate: {
 		light: {
-			background: "#f8fafc",
-			foreground: "#0f172a",
+			background: "#f3f5f8",
+			foreground: "#1b2028",
 			surface: "#ffffff",
-			surfaceElevated: "#f1f5f9",
-			border: "#e2e8f0",
-			muted: "#64748b",
+			surfaceElevated: "#e9edf3",
+			border: "#dce2ea",
+			muted: "#687384",
 		},
 		dark: {
-			background: "#000000",
-			foreground: "#f4f4f5",
-			surface: "#0d0d0f",
-			surfaceElevated: "#18181b",
-			border: "#27272a",
-			muted: "#a1a1aa",
+			background: "#15181d",
+			foreground: "#f2f4f7",
+			surface: "#1d2127",
+			surfaceElevated: "#272c34",
+			border: "#353b45",
+			muted: "#a4acb8",
 		},
 	},
 	neutral: {
@@ -250,6 +251,19 @@ function isHexColor(value: unknown): value is string {
 	return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 }
 
+function getAccentForeground(hexColor: string) {
+	const channels = hexColor
+		.slice(1)
+		.match(/.{2}/g)
+		?.map((channel) => {
+			const value = Number.parseInt(channel, 16) / 255;
+			return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+		});
+	if (!channels || channels.length !== 3) return "#ffffff";
+	const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+	return luminance > 0.19 ? "#101426" : "#ffffff";
+}
+
 function getStoredCustomPalette(): PaletteColors {
 	const stored = getStoredValue(CUSTOM_PALETTE_KEY);
 
@@ -348,10 +362,7 @@ export function applyAppearance(settings = getAppearanceSettings()) {
 	root.style.setProperty("--color-border", palette.border);
 	root.style.setProperty("--color-muted", palette.muted);
 	root.style.setProperty("--color-accent", settings.accent);
-	root.style.setProperty(
-		"--color-accent-foreground",
-		settings.accent === "#a1a1aa" ? "#09090b" : "#ffffff",
-	);
+	root.style.setProperty("--color-accent-foreground", getAccentForeground(settings.accent));
 	root.style.setProperty("--supportos-font-size", `${fontSize}px`);
 
 	for (const [key, value] of Object.entries(RADIUS_VALUES[settings.radius])) {
