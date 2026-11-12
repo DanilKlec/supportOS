@@ -336,18 +336,35 @@ export default async function handler(req, res) {
 		if (!cfg) return json(res, 503, { error: 'Добавьте CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID и CHATWOOT_ACCESS_TOKEN в серверные переменные окружения' });
 		const env = serverConfig(process.env);
 		const prefix = `/accounts/${cfg.accountId}/conversations`;
-		if (action === 'queue-count' && req.method === 'GET') {
+		if (action === 'conversation-counts' && req.method === 'GET') {
 			const inboxId = url.searchParams.get('inbox_id');
 			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
-			const counts = await Promise.all(['open', 'pending'].map(async (status) => {
+			const statuses = await Promise.all(['open', 'pending'].map(async (status) => {
 				const query = new URLSearchParams({ status });
 				if (inboxId) query.set('inbox_id', inboxId);
 				const result = await api(cfg, `${prefix}/meta?${query}`);
-				const meta = result?.data?.meta ?? result?.meta ?? {};
-				const count = Number(meta.unassigned_count);
-				return Number.isFinite(count) ? count : 0;
+				return result?.data?.meta ?? result?.meta ?? {};
 			}));
-			return json(res, 200, { count: counts[0] + counts[1] });
+			const countFromMeta = (meta, key) => {
+				const count = Number(meta?.[key]);
+				return Number.isSafeInteger(count) && count >= 0 ? count : null;
+			};
+			let mineCount = null;
+			const ownPresence = await presenceFor(env, user.id);
+			const ownAgent = ownPresence?.chatwoot_agent_id ?? Number((await matchAgent(cfg, user.email))?.id);
+			if (Number.isSafeInteger(Number(ownAgent)) && Number(ownAgent) > 0) {
+				const filtered = await api(cfg, `${prefix}/filter?page=1`, {
+					method: 'POST',
+					body: { payload: conversationFilters({ status: ['open', 'pending'], assigneeId: String(ownAgent), inboxId }) },
+				});
+				mineCount = conversationTotal(filtered);
+			}
+			const canSeeAllActive = user.access?.permissions?.includes('monitor.read') === true;
+			return json(res, 200, {
+				queueCount: statuses.reduce((total, meta) => total + (countFromMeta(meta, 'unassigned_count') ?? 0), 0),
+				mineCount,
+				activeCount: canSeeAllActive ? statuses.reduce((total, meta) => total + (countFromMeta(meta, 'all_count') ?? 0), 0) : null,
+			});
 		}
 		if (action === 'custom-attributes') {
 			const model = Number(url.searchParams.get('model') ?? body.model);
