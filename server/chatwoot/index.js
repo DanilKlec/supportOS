@@ -508,8 +508,11 @@ export default async function handler(req, res) {
 			}
 			if (assigneeId && !validId(assigneeId)) return json(res, 400, { error: 'Некорректный агент' });
 			const filters = conversationFilters({ status: scope === 'mine' && status === 'open' ? ['open', 'pending'] : status, assigneeId, inboxId, label, from, to });
-			const result = await api(cfg, `${prefix}/filter?page=${page}`, { method: 'POST', body: { payload: filters } });
-			return json(res, 200, result);
+			const search = url.searchParams.get('q')?.trim().slice(0, 150);
+			const searchQuery = search ? `&q=${encodeURIComponent(search)}` : '';
+			const result = await api(cfg, `${prefix}/filter?page=${page}${searchQuery}`, { method: 'POST', body: { payload: filters } });
+			const payload = itemList(result);
+			return json(res, 200, { ...result, payload, hasMore: payload.length >= 25 });
 		}
 		if (action === 'conversation' && req.method === 'GET') {
 			const id = url.searchParams.get('id');

@@ -169,7 +169,7 @@ export function AgentInboxPage() {
 	const request: ConversationSearch = {
 		scope: displayedScope,
 		status: displayedScope === "history" ? "resolved" : "open",
-		page: displayedScope === "active" ? activePage : 1,
+		page: activePage,
 		...(inboxId ? { inboxId: Number(inboxId) } : {}),
 		...(displayedScope === "history" && agentId ? { agentId: Number(agentId) } : {}),
 		...(label ? { label } : {}),
@@ -177,12 +177,15 @@ export function AgentInboxPage() {
 		...(displayedScope === "history" && to ? { to } : {}),
 		...(search.trim() ? { query: search.trim() } : {}),
 	};
+	useEffect(() => {
+		setActivePage(1);
+	}, [activeSection, scope, inboxId, agentId, label, from, to, search]);
 	const conversations = useQuery({
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
 		enabled: connection.data?.configured === true && activeSection !== "team",
-		staleTime: displayedScope === "queue" ? 8000 : 0,
-		refetchInterval: displayedScope === "active" ? 5000 : displayedScope === "queue" ? 7000 : 8000,
+		staleTime: displayedScope === "queue" ? 2000 : 0,
+		refetchInterval: displayedScope === "history" ? 20000 : 3000,
 		retry: 1,
 	});
 	const conversationCounts = useQuery({
@@ -190,7 +193,7 @@ export function AgentInboxPage() {
 		queryFn: () => chatwootService.conversationCounts(inboxId ? Number(inboxId) : undefined),
 		enabled: connection.data?.configured === true && activeSection === "inbox",
 		staleTime: 5000,
-		refetchInterval: 10000,
+		refetchInterval: 5000,
 		retry: 1,
 	});
 	const allLabels = useQuery({
@@ -214,6 +217,31 @@ export function AgentInboxPage() {
 		onSuccess: () => {
 			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
+		},
+	});
+	const takeConversation = useMutation({
+		mutationFn: (id: number) => chatwootService.assign(id, presence.data?.current.agentId ?? null),
+		onMutate: async (id) => {
+			await client.cancelQueries({ queryKey: ["chatwoot", "conversations"] });
+			const queued = client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })
+				.filter(([key]) => (key[2] as ConversationSearch | undefined)?.scope === "queue");
+			const counts = client.getQueriesData({ queryKey: ["chatwoot", "conversation-counts"] });
+			for (const [key, cached] of queued) client.setQueryData(key, withoutConversation(cached, id));
+			client.setQueriesData({ queryKey: ["chatwoot", "conversation-counts"] }, (cached) => {
+				if (!cached || typeof cached !== "object") return cached;
+				const value = cached as { queueCount?: number };
+				return { ...value, queueCount: Math.max(0, (value.queueCount ?? 0) - 1) };
+			});
+			return { queued, counts };
+		},
+		onError: (_error, _id, context) => {
+			for (const [key, cached] of context?.queued ?? []) client.setQueryData(key, cached);
+			for (const [key, cached] of context?.counts ?? []) client.setQueryData(key, cached);
+		},
+		onSettled: () => {
+			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
 		},
 	});
 	const agents: ChatwootAgent[] = directory.data?.agents ?? [];
@@ -279,7 +307,9 @@ export function AgentInboxPage() {
 		setConversationId(id);
 	};
 	const reload = () => {
-		void client.invalidateQueries({ queryKey: ["chatwoot"] });
+		void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
+		void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
+		void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
 	};
 	const openEmptyPane = () => {
 		setQueueOpen(true);
@@ -490,6 +520,11 @@ export function AgentInboxPage() {
 							</span>
 							<span>{displayedScope === "queue" ? conversationCounts.data?.queueCount ?? rows.length : rows.length}</span>
 						</div>
+						{takeConversation.isError && (
+							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">
+								{takeConversation.error instanceof Error ? takeConversation.error.message : "Не удалось взять чат"}
+							</div>
+						)}
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-3">
 							{conversations.isLoading ? (
 								<div className="p-6 text-center text-sm text-muted">
@@ -518,19 +553,23 @@ export function AgentInboxPage() {
 										onClick={() => placeConversation(item.id)}
 										onTake={
 											displayedScope === "queue"
-												? () =>
-														chatwootService
-															.assign(
-																item.id,
-																presence.data?.current.agentId ?? null,
-															)
-															.then(reload)
+												? () => takeConversation.mutate(item.id)
 												: undefined
 										}
+										taking={takeConversation.isPending && takeConversation.variables === item.id}
 									/>
 								))
 							)}
 						</div>
+						{displayedScope !== "active" && (
+							<footer className="flex shrink-0 items-center justify-between border-t border-border px-3 py-2 text-[10px] text-muted">
+								<span>Страница {activePage} · {rows.length} диалогов</span>
+								<div className="flex items-center gap-1.5">
+									<button type="button" disabled={activePage <= 1 || conversations.isFetching} onClick={() => setActivePage((page) => Math.max(1, page - 1))} className="rounded-md border border-border px-2 py-1 disabled:opacity-40">Назад</button>
+									<button type="button" disabled={conversations.data?.hasMore !== true || conversations.isFetching} onClick={() => setActivePage((page) => page + 1)} className="rounded-md border border-border px-2 py-1 disabled:opacity-40">Дальше</button>
+								</div>
+							</footer>
+						)}
 					</aside>
 				)}
 				{queueOpen && scope !== "active" && <ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} />}
@@ -882,11 +921,13 @@ function ConversationRow({
 	active,
 	onClick,
 	onTake,
+	taking = false,
 }: {
 	conversation: ChatwootConversation;
 	active: boolean;
 	onClick: () => void;
 	onTake?: () => void;
+	taking?: boolean;
 }) {
 	const sender = conversation.meta?.sender;
 	const last = conversation.last_non_activity_message;
@@ -946,10 +987,11 @@ function ConversationRow({
 				<button
 					type="button"
 					onClick={onTake}
+				disabled={taking}
 					title="Взять в работу"
-					className="hidden shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground group-hover:block"
+					className="hidden shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground disabled:opacity-50 group-hover:block"
 				>
-					Взять
+					{taking ? "Берём…" : "Взять"}
 				</button>
 			)}
 		</div>
@@ -988,6 +1030,7 @@ function ConversationPane({
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
 	const [tagOpen, setTagOpen] = useState(false);
+	const tagMenuRef = useRef<HTMLDivElement>(null);
 	const [showCustomer, setShowCustomer] = useState(false);
 	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
@@ -995,15 +1038,30 @@ function ConversationPane({
 	const [hasOlderMessages, setHasOlderMessages] = useState(true);
 	const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
 	const [olderMessagesError, setOlderMessagesError] = useState("");
+	const [optimisticMessage, setOptimisticMessage] = useState<ChatwootMessage | null>(null);
 	const messageViewport = useRef<HTMLDivElement>(null);
 	const previousScrollHeight = useRef<number | null>(null);
 	const olderMessagesRequest = useRef(false);
 	const followMessages = useRef(true);
+	const currentConversationId = useRef(id);
+	useEffect(() => {
+		if (!tagOpen) return;
+		const closeOnOutside = (event: PointerEvent) => {
+			if (event.target instanceof Node && !tagMenuRef.current?.contains(event.target)) setTagOpen(false);
+		};
+		const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setTagOpen(false); };
+		document.addEventListener("pointerdown", closeOnOutside);
+		document.addEventListener("keydown", closeOnEscape);
+		return () => {
+			document.removeEventListener("pointerdown", closeOnOutside);
+			document.removeEventListener("keydown", closeOnEscape);
+		};
+	}, [tagOpen]);
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
 		queryFn: () => chatwootService.conversation(id as number),
 		enabled: id != null,
-		refetchInterval: 15000,
+		refetchInterval: 5000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
 	const latestMessagesQuery = useQuery({
@@ -1020,14 +1078,18 @@ function ConversationPane({
 		: (conversation?.messages ?? query.data?.payload?.messages ?? []);
 	const messages = useMemo(() => {
 		const unique = new Map<number, ChatwootMessage>();
-		for (const message of [...olderMessages, ...latestMessages]) unique.set(message.id, message);
+		for (const message of [...olderMessages, ...latestMessages, ...(optimisticMessage ? [optimisticMessage] : [])]) unique.set(message.id, message);
 		return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
-	}, [olderMessages, latestMessages]);
+	}, [olderMessages, latestMessages, optimisticMessage]);
 	const latestMessageId = messages.at(-1)?.id;
 	useEffect(() => {
+		currentConversationId.current = id;
 		setOlderMessages([]);
 		setHasOlderMessages(true);
 		setOlderMessagesError("");
+		setOptimisticMessage(null);
+		olderMessagesRequest.current = false;
+		previousScrollHeight.current = null;
 		followMessages.current = true;
 	}, [id]);
 	useEffect(() => {
@@ -1057,12 +1119,15 @@ function ConversationPane({
 			if (viewport) previousScrollHeight.current = viewport.scrollHeight;
 			const result = await chatwootService.conversationMessages(id, firstId);
 			const page = result.payload ?? result.data?.payload ?? result.messages ?? [];
+			if (currentConversationId.current !== id) return;
+			const knownIds = new Set(messages.map((message) => message.id));
+			const unseen = page.filter((message) => !knownIds.has(message.id));
 			setOlderMessages((current) => {
 				const unique = new Map(current.map((message) => [message.id, message]));
-				for (const message of page) unique.set(message.id, message);
+				for (const message of unseen) unique.set(message.id, message);
 				return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
 			});
-			setHasOlderMessages(page.length >= 20);
+			setHasOlderMessages(page.length >= 20 && unseen.length > 0);
 		} catch (error) {
 			setOlderMessagesError(error instanceof Error ? error.message : "Не удалось загрузить историю");
 		} finally {
@@ -1081,14 +1146,25 @@ function ConversationPane({
 	const send = useMutation({
 		mutationFn: () =>
 			chatwootService.sendMessage(id as number, text.trim(), privateNote),
-		onSuccess: () => {
-			setText("");
+		onMutate: () => {
+			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: privateNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000) });
+			return { conversationId: id };
+		},
+		onSuccess: (_result, _variables, context) => {
+			if (currentConversationId.current === context?.conversationId) {
+				setOptimisticMessage(null);
+				setText("");
+			}
+			void client.invalidateQueries({ queryKey: ["chatwoot", "messages", id, "latest"] });
 			void client.invalidateQueries({
 				queryKey: ["chatwoot", "conversation", id],
 			});
 			void client.invalidateQueries({
 				queryKey: ["chatwoot", "conversations"],
 			});
+		},
+		onError: (_error, _variables, context) => {
+			if (currentConversationId.current === context?.conversationId) setOptimisticMessage(null);
 		},
 	});
 	const status = useMutation({
@@ -1287,7 +1363,7 @@ function ConversationPane({
 							{tag} ×
 						</button>
 					))}
-					<div className="relative z-30">
+					<div className="relative z-30" ref={tagMenuRef}>
 						<button
 							type="button"
 							onClick={() => setTagOpen(!tagOpen)}
@@ -1297,12 +1373,13 @@ function ConversationPane({
 						</button>
 						{tagOpen && (
 							<div className="supportos-scroll absolute left-0 top-[calc(100%+8px)] z-[90] max-h-64 w-60 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl">
-								{labels
-									.filter((tag) => !tags.includes(tag))
-									.map((tag) => (
+								{labels.filter((tag) => !tags.includes(tag)).length === 0 ? (
+									<p className="px-3 py-3 text-center text-[11px] text-muted">Все доступные теги уже добавлены</p>
+								) : labels.filter((tag) => !tags.includes(tag)).map((tag) => (
 										<button
 											key={tag}
 											type="button"
+										disabled={tagMutation.isPending}
 											onClick={() => {
 												tagMutation.mutate([...tags, tag]);
 												setTagOpen(false);
@@ -1311,7 +1388,7 @@ function ConversationPane({
 										>
 											{tag}
 										</button>
-									))}
+										))}
 							</div>
 						)}
 					</div>
@@ -1322,6 +1399,13 @@ function ConversationPane({
 							"—"}
 					</span>
 				</div>
+				{(status.error || assign.error || tagMutation.error || block.error) && (
+					<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-4 py-2 text-[11px] text-red-300">
+						{(status.error || assign.error || tagMutation.error || block.error) instanceof Error
+							? (status.error || assign.error || tagMutation.error || block.error)?.message
+							: "Не удалось выполнить действие"}
+					</div>
+				)}
 				<div
 					ref={messageViewport}
 					onScroll={(event) => {
