@@ -29,6 +29,10 @@ type SourceForm = {
 	websiteUrl: string;
 	allowedDomains: string[];
 	widgetColor: string;
+	widgetPosition: "left" | "right";
+	widgetType: "standard" | "expanded_bubble";
+	widgetLocale: string;
+	launcherTitle: string;
 	welcomeTitle: string;
 	welcomeTagline: string;
 	greetingEnabled: boolean;
@@ -41,6 +45,10 @@ const blankSource: SourceForm = {
 	websiteUrl: "https://",
 	allowedDomains: [],
 	widgetColor: "#2563eb",
+	widgetPosition: "right",
+	widgetType: "standard",
+	widgetLocale: "ru",
+	launcherTitle: "",
 	welcomeTitle: "Привет!",
 	welcomeTagline: "Связаться с нами просто: напишите нам или задайте вопрос.",
 	greetingEnabled: false,
@@ -74,6 +82,10 @@ function sourceForm(inbox: ChatwootWebsiteInbox): SourceForm {
 		websiteUrl: inbox.website_url ?? "",
 		allowedDomains: splitDomains(inbox.allowed_domains),
 		widgetColor: inbox.widget_color || "#2563eb",
+		widgetPosition: inbox.widget_position || "right",
+		widgetType: inbox.widget_type || "standard",
+		widgetLocale: inbox.widget_locale || "ru",
+		launcherTitle: inbox.launcher_title || "",
 		welcomeTitle: inbox.welcome_title || "Привет!",
 		welcomeTagline:
 			inbox.welcome_tagline ||
@@ -200,7 +212,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 		typeof window === "undefined" ? "" : window.location.hostname;
 	const copyWidgetCode = async (inbox: ChatwootWebsiteInbox) => {
 		if (!baseUrl || !inbox.website_token) return;
-		const code = widgetSnippet(baseUrl, inbox.website_token);
+		const code = widgetSnippet(baseUrl, inbox.website_token, inbox);
 		try {
 			await navigator.clipboard.writeText(code);
 			setCopiedSourceId(inbox.id);
@@ -646,6 +658,54 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 											/>
 										</Field>
 									</div>
+									<div className="grid gap-4 sm:grid-cols-2">
+										<Field label="Положение пузырька">
+							<select
+								value={form.widgetPosition}
+								onChange={(event) => set("widgetPosition", event.target.value as SourceForm["widgetPosition"])}
+								className={inputClass}
+							>
+								<option value="right">Справа</option>
+								<option value="left">Слева</option>
+											</select>
+										</Field>
+										<Field label="Вариант пузырька">
+							<select
+								value={form.widgetType}
+								onChange={(event) => set("widgetType", event.target.value as SourceForm["widgetType"])}
+								className={inputClass}
+							>
+								<option value="standard">Стандартный</option>
+								<option value="expanded_bubble">Расширенный</option>
+											</select>
+										</Field>
+									</div>
+									<div className="grid gap-4 sm:grid-cols-2">
+										<Field label="Язык интерфейса виджета">
+							<select
+								value={form.widgetLocale}
+								onChange={(event) => set("widgetLocale", event.target.value)}
+								className={inputClass}
+							>
+								<option value="ru">Русский</option>
+								<option value="en">English</option>
+								<option value="de">Deutsch</option>
+								<option value="pt">Português</option>
+								<option value="el">Ελληνικά</option>
+											</select>
+										</Field>
+						{form.widgetType === "expanded_bubble" && (
+							<Field label="Подпись пузырька">
+								<input
+									value={form.launcherTitle}
+									onChange={(event) => set("launcherTitle", event.target.value)}
+									placeholder="Например, Напишите нам"
+									maxLength={80}
+									className={inputClass}
+								/>
+							</Field>
+						)}
+									</div>
 									<Field label="Текст под заголовком">
 										<textarea
 											aria-label="Текст под заголовком"
@@ -933,6 +993,12 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 const inputClass =
 	"h-10 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none placeholder:text-muted focus:border-accent";
 
-function widgetSnippet(baseUrl: string, websiteToken: string) {
-	return `<script>\n(function(d,t){var BASE_URL=${JSON.stringify(baseUrl)};var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src=BASE_URL+"/packs/js/sdk.js";g.async=true;s.parentNode.insertBefore(g,s);g.onload=function(){window.chatwootSDK.run({websiteToken:${JSON.stringify(websiteToken)},baseUrl:BASE_URL});};})(document,"script");\n</script>`;
+function widgetSnippet(baseUrl: string, websiteToken: string, inbox: ChatwootWebsiteInbox) {
+	const settings = {
+		locale: inbox.widget_locale || "ru",
+		position: inbox.widget_position || "right",
+		type: inbox.widget_type || "standard",
+		...(inbox.launcher_title ? { launcherTitle: inbox.launcher_title } : {}),
+	};
+	return `<script>\nwindow.chatwootSettings = ${JSON.stringify(settings)};\n(function(d,t){var BASE_URL=${JSON.stringify(baseUrl)};var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src=BASE_URL+"/packs/js/sdk.js";g.async=true;s.parentNode.insertBefore(g,s);g.onload=function(){window.chatwootSDK.run({websiteToken:${JSON.stringify(websiteToken)},baseUrl:BASE_URL});};})(document,"script");\n</script>`;
 }

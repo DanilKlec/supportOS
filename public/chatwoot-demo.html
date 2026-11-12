@@ -76,12 +76,12 @@
           if (!response.ok) throw new Error(result.error || 'Не удалось получить настройки виджета');
           return result;
         })
-        .then(({ baseUrl, websiteToken, inboxName, allowedDomains }) => {
+        .then(({ baseUrl, websiteToken, inboxName, allowedDomains, settings }) => {
           inboxLabel = inboxName || inboxLabel;
           if (!hostAllowed(allowedDomains)) {
             throw new Error(`Домен ${location.hostname} не разрешён для источника «${inboxName}». Добавьте его в «Источники чатов» → домены.`);
           }
-          window.chatwootSettings = { locale: 'ru', position: 'right', type: 'standard', hideMessageBubble: false, darkMode: 'auto' };
+          window.chatwootSettings = { locale: settings?.locale || 'ru', position: settings?.position || 'right', type: settings?.type || 'standard', ...(settings?.launcherTitle ? { launcherTitle: settings.launcherTitle } : {}), hideMessageBubble: false, darkMode: 'auto' };
           const sdk = document.createElement('script');
           sdk.src = `${baseUrl.replace(/\/$/, '')}/packs/js/sdk.js`;
           sdk.async = true;

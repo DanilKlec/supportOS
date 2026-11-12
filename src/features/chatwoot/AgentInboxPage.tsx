@@ -121,6 +121,9 @@ export function AgentInboxPage() {
 	const canManageSites = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("technical") === true,
 	);
+	const canManageChatCapacity = useAuthStore(
+		(s) => s.session?.user.access?.roles.some((role) => role.id === "admin" || role.id === "qc") === true,
+	);
 	const canSupervise = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("monitor.read") === true,
 	);
@@ -140,13 +143,14 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "directory"],
 		queryFn: chatwootService.inboxDirectory,
 		enabled: connection.data?.configured === true,
-		staleTime: 60000,
+		staleTime: 5000,
+		refetchInterval: 5000,
 	});
 	const presence = useQuery({
 		queryKey: ["chatwoot", "presence"],
 		queryFn: () => chatwootService.presence(),
 		enabled: connection.data?.configured === true,
-		refetchInterval: 30000,
+		refetchInterval: 5000,
 	});
 	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
 	const request: ConversationSearch = {
@@ -164,7 +168,7 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
 		enabled: connection.data?.configured === true && activeSection !== "team",
-		refetchInterval: 5000,
+		refetchInterval: 3000,
 	});
 	const allLabels = useQuery({
 		queryKey: ["chatwoot", "labels"],
@@ -180,6 +184,13 @@ export function AgentInboxPage() {
 				queryKey: ["chatwoot", "conversations"],
 			});
 			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
+		},
+	});
+	const chatCapacity = useMutation({
+		mutationFn: ({ agentId, maxActiveChats }: { agentId: number; maxActiveChats: number }) => chatwootService.setAgentCapacity(agentId, maxActiveChats),
+		onSuccess: () => {
+			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
 		},
 	});
 	const agents: ChatwootAgent[] = directory.data?.agents ?? [];
@@ -315,12 +326,14 @@ export function AgentInboxPage() {
 				onManageAttributes={canManageSites ? () => { setAttributesOpen(true); setProfileOpen(false); } : undefined}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			{(presence.isError || accepting.isError) && (
+			{(presence.isError || accepting.isError || chatCapacity.isError) && (
 				<div
 					role="alert"
 					className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs text-amber-300"
 				>
-					{presence.error instanceof Error
+					{chatCapacity.error instanceof Error
+						? chatCapacity.error.message
+						: presence.error instanceof Error
 						? presence.error.message
 						: accepting.error instanceof Error
 							? accepting.error.message
@@ -343,6 +356,9 @@ export function AgentInboxPage() {
 						teams={directory.data?.teams ?? []}
 						presence={directory.data?.presence ?? []}
 						currentAgentId={presence.data?.current.agentId}
+						canManageChatCapacity={canManageChatCapacity}
+						capacityPending={chatCapacity.isPending}
+						onSetCapacity={(agentId, maxActiveChats) => chatCapacity.mutate({ agentId, maxActiveChats })}
 					/>
 				) : <>
 				{queueOpen && scope !== "active" && (
@@ -668,11 +684,14 @@ function AgentSettingsDialog({ email, accepting, acceptingPending, soundEnabled,
 	);
 }
 
-function TeamWorkspace({ agents, teams, presence, currentAgentId }: {
+function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, capacityPending, onSetCapacity }: {
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
-	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; heartbeat_at: string }>;
+	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; max_active_chats?: number; heartbeat_at: string }>;
 	currentAgentId?: number;
+	canManageChatCapacity: boolean;
+	capacityPending: boolean;
+	onSetCapacity: (agentId: number, maxActiveChats: number) => void;
 }) {
 	const [tab, setTab] = useState<"agents" | "teams">("agents");
 	const [search, setSearch] = useState("");
@@ -698,12 +717,46 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId }: {
 					{tab === "agents" ? filteredAgents.map((agent) => {
 						const state = presence.find((item) => item.chatwoot_agent_id === agent.id);
 						const isOnline = state && Date.now() - Date.parse(state.heartbeat_at) < 90_000;
-						return <div key={agent.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-3 last:border-0"><div className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold">{initials(agent.name)}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div><div className="truncate text-xs text-muted">{agent.email || "Почта не указана"}</div></div><span className="hidden rounded-full bg-background px-2 py-1 text-[10px] text-muted sm:block">{agent.role || "Агент"}</span><span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-2 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{state?.accepting && isOnline ? "Принимает чаты" : isOnline ? "В SupportOS" : agent.availability_status || "Не в сети"}</span></div>;
+						return <div key={agent.id} className="flex flex-wrap items-center gap-3 border-b border-border/70 px-4 py-3 last:border-0"><div className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold">{initials(agent.name)}</div><div className="min-w-[180px] flex-1"><div className="truncate text-sm font-medium">{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div><div className="truncate text-xs text-muted">{agent.email || "Почта не указана"}</div></div><span className="hidden rounded-full bg-background px-2 py-1 text-[10px] text-muted sm:block">{agent.role || "Агент"}</span><span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-2 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status || "Не в сети"}</span><AgentCapacityField agent={agent} editable={canManageChatCapacity} saving={capacityPending} onSave={onSetCapacity} /></div>;
 					}) : filteredTeams.map((team) => <div key={team.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-4 last:border-0"><div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-accent"><UsersRound size={17} /></div><div className="min-w-0 flex-1"><div className="text-sm font-medium">{team.name}</div><div className="text-xs text-muted">{team.agents?.length ?? 0} агентов{team.description ? ` · ${team.description}` : ""}</div></div><span className="rounded-full bg-background px-2.5 py-1 text-[10px] text-muted">{team.allow_auto_assign ? "Автоназначение" : "Ручное назначение"}</span></div>)}
 					{((tab === "agents" && filteredAgents.length === 0) || (tab === "teams" && filteredTeams.length === 0)) && <div className="p-10 text-center text-sm text-muted">Ничего не найдено</div>}
 				</div>
 			</div>
 		</section>
+	);
+}
+
+function AgentCapacityField({ agent, editable, saving, onSave }: {
+	agent: ChatwootAgent;
+	editable: boolean;
+	saving: boolean;
+	onSave: (agentId: number, maxActiveChats: number) => void;
+}) {
+	const limit = agent.max_active_chats ?? 4;
+	if (!editable)
+		return <span className="rounded-lg border border-border/70 px-2.5 py-1.5 text-[10px] text-muted">Лимит · {limit}</span>;
+	return (
+		<label className="flex items-center gap-2 text-[10px] text-muted">
+			<span>Лимит чатов</span>
+			<input
+				key={`${agent.id}:${limit}`}
+				aria-label={`Максимум чатов для ${agent.name}`}
+				defaultValue={limit}
+				type="number"
+				min={1}
+				max={50}
+				disabled={saving}
+				onBlur={(event) => {
+					const value = Number(event.currentTarget.value);
+					if (!Number.isInteger(value) || value < 1 || value > 50) {
+						event.currentTarget.value = String(limit);
+						return;
+					}
+					if (value !== limit) onSave(agent.id, value);
+				}}
+				className="h-8 w-16 rounded-lg border border-border bg-background px-2 text-center text-xs text-foreground outline-none focus:border-accent disabled:opacity-50"
+			/>
+		</label>
 	);
 }
 

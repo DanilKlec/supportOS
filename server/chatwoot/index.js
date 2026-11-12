@@ -86,21 +86,46 @@ function websiteSourceInput(body) {
 	const welcomeTitle = typeof body.welcomeTitle === 'string' ? body.welcomeTitle.trim() : '';
 	const welcomeTagline = typeof body.welcomeTagline === 'string' ? body.welcomeTagline.trim() : '';
 	const greetingMessage = typeof body.greetingMessage === 'string' ? body.greetingMessage.trim() : '';
+	const widgetPosition = body.widgetPosition === 'left' ? 'left' : 'right';
+	const widgetType = body.widgetType === 'expanded_bubble' ? 'expanded_bubble' : 'standard';
+	const widgetLocale = typeof body.widgetLocale === 'string' ? body.widgetLocale.trim() : 'ru';
+	const launcherTitle = typeof body.launcherTitle === 'string' ? body.launcherTitle.trim() : '';
 	if (!name || name.length > 120) throw chatwootError('Укажите название сайта (до 120 символов)', 400);
 	let url;
 	try { url = new URL(websiteUrl); } catch { throw chatwootError('Укажите корректный адрес сайта, например https://example.com', 400); }
 	if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw chatwootError('Адрес сайта должен начинаться с http:// или https://', 400);
 	if (!/^#[\da-f]{6}$/i.test(widgetColor)) throw chatwootError('Выберите корректный цвет виджета', 400);
-	if (welcomeTitle.length > 100 || welcomeTagline.length > 255 || greetingMessage.length > 5000) throw chatwootError('Текст приветствия превышает допустимую длину', 400);
+	if (welcomeTitle.length > 100 || welcomeTagline.length > 255 || greetingMessage.length > 5000 || launcherTitle.length > 80) throw chatwootError('Текст настройки виджета превышает допустимую длину', 400);
+	if (!['ru', 'en', 'de', 'pt', 'el'].includes(widgetLocale)) throw chatwootError('Выберите поддерживаемый язык виджета', 400);
 	if (typeof body.greetingEnabled !== 'boolean') throw chatwootError('Укажите, включено ли приветствие', 400);
 	const operatorIds = [...new Set((Array.isArray(body.operatorIds) ? body.operatorIds : []).map(Number))];
 	if (operatorIds.length > 200 || operatorIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw chatwootError('Выберите корректных операторов', 400);
-	return { name, websiteUrl: url.toString().replace(/\/$/, ''), widgetColor, welcomeTitle, welcomeTagline, greetingMessage, greetingEnabled: body.greetingEnabled, allowedDomains: normalizeAllowedDomains(body.allowedDomains ?? []), operatorIds };
+	return { name, websiteUrl: url.toString().replace(/\/$/, ''), widgetColor, widgetPosition, widgetType, widgetLocale, launcherTitle, welcomeTitle, welcomeTagline, greetingMessage, greetingEnabled: body.greetingEnabled, allowedDomains: normalizeAllowedDomains(body.allowedDomains ?? []), operatorIds };
+}
+
+async function saveWidgetSettings(env, inboxId, source) {
+	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_widget_settings?on_conflict=inbox_id`, {
+		method: 'POST',
+		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+		body: JSON.stringify({ inbox_id: Number(inboxId), widget_position: source.widgetPosition, widget_type: source.widgetType, widget_locale: source.widgetLocale, launcher_title: source.launcherTitle, updated_at: new Date().toISOString() }),
+		signal: AbortSignal.timeout(15000),
+	});
+	if (!response.ok) throw Object.assign(new Error('Не удалось сохранить настройки виджета. Проверьте, что миграция SupportOS применена.'), { status: 502 });
+}
+
+function normalizeWidgetSettings(row) {
+	return {
+		position: row?.widget_position === 'left' ? 'left' : 'right',
+		type: row?.widget_type === 'expanded_bubble' ? 'expanded_bubble' : 'standard',
+		locale: ['ru', 'en', 'de', 'pt', 'el'].includes(row?.widget_locale) ? row.widget_locale : 'ru',
+		launcherTitle: typeof row?.launcher_title === 'string' ? row.launcher_title : '',
+	};
 }
 
 function websiteSourcePayload(source) {
 	return {
 		name: source.name,
+		enable_auto_assignment: false,
 		greeting_enabled: source.greetingEnabled,
 		greeting_message: source.greetingMessage,
 		channel: {
@@ -143,6 +168,10 @@ async function writePresence(env, user, agentId, accepting) {
 	return (await response.json())?.[0];
 }
 
+async function getAgentLimits(env) {
+	return allRows(env, 'supportos_chatwoot_agent_limits?select=chatwoot_agent_id,max_active_chats');
+}
+
 async function listAgents(cfg) {
 	return itemList(await api(cfg, `/accounts/${cfg.accountId}/agents`));
 }
@@ -154,58 +183,77 @@ async function matchAgent(cfg, email) {
 }
 
 async function routeWaitingConversations(env, cfg) {
-	const [agents, presenceRows] = await Promise.all([
+	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 4 });
+	if (routerLease !== true) return { assigned: 0, skipped: true };
+	const [agents, presenceRows, limits] = await Promise.all([
 		listAgents(cfg),
 		allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
+		getAgentLimits(env),
 	]);
 	const cutoff = Date.now() - 90_000;
-	const activeIds = [...new Set(presenceRows.filter((row) => row.accepting && Date.parse(row.heartbeat_at) >= cutoff).map((row) => Number(row.chatwoot_agent_id)).filter(Number.isSafeInteger))];
+	const activePresence = presenceRows.filter((row) => row.accepting && Date.parse(row.heartbeat_at) >= cutoff);
+	const activeIds = [...new Set(activePresence.map((row) => Number(row.chatwoot_agent_id)).filter(Number.isSafeInteger))];
 	if (!activeIds.length) return { assigned: 0 };
 	const known = new Set(agents.map((agent) => Number(agent.id)));
 	const eligible = activeIds.filter((id) => known.has(id));
+	const capacities = Object.fromEntries(activePresence.map((row) => {
+		const agentId = Number(row.chatwoot_agent_id);
+		const limit = limits.find((item) => Number(item.chatwoot_agent_id) === agentId)?.max_active_chats;
+		return [String(agentId), Math.max(1, Math.min(50, Number(limit) || 4))];
+	}));
+	const activeCounts = Object.fromEntries(eligible.map((id) => [String(id), 0]));
+	const conversationById = new Map();
 	const inboxMembersCache = new Map();
-	let assigned = 0;
 	for (const status of ['open', 'pending']) {
 		for (let page = 1; page <= 10; page += 1) {
 			const active = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page}`);
 			const pageItems = itemList(active);
-			const inboxIds = [...new Set(pageItems.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
-			await Promise.all(inboxIds.filter((id) => !inboxMembersCache.has(id)).map(async (id) => {
-				const members = await websiteInboxMembers(cfg, id).catch(() => []);
-				inboxMembersCache.set(id, members);
-			}));
-			for (const conversation of pageItems) {
-				if (!validId(String(conversation.id))) continue;
-				const conversationInboxId = String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '');
-				let eligibleForInbox = eligible;
-				if (validId(conversationInboxId)) {
-					const memberIds = new Set(inboxMembersCache.get(conversationInboxId));
-					eligibleForInbox = eligible.filter((id) => memberIds.has(id));
-				}
-				if (!eligibleForInbox.length) continue;
-				const currentAssignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
-				const isUnassigned = !Number.isSafeInteger(currentAssignee) || currentAssignee <= 0;
-				if (!isUnassigned && eligible.includes(currentAssignee)) continue;
-				const rawCreatedAt = conversation.created_at;
-				const createdAt = typeof rawCreatedAt === 'string' && !/^\d+$/.test(rawCreatedAt)
-					? Date.parse(rawCreatedAt)
-					: Number(rawCreatedAt) * (Number(rawCreatedAt) > 1e12 ? 1 : 1000);
-				// Re-route fresh chats that Chatwoot auto-assigned outside the active SupportOS team.
-				// Older assigned conversations stay with their current owner; unassigned ones remain routable.
-				if (!isUnassigned && (!Number.isFinite(createdAt) || Date.now() - createdAt > 5 * 60_000)) continue;
-				const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route', { p_conversation_id: Number(conversation.id), p_agent_ids: eligibleForInbox });
-				const agentId = Number(chosen);
-				if (!Number.isSafeInteger(agentId) || !eligibleForInbox.includes(agentId)) continue;
-				try {
-					await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
-					await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
-					assigned += 1;
-				} catch (error) {
-					await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
-					if (error.status === 401 || error.status === 403) throw error;
-				}
-			}
+			for (const conversation of pageItems) conversationById.set(Number(conversation.id), conversation);
 			if (pageItems.length < 25) break;
+		}
+	}
+	const conversations = [...conversationById.values()];
+	for (const conversation of conversations) {
+		const assignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
+		if (Number.isSafeInteger(assignee) && Object.hasOwn(activeCounts, String(assignee))) activeCounts[String(assignee)] += 1;
+	}
+	const baselineCounts = { ...activeCounts };
+	const inboxIds = [...new Set(conversations.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
+	await Promise.all(inboxIds.map(async (id) => {
+		const members = await websiteInboxMembers(cfg, id).catch(() => []);
+		inboxMembersCache.set(id, members);
+	}));
+	const createdAtOf = (conversation) => {
+		const raw = conversation.created_at;
+		return typeof raw === 'string' && !/^\d+$/.test(raw) ? Date.parse(raw) : Number(raw) * (Number(raw) > 1e12 ? 1 : 1000);
+	};
+	conversations.sort((a, b) => createdAtOf(a) - createdAtOf(b));
+	let assigned = 0;
+	for (const conversation of conversations) {
+		if (!validId(String(conversation.id))) continue;
+		const conversationInboxId = String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '');
+		const currentAssignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
+		const isUnassigned = !Number.isSafeInteger(currentAssignee) || currentAssignee <= 0;
+		if (!isUnassigned && eligible.includes(currentAssignee)) continue;
+		// Only redirect fresh chats that Chatwoot assigned outside the active SupportOS team.
+		if (!isUnassigned && (!Number.isFinite(createdAtOf(conversation)) || Date.now() - createdAtOf(conversation) > 5 * 60_000)) continue;
+		let eligibleForInbox = eligible.filter((id) => activeCounts[String(id)] < capacities[String(id)]);
+		if (validId(conversationInboxId)) {
+			const memberIds = new Set(inboxMembersCache.get(conversationInboxId));
+			eligibleForInbox = eligibleForInbox.filter((id) => memberIds.has(id));
+		}
+		if (!eligibleForInbox.length) continue;
+		const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route_with_capacity', { p_conversation_id: Number(conversation.id), p_agent_ids: eligibleForInbox, p_active_counts: baselineCounts, p_capacities: capacities });
+		const agentId = Number(chosen);
+		if (!Number.isSafeInteger(agentId) || !eligibleForInbox.includes(agentId)) continue;
+		try {
+			await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
+			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
+			activeCounts[String(agentId)] += 1;
+			assigned += 1;
+		} catch (error) {
+			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
+			if (error.status === 401 || error.status === 403) throw error;
 		}
 	}
 	return { assigned };
@@ -233,6 +281,7 @@ export default async function handler(req, res) {
 			// Website tokens are designed to be public in widget snippets; never return the Chatwoot API token here.
 			const cfg = config();
 			if (!cfg) return json(res, 503, { error: 'Chatwoot не настроен на сервере' });
+			const env = serverConfig(process.env);
 			const inboxes = itemList(await api(cfg, `/accounts/${cfg.accountId}/inboxes`)).filter(isWebsiteInbox);
 			const candidates = await Promise.all(inboxes.map(async (inbox) => {
 				const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inbox.id}`);
@@ -260,13 +309,15 @@ export default async function handler(req, res) {
 			if (selected) {
 				const { inbox, detail } = selected;
 				const websiteToken = detail.website_token ?? detail.channel?.website_token ?? inbox.website_token;
-				if (typeof websiteToken === 'string' && websiteToken.length > 0)
-					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxName: detail.name ?? inbox.name ?? 'Поддержка', allowedDomains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? inbox.allowed_domains ?? '' });
+				if (typeof websiteToken === 'string' && websiteToken.length > 0) {
+					const preferences = (await db(env, `supportos_chatwoot_widget_settings?select=widget_position,widget_type,widget_locale,launcher_title&inbox_id=eq.${Number(inbox.id)}&limit=1`))?.[0];
+					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxId: Number(inbox.id), inboxName: detail.name ?? inbox.name ?? 'Поддержка', allowedDomains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? inbox.allowed_domains ?? '', settings: normalizeWidgetSettings(preferences) });
+				}
 			}
 			return json(res, 409, { error: inboxes.length ? 'У Website-канала не найден публичный токен виджета' : 'Создайте Website-канал в Chatwoot, чтобы включить тестовый виджет' });
 		}
 		const requestedScope = url.searchParams.get('scope');
-		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) || action === 'custom-attributes' && req.method !== 'GET' ? 'technical' : action === 'conversations' && requestedScope === 'active' ? 'monitor.read' : 'work';
+		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) || action === 'custom-attributes' && req.method !== 'GET' ? 'technical' : ['conversations', 'agent-capacity'].includes(action) && (action === 'agent-capacity' || requestedScope === 'active') ? 'monitor.read' : 'work';
 		const user = await requireUser(req, { permission });
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
@@ -325,17 +376,42 @@ export default async function handler(req, res) {
 			}
 			return json(res, 400, { error: 'Укажите корректный ID диалога или контакта' });
 		}
+		if (action === 'agent-capacity' && req.method === 'POST') {
+			const allowedRole = user.access?.roles?.some((role) => ['admin', 'qc'].includes(role.id));
+			if (!allowedRole) return json(res, 403, { error: 'Лимиты чатов может менять только администратор или QC' });
+			const agentId = Number(body.agentId);
+			const maxActiveChats = Number(body.maxActiveChats);
+			if (!Number.isSafeInteger(agentId) || agentId <= 0 || !Number.isInteger(maxActiveChats) || maxActiveChats < 1 || maxActiveChats > 50)
+				return json(res, 400, { error: 'Укажите агента и лимит от 1 до 50 чатов' });
+			const agent = (await listAgents(cfg)).find((item) => Number(item.id) === agentId);
+			if (!agent) return json(res, 404, { error: 'Агент Chatwoot не найден' });
+			const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_agent_limits?on_conflict=chatwoot_agent_id`, {
+				method: 'POST',
+				headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+				body: JSON.stringify({ chatwoot_agent_id: agentId, max_active_chats: maxActiveChats, updated_by: user.id, updated_at: new Date().toISOString() }),
+				signal: AbortSignal.timeout(15000),
+			});
+			if (!response.ok) throw Object.assign(new Error('Не удалось сохранить лимит агента'), { status: 502 });
+			const presence = await allRows(env, 'supportos_chatwoot_presence?select=accepting,heartbeat_at');
+			if (presence.some((row) => row.accepting && Date.now() - Date.parse(row.heartbeat_at) < 90_000))
+				await routeWaitingConversations(env, cfg);
+			return json(res, 200, { agentId, maxActiveChats });
+		}
 		if (action === 'presence' && ['GET', 'POST'].includes(req.method)) {
 			const agent = await matchAgent(cfg, user.email);
 			if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot, чтобы подключить приём чатов' });
 			const previous = await presenceFor(env, user.id);
 			const accepting = typeof body.accepting === 'boolean' ? body.accepting : previous?.accepting === true;
 			const current = await writePresence(env, user, Number(agent.id), accepting);
-			const team = await allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at');
+			const [team, limits] = await Promise.all([
+				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
+				getAgentLimits(env),
+			]);
 			const cutoff = Date.now() - 90_000;
-			const activeTeam = team.filter((row) => Date.parse(row.heartbeat_at) >= cutoff).map((row) => ({ agentId: Number(row.chatwoot_agent_id), accepting: row.accepting, active: true }));
-			const routing = accepting ? await routeWaitingConversations(env, cfg) : { assigned: 0 };
-			return json(res, 200, { current: { agentId: Number(agent.id), accepting: current.accepting, heartbeatAt: current.heartbeat_at }, team: activeTeam, routing });
+			const activeTeam = team.filter((row) => Date.parse(row.heartbeat_at) >= cutoff).map((row) => ({ agentId: Number(row.chatwoot_agent_id), accepting: row.accepting, maxActiveChats: Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(row.chatwoot_agent_id))?.max_active_chats) || 4, active: true }));
+			const routing = activeTeam.some((row) => row.accepting) ? await routeWaitingConversations(env, cfg) : { assigned: 0 };
+			const maxActiveChats = Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agent.id))?.max_active_chats) || 4;
+			return json(res, 200, { current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at }, team: activeTeam, routing });
 		}
 		if (action === 'conversations' && req.method === 'GET') {
 			const scope = url.searchParams.get('scope') ?? 'queue';
@@ -413,13 +489,15 @@ export default async function handler(req, res) {
 			return json(res, 200, await api(cfg, `${prefix}/${id}/messages${cursor}`));
 		}
 		if (action === 'agents' && req.method === 'GET') {
-			const [agents, inboxes, teams, presence] = await Promise.all([
+			const [agents, inboxes, teams, presence, limits] = await Promise.all([
 				api(cfg, `/accounts/${cfg.accountId}/agents`),
 				api(cfg, `/accounts/${cfg.accountId}/inboxes`),
 				api(cfg, `/accounts/${cfg.accountId}/teams`).catch(() => []),
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
+				getAgentLimits(env),
 			]);
-			return json(res, 200, { agents: itemList(agents), inboxes: itemList(inboxes), teams: itemList(teams), presence });
+			const maxFor = (agentId) => Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agentId))?.max_active_chats) || 4;
+			return json(res, 200, { agents: itemList(agents).map((agent) => ({ ...agent, max_active_chats: maxFor(agent.id) })), inboxes: itemList(inboxes), teams: itemList(teams), presence: presence.map((row) => ({ ...row, max_active_chats: maxFor(row.chatwoot_agent_id) })) });
 		}
 		if (action === 'labels' && req.method === 'GET')
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/labels`));
@@ -430,7 +508,9 @@ export default async function handler(req, res) {
 			const inboxes = await Promise.all(source.map(async (item) => {
 				const detailResult = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${item.id}`);
 				const detail = detailResult?.payload ?? detailResult;
-				return { id: Number(item.id), name: detail.name ?? item.name ?? `Website #${item.id}`, website_url: detail.website_url ?? detail.channel?.website_url ?? item.website_url ?? null, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? item.allowed_domains ?? '', widget_color: detail.widget_color ?? detail.channel?.widget_color ?? null, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? null, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? null, greeting_enabled: detail.greeting_enabled ?? false, greeting_message: detail.greeting_message ?? '', website_token: detail.website_token ?? detail.channel?.website_token ?? null };
+				const preferences = (await db(env, `supportos_chatwoot_widget_settings?select=widget_position,widget_type,widget_locale,launcher_title&inbox_id=eq.${Number(item.id)}&limit=1`))?.[0];
+				const settings = normalizeWidgetSettings(preferences);
+				return { id: Number(item.id), name: detail.name ?? item.name ?? `Website #${item.id}`, website_url: detail.website_url ?? detail.channel?.website_url ?? item.website_url ?? null, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? item.allowed_domains ?? '', widget_color: detail.widget_color ?? detail.channel?.widget_color ?? null, widget_position: settings.position, widget_type: settings.type, widget_locale: settings.locale, launcher_title: settings.launcherTitle, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? null, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? null, greeting_enabled: detail.greeting_enabled ?? false, greeting_message: detail.greeting_message ?? '', website_token: detail.website_token ?? detail.channel?.website_token ?? null };
 			}));
 			return json(res, 200, { baseUrl: cfg.base, inboxes });
 		}
@@ -460,7 +540,9 @@ export default async function handler(req, res) {
 			if (req.method === 'DELETE') {
 				const inboxId = String(body.inboxId ?? '');
 				if (!validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
-				return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'DELETE' }));
+				const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'DELETE' });
+				await db(env, `supportos_chatwoot_widget_settings?inbox_id=eq.${inboxId}`, undefined, 'DELETE');
+				return json(res, 200, result);
 			}
 			if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
 			const source = websiteSourceInput(body);
@@ -471,6 +553,7 @@ export default async function handler(req, res) {
 			if (inboxId) {
 				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'PATCH', body: websiteSourcePayload(source) });
 				await setWebsiteInboxMembers(cfg, inboxId, source.operatorIds);
+				await saveWidgetSettings(env, inboxId, source);
 			} else {
 				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes`, { method: 'POST', body: websiteSourcePayload(source) });
 				const created = result?.payload ?? result;
@@ -478,13 +561,14 @@ export default async function handler(req, res) {
 				if (!validId(createdId)) throw chatwootError('Chatwoot создал источник, но не вернул его ID', 502);
 				try {
 					await setWebsiteInboxMembers(cfg, createdId, source.operatorIds);
+					await saveWidgetSettings(env, createdId, source);
 				} catch (error) {
 					await api(cfg, `/accounts/${cfg.accountId}/inboxes/${createdId}`, { method: 'DELETE' }).catch(() => undefined);
 					throw error;
 				}
 			}
 			const detail = result?.payload ?? result;
-			return json(res, 200, { inbox: { id: Number(detail.id ?? inboxId), name: detail.name ?? source.name, website_url: detail.website_url ?? detail.channel?.website_url ?? source.websiteUrl, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? source.allowedDomains.join(','), widget_color: detail.widget_color ?? detail.channel?.widget_color ?? source.widgetColor, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? source.welcomeTitle, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? source.welcomeTagline, greeting_enabled: detail.greeting_enabled ?? source.greetingEnabled, greeting_message: detail.greeting_message ?? source.greetingMessage, website_token: detail.website_token ?? detail.channel?.website_token ?? null } });
+			return json(res, 200, { inbox: { id: Number(detail.id ?? inboxId), name: detail.name ?? source.name, website_url: detail.website_url ?? detail.channel?.website_url ?? source.websiteUrl, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? source.allowedDomains.join(','), widget_color: detail.widget_color ?? detail.channel?.widget_color ?? source.widgetColor, widget_position: source.widgetPosition, widget_type: source.widgetType, widget_locale: source.widgetLocale, launcher_title: source.launcherTitle, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? source.welcomeTitle, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? source.welcomeTagline, greeting_enabled: detail.greeting_enabled ?? source.greetingEnabled, greeting_message: detail.greeting_message ?? source.greetingMessage, website_token: detail.website_token ?? detail.channel?.website_token ?? null } });
 		}
 		if (!validId(String(body.conversationId ?? ''))) return json(res, 400, { error: 'Некорректный ID диалога' });
 		const id = String(body.conversationId);

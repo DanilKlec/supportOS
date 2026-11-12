@@ -55,6 +55,7 @@ export type ChatwootAgent = {
 	email?: string;
 	role?: string;
 	availability_status?: string;
+	max_active_chats?: number;
 };
 export type ChatwootTeam = {
 	id: number;
@@ -70,6 +71,10 @@ export type ChatwootWebsiteInbox = {
 	website_url?: string | null;
 	allowed_domains?: string | null;
 	widget_color?: string | null;
+	widget_position?: "left" | "right";
+	widget_type?: "standard" | "expanded_bubble";
+	widget_locale?: string;
+	launcher_title?: string;
 	welcome_title?: string | null;
 	welcome_tagline?: string | null;
 	greeting_enabled?: boolean;
@@ -165,6 +170,7 @@ export const chatwootService = {
 			presence: Array<{
 				chatwoot_agent_id: number;
 				accepting: boolean;
+				max_active_chats: number;
 				heartbeat_at: string;
 			}>;
 		}>("agents"),
@@ -184,6 +190,10 @@ export const chatwootService = {
 		websiteUrl: string;
 		allowedDomains: string[];
 		widgetColor: string;
+		widgetPosition: "left" | "right";
+		widgetType: "standard" | "expanded_bubble";
+		widgetLocale: string;
+		launcherTitle: string;
 		welcomeTitle: string;
 		welcomeTagline: string;
 		greetingEnabled: boolean;
@@ -207,10 +217,16 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ inboxId, domains }),
 		}),
+	setAgentCapacity: (agentId: number, maxActiveChats: number) =>
+		request<{ agentId: number; maxActiveChats: number }>("agent-capacity", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ agentId, maxActiveChats }),
+		}),
 	presence: (accepting?: boolean) =>
 		request<{
-			current: { agentId: number; accepting: boolean; heartbeatAt: string };
-			team: Array<{ agentId: number; accepting: boolean; active: boolean }>;
+			current: { agentId: number; accepting: boolean; maxActiveChats: number; heartbeatAt: string };
+			team: Array<{ agentId: number; accepting: boolean; maxActiveChats: number; active: boolean }>;
 			routing: { assigned: number };
 		}>(
 			"presence",
