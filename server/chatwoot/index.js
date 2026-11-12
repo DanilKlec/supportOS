@@ -234,9 +234,31 @@ export default async function handler(req, res) {
 			const cfg = config();
 			if (!cfg) return json(res, 503, { error: 'Chatwoot не настроен на сервере' });
 			const inboxes = itemList(await api(cfg, `/accounts/${cfg.accountId}/inboxes`)).filter(isWebsiteInbox);
-			for (const inbox of inboxes) {
+			const candidates = await Promise.all(inboxes.map(async (inbox) => {
 				const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inbox.id}`);
 				const detail = result?.payload ?? result;
+				return { inbox, detail };
+			}));
+			const refererValue = req.headers?.referer ?? req.headers?.Referer;
+			let referer;
+			try { if (refererValue) referer = new URL(refererValue); } catch { /* use a deterministic fallback below */ }
+			const matchingSource = referer ? candidates.find(({ inbox, detail }) => {
+				const websiteUrl = detail.website_url ?? detail.channel?.website_url ?? inbox.website_url;
+				if (websiteUrl) {
+					try {
+						const configured = new URL(websiteUrl);
+						if (configured.origin === referer.origin && configured.pathname.replace(/\/$/, '') === referer.pathname.replace(/\/$/, '')) return true;
+					} catch { /* check the allowed domains as a fallback */ }
+				}
+				const allowed = detail.allowed_domains ?? detail.channel?.allowed_domains ?? inbox.allowed_domains ?? '';
+				const domains = (Array.isArray(allowed) ? allowed : String(allowed).split(','))
+					.map((domain) => String(domain).trim().toLowerCase().replace(/^https?:\/\//, '').split(/[/?#]/, 1)[0])
+					.filter(Boolean);
+				return domains.some((domain) => domain === referer.hostname.toLowerCase() || domain.startsWith('*.') && referer.hostname.toLowerCase().endsWith(domain.slice(1)));
+			}) : undefined;
+			const selected = matchingSource ?? candidates[0];
+			if (selected) {
+				const { inbox, detail } = selected;
 				const websiteToken = detail.website_token ?? detail.channel?.website_token ?? inbox.website_token;
 				if (typeof websiteToken === 'string' && websiteToken.length > 0)
 					return json(res, 200, { baseUrl: cfg.base, websiteToken, inboxName: detail.name ?? inbox.name ?? 'Поддержка', allowedDomains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? inbox.allowed_domains ?? '' });

@@ -41,6 +41,7 @@
       const button = document.getElementById('open-chat');
       const newVisitor = document.getElementById('new-visitor');
       let widgetReady = false;
+      let inboxLabel = 'Chatwoot';
       const setState = (kind, text) => { state.dataset.kind = kind; state.lastElementChild.textContent = text; };
       const hostAllowed = (allowedDomains) => {
         const patterns = (Array.isArray(allowedDomains) ? allowedDomains : String(allowedDomains || '').split(','))
@@ -54,7 +55,7 @@
       };
       window.addEventListener('chatwoot:ready', () => {
         widgetReady = true;
-        setState('ready', 'Виджет подключён. Откройте чат и отправьте тестовое сообщение.');
+        setState('ready', `Виджет подключён · ${inboxLabel}. Откройте чат и отправьте тестовое сообщение.`);
       }, { once: true });
       button.addEventListener('click', () => {
         if (widgetReady && window.$chatwoot) window.$chatwoot.toggle('open');
@@ -76,6 +77,7 @@
           return result;
         })
         .then(({ baseUrl, websiteToken, inboxName, allowedDomains }) => {
+          inboxLabel = inboxName || inboxLabel;
           if (!hostAllowed(allowedDomains)) {
             throw new Error(`Домен ${location.hostname} не разрешён для источника «${inboxName}». Добавьте его в «Источники чатов» → домены.`);
           }
