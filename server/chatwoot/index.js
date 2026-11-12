@@ -183,7 +183,7 @@ async function matchAgent(cfg, email) {
 }
 
 async function routeWaitingConversations(env, cfg) {
-	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 4 });
+	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 8 });
 	if (routerLease !== true) return { assigned: 0, skipped: true };
 	const [agents, presenceRows, limits] = await Promise.all([
 		listAgents(cfg),
@@ -204,14 +204,20 @@ async function routeWaitingConversations(env, cfg) {
 	const activeCounts = Object.fromEntries(eligible.map((id) => [String(id), 0]));
 	const conversationById = new Map();
 	const inboxMembersCache = new Map();
-	for (const status of ['open', 'pending']) {
-		for (let page = 1; page <= 10; page += 1) {
-			const active = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page}`);
-			const pageItems = itemList(active);
-			for (const conversation of pageItems) conversationById.set(Number(conversation.id), conversation);
-			if (pageItems.length < 25) break;
+	const statusPages = await Promise.all(['open', 'pending'].map(async (status) => {
+		const firstPage = await api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=1`);
+		const firstItems = itemList(firstPage);
+		if (firstItems.length < 25) return firstItems;
+		const remainingPages = [];
+		for (let page = 2; page <= 10; page += 4) {
+			const batch = await Promise.all(Array.from({ length: Math.min(4, 11 - page) }, (_, index) =>
+				api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&page=${page + index}`).then(itemList),
+			));
+			remainingPages.push(...batch);
 		}
-	}
+		return [...firstItems, ...remainingPages.flat()];
+	}));
+	for (const conversation of statusPages.flat()) conversationById.set(Number(conversation.id), conversation);
 	const conversations = [...conversationById.values()];
 	for (const conversation of conversations) {
 		const assignee = Number(conversation.meta?.assignee?.id ?? conversation.assignee_id);
@@ -330,6 +336,19 @@ export default async function handler(req, res) {
 		if (!cfg) return json(res, 503, { error: 'Добавьте CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID и CHATWOOT_ACCESS_TOKEN в серверные переменные окружения' });
 		const env = serverConfig(process.env);
 		const prefix = `/accounts/${cfg.accountId}/conversations`;
+		if (action === 'queue-count' && req.method === 'GET') {
+			const inboxId = url.searchParams.get('inbox_id');
+			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
+			const counts = await Promise.all(['open', 'pending'].map(async (status) => {
+				const query = new URLSearchParams({ status });
+				if (inboxId) query.set('inbox_id', inboxId);
+				const result = await api(cfg, `${prefix}/meta?${query}`);
+				const meta = result?.data?.meta ?? result?.meta ?? {};
+				const count = Number(meta.unassigned_count);
+				return Number.isFinite(count) ? count : 0;
+			}));
+			return json(res, 200, { count: counts[0] + counts[1] });
+		}
 		if (action === 'custom-attributes') {
 			const model = Number(url.searchParams.get('model') ?? body.model);
 			if (![0, 1].includes(model)) return json(res, 400, { error: 'Некорректный тип полей' });

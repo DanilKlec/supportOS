@@ -143,14 +143,14 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "directory"],
 		queryFn: chatwootService.inboxDirectory,
 		enabled: connection.data?.configured === true,
-		staleTime: 5000,
-		refetchInterval: 5000,
+		staleTime: 30000,
+		refetchInterval: 30000,
 	});
 	const presence = useQuery({
 		queryKey: ["chatwoot", "presence"],
 		queryFn: () => chatwootService.presence(),
 		enabled: connection.data?.configured === true,
-		refetchInterval: 5000,
+		refetchInterval: 12000,
 	});
 	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
 	const request: ConversationSearch = {
@@ -168,7 +168,16 @@ export function AgentInboxPage() {
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
 		enabled: connection.data?.configured === true && activeSection !== "team",
-		refetchInterval: 3000,
+		refetchInterval: displayedScope === "active" ? 5000 : displayedScope === "queue" ? 7000 : 8000,
+		retry: 1,
+	});
+	const queueCount = useQuery({
+		queryKey: ["chatwoot", "queue-count", inboxId],
+		queryFn: () => chatwootService.queueCount(inboxId ? Number(inboxId) : undefined),
+		enabled: connection.data?.configured === true && activeSection === "inbox",
+		staleTime: 5000,
+		refetchInterval: 10000,
+		retry: 1,
 	});
 	const allLabels = useQuery({
 		queryKey: ["chatwoot", "labels"],
@@ -345,6 +354,7 @@ export function AgentInboxPage() {
 					{(["mine", "queue", ...(canSupervise ? ["active" as const] : [])] as const).map((item) => (
 						<button key={item} type="button" onClick={() => selectScope(item)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
 							{item === "mine" ? "Мои" : item === "queue" ? "Очередь" : "Активные"}
+							{item === "queue" && <span aria-label={`${queueCount.data?.count ?? 0} чатов в очереди`} className="ml-1.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-300">{queueCount.isLoading ? "…" : queueCount.isError ? "—" : queueCount.data?.count ?? 0}</span>}
 							{item === "active" && <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">все агенты</span>}
 						</button>
 					))}
@@ -447,7 +457,7 @@ export function AgentInboxPage() {
 										? "Нераспределённые"
 										: displayedScope === "active" ? "Активные диалоги" : "История диалогов"}
 							</span>
-							<span>{rows.length}</span>
+							<span>{displayedScope === "queue" ? queueCount.data?.count ?? rows.length : rows.length}</span>
 						</div>
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-3">
 							{conversations.isLoading ? (

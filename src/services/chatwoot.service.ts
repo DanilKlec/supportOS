@@ -149,6 +149,8 @@ export const chatwootService = {
 			undefined,
 			`&scope=${options.scope}&status=${encodeURIComponent(options.status ?? "open")}&page=${options.page ?? 1}${options.inboxId ? `&inbox_id=${options.inboxId}` : ""}${options.agentId ? `&agent_id=${options.agentId}` : ""}${options.label ? `&label=${encodeURIComponent(options.label)}` : ""}${options.from ? `&from=${encodeURIComponent(options.from)}` : ""}${options.to ? `&to=${encodeURIComponent(options.to)}` : ""}${options.query ? `&q=${encodeURIComponent(options.query)}` : ""}`,
 		),
+	queueCount: (inboxId?: number) =>
+		request<{ count: number }>("queue-count", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
 	conversation: (id: number) =>
 		request<{
 			id?: number;
