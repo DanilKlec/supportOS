@@ -594,9 +594,8 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	];
 	return (
 		<aside className={`relative z-30 flex shrink-0 flex-col border-r border-border bg-surface/75 py-3 transition-[width] duration-200 ${collapsed ? "w-[62px] items-center" : "w-[208px]"}`}>
-			{!collapsed && <div className="mb-3 flex w-full justify-end px-3"><button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="grid size-7 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button></div>}
 			{collapsed && <button type="button" title="Развернуть меню" onClick={onToggleCollapsed} className="mb-3 grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftOpen size={15} /></button>}
-			{!collapsed && <div className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">Рабочие разделы</div>}
+			{!collapsed && <div className="mb-2 flex items-center justify-between gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted"><span>Рабочие разделы</span><button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="-mr-2 grid size-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button></div>}
 			<nav className={`flex w-full flex-col gap-1.5 ${collapsed ? "items-center px-2" : "px-2"}`}>
 				{items.map(({ id, label, icon: Icon }) => (
 					<button key={id} type="button" title={collapsed ? label : undefined} aria-label={label} onClick={() => onSelect(id)} className={`flex h-10 items-center gap-3 rounded-xl px-3 text-left text-xs font-medium transition ${collapsed ? "w-10 justify-center px-0" : "w-full"} ${activeSection === id ? "bg-accent/15 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
