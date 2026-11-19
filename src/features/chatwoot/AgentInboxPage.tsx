@@ -7,11 +7,11 @@ import {
 	CheckCheck,
 	ChevronDown,
 	ExternalLink,
-	Eye,
 	FileText,
 	Globe2,
 	Headphones,
 	LoaderCircle,
+	LockKeyhole,
 	MessageCircle,
 	MessageSquareText,
 	MessagesSquare,
@@ -30,7 +30,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createElement, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
@@ -62,6 +62,7 @@ import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ActiveChatsTable } from "./ActiveChatsTable";
 import { useChatPopover } from "./useChatPopover";
 import { InboxModal } from "./InboxModal";
+import { CoachingComposer, type CoachingRecipient, CoachingThreadTabs, ObservationHeader } from "./ChatCoaching";
 import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
 import "./inbox-workspace.css";
 
@@ -136,7 +137,7 @@ function InboxSession({ parentClient }: { parentClient: QueryClient }) {
 	return <QueryClientProvider client={client}><AgentInboxWorkspace /></QueryClientProvider>;
 }
 
-type ChatDraft = { text: string; privateNote: boolean };
+type ChatDraft = { text: string; privateNote: boolean; coachTo?: CoachingRecipient };
 
 function AgentInboxWorkspace() {
 	const client = useQueryClient();
@@ -151,6 +152,7 @@ function AgentInboxWorkspace() {
 	const drafts = useRef(new Map<number, ChatDraft>());
 	const [supervisionId, setSupervisionId] = useState<number | null>(null);
 	const [manageObservedChat, setManageObservedChat] = useState(false);
+	const observationTrigger = useRef<HTMLElement | null>(null);
 	const supervisionDrafts = useRef(new Map<number, ChatDraft>());
 	const [realtimeSubscribed, setRealtimeSubscribed] = useState(false);
 	const [coachingRealtimeConnected, setCoachingRealtimeConnected] = useState(false);
@@ -277,6 +279,7 @@ function AgentInboxWorkspace() {
 			});
 			void client.invalidateQueries({ queryKey: ["chatwoot", "supervision"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "active-overview"] });
+			if (!watching && id === supervisionId) closeObservation();
 		},
 	});
 	const watched = new Set(watching.data?.ids ?? []);
@@ -432,9 +435,17 @@ function AgentInboxWorkspace() {
 		setManageObservedChat(false);
 		setSupervisionId(id);
 	};
+	const startObservation = (id: number) => {
+		observationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		openObservation(id);
+		if (!watched.has(id) && !changeWatch.isPending) changeWatch.mutate({ id, enabled: true });
+	};
 	const closeObservation = () => {
 		setManageObservedChat(false);
 		setSupervisionId(null);
+		const trigger = observationTrigger.current;
+		observationTrigger.current = null;
+		if (trigger) window.requestAnimationFrame(() => { if (trigger.isConnected) trigger.focus({ preventScroll: true }); });
 	};
 	const reload = () => {
 		void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
@@ -563,7 +574,7 @@ function AgentInboxWorkspace() {
 				<div className="flex min-h-0 flex-1">
 				{activeSection === "supervisor" ? (
 					<ChatOperationsPage agents={agents} inboxes={inboxes} canEdit={canManageChatCapacity}
-						onOpen={(id) => { selectSection("inbox"); setScope("active"); openObservation(id); }} />
+						onOpen={(id) => { selectSection("inbox"); setScope("active"); startObservation(id); }} />
 				) : activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
@@ -732,40 +743,21 @@ function AgentInboxWorkspace() {
 				{queueOpen && scope !== "active" && <div className="hidden md:flex"><ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} /></div>}
 				<main className={`relative min-h-0 min-w-0 flex-1 flex-col ${queueOpen && scope !== "active" ? "hidden md:flex" : "flex"}`}>
 					{scope === "active" && canSupervise ? (
-						<div className="relative flex min-h-0 min-w-0 flex-1">
+						<div className="chat-observation-layout relative flex min-h-0 min-w-0 flex-1" data-observation-open={supervisionId !== null}>
 							<ActiveChatsTable agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
 								labels={labels} realtime={realtimeConnected} selectedId={supervisionId} watched={watched}
 								watchingError={(changeWatch.error ?? watching.error)?.message}
 								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
-								onOpen={(id) => {
-									openObservation(id);
-									if (!watched.has(id) && !changeWatch.isPending) changeWatch.mutate({ id, enabled: true });
-								}}
+								onOpen={startObservation}
 								onStop={(id) => changeWatch.mutate({ id, enabled: false })}
 							/>
 							{supervisionId !== null && (
-								<aside aria-label="Наблюдение за диалогом" className="absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[43%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
-									<header className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-3 py-2">
-										<Eye size={15} className="shrink-0 text-accent" />
-										<h2 className="truncate text-xs font-semibold">{managingObservedChat ? "Управление диалогом" : "Наблюдение"}</h2>
-										{capabilities?.manageAllChats && (
-											<button type="button" onClick={() => setManageObservedChat(!manageObservedChat)}
-												className="ml-auto whitespace-nowrap rounded-md px-2 py-1 text-xs text-accent hover:bg-surface">
-												{managingObservedChat ? "К наблюдению" : "Управлять"}
-											</button>
-										)}
-										{watched.has(supervisionId) && (
-											<button type="button" disabled={changeWatch.isPending} aria-label="Прекратить наблюдение"
-												onClick={() => changeWatch.mutate({ id: supervisionId, enabled: false })}
-												className={`whitespace-nowrap rounded-md px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground disabled:opacity-50 ${capabilities?.manageAllChats ? "" : "ml-auto"}`}>
-												Отписаться
-											</button>
-										)}
-										<button type="button" aria-label="Закрыть наблюдение" onClick={closeObservation}
-											className={`grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface hover:text-foreground ${watched.has(supervisionId) || capabilities?.manageAllChats ? "" : "ml-auto"}`}>
-											<X size={15} />
-										</button>
-									</header>
+								<aside aria-label="Наблюдение за диалогом" className="chat-observation-panel absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[45%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
+									<ObservationHeader managing={managingObservedChat} canManage={capabilities?.manageAllChats === true}
+										watching={watched.has(supervisionId)} watchPending={changeWatch.isPending}
+										onMode={() => setManageObservedChat(!manageObservedChat)}
+										onStop={() => changeWatch.mutate({ id: supervisionId, enabled: false })}
+										onClose={closeObservation} />
 									{changeWatch.isError && changeWatch.variables?.id === supervisionId && (
 										<p role="alert" className="border-b border-border px-3 py-2 text-xs chat-text-danger">{changeWatch.error.message}</p>
 									)}
@@ -1227,9 +1219,10 @@ function ConversationPane({
 	const [attachmentError, setAttachmentError] = useState("");
 	const fileInput = useRef<HTMLInputElement>(null);
 	const [privateNote, setPrivateNote] = useState(draft?.privateNote ?? false);
+	const [draftCoachTo, setDraftCoachTo] = useState<CoachingRecipient | null>(draft?.coachTo ?? null);
 	useEffect(() => {
-		if (id != null) onDraft(id, { text, privateNote });
-	}, [id, text, privateNote, onDraft]);
+		if (id != null) onDraft(id, { text, privateNote, coachTo: draftCoachTo ?? undefined });
+	}, [id, text, privateNote, draftCoachTo, onDraft]);
 	const [assignOpen, setAssignOpen] = useState(false);
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
@@ -1251,6 +1244,7 @@ function ConversationPane({
 	const previousScrollHeight = useRef<number | null>(null);
 	const olderMessagesRequest = useRef(false);
 	const followMessages = useRef(true);
+	const [privateOnly, setPrivateOnly] = useState(false);
 	const [showLatest, setShowLatest] = useState(false);
 	const currentConversationId = useRef(id);
 	useEffect(() => {
@@ -1310,18 +1304,25 @@ function ConversationPane({
 			key: `coaching-${note.id}`, time: Date.parse(note.createdAt), note,
 		})),
 	].sort((left, right) => left.time - right.time), [messages, coachingNotes]);
+	const visibleTimeline = privateOnly ? timeline.filter((entry) => "note" in entry) : timeline;
+	const showCoachingTabs = supervising || privateOnly || Boolean(coachingNotes?.length);
 	const coachingRequest = useRef<{ recipientAgentId: number; content: string; noteId: string } | null>(null);
 	const coachRecipient = conversation?.coachRecipient;
+	const changedRecipient = text.trim() && draftCoachTo && coachRecipient && draftCoachTo.id !== coachRecipient.id ? draftCoachTo : null;
 	const sendCoach = useMutation({
 		mutationFn: (note: NonNullable<typeof coachingRequest.current>) => chatwootService.sendCoachingNote(id as number, note),
 		onSuccess: async (note) => {
 			await client.cancelQueries({ queryKey: coachingKey });
+			previousScrollHeight.current = null;
+			followMessages.current = true;
+			setShowLatest(false);
 			client.setQueryData<{ notes: ChatwootCoachingNote[] }>(coachingKey, (cached) => ({
 				notes: [note, ...(cached?.notes ?? []).filter((item) => item.id !== note.id)].slice(0, 100),
 			}));
 			coachingRequest.current = null;
-			if (id != null && text.trim() === note.content) onDraft(id, { text: "", privateNote: false });
-			setText((value) => value.trim() === note.content ? "" : value);
+			setDraftCoachTo(null);
+			setText("");
+			if (id != null) onDraft(id, { text: "", privateNote: false });
 			void client.invalidateQueries({ queryKey: coachingKey });
 		},
 		onError: () => {
@@ -1330,12 +1331,25 @@ function ConversationPane({
 	});
 	const submitCoach = () => {
 		const content = text.trim();
-		if (!coachRecipient || !content || sendCoach.isPending) return;
+		if (!coachRecipient || !content || changedRecipient || sendCoach.isPending) return;
 		const previous = coachingRequest.current;
 		const request = previous?.recipientAgentId === coachRecipient.id && previous.content === content
 			? previous : { recipientAgentId: coachRecipient.id, content, noteId: crypto.randomUUID() };
 		coachingRequest.current = request;
 		sendCoach.mutate(request);
+	};
+	const updateCoachingDraft = (value: string) => {
+		if (!value.trim()) setDraftCoachTo(null);
+		else if (!draftCoachTo && coachRecipient) setDraftCoachTo(coachRecipient);
+		if (sendCoach.isSuccess || sendCoach.isError) sendCoach.reset();
+		setText(value);
+	};
+	const changeThreadView = (onlyNotes: boolean) => {
+		if (onlyNotes === privateOnly) return;
+		previousScrollHeight.current = null;
+		followMessages.current = true;
+		setShowLatest(false);
+		setPrivateOnly(onlyNotes);
 	};
 	useEffect(() => {
 		currentConversationId.current = id;
@@ -1349,13 +1363,14 @@ function ConversationPane({
 		previousScrollHeight.current = null;
 		followMessages.current = true;
 		setShowLatest(false);
+		setPrivateOnly(false);
 	}, [id]);
 	useEffect(() => {
 		if (!latestMessagesQuery.data) return;
 		const page = latestMessagesQuery.data.payload ?? latestMessagesQuery.data.data?.payload ?? latestMessagesQuery.data.messages ?? [];
 		if (page.length < 20) setHasOlderMessages(false);
 	}, [latestMessagesQuery.data]);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const viewport = messageViewport.current;
 		if (!viewport || (latestMessageId == null && !latestCoachingId)) return;
 		if (previousScrollHeight.current !== null) {
@@ -1365,7 +1380,17 @@ function ConversationPane({
 		}
 		if (!followMessages.current) return;
 		viewport.scrollTop = viewport.scrollHeight;
-	}, [latestMessageId, latestCoachingId, messages.length]);
+	}, [latestMessageId, latestCoachingId, messages.length, privateOnly]);
+	const conversationVisible = conversation?.access?.read === true && !query.isError;
+	useEffect(() => {
+		if (!conversationVisible || !messageViewport.current) return;
+		const viewport = messageViewport.current;
+		const observer = new ResizeObserver(() => {
+			if (followMessages.current && previousScrollHeight.current === null) viewport.scrollTop = viewport.scrollHeight;
+		});
+		observer.observe(viewport);
+		return () => observer.disconnect();
+	}, [conversationVisible]);
 	const loadOlderMessages = async () => {
 		const firstId = messages[0]?.id;
 		if (!id || !firstId || olderMessagesRequest.current || !hasOlderMessages) return;
@@ -1570,8 +1595,8 @@ function ConversationPane({
 		);
 	if (!conversation?.access?.read || query.isError) return (
 		<div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted">
-			<div><p role={query.isError ? "alert" : undefined}>{query.error?.message ?? "Загружаем диалог…"}</p>
-				{query.isError && <button type="button" onClick={onClose} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs">Закрыть</button>}
+			<div><p role={query.isError ? "alert" : "status"}>{query.error?.message ?? (query.isLoading ? "Загружаем диалог…" : "Диалог недоступен")}</p>
+				{query.isError && <button type="button" onClick={() => void query.refetch()} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs">Повторить</button>}
 			</div>
 		</div>
 	);
@@ -1582,19 +1607,22 @@ function ConversationPane({
 			className="chat-thread relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
 		>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border pr-3 py-2.5 ${docked ? "pl-3" : "pl-12"}`}>
+				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border pr-3 py-2.5 ${docked ? "chat-docked-thread-header pl-3" : "pl-12"}`}>
 					<div className="flex min-w-0 items-center gap-2.5">
 						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
 							{initials(sender?.name)}
 						</div>
 						<div className="min-w-0">
-							<h2 className="truncate text-sm font-semibold">
+							<h2 className="truncate text-sm font-semibold" title={sender?.name}>
 								{sender?.name || sender?.email || `Диалог #${id}`}
 							</h2>
 							<p className="truncate text-[11px] text-muted">
 								{project ? `${project} · #${id}` : `#${id}`}
 								{conversation.status === "pending" ? " · ожидает" : conversation.status === "snoozed" ? " · отложен" : conversation.status === "resolved" ? " · завершён" : ""}
 							</p>
+							{supervising && <p className="truncate text-[11px] text-muted" title={conversation.meta?.assignee?.name}>
+								{conversation.meta?.assignee?.name ? `Агент · ${conversation.meta.assignee.name}` : coachRecipient ? "Назначенный агент" : "Агент не назначен"}
+							</p>}
 						</div>
 					</div>
 					<div className="chat-thread-actions flex shrink-0 flex-wrap items-center gap-1.5">
@@ -1739,18 +1767,28 @@ function ConversationPane({
 						{editError.message}
 					</div>
 				)}
+				{showCoachingTabs && <CoachingThreadTabs count={coachingNotes?.length ?? 0} privateOnly={privateOnly} onChange={changeThreadView} />}
+				{latestMessagesQuery.isError && messages.length > 0 && !privateOnly && (
+					<p role="status" className="flex flex-wrap items-center justify-between gap-1 border-b border-border px-3 py-1.5 text-xs text-muted">
+						Не удалось обновить сообщения
+						<button type="button" className="font-medium text-accent" onClick={() => void latestMessagesQuery.refetch()}>Повторить</button>
+					</p>
+				)}
 				<div className="relative min-h-0 flex-1">
 				<div
 					ref={messageViewport}
+					role="log"
+					aria-label={privateOnly ? "Подсказки в диалоге" : "Переписка"}
+					aria-relevant="additions"
 					onScroll={(event) => {
 						const viewport = event.currentTarget;
 						followMessages.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
 						setShowLatest(!followMessages.current);
-						if (viewport.scrollTop < 48) void loadOlderMessages();
+						if (!privateOnly && viewport.scrollTop < 48) void loadOlderMessages();
 					}}
 					className="chat-thread-transcript supportos-scroll flex h-full flex-col overflow-y-auto px-3 py-4 sm:px-5"
 				>
-					{hasOlderMessages && messages.length > 0 && (
+					{!privateOnly && hasOlderMessages && messages.length > 0 && (
 						<div className="sticky top-0 z-10 mb-4 flex shrink-0 justify-center">
 							<button
 								type="button"
@@ -1763,29 +1801,30 @@ function ConversationPane({
 							</button>
 						</div>
 					)}
-					{olderMessagesError && (
+					{!privateOnly && olderMessagesError && (
 						<p role="alert" className="mb-3 text-center text-xs chat-text-danger">
 							{olderMessagesError}
 						</p>
 					)}
-					{query.isLoading || latestMessagesQuery.isLoading ? (
+					{(privateOnly ? coaching.isLoading : latestMessagesQuery.isLoading && !visibleTimeline.length) ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted">
 							<LoaderCircle className="mr-2 animate-spin" size={16} />
-							Загружаем переписку
+							{privateOnly ? "Загружаем подсказки…" : "Загружаем переписку…"}
 						</div>
-					) : query.isError || latestMessagesQuery.isError ? (
-						<div className="m-auto max-w-sm rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm chat-text-danger">
-							{(latestMessagesQuery.error ?? query.error) instanceof Error
-								? (latestMessagesQuery.error ?? query.error)?.message
-								: "Не удалось загрузить диалог"}
+					) : (privateOnly ? coaching.isError : latestMessagesQuery.isError) && !visibleTimeline.length ? (
+						<div role="alert" className="m-auto space-y-2 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-center text-sm chat-text-danger">
+							<p>{privateOnly ? "Не удалось загрузить подсказки" : "Не удалось загрузить переписку"}</p>
+							<button type="button" onClick={() => void (privateOnly ? coaching.refetch() : latestMessagesQuery.refetch())}
+								className="rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-surface-elevated">Повторить</button>
 						</div>
-					) : timeline.length === 0 ? (
-						<div className="flex h-full items-center justify-center text-sm text-muted">
-							Сообщений пока нет
+					) : visibleTimeline.length === 0 ? (
+						<div className="m-auto flex flex-col items-center gap-2 px-3 text-center text-sm text-muted">
+							{privateOnly ? <LockKeyhole size={19} className="chat-text-hint" /> : <MessageSquareText size={19} />}
+							{privateOnly ? "Подсказок пока нет" : "Сообщений пока нет"}
 						</div>
 					) : (
 						<div className="mt-auto flex w-full shrink-0 flex-col gap-3 px-1 sm:px-3">
-							{timeline.map((entry) => "note" in entry ? (
+							{visibleTimeline.map((entry) => "note" in entry ? (
 								<CoachingBubble key={entry.key} note={entry.note} />
 							) : <MessageBubble key={entry.key} message={entry.message} />)}
 						</div>
@@ -1801,35 +1840,16 @@ function ConversationPane({
 				</button>}
 				</div>
 				{supervising ? (
-					<footer className="shrink-0 border-t border-violet-500/20 bg-violet-500/5 p-3">
-						{coachRecipient ? (
-							<>
-								<div className="mb-2 flex items-center justify-between gap-2">
-									<div className="min-w-0">
-										<label htmlFor={`coach-${id}`} className="block text-xs font-semibold chat-text-hint">Подсказка агенту</label>
-										<p className="truncate text-[11px] text-muted">
-											{coachRecipient.name ? `Получатель · ${coachRecipient.name}` : "Получатель · назначенный агент"}
-										</p>
-									</div>
-									<button type="button" disabled={!text.trim() || sendCoach.isPending} onClick={submitCoach}
-										className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-violet-700 px-2.5 text-xs font-semibold text-white disabled:opacity-50">
-										<Send size={13} /> {sendCoach.isPending ? "Отправляем" : "Отправить"}
-									</button>
-								</div>
-								<textarea id={`coach-${id}`} rows={2} maxLength={2000}
-									value={text} onChange={(event) => setText(event.target.value)}
-									onKeyDown={(event) => {
-										if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
-										event.preventDefault();
-										submitCoach();
-									}}
-									placeholder="Напишите подсказку сотруднику…"
-									className="block w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-violet-400/60" />
-								{sendCoach.isError && <p role="alert" className="mt-2 text-xs chat-text-danger">{sendCoach.error.message}</p>}
-							</>
-						) : <p className="text-xs text-muted">
-							{["open", "pending"].includes(conversation.status) ? "Подсказку можно отправить, когда у диалога появится ответственный агент." : "Подсказки доступны в активном диалоге."}
-						</p>}
+					<CoachingComposer recipient={coachRecipient} previousRecipient={changedRecipient} text={text}
+						pending={sendCoach.isPending} sent={sendCoach.isSuccess} error={sendCoach.error?.message}
+						inactive={!["open", "pending"].includes(conversation.status)} onChange={updateCoachingDraft}
+						onRetarget={() => { if (coachRecipient) setDraftCoachTo(coachRecipient); sendCoach.reset(); }}
+						onSend={submitCoach} />
+				) : privateOnly ? (
+					<footer className="chat-thread-composer shrink-0 border-t border-border p-2.5">
+						<button type="button" className="chat-observation-action" onClick={() => changeThreadView(false)}>
+							<MessageSquareText size={14} /> Вернуться к переписке
+						</button>
 					</footer>
 				) : (canWrite || canNote) ? <footer className="chat-thread-composer relative shrink-0 border-t border-border p-2.5 sm:p-3">
 					<input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ""; }} />
@@ -1847,14 +1867,14 @@ function ConversationPane({
 					)}
 					<div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
 						<div className="flex flex-wrap items-center gap-1.5">
-							<button
-								type="button"
-								disabled={!canWrite || !canNote}
-								onClick={() => setPrivateNote(!privateNote)}
-								className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium ${sendAsNote ? "bg-amber-500/10 chat-text-warning" : "text-muted hover:bg-surface-elevated"}`}
-							>
-								{sendAsNote ? "Внутренняя заметка" : "Ответ клиенту"}
-							</button>
+							<div className="chat-operator-composer inline-flex flex-wrap items-center gap-0.5 rounded-lg border border-border p-0.5" role="group" aria-label="Кому отправить сообщение">
+								{canWrite && <button type="button" aria-pressed={!sendAsNote} onClick={() => setPrivateNote(false)}
+									className="rounded-md px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground">Ответ игроку</button>}
+								{canNote && <button type="button" aria-pressed={sendAsNote} data-private={sendAsNote} onClick={() => setPrivateNote(true)}
+									className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground">
+									<LockKeyhole size={11} /> Заметка команде
+								</button>}
+							</div>
 							{canWrite && <div ref={bindMenu}>
 								<button
 									type="button"
@@ -1920,19 +1940,19 @@ function ConversationPane({
 							</span>
 							<button
 								type="button"
-								aria-label="Отправить"
-								title="Отправить"
+								aria-label={sendAsNote ? "Отправить заметку команде" : "Отправить игроку"}
+								title={sendAsNote ? "Отправить заметку команде" : "Отправить игроку"}
 								disabled={(!text.trim() && !selectedFiles.length) || send.isPending}
 								onClick={() => send.mutate()}
 								className="inline-flex h-8 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
 							>
 								<Send size={13} />
-								<span className="chat-send-caption">{send.isPending ? "Отправка" : "Отправить"}</span>
+								<span className="chat-send-caption">{send.isPending ? "Отправляем…" : sendAsNote ? "Отправить команде" : "Отправить игроку"}</span>
 							</button>
 						</div>
 					</div>
 					<textarea
-						aria-label={sendAsNote ? "Внутренняя заметка" : "Ответ клиенту"}
+						aria-label={sendAsNote ? "Заметка команде" : "Ответ игроку"}
 						value={text}
 						onChange={(event) => setText(event.target.value)}
 						onKeyDown={(event) => {
@@ -2167,10 +2187,12 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 function CoachingBubble({ note }: { note: ChatwootCoachingNote }) {
 	return (
 		<div className={`flex ${note.own ? "justify-end" : "justify-start"}`}>
-			<article data-thread-bubble aria-label="Личная подсказка" className="min-w-0 max-w-[min(88%,42rem)] rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5">
-				<div className="mb-1 flex flex-wrap items-center gap-x-2 text-[11px]">
-					<span className="font-semibold chat-text-hint">{note.own ? "Подсказка агенту" : "Подсказка от супервайзера"}</span>
-					<span className="text-muted">{note.author}</span>
+			<article data-thread-bubble aria-label="Личная подсказка" className="chat-coaching-message min-w-0 max-w-[min(88%,42rem)]">
+				<div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+					<span className="inline-flex items-center gap-1.5 text-xs font-semibold chat-text-hint">
+						<LockKeyhole size={12} aria-hidden="true" /> {note.own ? "Лично агенту" : "Подсказка от супервайзера"}
+					</span>
+					<span className="text-[11px] text-muted">{note.own ? "Вы" : note.author}</span>
 				</div>
 				<p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{note.content}</p>
 				<div className="mt-1 text-right text-[10px] text-muted">{dateLabel(Date.parse(note.createdAt) / 1000)}</div>
@@ -2212,7 +2234,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 				)}
 				{!outgoing && (
 					<div className="mb-1 text-[10px] font-semibold text-muted">
-						{message.sender?.name || "Клиент"}
+						{message.sender?.name || "Игрок"}
 					</div>
 				)}
 				{message.content && (

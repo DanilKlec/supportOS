@@ -96,6 +96,14 @@ const optionalColumns = [
 	{ key: "tags", title: "Теги" },
 ] as const;
 type Extra = (typeof optionalColumns)[number]["key"];
+const primaryColumns = [
+	["player", "Игрок"],
+	["email", "Email"],
+	["actions", "Действие"],
+	["status", "Статус"],
+	["agent", "Агент"],
+	["project", "Проект"],
+] as const;
 
 export function ActiveChatsTable({
 	agents,
@@ -222,6 +230,7 @@ export function ActiveChatsTable({
 	return (
 		<section
 			aria-label="Активные чаты команды"
+			data-observing={selectedId !== null}
 			className="chat-active flex min-h-0 min-w-0 flex-1 flex-col bg-background"
 		>
 			<div className="chat-active-tabs flex shrink-0 items-center gap-1 border-b border-border px-3">
@@ -431,19 +440,19 @@ export function ActiveChatsTable({
 				>
 					<thead className="sticky top-0 z-10 bg-surface text-[11px] font-medium text-muted">
 						<tr>
-							{["Игрок", "Email", "Действие", "Статус", "Агент", "Проект"].map(
-								(title) => (
-									<th
-										key={title}
-										scope="col"
-										className="border-b border-border px-3 py-2 font-medium"
-									>
-										{title}
-									</th>
-								),
-							)}
+							{primaryColumns.map(([key, title]) => (
+								<th
+									key={key}
+									data-field={key}
+									scope="col"
+									className="border-b border-border px-3 py-2 font-medium"
+								>
+									{title}
+								</th>
+							))}
 							<th
 								scope="col"
+								data-field="duration"
 								aria-sort={
 									filters.sort === "created_at_desc"
 										? "ascending"
@@ -457,6 +466,7 @@ export function ActiveChatsTable({
 							</th>
 							<th
 								scope="col"
+								data-field="updated"
 								aria-sort={
 									filters.sort === "last_activity_at_asc"
 										? "ascending"
@@ -475,6 +485,7 @@ export function ActiveChatsTable({
 							{visibleExtras.map((column) => (
 								<th
 									key={column.key}
+									data-field="extra"
 									scope="col"
 									className="border-b border-border px-3 py-2 font-medium"
 								>
@@ -565,8 +576,11 @@ export function ActiveChatsTable({
 										>
 											<button
 												type="button"
+												aria-label={
+													alreadyWatched ? "Открыть наблюдение" : "Наблюдать"
+												}
 												disabled={!alreadyWatched && changingId !== undefined}
-												className={action}
+												className={`${action} chat-watch-action`}
 												onClick={() => onOpen(row.id)}
 											>
 												{changingId === row.id && !alreadyWatched ? (
@@ -574,7 +588,7 @@ export function ActiveChatsTable({
 												) : (
 													<Eye size={13} />
 												)}
-												{alreadyWatched ? "Открыть" : "Наблюдать"}
+												{alreadyWatched ? "Наблюдение" : "Наблюдать"}
 											</button>
 											{alreadyWatched && (
 												<button

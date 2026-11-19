@@ -8,6 +8,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 }, info) => {
 	let watching = false;
 	let agentView = false;
+	let assignedAgent = { id: 5, name: "Тестовый агент" };
+	let notesSent = 0;
 	let privateNote:
 		| { id: string; author: string; content: string; createdAt: string }
 		| undefined;
@@ -208,14 +210,21 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				});
 			}
 			case "conversation":
-				return route.fulfill({ json: conversation });
+				return route.fulfill({
+					json: {
+						...conversation,
+						meta: { ...conversation.meta, assignee: assignedAgent },
+						coachRecipient: assignedAgent,
+					},
+				});
 			case "messages":
 				return route.fulfill({ json: { payload: readMessages } });
 			case "coaching-notes":
 				if (request.method() === "POST") {
 					const body = request.postDataJSON();
 					expect(body.conversationId).toBe(row.id);
-					expect(body.recipientAgentId).toBe(5);
+					expect(body.recipientAgentId).toBe(assignedAgent.id);
+					notesSent += 1;
 					privateNote = {
 						id: body.noteId,
 						content: body.content,
@@ -259,25 +268,56 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		name: "Наблюдение за диалогом",
 	});
 	await expect(observation.getByText("Первое обращение")).toBeVisible();
+	if (!isMobile)
+		await expect(table.locator("[data-chat-row]")).toHaveCSS(
+			"display",
+			"table-row",
+		);
 	await expect(
-		observation.getByText("Ответ клиенту", { exact: true }),
+		observation.getByText("Лично назначенному агенту"),
+	).toBeVisible();
+	await expect(
+		observation.getByText("Агент · Тестовый агент", { exact: true }),
+	).toBeVisible();
+	await expect(
+		observation.getByRole("textbox", { name: "Ответ игроку" }),
 	).toHaveCount(0);
+	const draft = observation.getByRole("textbox", { name: "Подсказка агенту" });
+	const sendHint = observation.getByRole("button", {
+		name: "Отправить агенту",
+	});
+	await draft.fill("Проверьте статус заявки");
+	await assertLayout("supervision-draft");
+	assignedAgent = { id: 6, name: "Новый тестовый агент" };
+	await expect(observation.getByText(/Агент сменился/)).toBeVisible();
+	await expect(sendHint).toBeDisabled();
+	await draft.press("Enter");
+	expect(notesSent).toBe(0);
 	await observation
-		.getByRole("textbox", { name: "Подсказка агенту" })
-		.fill("Проверьте статус заявки");
-	await observation
-		.getByRole("textbox", { name: "Подсказка агенту" })
-		.press("Enter");
+		.getByRole("button", { name: "Выбрать нового агента" })
+		.click();
+	await expect(sendHint).toBeEnabled();
+	await draft.press("Enter");
+	await expect(observation.getByText("Подсказка отправлена")).toBeVisible();
+	await expect(
+		observation.getByText("Проверьте статус заявки", { exact: true }),
+	).toBeInViewport({ ratio: 1 });
+	await assertLayout("supervision");
+	await observation.getByRole("button", { name: /Подсказки/ }).click();
+	await expect(observation.getByText("Первое обращение")).toHaveCount(0);
 	await expect(
 		observation.getByText("Проверьте статус заявки", { exact: true }),
 	).toBeVisible();
-	await assertLayout("supervision");
 	await observation
-		.getByRole("button", { name: "Управлять", exact: true })
+		.getByRole("button", { name: "Управлять чатом", exact: true })
 		.click();
 	await expect(
-		observation.getByText("Ответ клиенту", { exact: true }),
+		observation.getByRole("textbox", { name: "Ответ игроку" }),
 	).toBeVisible();
+	await expect(
+		observation.getByText("Управление чатом", { exact: true }),
+	).toBeVisible();
+	await expect(draft).toHaveCount(0);
 	const tag = observation.getByRole("button", { name: "Добавить тег" });
 	await tag.click();
 	await expect(
@@ -361,6 +401,15 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	).toBeVisible();
 	await expect(incomingNote.getByText("Проверьте статус заявки")).toBeVisible();
 	await assertLayout("agent-chat");
+	await page.getByRole("button", { name: /Подсказки/ }).click();
+	await expect(page.getByRole("textbox", { name: "Ответ игроку" })).toHaveCount(
+		0,
+	);
+	await expect(incomingNote.getByText("Проверьте статус заявки")).toBeVisible();
+	await page.getByRole("button", { name: "Вернуться к переписке" }).click();
+	await expect(
+		page.getByRole("textbox", { name: "Ответ игроку" }),
+	).toBeVisible();
 	const quickReplies = page.getByRole("button", { name: "Быстрый бинд" });
 	await quickReplies.click();
 	await expect(page.getByPlaceholder("Найти бинд…")).toBeInViewport({
