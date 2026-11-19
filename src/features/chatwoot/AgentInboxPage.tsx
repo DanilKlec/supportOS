@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+	Activity,
 	Archive,
+	ArrowDownToLine,
 	Ban,
 	CheckCheck,
 	ChevronDown,
@@ -21,7 +23,6 @@ import {
 	Paperclip,
 	Plus,
 	RefreshCw,
-	Search,
 	Send,
 	Settings2,
 	UserRound,
@@ -62,6 +63,7 @@ import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ActiveChatsTable } from "./ActiveChatsTable";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
+import { ChatSearch } from "./ChatFilters";
 import { ConversationListToolbar, type ConversationFilters, countConversationFilters, emptyConversationFilters } from "./ConversationListToolbar";
 import { chatWindowsReducer, ConversationWindows, initialChatWindows, MAX_CHAT_WINDOWS } from "./ConversationWindows";
 import { useChatPopover } from "./useChatPopover";
@@ -596,22 +598,23 @@ function AgentInboxWorkspace() {
 				</div>
 			)}
 			<div className="flex min-h-0 flex-1 flex-col">
-				{activeSection === "inbox" && <div className="chat-scope-bar flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto px-1.5 py-2 sm:gap-1.5 sm:px-3" aria-label="Списки диалогов">
-					<div className="flex min-w-0 flex-1 items-center gap-0.5 sm:gap-1">
-					{(["mine", "queue", ...(canSupervise ? ["active" as const] : [])] as const).map((item) => (
-						<button key={item} type="button" aria-pressed={scope === item} onPointerEnter={item === "queue" ? prefetchQueue : undefined} onFocus={item === "queue" ? prefetchQueue : undefined} onClick={() => selectScope(item)} className={`shrink-0 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition sm:px-3 ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
-							{item === "mine" ? "Мои" : item === "queue" ? "Очередь" : "Активные"}
-							{item === "mine" && <span aria-label={`${conversationCounts.data?.mineCount ?? 0} моих чатов`} className="ml-1.5 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[10px] tabular-nums text-muted">{conversationCounts.isLoading ? "…" : conversationCounts.isError || conversationCounts.data?.mineCount == null ? "—" : conversationCounts.data.mineCount}</span>}
-							{item === "queue" && <span aria-label={conversationCounts.data?.queueCount == null ? "Количество чатов в очереди недоступно" : `${conversationCounts.data.queueCount} чатов в очереди`} className="ml-1.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] tabular-nums chat-text-warning">{conversationCounts.isLoading ? "…" : conversationCounts.isError ? "—" : conversationCounts.data?.queueCount ?? "—"}</span>}
-							{item === "active" && <span className="ml-1.5 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[10px] tabular-nums text-muted">{conversationCounts.isLoading ? "…" : conversationCounts.isError || conversationCounts.data?.activeCount == null ? "—" : conversationCounts.data.activeCount}</span>}
-						</button>
-					))}
+				{activeSection === "inbox" && <nav className="chat-scope-bar" aria-label="Списки диалогов">
+					<div className="chat-scope-tabs">
+						{([{ id: "mine", title: "Мои", icon: MessageSquareText, count: conversationCounts.data?.mineCount },
+							{ id: "queue", title: "Очередь", icon: Inbox, count: conversationCounts.data?.queueCount },
+							...(canSupervise ? [{ id: "active" as const, title: "Активные", icon: Activity, count: conversationCounts.data?.activeCount }] : [])] as const).map(({ id, title, icon: Icon, count }) => (
+							<button key={id} type="button" aria-pressed={scope === id} data-scope={id} onClick={() => selectScope(id)}
+								onPointerEnter={id === "queue" ? prefetchQueue : undefined} onFocus={id === "queue" ? prefetchQueue : undefined} className="chat-scope-tab">
+								<Icon size={15} className="chat-scope-icon" aria-hidden="true" />
+								{title}<span className="chat-scope-count">{conversationCounts.isLoading ? "…" : count ?? "—"}</span>
+							</button>
+						))}
 					</div>
-					<span className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[11px] ${realtimeConnected ? "bg-emerald-500/10 chat-text-success" : "bg-surface-elevated text-muted"}`} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
-						<i aria-hidden="true" className={`size-1.5 rounded-full ${realtimeConnected ? "bg-emerald-400" : "bg-zinc-500"}`} />
-						<span className="sr-only md:not-sr-only">{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
+					<span className="chat-connection" data-live={realtimeConnected} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
+						<i aria-hidden="true" />
+						<span>{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
 					</span>
-				</div>}
+				</nav>}
 				<div className="flex min-h-0 flex-1">
 				{activeSection === "supervisor" ? (
 					<ChatOperationsPage agents={agents} inboxes={inboxes} canEdit={canManageChatCapacity}
@@ -641,6 +644,13 @@ function AgentInboxWorkspace() {
 						{chatWindows.panes.length > 0 && <button type="button" className="chat-window-list-back md:hidden" onClick={() => { setAddingChat(false); setQueueOpen(false); }}>
 							<PanelLeftClose size={14} /> К открытым чатам
 						</button>}
+						<div className="chat-list-heading">
+							<div className="chat-list-heading-icon" aria-hidden="true">
+								{listScope === "history" ? <Archive size={17} /> : listScope === "queue" ? <Inbox size={17} /> : <MessagesSquare size={17} />}
+							</div>
+							<h2>{listScope === "mine" ? "Мои диалоги" : listScope === "queue" ? "Ожидают назначения" : "Архив диалогов"}</h2>
+							{conversations.isSuccess && <span title="На этой странице" className="chat-scope-count">{rows.length}</span>}
+						</div>
 						<ConversationListToolbar key={listScope} scope={listScope} filters={filters} update={updateListFilters}
 							project={queueInbox} requireProject={listScope === "queue" && !canSupervise}
 							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
@@ -650,16 +660,12 @@ function AgentInboxWorkspace() {
 							<p role="status">Выберите чат для нового окна <span className="whitespace-nowrap">({chatWindows.panes.length + 1} из {MAX_CHAT_WINDOWS})</span></p>
 							<button type="button" className="shrink-0 rounded-md px-2 py-1.5 text-xs hover:bg-surface-elevated" onClick={() => setAddingChat(false)}>Отмена</button>
 						</div>}
-						<div className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs text-muted">
-							<span className="font-medium">{listScope === "mine" ? "Мои диалоги" : listScope === "queue" ? "Ожидают назначения" : "Диалоги в архиве"}</span>
-							{conversations.isSuccess && <span title="На этой странице" className="rounded-md bg-surface-elevated px-1.5 tabular-nums">{rows.length}</span>}
-						</div>
 						{takeConversation.isError && (
 							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] chat-text-danger">
 								{takeConversation.error instanceof Error ? takeConversation.error.message : "Не удалось взять чат"}
 							</div>
 						)}
-						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto pb-3">
+						<div className="chat-list-results supportos-scroll min-h-0 flex-1 overflow-y-auto">
 							{conversations.isLoading ? (
 								<div className="p-6 text-center text-sm text-muted">
 									<LoaderCircle
@@ -679,7 +685,7 @@ function AgentInboxWorkspace() {
 								</div>
 							) : rows.length === 0 ? (
 								<div className="chat-list-empty">
-									<Inbox size={22} aria-hidden="true" className="text-muted" />
+									<Inbox size={22} aria-hidden="true" className="chat-empty-icon" />
 									<p className="text-sm font-medium">{search.trim() || countConversationFilters(filters) ? "Диалогов не найдено" : listScope === "queue" ? "Очередь пуста" : listScope === "history" ? (historyStatus === "snoozed" ? "Нет отложенных диалогов" : "Нет завершённых диалогов") : "У вас нет открытых диалогов"}</p>
 									{(search.trim() || countConversationFilters(filters) > 0) && <button type="button" onClick={() => updateListFilters(emptyConversationFilters)} className="rounded-md px-2 py-1.5 text-xs text-accent hover:bg-surface-elevated">Очистить поиск и фильтры</button>}
 									{listScope === "mine" && !search.trim() && countConversationFilters(filters) === 0 && <button type="button" onClick={() => selectScope("queue")} className="rounded-md px-2 py-1.5 text-xs text-accent hover:bg-surface-elevated">Посмотреть очередь</button>}
@@ -939,23 +945,25 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 	);
 	const filteredTeams = teams.filter((team) => team.name.toLowerCase().includes(query));
 	return (
-		<section aria-label="Команда чатов" className="supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
+		<section aria-label="Команда чатов" className="chat-secondary-workspace supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-5xl">
 				<div className="grid grid-cols-3 gap-1.5 sm:gap-3">
 					<StatCard label="Агенты" value={agents.length} icon={<UsersRound size={16} />} />
 					<StatCard label="Принимают чаты" value={[...online.values()].filter((agent) => agent.accepting).length} icon={<Headphones size={16} />} />
 					<StatCard label="Команды" value={teams.length} icon={<MessagesSquare size={16} />} />
 				</div>
-				<div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface/40 sm:mt-5">
+				<div className="chat-support-panel mt-3 overflow-hidden sm:mt-5">
 					<div className="flex flex-wrap items-center gap-2 border-b border-border p-2.5 sm:p-3">
 						<div role="group" aria-label="Справочник команды" className="chat-menu-tabs flex">
 							<button type="button" aria-pressed={tab === "agents"} onClick={() => { setTab("agents"); setSearch(""); }}>Агенты</button>
 							<button type="button" aria-pressed={tab === "teams"} onClick={() => { setTab("teams"); setSearch(""); }}>Команды</button>
 						</div>
-						<div className="relative order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input aria-label={tab === "agents" ? "Найти агента" : "Найти команду"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "agents" ? "Найти агента…" : "Найти команду…"} className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
+						<div className="order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1">
+							<ChatSearch label={tab === "agents" ? "Найти агента" : "Найти команду"} placeholder={tab === "agents" ? "Имя или почта агента" : "Название команды"} value={search} onChange={setSearch} />
+						</div>
 					</div>
 					{tab === "agents" && <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs text-muted">
-						<label className="inline-flex min-h-7 items-center gap-2"><input type="checkbox" checked={acceptingOnly} onChange={(event) => setAcceptingOnly(event.target.checked)} /> Только принимающие</label>
+						<label className="chat-team-filter"><input type="checkbox" checked={acceptingOnly} onChange={(event) => setAcceptingOnly(event.target.checked)} /> Только принимающие</label>
 						<span className="shrink-0 tabular-nums" title="Показано агентов">{filteredAgents.length} / {agents.length}</span>
 					</div>}
 					{tab === "agents" ? filteredAgents.map((agent) => {
@@ -963,7 +971,7 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 						const isOnline = state != null;
 						const status = state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status === "online" ? "В Chatwoot" : "Не в сети";
 						return <div key={agent.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 border-b border-border/70 px-3 py-3 last:border-0 md:flex md:gap-3 md:px-4">
-							<div className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface-elevated text-xs font-semibold">{initials(agent.name)}</div>
+							<div className="chat-avatar chat-avatar-small" data-tone={agent.id % 4}>{initials(agent.name)}</div>
 							<div className="min-w-0 flex-1">
 								<div className="truncate text-sm font-medium" title={agent.name}>{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div>
 								<div className="truncate text-xs text-muted" title={agent.email}>{agent.email || "Почта не указана"}</div>
@@ -1026,7 +1034,7 @@ function AgentCapacityField({ agent, editable, onSave }: {
 }
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
-	return <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-surface/60 px-2.5 py-2 sm:flex-row sm:items-center sm:gap-3 sm:p-4">
+	return <div className="chat-stat-card flex min-w-0 flex-col gap-1.5 px-2.5 py-2 sm:flex-row sm:items-center sm:gap-3 sm:p-4">
 		<div aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent sm:size-9">{icon}</div>
 		<div><div className="text-base font-semibold tabular-nums sm:text-lg">{value}</div><div className="text-[11px] leading-tight text-muted">{label}</div></div>
 	</div>;
@@ -1053,75 +1061,38 @@ function ConversationRow({
 }) {
 	const sender = conversation.meta?.sender;
 	const last = conversation.last_non_activity_message;
+	const name = sender?.name || sender?.email || "Диалог #" + conversation.id;
+	const source = projectName ?? (conversation.inbox_id ? "Источник #" + conversation.inbox_id : "Входящие");
+	const tags = conversation.labels ?? [];
+	const timestamp = dateLabel(last?.created_at ?? conversation.updated_at);
 	return (
-		<div
-			data-active={active}
-			data-opened={opened}
-			className="chat-list-row group flex w-full items-center border-b border-border/70 pr-2 transition hover:bg-surface-elevated/70"
-		>
-			<button
-				type="button"
-				aria-pressed={active}
-				onClick={onClick}
-				className="min-w-0 flex-1 px-4 py-3 text-left"
-			>
-				<div className="flex min-w-0 gap-3">
-					<div className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-						{initials(sender?.name)}
-					</div>
-					<div className="min-w-0 flex-1">
-						<div className="flex items-center justify-between gap-2">
-							<span className="truncate text-sm font-semibold">
-								{sender?.name || sender?.email || `Диалог #${conversation.id}`}
-							</span>
-							<span className="shrink-0 text-[10px] text-muted">
-								{dateLabel(last?.created_at ?? conversation.updated_at)}
-							</span>
-						</div>
-						<div className="mt-0.5 flex items-center justify-between gap-2">
-							<span className="truncate text-xs text-muted">
-								{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") ||
-									"Новое обращение"}
-							</span>
-							<span className="shrink-0 text-[10px] text-muted">
-								#{conversation.id}
-							</span>
-						</div>
-						<div className="mt-2 flex min-w-0 items-center gap-1.5">
-							<span className="max-w-28 truncate rounded bg-background px-1.5 py-0.5 text-[10px] text-muted">
-								{projectName ?? (conversation.inbox_id ? `Источник #${conversation.inbox_id}` : "Входящие")}
-							</span>
-							{conversation.meta?.assignee?.name && (
-								<span className="truncate text-[10px] text-muted">
-									· {conversation.meta.assignee.name}
-								</span>
-							)}
-							{conversation.labels?.slice(0, 2).map((tag) => (
-								<span
-									key={tag}
-									className="truncate rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent"
-								>
-									{tag}
-								</span>
-							))}
-						</div>
-					</div>
-				</div>
+		<div data-active={active} data-opened={opened} className="chat-list-row">
+			<button type="button" aria-pressed={active} onClick={onClick} className="chat-list-item">
+				<span className="chat-avatar" data-tone={conversation.id % 4} aria-hidden="true">{initials(name)}</span>
+				<span className="chat-list-main">
+					<span className="chat-list-line">
+						<span className="chat-list-player truncate" title={name}>{name}</span>
+						<span className="chat-list-time">{timestamp || "#" + conversation.id}</span>
+					</span>
+					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
+					<span className="chat-list-meta">
+						<span className="chat-list-project truncate" title={source}>{source}</span>
+						{conversation.meta?.assignee?.name && <span className="truncate" title={conversation.meta.assignee.name}>{conversation.meta.assignee.name}</span>}
+						{timestamp && <span className="chat-list-number">#{conversation.id}</span>}
+					</span>
+					{tags.length > 0 && <span className="chat-list-tags">
+						{tags.slice(0, 2).map((tag) => <span className="chat-context-tag truncate" title={tag} key={tag}>{tag}</span>)}
+						{tags.length > 2 && <span className="shrink-0 text-muted" title={tags.slice(2).join(", ")}>+{tags.length - 2}</span>}
+					</span>}
+				</span>
 			</button>
-			{onTake && (
-				<button
-					type="button"
-					onClick={onTake}
-				disabled={takeDisabled}
-					title="Взять в работу"
-					aria-label={`Взять в работу диалог #${conversation.id}`}
-					className="shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground disabled:opacity-50"
-				>
-					{taking ? "Берём…" : "Взять"}
-				</button>
-			)}
+			{onTake && <button type="button" onClick={onTake} disabled={takeDisabled} title="Взять в работу"
+				aria-label={"Взять в работу диалог #" + conversation.id} className="chat-list-take">
+				<ArrowDownToLine size={13} aria-hidden="true" /> {taking ? "Берём…" : "Взять"}
+			</button>}
 		</div>
 	);
+
 }
 
 function ConversationPane({
@@ -1565,19 +1536,16 @@ function ConversationPane({
 	if (!id)
 		return (
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center p-8 text-center">
-				<div className="grid size-14 place-items-center rounded-2xl border border-border bg-surface text-muted">
+				<div className="chat-empty-icon">
 					<MessageSquareText size={23} />
 				</div>
-				<h2 className="mt-4 text-sm font-semibold">Панель свободна</h2>
-				<p className="mt-1 max-w-60 text-xs leading-relaxed text-muted">
-					Выберите диалог из списка
-				</p>
+				<h2 className="mt-4 text-sm font-semibold">Выберите диалог</h2>
 				<button
 					type="button"
 					onClick={onChoose}
 					className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium hover:bg-surface-elevated"
 				>
-					<Plus size={14} /> Выбрать диалог
+					<Plus size={14} /> Показать список диалогов
 				</button>
 			</div>
 		);
@@ -1603,7 +1571,7 @@ function ConversationPane({
 			<div inert={contextVisible && contextOverlay} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5 ${docked ? "chat-docked-thread-header" : ""}`}>
 					<div className="flex min-w-0 items-center gap-2.5">
-						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
+						<div className="chat-avatar chat-avatar-small" data-tone={id % 4}>
 							{initials(sender?.name)}
 						</div>
 						<div className="min-w-0">
@@ -1877,7 +1845,7 @@ function ConversationPane({
 							</div>}
 						</div>
 						<div className="ml-auto flex items-center gap-2">
-							<span className="hidden text-[10px] text-muted sm:block">
+							<span className="chat-send-hint hidden text-[10px] text-muted sm:block">
 								Enter · Shift+Enter — перенос
 							</span>
 							<button
@@ -2157,6 +2125,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 		<div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
 			<article
 				data-thread-bubble
+				data-side={message.private ? "note" : outgoing ? "outgoing" : "incoming"}
 				className={`max-w-[min(88%,42rem)] min-w-0 rounded-2xl px-3 py-2.5 shadow-sm sm:px-4 ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "border border-accent/15 bg-accent/15" : "border border-border/80 bg-surface"}`}
 			>
 				{message.private && (

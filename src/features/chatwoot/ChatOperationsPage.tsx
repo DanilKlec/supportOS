@@ -47,7 +47,7 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 	const sla = data?.sla.filter((row) => !projectFilter || row.inboxId === projectFilter) ?? [];
 	const selectTab = (next: typeof tab) => { setTab(next); setSelected(0); save.reset(); };
 	return (
-		<section aria-label="Управление работой чатов" className="supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
+		<section aria-label="Управление работой чатов" className="chat-secondary-workspace supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-6xl space-y-4">
 				<header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:items-center">
 					<div role="group" aria-label="Разделы руководителя" className="chat-menu-tabs flex w-fit max-w-full flex-wrap">
@@ -70,14 +70,14 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 								{ label: "Принимают на смене", value: data.agents.filter((agent) => agent.online && agent.accepting && agent.onShift).length, icon: Headphones },
 								{ label: "Просрочено по SLA", value: data.sla.filter((row) => row.overdue).length, icon: Clock3 },
 							].map(({ label, value, icon: Icon }) => (
-								<div key={label} className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-surface p-2.5 sm:flex-row sm:items-center sm:gap-3 sm:p-3">
-									<Icon size={16} className="shrink-0 text-accent" /><div><div className="text-base font-semibold tabular-nums">{value ?? "—"}</div><div className="text-xs leading-tight text-muted">{label}</div></div>
+								<div key={label} className="chat-stat-card flex min-w-0 flex-col gap-1.5 p-2.5 sm:flex-row sm:items-center sm:gap-3 sm:p-3">
+									<span className="chat-settings-icon"><Icon size={16} aria-hidden="true" /></span><div><div className="text-base font-semibold tabular-nums">{value ?? "—"}</div><div className="text-xs leading-tight text-muted">{label}</div></div>
 								</div>
 							))}
 						</div>
 						{data.truncated && <p className="text-xs chat-text-warning">Chatwoot вернул часть диалогов. Показатели нагрузки и SLA рассчитаны по полученным данным.</p>}
 						<div className="grid gap-3 lg:grid-cols-2">
-							<div className="overflow-hidden rounded-xl border border-border bg-surface/60">
+							<div className="chat-support-panel overflow-hidden">
 								<h3 className="border-b border-border p-3 text-sm font-semibold">Нагрузка агентов</h3>
 								{!data.agents.length && <p className="p-3 text-xs text-muted">Пока нет агентов со статусом SupportOS.</p>}
 								{data.agents.map((agent) => <div key={agent.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-border/60 p-3 text-xs last:border-0">
@@ -87,7 +87,7 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 									<span className={agent.used >= agent.limit ? "text-right font-medium tabular-nums chat-text-warning" : "text-right tabular-nums text-muted"} title="Активные чаты / лимит">{agent.used} / {agent.limit}</span>
 								</div>)}
 							</div>
-							<div className="overflow-hidden rounded-xl border border-border bg-surface/60">
+							<div className="chat-support-panel overflow-hidden">
 								<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3">
 									<h3 className="text-sm font-semibold">Ожидают ответа</h3>
 									<select aria-label="Проект SLA" value={projectFilter} onChange={(event) => setProjectFilter(Number(event.target.value))} className={field}>
@@ -106,7 +106,7 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 				</> : <>
 					{(settings.isError || save.isError) && <p role="alert" className="text-sm chat-text-danger">{save.error?.message ?? settings.error?.message}</p>}
 					{settings.isPending && <p className="text-sm text-muted">Загружаем настройки…</p>}
-					{settings.data && <div className="max-w-2xl rounded-xl border border-border bg-surface/60 p-4">
+					{settings.data && <div className="chat-support-panel max-w-2xl p-4">
 						<label className="flex flex-col gap-2 text-xs font-medium">{tab === "shifts" ? "Агент" : "Проект"}
 							<select className={field} value={activeId ?? 0} onChange={(event) => { setSelected(Number(event.target.value)); save.reset(); }}>
 								{(tab === "shifts" ? agents : inboxes).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

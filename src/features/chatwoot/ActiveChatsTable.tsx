@@ -2,15 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import {
 	ArrowDown,
 	ArrowUp,
+	ArrowDownUp,
+	Building2,
 	Columns3,
+	Flag,
+	Inbox,
 	Eye,
 	EyeOff,
 	LoaderCircle,
 	RefreshCw,
-	Search,
-	SlidersHorizontal,
+	Tag,
+	UserRound,
+	UsersRound,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
 	chatwootService,
 	type ActiveChatFilters,
@@ -21,6 +26,13 @@ import {
 	type ChatwootInbox,
 	type ChatwootTeam,
 } from "@/services/chatwoot.service";
+import {
+	ChatFilterPanel,
+	ChatFilterSelect,
+	ChatFilterSummary,
+	ChatFilterToggle,
+	ChatSearch,
+} from "./ChatFilters";
 import { useChatPopover } from "./useChatPopover";
 
 const filtersDefault: ActiveChatFilters = {
@@ -55,8 +67,6 @@ const dateFormat = new Intl.DateTimeFormat("ru-RU", {
 const countries = new Intl.DisplayNames("ru", { type: "region" });
 const action =
 	"inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium hover:border-accent/40 hover:bg-accent/10 disabled:opacity-50";
-const field =
-	"h-8 min-w-0 rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-accent";
 
 function duration(value: number | undefined, now: number) {
 	if (!value) return "—";
@@ -133,6 +143,7 @@ export function ActiveChatsTable({
 	const [filters, setFilters] = useState(filtersDefault);
 	const [search, setSearch] = useState("");
 	const [filterOpen, setFilterOpen] = useState(false);
+	const filterPanelId = useId();
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const columns = useChatPopover<HTMLDivElement>(columnsOpen, () =>
 		setColumnsOpen(false),
@@ -191,13 +202,80 @@ export function ActiveChatsTable({
 	const visibleExtras = optionalColumns.filter((column) =>
 		extra.has(column.key),
 	);
-	const filterCount = [
-		filters.inbox,
-		filters.agent,
-		filters.team,
-		filters.label,
-		filters.priority,
-	].filter(Boolean).length;
+	const filterFields = [
+		{
+			key: "inbox",
+			label: "Проект",
+			icon: Building2,
+			empty: "Все проекты",
+			options: inboxes.map(({ id, name }) => ({
+				value: String(id),
+				label: name,
+			})),
+		},
+		{
+			key: "agent",
+			label: "Агент",
+			icon: UserRound,
+			empty: "Все агенты",
+			options: agents.map(({ id, name }) => ({
+				value: String(id),
+				label: name,
+			})),
+		},
+		{
+			key: "team",
+			label: "Команда",
+			icon: UsersRound,
+			empty: "Все команды",
+			options: teams.map(({ id, name }) => ({
+				value: String(id),
+				label: name,
+			})),
+		},
+		{
+			key: "label",
+			label: "Тег",
+			icon: Tag,
+			empty: "Все теги",
+			options: labels.map((label) => ({ value: label, label })),
+		},
+		{
+			key: "priority",
+			label: "Приоритет",
+			icon: Flag,
+			empty: "Все приоритеты",
+			options: Object.entries(priorities).map(([value, label]) => ({
+				value,
+				label,
+			})),
+		},
+	] as const;
+	const chips = filterFields.flatMap(({ key, label, options }) =>
+		filters[key]
+			? [
+					{
+						key,
+						label,
+						value:
+							options.find((option) => option.value === filters[key])?.label ??
+							filters[key],
+						remove: () => update(key, ""),
+					},
+				]
+			: [],
+	);
+	const resetFilters = () =>
+		setFilters((current) => ({
+			...current,
+			inbox: "",
+			agent: "",
+			team: "",
+			label: "",
+			priority: "",
+			page: 1,
+		}));
+	const filterCount = chips.length;
 	const header = (
 		title: string,
 		ascending: ActiveChatSort,
@@ -240,7 +318,7 @@ export function ActiveChatsTable({
 						type="button"
 						onClick={() => update("mode", tab.id)}
 						aria-pressed={filters.mode === tab.id}
-						className={`flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-xs font-medium ${filters.mode === tab.id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"}`}
+						className="chat-active-collection"
 					>
 						{tab.id === "watching" && <Eye size={13} />}
 						{tab.id === "all" ? (
@@ -252,56 +330,49 @@ export function ActiveChatsTable({
 							tab.title
 						)}
 						{tab.id === "watching" ? (
-							<span className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px]">
-								{watched.size}
-							</span>
+							<span className="chat-scope-count">{watched.size}</span>
 						) : filters.mode === tab.id && query.data?.total != null ? (
-							<span className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px]">
-								{query.data.total}
-							</span>
+							<span className="chat-scope-count">{query.data.total}</span>
 						) : null}
 					</button>
 				))}
 			</div>
 			<div className="chat-active-tools relative z-20 flex shrink-0 flex-wrap items-center gap-2 border-b border-border p-2 sm:p-3">
-				<label className="chat-active-search relative min-w-0 basis-full sm:max-w-xs sm:flex-1">
-					<Search
-						size={14}
-						className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
-					/>
-					<input
-						aria-label="Поиск игрока, почты или номера"
+				<div className="chat-active-search">
+					<ChatSearch
+						label="Поиск игрока, почты или номера"
+						placeholder="Игрок, email или №"
 						value={search}
 						maxLength={120}
-						onChange={(event) => setSearch(event.target.value)}
-						placeholder="Игрок, email или #номер чата"
-						className={`${field} w-full pl-8`}
+						onChange={setSearch}
 					/>
-				</label>
-				<button
-					type="button"
-					aria-expanded={filterOpen}
-					onClick={() => setFilterOpen(!filterOpen)}
-					className={action}
-				>
-					<SlidersHorizontal size={13} /> Фильтры
-					{filterCount ? ` · ${filterCount}` : ""}
-				</button>
-				<select
-					aria-label="Сортировка активных чатов"
-					value={filters.sort}
-					onChange={(event) =>
-						update("sort", event.target.value as ActiveChatSort)
-					}
-					className={field}
-				>
-					<option value="last_activity_at_desc">Недавняя активность</option>
-					<option value="last_activity_at_asc">Давняя активность</option>
-					<option value="created_at_asc">Старые диалоги</option>
-					<option value="created_at_desc">Новые диалоги</option>
-					<option value="waiting_since_asc">Дольше ждут ответа</option>
-					<option value="priority_desc">По приоритету</option>
-				</select>
+				</div>
+				<ChatFilterToggle
+					open={filterOpen}
+					panel={filterPanelId}
+					count={filterCount}
+					onToggle={() => setFilterOpen(!filterOpen)}
+				/>
+				<div className="chat-active-sort">
+					<ArrowDownUp size={13} aria-hidden="true" />
+					<span className="chat-active-sort-caption" aria-hidden="true">
+						Порядок
+					</span>
+					<select
+						aria-label="Сортировка активных чатов"
+						value={filters.sort}
+						onChange={(event) =>
+							update("sort", event.target.value as ActiveChatSort)
+						}
+					>
+						<option value="last_activity_at_desc">Недавняя активность</option>
+						<option value="last_activity_at_asc">Давняя активность</option>
+						<option value="created_at_asc">Старые диалоги</option>
+						<option value="created_at_desc">Новые диалоги</option>
+						<option value="waiting_since_asc">Дольше ждут ответа</option>
+						<option value="priority_desc">По приоритету</option>
+					</select>
+				</div>
 				<div className="chat-active-tool-actions ml-auto flex items-center gap-1.5">
 					<div ref={columns} className="chat-active-columns relative">
 						<button
@@ -340,85 +411,29 @@ export function ActiveChatsTable({
 						<RefreshCw size={13} />
 					</button>
 				</div>
-				{filterOpen && (
-					<div className="chat-active-filter-fields flex w-full flex-wrap items-center gap-2 border-t border-border pt-2">
-						<select
-							aria-label="Проект"
-							value={filters.inbox}
-							onChange={(event) => update("inbox", event.target.value)}
-							className={field}
-						>
-							<option value="">Все проекты</option>
-							{inboxes.map((item) => (
-								<option key={item.id} value={item.id}>
-									{item.name}
-								</option>
-							))}
-						</select>
-						<select
-							aria-label="Агент"
-							value={filters.agent}
-							onChange={(event) => update("agent", event.target.value)}
-							className={field}
-						>
-							<option value="">Все агенты</option>
-							{agents.map((item) => (
-								<option key={item.id} value={item.id}>
-									{item.name}
-								</option>
-							))}
-						</select>
-						<select
-							aria-label="Команда"
-							value={filters.team}
-							onChange={(event) => update("team", event.target.value)}
-							className={field}
-						>
-							<option value="">Все команды</option>
-							{teams.map((item) => (
-								<option key={item.id} value={item.id}>
-									{item.name}
-								</option>
-							))}
-						</select>
-						<select
-							aria-label="Тег"
-							value={filters.label}
-							onChange={(event) => update("label", event.target.value)}
-							className={field}
-						>
-							<option value="">Все теги</option>
-							{labels.map((item) => (
-								<option key={item} value={item}>
-									{item}
-								</option>
-							))}
-						</select>
-						<select
-							aria-label="Приоритет"
-							value={filters.priority}
-							onChange={(event) => update("priority", event.target.value)}
-							className={field}
-						>
-							<option value="">Все приоритеты</option>
-							{Object.entries(priorities).map(([key, title]) => (
-								<option key={key} value={key}>
-									{title}
-								</option>
-							))}
-						</select>
-						<button
-							type="button"
-							className={action}
-							onClick={() => {
-								setFilters({ ...filtersDefault, mode: filters.mode });
-								setSearch("");
-							}}
-						>
-							Сбросить
-						</button>
-					</div>
-				)}
+			</div>
+			<div
+				className="chat-active-refinements"
+				hidden={!filterOpen && filterCount === 0}
+			>
+				<ChatFilterSummary chips={chips} onReset={resetFilters} />
+				<ChatFilterPanel
+					id={filterPanelId}
+					open={filterOpen}
+					onClose={() => setFilterOpen(false)}
+				>
+					{filterFields.map((item) => (
+						<ChatFilterSelect
+							key={item.key}
+							icon={item.icon}
+							label={item.label}
+							options={item.options}
+							value={filters[item.key]}
+							empty={item.empty}
+							onChange={(value) => update(item.key, value)}
+						/>
+					))}
+				</ChatFilterPanel>
 			</div>
 			{watchingError && (
 				<p
@@ -532,9 +547,32 @@ export function ActiveChatsTable({
 									colSpan={8 + visibleExtras.length}
 									className="p-10 text-center text-muted"
 								>
-									{filters.mode === "watching"
-										? "Нет наблюдаемых диалогов по выбранным условиям"
-										: "Чатов по выбранным условиям не найдено"}
+									<div className="chat-list-empty">
+										<Inbox
+											size={22}
+											className="chat-empty-icon"
+											aria-hidden="true"
+										/>
+										<p>
+											{filters.mode === "watching"
+												? "Нет наблюдаемых диалогов по выбранным условиям"
+												: filterCount || search.trim()
+													? "Чатов по выбранным условиям не найдено"
+													: "В этом списке пока нет чатов"}
+										</p>
+										{(filterCount > 0 || search.trim()) && (
+											<button
+												type="button"
+												className={action}
+												onClick={() => {
+													resetFilters();
+													setSearch("");
+												}}
+											>
+												Очистить поиск и фильтры
+											</button>
+										)}
+									</div>
 								</td>
 							</tr>
 						) : (
@@ -549,11 +587,14 @@ export function ActiveChatsTable({
 										key={row.id}
 										data-chat-row
 										data-active={selectedId === row.id}
-										className="hover:bg-surface/65"
+										className="chat-active-row"
 									>
 										<td data-field="player" className="px-3 py-2">
 											<div className="flex items-center gap-2">
-												<span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent/15 text-[10px] font-semibold text-accent">
+												<span
+													className="chat-avatar chat-avatar-small"
+													data-tone={row.id % 4}
+												>
 													{player.trim().slice(0, 1).toUpperCase()}
 												</span>
 												<div className="min-w-0 leading-tight">
@@ -607,7 +648,10 @@ export function ActiveChatsTable({
 											data-field="status"
 											className="whitespace-nowrap px-3 py-2"
 										>
-											<span className="inline-flex items-center gap-1.5">
+											<span
+												className="chat-table-status"
+												data-status={row.agent ? row.status : "unassigned"}
+											>
 												<span
 													className={`size-1.5 rounded-full ${state.color}`}
 												/>

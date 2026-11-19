@@ -1,6 +1,21 @@
-import { RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+	Archive,
+	Building2,
+	Clock3,
+	Globe2,
+	Tag,
+	UserRound,
+} from "lucide-react";
 import { useId, useState } from "react";
 import type { ChatwootAgent, ChatwootInbox } from "@/services/chatwoot.service";
+import {
+	ChatFilterPanel,
+	ChatFilterSelect,
+	ChatFilterSummary,
+	ChatFilterToggle,
+	ChatSearch,
+	type FilterChip,
+} from "./ChatFilters";
 
 export const emptyConversationFilters = {
 	search: "",
@@ -26,9 +41,6 @@ type Props = {
 	onHistoryStatus: (status: "resolved" | "snoozed") => void;
 };
 
-const field =
-	"h-8 w-full min-w-0 rounded-lg border border-border bg-background px-2 text-xs text-foreground";
-
 export function countConversationFilters(filters: ConversationFilters) {
 	return [
 		filters.inboxId,
@@ -37,6 +49,8 @@ export function countConversationFilters(filters: ConversationFilters) {
 		filters.from || filters.to,
 	].filter(Boolean).length;
 }
+
+const shortDate = (date: string) => date.split("-").reverse().join(".");
 
 export function ConversationListToolbar({
 	scope,
@@ -53,12 +67,49 @@ export function ConversationListToolbar({
 }: Props) {
 	const filterPanelId = useId();
 	const [expanded, setExpanded] = useState(false);
-	const count = countConversationFilters(filters);
-	const projectName = requireProject
-		? inboxes.find((inbox) => String(inbox.id) === project)?.name
-		: undefined;
+	const projectName = inboxes.find(
+		(inbox) => String(inbox.id) === project,
+	)?.name;
+	const chips: FilterChip[] = [];
+	if (filters.inboxId)
+		chips.push({
+			key: "project",
+			label: "Проект",
+			value: projectName ?? `#${filters.inboxId}`,
+			remove: () => update({ inboxId: "" }),
+		});
+	if (filters.label)
+		chips.push({
+			key: "tag",
+			label: "Тег",
+			value: filters.label,
+			remove: () => update({ label: "" }),
+		});
+	if (canFilterByAgent && filters.agentId)
+		chips.push({
+			key: "agent",
+			label: "Агент",
+			value:
+				agents.find((agent) => String(agent.id) === filters.agentId)?.name ??
+				`#${filters.agentId}`,
+			remove: () => update({ agentId: "" }),
+		});
+	if (filters.from || filters.to) {
+		const range = [
+			filters.from && `с ${shortDate(filters.from)}`,
+			filters.to && `по ${shortDate(filters.to)}`,
+		]
+			.filter(Boolean)
+			.join(" ");
+		chips.push({
+			key: "range",
+			label: "Период",
+			value: range,
+			remove: () => update({ from: "", to: "" }),
+		});
+	}
 	return (
-		<div className="space-y-2.5 border-b border-border p-3">
+		<div className="chat-list-toolbar">
 			{scope === "history" && (
 				<fieldset className="chat-menu-tabs grid min-w-0 grid-cols-2">
 					<legend className="sr-only">Статус в архиве</legend>
@@ -67,163 +118,115 @@ export function ConversationListToolbar({
 						aria-pressed={historyStatus === "resolved"}
 						onClick={() => onHistoryStatus("resolved")}
 					>
-						Завершённые
+						<Archive size={13} /> Завершённые
 					</button>
 					<button
 						type="button"
 						aria-pressed={historyStatus === "snoozed"}
 						onClick={() => onHistoryStatus("snoozed")}
 					>
-						Отложенные
+						<Clock3 size={13} /> Отложенные
 					</button>
 				</fieldset>
 			)}
-			<div className="flex flex-wrap gap-1.5">
-				<div className="relative min-w-[8rem] flex-1">
-					<Search
-						size={14}
-						aria-hidden="true"
-						className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
-					/>
-					<input
-						type="text"
-						aria-label="Поиск диалогов"
-						placeholder="Игрок, текст или №"
-						value={filters.search}
-						onChange={(event) => update({ search: event.target.value })}
-						className="h-9 w-full min-w-0 rounded-lg border border-border bg-background pl-8 pr-7 text-xs placeholder:text-muted"
-					/>
-					{filters.search && (
-						<button
-							type="button"
-							aria-label="Очистить поиск"
-							onClick={() => update({ search: "" })}
-							className="absolute right-0.5 top-0.5 grid size-8 place-items-center rounded-md text-muted hover:text-foreground"
-						>
-							<X size={13} />
-						</button>
-					)}
-				</div>
-				<button
-					type="button"
-					aria-expanded={expanded}
-					aria-controls={filterPanelId}
-					className="chat-menu-filter"
-					onClick={() => setExpanded(!expanded)}
-				>
-					<SlidersHorizontal size={14} aria-hidden="true" /> Фильтры
-					{count > 0 && (
-						<span
-							title={`Применено фильтров: ${count}`}
-							className="rounded-md bg-accent/15 px-1.5 tabular-nums text-accent"
-						>
-							{count}
-						</span>
-					)}
-				</button>
+			<div className="chat-list-searchbar">
+				<ChatSearch
+					label="Поиск диалогов"
+					placeholder="Игрок, текст или №"
+					value={filters.search}
+					onChange={(search) => update({ search })}
+				/>
+				<ChatFilterToggle
+					open={expanded}
+					panel={filterPanelId}
+					count={chips.length}
+					onToggle={() => setExpanded(!expanded)}
+				/>
 			</div>
-			{requireProject && (
-				<p
-					className="truncate px-0.5 text-[11px] text-muted"
-					title={projectName}
-				>
-					{projectName
-						? `Очередь проекта · ${projectName}`
-						: "Нет доступных проектов"}
+			{requireProject && !filters.inboxId && (
+				<p className="chat-filter-source" title={projectName}>
+					<Globe2 size={13} aria-hidden="true" />
+					<span className="truncate">
+						{projectName
+							? `Очередь проекта · ${projectName}`
+							: "Нет доступных проектов"}
+					</span>
 				</p>
 			)}
-			<div id={filterPanelId} hidden={!expanded}>
-				<div className="chat-list-filter-fields grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface p-2">
-					<label className="min-w-0 space-y-1 text-[11px] text-muted">
-						<span>Проект</span>
-						<select
-							className={field}
-							value={project}
-							onChange={(event) => update({ inboxId: event.target.value })}
-						>
-							{(!requireProject || !inboxes.length) && (
-								<option value="">
-									{requireProject ? "Нет проектов" : "Все проекты"}
-								</option>
-							)}
-							{inboxes.map((inbox) => (
-								<option key={inbox.id} value={inbox.id}>
-									{inbox.name}
-								</option>
-							))}
-						</select>
-					</label>
-					<label className="min-w-0 space-y-1 text-[11px] text-muted">
-						<span>Тег</span>
-						<select
-							className={field}
-							value={filters.label}
-							onChange={(event) => update({ label: event.target.value })}
-						>
-							<option value="">Все теги</option>
-							{labels.map((tag) => (
-								<option key={tag} value={tag}>
-									{tag}
-								</option>
-							))}
-						</select>
-					</label>
-					{scope === "history" && (
-						<>
-							{canFilterByAgent && (
-								<label className="col-span-2 min-w-0 space-y-1 text-[11px] text-muted">
-									<span>Агент</span>
-									<select
-										className={field}
-										value={filters.agentId}
-										onChange={(event) =>
-											update({ agentId: event.target.value })
-										}
-									>
-										<option value="">Все агенты</option>
-										{agents.map((agent) => (
-											<option key={agent.id} value={agent.id}>
-												{agent.name}
-											</option>
-										))}
-									</select>
-								</label>
-							)}
-							<label className="min-w-0 space-y-1 text-[11px] text-muted">
-								<span>С даты</span>
-								<input
-									className={field}
-									type="date"
-									value={filters.from}
-									max={filters.to || undefined}
-									onChange={(event) => update({ from: event.target.value })}
+			<ChatFilterSummary
+				chips={chips}
+				onReset={() =>
+					update({ ...emptyConversationFilters, search: filters.search })
+				}
+			/>
+			<ChatFilterPanel
+				id={filterPanelId}
+				open={expanded}
+				onClose={() => setExpanded(false)}
+			>
+				<ChatFilterSelect
+					icon={Building2}
+					label="Проект"
+					value={project}
+					empty={
+						requireProject
+							? inboxes.length
+								? undefined
+								: "Нет проектов"
+							: "Все проекты"
+					}
+					options={inboxes.map((inbox) => ({
+						value: String(inbox.id),
+						label: inbox.name,
+					}))}
+					onChange={(inboxId) => update({ inboxId })}
+				/>
+				<ChatFilterSelect
+					icon={Tag}
+					label="Тег"
+					value={filters.label}
+					empty="Все теги"
+					options={labels.map((label) => ({ value: label, label }))}
+					onChange={(label) => update({ label })}
+				/>
+				{scope === "history" && (
+					<>
+						{canFilterByAgent && (
+							<div className="col-span-2">
+								<ChatFilterSelect
+									icon={UserRound}
+									label="Агент"
+									value={filters.agentId}
+									empty="Все агенты"
+									options={agents.map((agent) => ({
+										value: String(agent.id),
+										label: agent.name,
+									}))}
+									onChange={(agentId) => update({ agentId })}
 								/>
-							</label>
-							<label className="min-w-0 space-y-1 text-[11px] text-muted">
-								<span>По дату</span>
-								<input
-									className={field}
-									type="date"
-									value={filters.to}
-									min={filters.from || undefined}
-									onChange={(event) => update({ to: event.target.value })}
-								/>
-							</label>
-						</>
-					)}
-					{count > 0 && (
-						<button
-							type="button"
-							onClick={() =>
-								update({ ...emptyConversationFilters, search: filters.search })
-							}
-							className="col-span-2 flex min-h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted hover:bg-surface-elevated hover:text-foreground"
-						>
-							<RotateCcw size={12} /> Сбросить фильтры
-						</button>
-					)}
-				</div>
-			</div>
+							</div>
+						)}
+						<label className="chat-filter-field">
+							<span>С даты</span>
+							<input
+								type="date"
+								value={filters.from}
+								max={filters.to || undefined}
+								onChange={(event) => update({ from: event.target.value })}
+							/>
+						</label>
+						<label className="chat-filter-field">
+							<span>По дату</span>
+							<input
+								type="date"
+								value={filters.to}
+								min={filters.from || undefined}
+								onChange={(event) => update({ to: event.target.value })}
+							/>
+						</label>
+					</>
+				)}
+			</ChatFilterPanel>
 		</div>
 	);
 }

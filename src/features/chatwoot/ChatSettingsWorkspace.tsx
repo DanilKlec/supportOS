@@ -49,7 +49,7 @@ export function ChatSettingsWorkspace({
 	return (
 		<section
 			aria-labelledby="chat-settings-heading"
-			className="chat-workspace-settings supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-3 sm:p-6"
+			className="chat-workspace-settings chat-secondary-workspace supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-3 sm:p-6"
 		>
 			<div className="mx-auto max-w-3xl">
 				<h2
@@ -58,7 +58,7 @@ export function ChatSettingsWorkspace({
 				>
 					Настройки чатов
 				</h2>
-				<div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+				<div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
 					{items.map(
 						({ title, detail, icon: Icon, action }) =>
 							action && (

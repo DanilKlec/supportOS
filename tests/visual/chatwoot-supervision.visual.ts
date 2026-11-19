@@ -7,6 +7,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	page,
 }, info) => {
 	let watching = false;
+	let activeParameters = new URLSearchParams();
 	let agentView = false;
 	let queued = false;
 	let taken = false;
@@ -238,6 +239,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				return route.fulfill({ json: { ids: watching ? [row.id] : [] } });
 			}
 			case "active-overview": {
+				activeParameters = url.searchParams;
 				const rows =
 					url.searchParams.get("mode") === "watching" && !watching ? [] : [row];
 				return route.fulfill({
@@ -321,11 +323,42 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		await columns.press("Escape");
 		await expect(columns).toHaveAttribute("aria-expanded", "false");
 	}
-	await page.getByRole("button", { name: "Фильтры", exact: true }).click();
+	const active = page.getByRole("region", { name: "Активные чаты команды" });
+	const filterToggle = active.getByRole("button", { name: /^Фильтры/ });
+	await filterToggle.click();
+	const project = active.getByRole("combobox", { name: "Проект", exact: true });
+	await project.selectOption(String(row.inboxId));
+	await active
+		.getByRole("combobox", { name: "Тег", exact: true })
+		.selectOption("billing");
+	await expect
+		.poll(() => activeParameters.get("inbox"))
+		.toBe(String(row.inboxId));
+	await expect.poll(() => activeParameters.get("label")).toBe("billing");
+	await assertLayout("active-filters");
+	await active.getByRole("button", { name: "Закрыть фильтры" }).click();
+	await expect(filterToggle).toBeFocused();
+	await expect(project).toBeHidden();
+	await active.getByRole("button", { name: "Убрать фильтр «Проект»" }).click();
+	await expect.poll(() => activeParameters.has("inbox")).toBe(false);
 	await expect(
-		page.getByRole("combobox", { name: "Проект", exact: true }),
+		active.getByRole("button", { name: "Убрать фильтр «Тег»" }),
 	).toBeVisible();
-	await page.getByRole("button", { name: "Фильтры", exact: true }).click();
+	const sort = active.getByRole("combobox", {
+		name: "Сортировка активных чатов",
+	});
+	await sort.selectOption("created_at_desc");
+	const activeSearch = active.getByRole("textbox", {
+		name: "Поиск игрока, почты или номера",
+	});
+	await activeSearch.fill(row.player);
+	await expect.poll(() => activeParameters.get("search")).toBe(row.player);
+	await active.getByRole("button", { name: "Сбросить фильтры" }).click();
+	await expect.poll(() => activeParameters.has("label")).toBe(false);
+	await expect(sort).toHaveValue("created_at_desc");
+	await expect(activeSearch).toHaveValue(row.player);
+	await active.getByRole("button", { name: "Очистить поиск" }).click();
+	await expect.poll(() => activeParameters.has("search")).toBe(false);
 	await table.getByRole("button", { name: "Наблюдать" }).click();
 	const observation = page.getByRole("complementary", {
 		name: "Наблюдение за диалогом",
@@ -430,6 +463,12 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		"1",
 	);
 	await assertLayout("archive-filters");
+	await archive.getByLabel("С даты").fill("2026-10-01");
+	await expect(
+		archive.getByRole("button", { name: "Убрать фильтр «Период»" }),
+	).toContainText("01.10.2026");
+	await archive.getByRole("button", { name: "Убрать фильтр «Период»" }).click();
+	await expect(archive.getByLabel("С даты")).toHaveValue("");
 	await archive
 		.getByRole("textbox", { name: "Поиск диалогов" })
 		.fill("несуществующий");
