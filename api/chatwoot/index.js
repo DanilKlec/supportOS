@@ -1,3 +1,3 @@
-// Server-only Chatwoot proxy. Keep API credentials out of the browser bundle.
-export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
-export { default } from '../../server/chatwoot/index.js';
+// Keep the webhook's original bytes and share one Vercel function with the proxy.
+export const config = { api: { bodyParser: false } };
+export { default } from '../../server/chatwoot/_http.js';

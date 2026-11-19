@@ -1,8 +1,36 @@
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 
+export type ChatwootStatus = "open" | "pending" | "resolved" | "snoozed";
+export type ChatwootPriority = "low" | "medium" | "high" | "urgent";
+export type ActiveChatMode = "all" | "open" | "pending" | "watching";
+export type ActiveChatSort = "last_activity_at_desc" | "last_activity_at_asc" | "created_at_asc" | "created_at_desc" | "priority_desc" | "waiting_since_asc";
+export type ActiveChatRow = {
+	id: number; inboxId?: number; player?: string; email?: string; agent?: string; team?: string; project?: string;
+	status: ChatwootStatus; priority?: ChatwootPriority; startedAt?: number; activityAt?: number; waitingSince?: number;
+	country?: string; region?: string; city?: string; referrer?: string; device?: string; lastPage?: string; visits?: number; tags: string[];
+};
+export type ActiveChatFilters = {
+	mode: ActiveChatMode; sort: ActiveChatSort; page: number;
+	inbox: string; agent: string; team: string; label: string; priority: string; search: string;
+};
+export type ChatwootCapabilities = {
+	role: "support" | "shift" | "qc" | "admin" | "creator";
+	supervise: boolean;
+	manageRouting: boolean;
+	manageProjects: boolean;
+	manageWebhooks: boolean;
+	deleteProjects: boolean;
+	manageAllChats: boolean;
+	reviewNotes: boolean;
+};
+
 export type ChatwootConversation = {
 	id: number;
 	status: string;
+	priority?: ChatwootPriority | null;
+	snoozed_until?: string | number | null;
+	access?: { read: boolean; write: boolean; note: boolean; take: boolean; seeIp: boolean };
+	coachRecipient?: { id: number; name: string | null } | null;
 	inbox_id?: number;
 	labels?: string[];
 	contact_id?: number;
@@ -25,11 +53,14 @@ export type ChatwootConversation = {
 			available_name?: string;
 		};
 		inbox?: { id: number; name?: string; channel_type?: string };
+		team?: { id: number; name?: string };
 	};
 	messages?: ChatwootMessage[];
 	last_non_activity_message?: ChatwootMessage;
 	additional_attributes?: Record<string, unknown>;
 	custom_attributes?: Record<string, unknown>;
+	visitor?: { page?: string; ip?: string; city?: string; country?: string; browser?: string; device?: string; platform?: string; login?: string };
+	crm?: "adwa" | "whitelabels" | "vortexino" | null;
 	created_at?: number;
 	updated_at?: number;
 };
@@ -50,6 +81,14 @@ export type ChatwootMessage = {
 	}>;
 };
 
+export type ChatwootCoachingNote = {
+	id: string;
+	author: string;
+	content: string;
+	createdAt: string;
+	own: boolean;
+};
+
 export type ChatwootAgent = {
 	id: number;
 	name: string;
@@ -65,7 +104,23 @@ export type ChatwootTeam = {
 	allow_auto_assign?: boolean;
 	agents?: ChatwootAgent[];
 };
-export type ChatwootInbox = { id: number; name: string; channel_type?: string };
+export type ChatDirectoryKind = "chat-team" | "chat-label";
+export type ChatDirectoryItem = { id: number; name?: string; title?: string; description?: string; color?: string; show_on_sidebar?: boolean };
+export type ChatwootInbox = { id: number; name: string; channel_type?: string; website_url?: string | null };
+
+export type ChatwootOperations = {
+	revision: string;
+	agents: Record<number, { skills: string[]; zone: string; shifts: { day: number; start: string; end: string }[] }>;
+	inboxes: Record<number, { skills: string[]; responseMinutes: number; crm: NonNullable<ChatwootConversation["crm"]> | "" }>;
+};
+
+export type ChatwootSupervisor = {
+	queue: number | null;
+	active: number | null;
+	truncated: boolean;
+	agents: { id: number; online: boolean; accepting: boolean; onShift: boolean; used: number; limit: number }[];
+	sla: { id: number; inboxId: number; agentId: number | null; seconds: number; goal: number; overdue: boolean }[];
+};
 export type ChatwootWebsiteInbox = {
 	id: number;
 	name: string;
@@ -143,7 +198,8 @@ export const chatwootService = {
 	health: () =>
 		request<{
 			configured: boolean;
-			profile?: { id: number; name: string; email: string };
+			lastWebhookAt?: string | null;
+			capabilities?: ChatwootCapabilities;
 			inboxes?: { payload?: Array<{ inbox: ChatwootInbox }> };
 		}>("health"),
 	conversations: (options: ConversationSearch) =>
@@ -157,14 +213,32 @@ export const chatwootService = {
 			`&scope=${options.scope}&status=${encodeURIComponent(options.status ?? "open")}&page=${options.page ?? 1}${options.inboxId ? `&inbox_id=${options.inboxId}` : ""}${options.agentId ? `&agent_id=${options.agentId}` : ""}${options.label ? `&label=${encodeURIComponent(options.label)}` : ""}${options.from ? `&from=${encodeURIComponent(options.from)}` : ""}${options.to ? `&to=${encodeURIComponent(options.to)}` : ""}${options.query ? `&q=${encodeURIComponent(options.query)}` : ""}`,
 		),
 	conversationCounts: (inboxId?: number) =>
-		request<{ queueCount: number; mineCount: number | null; activeCount: number | null }>("conversation-counts", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
+		request<{ queueCount: number | null; mineCount: number | null; activeCount: number | null }>("conversation-counts", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
 	conversation: (id: number) =>
-		request<{
-			id?: number;
-			messages?: ChatwootMessage[];
-			payload?: { messages?: ChatwootMessage[] };
-			meta?: ChatwootConversation["meta"];
-		}>("conversation", undefined, `&id=${id}`),
+		request<ChatwootConversation>("conversation", undefined, `&id=${id}`),
+	activeOverview: (filters: ActiveChatFilters, signal?: AbortSignal) => {
+		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries(filters)) if (value !== "") params.set(key, String(value));
+		return request<{ rows: ActiveChatRow[]; total: number | null; hasMore: boolean; searchTruncated: boolean }>("active-overview", { signal }, `&${params}`);
+	},
+	supervision: () => request<{ ids: number[] }>("supervision"),
+	setSupervision: (conversationId: number, enabled: boolean) => request<{ id: number; watching: boolean }>("supervision", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, enabled }),
+	}),
+	coachingNotes: (conversationId: number, signal: AbortSignal) => request<{ notes: ChatwootCoachingNote[] }>(
+		"coaching-notes", { signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]) }, `&id=${conversationId}`,
+	),
+	sendCoachingNote: (conversationId: number, note: { noteId: string; recipientAgentId: number; content: string }) =>
+		request<ChatwootCoachingNote>("coaching-notes", {
+			method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, ...note }),
+		}),
+	operations: () => request<ChatwootOperations>("chat-operations"),
+	supervisor: () => request<ChatwootSupervisor>("chat-supervisor"),
+	saveOperations: (settings: ChatwootOperations) => request<ChatwootOperations>("chat-operations", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(settings),
+	}),
 	conversationMessages: (id: number, before?: number) =>
 		request<{
 			payload?: ChatwootMessage[];
@@ -187,6 +261,14 @@ export const chatwootService = {
 		request<{ baseUrl: string; inboxes: ChatwootWebsiteInbox[] }>(
 			"website-inboxes",
 		),
+	webhookSettings: () =>
+		request<{ configured: boolean; lastReceivedAt: string | null }>("webhook-secret"),
+	saveWebhookSecret: (signingSecret: string) =>
+		request<{ configured: boolean }>("webhook-secret", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ signingSecret }),
+		}),
 	websiteInboxMembers: (inboxId: number) =>
 		request<{ operatorIds: number[] }>(
 			"website-inbox-members",
@@ -247,12 +329,15 @@ export const chatwootService = {
 						body: JSON.stringify({ accepting }),
 					},
 		),
-	contact: async (id: number) => {
+	contact: async (id: number, conversationId: number) => {
 		const result = await request<
 			ChatwootContact | { payload?: ChatwootContact }
-		>("contact", undefined, `&id=${id}`);
+		>("contact", undefined, `&id=${id}&conversationId=${conversationId}`);
 		return "payload" in result && result.payload ? result.payload : result;
 	},
+	contactHistory: (id: number, conversationId: number) => request<{
+		payload: Pick<ChatwootConversation, "id" | "inbox_id" | "status" | "created_at">[];
+	}>("contact-history", undefined, `&id=${id}&conversationId=${conversationId}`),
 	labels: () =>
 		request<
 			| { payload?: Array<{ title?: string; name?: string; color?: string }> }
@@ -268,12 +353,13 @@ export const chatwootService = {
 		}),
 	setStatus: (
 		conversationId: number,
-		status: "open" | "resolved" | "snoozed",
+		status: ChatwootStatus,
+		snoozedUntil?: number,
 	) =>
 		request("status", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ conversationId, status }),
+			body: JSON.stringify({ conversationId, status, snoozedUntil }),
 		}),
 	assign: (conversationId: number, assigneeId: number | null) =>
 		request("assign", {
@@ -281,17 +367,39 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ conversationId, assigneeId }),
 		}),
+	assignTeam: (conversationId: number, teamId: number | null) => request("assign", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, teamId }),
+	}),
+	setPriority: (conversationId: number, priority: ChatwootPriority | null) => request("priority", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, priority }),
+	}),
+	directoryItems: (kind: ChatDirectoryKind) => request<{ payload: ChatDirectoryItem[] }>(kind),
+	teamMembers: (id: number) => request<{ memberIds: number[] }>("chat-team", undefined, `&id=${id}`),
+	saveDirectoryItem: (kind: ChatDirectoryKind, value: { id?: number; name: string; description: string; color?: string; showOnSidebar?: boolean }) => request(kind, {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value),
+	}),
+	saveTeamMembers: (id: number, memberIds: number[]) => request("chat-team", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, memberIds }),
+	}),
+	deleteDirectoryItem: (kind: ChatDirectoryKind, id: number) => request(kind, {
+		method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+	}),
+	take: (conversationId: number) => request("take", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ conversationId }),
+	}),
 	setLabels: (conversationId: number, labels: string[]) =>
 		request("labels", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ conversationId, labels }),
 		}),
-	blockContact: (contactId: number, blocked: boolean) =>
+	blockContact: (conversationId: number, contactId: number, blocked: boolean) =>
 		request("contact-block", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ contactId, blocked }),
+			body: JSON.stringify({ conversationId, contactId, blocked }),
 		}),
 	customAttributes: (model: 0 | 1) =>
 		request<{ payload?: ChatwootCustomAttributeDefinition[] }>(

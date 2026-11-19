@@ -90,7 +90,7 @@ it("does not share request or response state between concurrent calls", async ()
 	expect(results[1].end).toHaveBeenCalledExactlyOnceWith("Bearer synthetic-1");
 });
 
-it("keeps exactly 11 deployment entry points within the Hobby limit", () => {
+it("keeps the Chatwoot proxy and webhook within the Hobby entry limit", () => {
 	const entries = readdirSync(new URL("../../api/", import.meta.url), { recursive: true })
 		.filter((file) => /\.(?:[cm]?[jt]s|py|go|rb|rs)$/.test(file))
 		.map((file) => file.replaceAll("\\", "/"))
@@ -100,6 +100,7 @@ it("keeps exactly 11 deployment entry points within the Hobby limit", () => {
 		"agent-monitor/index.js",
 		"ai/[endpoint].js",
 		"binds/index.js",
+		"chatwoot/index.js",
 		"content/index.js",
 		"google-sheets/fetch.js",
 		"projects/index.js",

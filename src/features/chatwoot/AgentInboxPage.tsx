@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	Archive,
@@ -7,6 +7,7 @@ import {
 	CheckCheck,
 	ChevronDown,
 	ExternalLink,
+	Eye,
 	FileText,
 	Globe2,
 	Headphones,
@@ -29,16 +30,23 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
+import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
+import { ChatDirectorySettingsDialog } from "@/features/chatwoot/ChatDirectorySettingsDialog";
 import { CustomAttributesDialog } from "@/features/chatwoot/CustomAttributesDialog";
+import { subscribeToChatwootEvents } from "@/services/chatwoot-realtime";
 import {
 	type ChatwootAgent,
+	type ChatwootCoachingNote,
 	type ChatwootContact,
 	type ChatwootConversation,
 	type ChatwootCustomAttributeDefinition,
+	type ChatwootInbox,
 	type ChatwootMessage,
+	type ChatwootPriority,
+	type ChatwootStatus,
 	type ChatwootTeam,
 	type ConversationSearch,
 	chatwootService,
@@ -50,9 +58,15 @@ import {
 import { useAuthStore } from "@/store/auth.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
+import { ChatOperationsPage } from "./ChatOperationsPage";
+import { ActiveChatsTable } from "./ActiveChatsTable";
+import { useChatPopover } from "./useChatPopover";
+import { InboxModal } from "./InboxModal";
+import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
+import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
-type WorkspaceSection = "inbox" | "team" | "archive";
+type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
@@ -107,6 +121,24 @@ function dateLabel(timestamp?: number) {
 }
 
 export function AgentInboxPage() {
+	const parentClient = useQueryClient();
+	const identity = useAuthStore((state) => {
+		const session = state.session;
+		const access = session?.user.access;
+		return session ? `${session.user.id}:${session.sessionId ?? ""}:${access?.version ?? ""}:${access?.roles.map((role) => role.id).join(",") ?? ""}` : "";
+	});
+	return <InboxSession key={identity} parentClient={parentClient} />;
+}
+
+function InboxSession({ parentClient }: { parentClient: QueryClient }) {
+	const [client] = useState(() => new QueryClient({ defaultOptions: parentClient.getDefaultOptions() }));
+	useEffect(() => () => client.clear(), [client]);
+	return <QueryClientProvider client={client}><AgentInboxWorkspace /></QueryClientProvider>;
+}
+
+type ChatDraft = { text: string; privateNote: boolean };
+
+function AgentInboxWorkspace() {
 	const client = useQueryClient();
 	const [scope, setScope] = useState<Scope>("mine");
 	const [activeSection, setActiveSection] = useState<WorkspaceSection>("inbox");
@@ -116,6 +148,13 @@ export function AgentInboxPage() {
 	});
 	const [activePage, setActivePage] = useState(1);
 	const [conversationId, setConversationId] = useState<number | null>(null);
+	const drafts = useRef(new Map<number, ChatDraft>());
+	const [supervisionId, setSupervisionId] = useState<number | null>(null);
+	const [manageObservedChat, setManageObservedChat] = useState(false);
+	const supervisionDrafts = useRef(new Map<number, ChatDraft>());
+	const [realtimeSubscribed, setRealtimeSubscribed] = useState(false);
+	const [coachingRealtimeConnected, setCoachingRealtimeConnected] = useState(false);
+	const [webhookSeen, setWebhookSeen] = useState(false);
 	const [search, setSearch] = useState("");
 	const [queueOpen, setQueueOpen] = useState(true);
 	const [inboxId, setInboxId] = useState("");
@@ -123,7 +162,10 @@ export function AgentInboxPage() {
 	const [label, setLabel] = useState("");
 	const [from, setFrom] = useState("");
 	const [to, setTo] = useState("");
+	const [historyStatus, setHistoryStatus] = useState<"resolved" | "snoozed">("resolved");
 	const [sitesOpen, setSitesOpen] = useState(false);
+	const [webhookSettingsOpen, setWebhookSettingsOpen] = useState(false);
+	const [directorySettingsOpen, setDirectorySettingsOpen] = useState(false);
 	const [attributesOpen, setAttributesOpen] = useState(false);
 	const [profileOpen, setProfileOpen] = useState(false);
 	const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
@@ -133,15 +175,7 @@ export function AgentInboxPage() {
 	const audioContext = useRef<AudioContext | null>(null);
 	const seenConversationActivity = useRef<Map<number, number | string> | null>(null);
 	const user = useAuthStore((s) => s.session?.user);
-	const canManageSites = useAuthStore(
-		(s) => s.session?.user.access?.permissions.includes("technical") === true,
-	);
-	const canManageChatCapacity = useAuthStore(
-		(s) => s.session?.user.access?.roles.some((role) => ["admin", "qc", "creator"].includes(role.id)) === true,
-	);
-	const canSupervise = useAuthStore(
-		(s) => s.session?.user.access?.permissions.includes("monitor.read") === true,
-	);
+	const accessToken = useAuthStore((s) => s.session?.accessToken);
 	const canWork = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("work") === true,
 	);
@@ -150,10 +184,67 @@ export function AgentInboxPage() {
 	const language = useKnowledgeStore((s) => s.language);
 	const setLanguage = useKnowledgeStore((s) => s.setLanguage);
 	const connection = useQuery({
-		queryKey: ["chatwoot", "health"],
+		queryKey: ["chatwoot", "health", user?.email],
 		queryFn: chatwootService.health,
 		retry: false,
 	});
+	const capabilities = connection.data?.capabilities;
+	const canManageSites = capabilities?.manageProjects === true;
+	const canManageChatCapacity = capabilities?.manageRouting === true;
+	const canManageWebhookSettings = capabilities?.manageWebhooks === true;
+	const canSupervise = capabilities?.supervise === true;
+	const managingObservedChat = canSupervise && capabilities?.manageAllChats === true && manageObservedChat;
+	const realtimeConnected = realtimeSubscribed && (webhookSeen || Boolean(connection.data?.lastWebhookAt));
+	useEffect(() => {
+		if (!connection.data?.configured || !accessToken || !user?.id || !(canWork || canSupervise)) {
+			setRealtimeSubscribed(false);
+			setCoachingRealtimeConnected(false);
+			return;
+		}
+		let refreshTimer: number | undefined;
+		let disposed = false;
+		const scheduleRefresh = () => {
+			if (refreshTimer !== undefined) return;
+			refreshTimer = window.setTimeout(() => {
+				refreshTimer = undefined;
+				void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] }, { cancelRefetch: false });
+				void client.invalidateQueries({ queryKey: ["chatwoot", "active-overview"] }, { cancelRefetch: false });
+				void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] }, { cancelRefetch: false });
+				void client.invalidateQueries({ queryKey: ["chatwoot", "messages"] }, { cancelRefetch: false });
+				void client.invalidateQueries({ queryKey: ["chatwoot", "conversation"] }, { cancelRefetch: false });
+			}, 650);
+		};
+		const unsubscribe = subscribeToChatwootEvents(
+			accessToken,
+			() => {
+				if (disposed) return;
+				setWebhookSeen(true);
+				scheduleRefresh();
+			},
+			(status) => {
+				if (disposed) return;
+				setRealtimeSubscribed(status === "SUBSCRIBED");
+				if (status === "SUBSCRIBED") scheduleRefresh();
+			},
+			{
+				userId: user.id,
+				onNote: () => {
+					void client.invalidateQueries({ queryKey: ["chatwoot", "coaching-notes"] });
+				},
+				onStatus: (status) => {
+					if (disposed) return;
+					setCoachingRealtimeConnected(status === "SUBSCRIBED");
+					if (status === "SUBSCRIBED")
+						void client.invalidateQueries({ queryKey: ["chatwoot", "coaching-notes"] });
+				},
+			},
+		);
+		return () => {
+			disposed = true;
+			if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+			unsubscribe();
+		};
+	}, [connection.data?.configured, accessToken, user?.id, canWork, canSupervise, client]);
 	const directory = useQuery({
 		queryKey: ["chatwoot", "directory"],
 		queryFn: chatwootService.inboxDirectory,
@@ -168,12 +259,36 @@ export function AgentInboxPage() {
 		refetchInterval: 5000,
 	});
 	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
+	const watching = useQuery({
+		queryKey: ["chatwoot", "supervision"],
+		queryFn: chatwootService.supervision,
+		enabled: connection.data?.configured === true && canSupervise && displayedScope === "active",
+		refetchInterval: 30000,
+		retry: false,
+	});
+	const changeWatch = useMutation({
+		mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => chatwootService.setSupervision(id, enabled),
+		onSuccess: ({ id, watching }) => {
+			client.setQueryData<{ ids: number[] }>(["chatwoot", "supervision"], (cached) => {
+				const ids = new Set(cached?.ids ?? []);
+				if (watching) ids.add(id);
+				else ids.delete(id);
+				return { ids: [...ids] };
+			});
+			void client.invalidateQueries({ queryKey: ["chatwoot", "supervision"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "active-overview"] });
+		},
+	});
+	const watched = new Set(watching.data?.ids ?? []);
+	const queueInbox = displayedScope === "queue" && !canSupervise
+		? inboxId || String(directory.data?.inboxes[0]?.id ?? "")
+		: inboxId;
 	const request: ConversationSearch = {
 		scope: displayedScope,
-		status: displayedScope === "history" ? "resolved" : "open",
+		status: displayedScope === "history" ? historyStatus : "open",
 		page: activePage,
-		...(inboxId ? { inboxId: Number(inboxId) } : {}),
-		...(displayedScope === "history" && agentId ? { agentId: Number(agentId) } : {}),
+		...(queueInbox ? { inboxId: Number(queueInbox) } : {}),
+		...(displayedScope === "history" && canSupervise && agentId ? { agentId: Number(agentId) } : {}),
 		...(label ? { label } : {}),
 		...(displayedScope === "history" && from ? { from } : {}),
 		...(displayedScope === "history" && to ? { to } : {}),
@@ -181,13 +296,13 @@ export function AgentInboxPage() {
 	};
 	useEffect(() => {
 		setActivePage(1);
-	}, [activeSection, scope, inboxId, agentId, label, from, to, search]);
+	}, [activeSection, scope, inboxId, agentId, label, from, to, search, historyStatus]);
 	const conversations = useQuery({
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
-		enabled: connection.data?.configured === true && activeSection !== "team",
+		enabled: connection.data?.configured === true && displayedScope !== "active" && (activeSection === "inbox" || activeSection === "archive"),
 		staleTime: displayedScope === "queue" ? 2000 : 0,
-		refetchInterval: displayedScope === "history" ? 20000 : 3000,
+		refetchInterval: displayedScope === "history" ? 20000 : realtimeConnected ? 12000 : 3000,
 		retry: 1,
 	});
 	const conversationCounts = useQuery({
@@ -195,7 +310,7 @@ export function AgentInboxPage() {
 		queryFn: () => chatwootService.conversationCounts(inboxId ? Number(inboxId) : undefined),
 		enabled: connection.data?.configured === true && activeSection === "inbox",
 		staleTime: 5000,
-		refetchInterval: 5000,
+		refetchInterval: realtimeConnected ? 12000 : 5000,
 		retry: 1,
 	});
 	const allLabels = useQuery({
@@ -222,7 +337,7 @@ export function AgentInboxPage() {
 		},
 	});
 	const takeConversation = useMutation({
-		mutationFn: (id: number) => chatwootService.assign(id, presence.data?.current.agentId ?? null),
+		mutationFn: chatwootService.take,
 		onMutate: async (id) => {
 			await client.cancelQueries({ queryKey: ["chatwoot", "conversations"] });
 			const queued = client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })
@@ -231,8 +346,8 @@ export function AgentInboxPage() {
 			for (const [key, cached] of queued) client.setQueryData(key, withoutConversation(cached, id));
 			client.setQueriesData({ queryKey: ["chatwoot", "conversation-counts"] }, (cached) => {
 				if (!cached || typeof cached !== "object") return cached;
-				const value = cached as { queueCount?: number };
-				return { ...value, queueCount: Math.max(0, (value.queueCount ?? 0) - 1) };
+				const value = cached as { queueCount?: number | null };
+				return value.queueCount == null ? cached : { ...value, queueCount: Math.max(0, value.queueCount - 1) };
 			});
 			return { queued, counts };
 		},
@@ -307,9 +422,23 @@ export function AgentInboxPage() {
 	}, [conversations.data, rows, soundEnabled]);
 	const placeConversation = (id: number) => {
 		setConversationId(id);
+		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(false);
+	};
+	const closeConversation = () => {
+		setConversationId(null);
+		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
+	};
+	const openObservation = (id: number) => {
+		setManageObservedChat(false);
+		setSupervisionId(id);
+	};
+	const closeObservation = () => {
+		setManageObservedChat(false);
+		setSupervisionId(null);
 	};
 	const reload = () => {
 		void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
+		void client.invalidateQueries({ queryKey: ["chatwoot", "active-overview"] });
 		void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
 		void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
 	};
@@ -321,11 +450,13 @@ export function AgentInboxPage() {
 		setProfileOpen(false);
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
+		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
 		setActivePage(1);
 	};
 	const selectScope = (next: Scope) => {
 		setScope(next);
 		setActivePage(1);
+		if (next !== "active" && window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
 	};
 	const toggleSound = () => {
 		setSoundEnabled((current) => {
@@ -377,18 +508,20 @@ export function AgentInboxPage() {
 			/>
 		);
 	return (
-		<div className="supportos-inbox flex h-full min-h-0 text-foreground" onPointerDownCapture={unlockAudio}>
+		<div className="supportos-inbox flex h-full min-h-0 w-full text-foreground" onPointerDownCapture={unlockAudio}>
 			<InboxRail
 				activeSection={activeSection}
 				collapsed={railCollapsed}
 				onToggleCollapsed={() => setRailCollapsed((value) => !value)}
 				userEmail={user?.email ?? ""}
+				accessRole={capabilities?.role}
 				accepting={presence.data?.current.accepting === true}
 				acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
 				profileOpen={profileOpen}
 				soundEnabled={soundEnabled}
 				onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
 				onSelect={selectSection}
+				canSupervise={canSupervise}
 				onToggleProfile={() => setProfileOpen(!profileOpen)}
 				onToggleSound={toggleSound}
 				onOpenSettings={() => { setAgentSettingsOpen(true); setProfileOpen(false); }}
@@ -399,7 +532,7 @@ export function AgentInboxPage() {
 			{(presence.isError || accepting.isError || chatCapacity.isError) && (
 				<div
 					role="alert"
-					className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs text-amber-300"
+					className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs chat-text-warning"
 				>
 					{chatCapacity.error instanceof Error
 						? chatCapacity.error.message
@@ -411,39 +544,54 @@ export function AgentInboxPage() {
 				</div>
 			)}
 			<div className="flex min-h-0 flex-1 flex-col">
-				{activeSection === "inbox" && <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-2">
+				{activeSection === "inbox" && <div className="chat-scope-bar flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto px-1.5 py-2 sm:gap-1.5 sm:px-3" aria-label="Списки диалогов">
+					<div className="flex min-w-0 flex-1 items-center gap-0.5 sm:gap-1">
 					{(["mine", "queue", ...(canSupervise ? ["active" as const] : [])] as const).map((item) => (
-						<button key={item} type="button" onPointerEnter={item === "queue" ? prefetchQueue : undefined} onFocus={item === "queue" ? prefetchQueue : undefined} onClick={() => selectScope(item)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
+						<button key={item} type="button" aria-pressed={scope === item} onPointerEnter={item === "queue" ? prefetchQueue : undefined} onFocus={item === "queue" ? prefetchQueue : undefined} onClick={() => selectScope(item)} className={`shrink-0 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition sm:px-3 ${scope === item ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
 							{item === "mine" ? "Мои" : item === "queue" ? "Очередь" : "Активные"}
 							{item === "mine" && <span aria-label={`${conversationCounts.data?.mineCount ?? 0} моих чатов`} className="ml-1.5 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[10px] tabular-nums text-muted">{conversationCounts.isLoading ? "…" : conversationCounts.isError || conversationCounts.data?.mineCount == null ? "—" : conversationCounts.data.mineCount}</span>}
-							{item === "queue" && <span aria-label={`${conversationCounts.data?.queueCount ?? 0} чатов в очереди`} className="ml-1.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-300">{conversationCounts.isLoading ? "…" : conversationCounts.isError ? "—" : conversationCounts.data?.queueCount ?? 0}</span>}
+							{item === "queue" && <span aria-label={conversationCounts.data?.queueCount == null ? "Количество чатов в очереди недоступно" : `${conversationCounts.data.queueCount} чатов в очереди`} className="ml-1.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] tabular-nums chat-text-warning">{conversationCounts.isLoading ? "…" : conversationCounts.isError ? "—" : conversationCounts.data?.queueCount ?? "—"}</span>}
 							{item === "active" && <span className="ml-1.5 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[10px] tabular-nums text-muted">{conversationCounts.isLoading ? "…" : conversationCounts.isError || conversationCounts.data?.activeCount == null ? "—" : conversationCounts.data.activeCount}</span>}
-							{item === "active" && <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">все агенты</span>}
 						</button>
 					))}
+					</div>
+					<span className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[11px] ${realtimeConnected ? "bg-emerald-500/10 chat-text-success" : "bg-surface-elevated text-muted"}`} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
+						<i aria-hidden="true" className={`size-1.5 rounded-full ${realtimeConnected ? "bg-emerald-400" : "bg-zinc-500"}`} />
+						<span className="sr-only md:not-sr-only">{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
+					</span>
 				</div>}
 				<div className="flex min-h-0 flex-1">
-				{activeSection === "team" ? (
+				{activeSection === "supervisor" ? (
+					<ChatOperationsPage agents={agents} inboxes={inboxes} canEdit={canManageChatCapacity}
+						onOpen={(id) => { selectSection("inbox"); setScope("active"); openObservation(id); }} />
+				) : activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
 						teams={directory.data?.teams ?? []}
 						presence={directory.data?.presence ?? []}
 						currentAgentId={presence.data?.current.agentId}
 						canManageChatCapacity={canManageChatCapacity}
+						canManageWebhookSettings={canManageWebhookSettings}
+						onManageWebhooks={() => setWebhookSettingsOpen(true)}
+						onManageDirectory={canManageSites ? () => setDirectorySettingsOpen(true) : undefined}
 						capacityPending={chatCapacity.isPending}
 						onSetCapacity={(agentId, maxActiveChats) => chatCapacity.mutate({ agentId, maxActiveChats })}
+						loading={directory.isLoading}
+						error={directory.error?.message}
+						onRetry={() => void directory.refetch()}
 					/>
 				) : <>
 				{queueOpen && scope !== "active" && (
-					<aside style={{ width: listWidth }} className="flex min-w-[260px] max-w-[520px] shrink-0 flex-col border-r border-border bg-surface/40">
+					<aside aria-label={displayedScope === "history" ? "Архив диалогов" : "Список диалогов"} style={{ "--chat-list-width": `${listWidth}px` } as CSSProperties} className="chat-list flex w-full min-w-0 shrink-0 flex-col border-r border-border md:w-[var(--chat-list-width)] md:min-w-[260px] md:max-w-[min(520px,45%)]">
 						<div className="border-b border-border p-3">
-							<div className="relative mt-3">
+							<div className="relative">
 								<Search
 									size={14}
 									className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 								/>
 								<input
 									value={search}
+									aria-label="Поиск диалогов"
 									onChange={(event) => setSearch(event.target.value)}
 									placeholder="Игрок, сообщение или №"
 									className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none placeholder:text-muted focus:border-accent"
@@ -451,11 +599,11 @@ export function AgentInboxPage() {
 							</div>
 							<div className="mt-2 grid grid-cols-2 gap-2">
 								<select
-									value={inboxId}
+									value={queueInbox}
 									onChange={(event) => setInboxId(event.target.value)}
 									className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-xs"
 								>
-									<option value="">Все проекты</option>
+									{(displayedScope !== "queue" || canSupervise || !inboxes.length) && <option value="">{displayedScope === "queue" && !canSupervise ? "Нет доступных проектов" : "Все проекты"}</option>}
 									{inboxes.map((box) => (
 										<option key={box.id} value={box.id}>
 											{box.name}
@@ -477,7 +625,10 @@ export function AgentInboxPage() {
 							</div>
 							{displayedScope === "history" && (
 								<div className="mt-2 grid grid-cols-2 gap-2">
-									<select
+									<select aria-label="Статус в архиве" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value === "snoozed" ? "snoozed" : "resolved")} className="col-span-2 h-8 rounded-lg border border-border bg-background px-2 text-xs">
+										<option value="resolved">Завершённые</option><option value="snoozed">Отложенные</option>
+									</select>
+									{canSupervise && <select
 										value={agentId}
 										onChange={(event) => setAgentId(event.target.value)}
 										className="col-span-2 h-8 rounded-lg border border-border bg-background px-2 text-xs"
@@ -488,7 +639,7 @@ export function AgentInboxPage() {
 												{agent.name}
 											</option>
 										))}
-									</select>
+									</select>}
 									<label className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[10px] text-muted">
 										<CalendarDays size={12} />
 										<input
@@ -520,10 +671,10 @@ export function AgentInboxPage() {
 										? "Нераспределённые"
 										: displayedScope === "active" ? "Активные диалоги" : "История диалогов"}
 							</span>
-							<span>{displayedScope === "queue" ? conversationCounts.data?.queueCount ?? rows.length : rows.length}</span>
+							<span>{displayedScope === "queue" ? conversationCounts.data?.queueCount ?? "—" : rows.length}</span>
 						</div>
 						{takeConversation.isError && (
-							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] text-red-300">
+							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] chat-text-danger">
 								{takeConversation.error instanceof Error ? takeConversation.error.message : "Не удалось взять чат"}
 							</div>
 						)}
@@ -536,21 +687,25 @@ export function AgentInboxPage() {
 									/>
 									Загружаем диалоги
 								</div>
-							) : conversations.isError ? (
-								<div className="p-4 text-sm text-red-400">
+							) : conversations.isError && rows.length === 0 ? (
+								<div role="alert" className="space-y-3 p-5 text-center text-sm chat-text-danger">
+									<p>
 									{conversations.error instanceof Error
 										? conversations.error.message
 										: "Не удалось загрузить очередь"}
+									</p>
+									<button type="button" onClick={() => void conversations.refetch()} className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface-elevated">Повторить</button>
 								</div>
 							) : rows.length === 0 ? (
 								<div className="p-8 text-center text-sm text-muted">
-									Диалогов нет
+									{search || label || inboxId || from || to ? "По выбранным условиям диалогов нет" : displayedScope === "queue" ? "Очередь пуста" : displayedScope === "history" ? "В архиве пока нет диалогов" : "Нет назначенных диалогов"}
 								</div>
 							) : (
 								rows.map((item) => (
 									<ConversationRow
 										key={item.id}
 										conversation={item}
+										projectName={item.meta?.inbox?.name ?? inboxes.find((project) => project.id === item.inbox_id)?.name}
 										active={conversationId === item.id}
 										onClick={() => placeConversation(item.id)}
 										onTake={
@@ -563,7 +718,7 @@ export function AgentInboxPage() {
 								))
 							)}
 						</div>
-						{displayedScope !== "active" && (
+						{(activePage > 1 || conversations.data?.hasMore === true) && (
 							<footer className="flex shrink-0 items-center justify-between border-t border-border px-3 py-2 text-[10px] text-muted">
 								<span>Страница {activePage} · {rows.length} диалогов</span>
 								<div className="flex items-center gap-1.5">
@@ -574,9 +729,64 @@ export function AgentInboxPage() {
 						)}
 					</aside>
 				)}
-				{queueOpen && scope !== "active" && <ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} />}
-				<main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-					{scope === "active" ? <ActiveChatsTable rows={rows} isLoading={conversations.isLoading} isError={conversations.isError} error={conversations.error} canOpen={canWork} page={activePage} hasMore={conversations.data?.hasMore === true} onPage={setActivePage} onOpen={(id) => { placeConversation(id); setScope("mine"); }} inboxes={inboxes} labels={labels} inboxId={inboxId} onInbox={setInboxId} label={label} onLabel={setLabel} search={search} onSearch={setSearch} /> : <>
+				{queueOpen && scope !== "active" && <div className="hidden md:flex"><ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} /></div>}
+				<main className={`relative min-h-0 min-w-0 flex-1 flex-col ${queueOpen && scope !== "active" ? "hidden md:flex" : "flex"}`}>
+					{scope === "active" && canSupervise ? (
+						<div className="relative flex min-h-0 min-w-0 flex-1">
+							<ActiveChatsTable agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
+								labels={labels} realtime={realtimeConnected} selectedId={supervisionId} watched={watched}
+								watchingError={(changeWatch.error ?? watching.error)?.message}
+								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
+								onOpen={(id) => {
+									openObservation(id);
+									if (!watched.has(id) && !changeWatch.isPending) changeWatch.mutate({ id, enabled: true });
+								}}
+								onStop={(id) => changeWatch.mutate({ id, enabled: false })}
+							/>
+							{supervisionId !== null && (
+								<aside aria-label="Наблюдение за диалогом" className="absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[43%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
+									<header className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-3 py-2">
+										<Eye size={15} className="shrink-0 text-accent" />
+										<h2 className="truncate text-xs font-semibold">{managingObservedChat ? "Управление диалогом" : "Наблюдение"}</h2>
+										{capabilities?.manageAllChats && (
+											<button type="button" onClick={() => setManageObservedChat(!manageObservedChat)}
+												className="ml-auto whitespace-nowrap rounded-md px-2 py-1 text-xs text-accent hover:bg-surface">
+												{managingObservedChat ? "К наблюдению" : "Управлять"}
+											</button>
+										)}
+										{watched.has(supervisionId) && (
+											<button type="button" disabled={changeWatch.isPending} aria-label="Прекратить наблюдение"
+												onClick={() => changeWatch.mutate({ id: supervisionId, enabled: false })}
+												className={`whitespace-nowrap rounded-md px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground disabled:opacity-50 ${capabilities?.manageAllChats ? "" : "ml-auto"}`}>
+												Отписаться
+											</button>
+										)}
+										<button type="button" aria-label="Закрыть наблюдение" onClick={closeObservation}
+											className={`grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface hover:text-foreground ${watched.has(supervisionId) || capabilities?.manageAllChats ? "" : "ml-auto"}`}>
+											<X size={15} />
+										</button>
+									</header>
+									{changeWatch.isError && changeWatch.variables?.id === supervisionId && (
+										<p role="alert" className="border-b border-border px-3 py-2 text-xs chat-text-danger">{changeWatch.error.message}</p>
+									)}
+									<ConversationPane key={`${supervisionId}/${managingObservedChat}`} id={supervisionId}
+										supervising={!managingObservedChat} docked
+										draft={(managingObservedChat ? drafts : supervisionDrafts).current.get(supervisionId)}
+										onDraft={(id, draft) => {
+											const currentDrafts = (managingObservedChat ? drafts : supervisionDrafts).current;
+											if (draft.text) currentDrafts.set(id, draft);
+											else currentDrafts.delete(id);
+										}}
+										onOpenRelated={openObservation} realtimeConnected={realtimeConnected}
+										coachingRealtimeConnected={coachingRealtimeConnected}
+										agents={agents} teams={directory.data?.teams ?? []} inboxes={inboxes} labels={labels}
+										binds={managingObservedChat ? [...remoteBinds, ...binds] : []} language={language} onLanguage={setLanguage}
+										onClose={closeObservation} onChanged={reload} onChoose={openEmptyPane}
+									/>
+								</aside>
+							)}
+						</div>
+					) : <>
 					<button
 						type="button"
 						aria-label={queueOpen ? "Скрыть список" : "Показать список"}
@@ -590,15 +800,24 @@ export function AgentInboxPage() {
 					</button>
 					<div className="flex min-h-0 flex-1 overflow-hidden">
 						<ConversationPane
+							key={conversationId ?? "empty"}
 							id={conversationId}
-							canEditCustomAttributes={canWork}
+							draft={conversationId == null ? undefined : drafts.current.get(conversationId)}
+							onDraft={(id, draft) => {
+								if (draft.text) drafts.current.set(id, draft);
+								else drafts.current.delete(id);
+							}}
+							onOpenRelated={placeConversation}
+							realtimeConnected={realtimeConnected}
+							coachingRealtimeConnected={coachingRealtimeConnected}
 							agents={agents}
+							teams={directory.data?.teams ?? []}
 							inboxes={inboxes}
 							labels={labels}
 							binds={[...remoteBinds, ...binds]}
 							language={language}
 							onLanguage={setLanguage}
-							onClose={() => setConversationId(null)}
+							onClose={closeConversation}
 							onChanged={reload}
 							onChoose={openEmptyPane}
 						/>
@@ -609,12 +828,16 @@ export function AgentInboxPage() {
 			</div>
 			</div>
 			</div>
-			{sitesOpen && (
-				<WebsiteDomainsDialog onClose={() => setSitesOpen(false)} />
+			{sitesOpen && canManageSites && (
+				<WebsiteDomainsDialog onClose={() => setSitesOpen(false)} canDelete={capabilities?.deleteProjects === true} />
 			)}
-			{attributesOpen && (
+			{webhookSettingsOpen && canManageWebhookSettings && (
+				<ChatwootWebhookSettingsDialog onClose={() => setWebhookSettingsOpen(false)} />
+			)}
+			{attributesOpen && canManageSites && (
 				<CustomAttributesDialog onClose={() => setAttributesOpen(false)} />
 			)}
+			{directorySettingsOpen && canManageSites && <ChatDirectorySettingsDialog agents={agents} onClose={() => setDirectorySettingsOpen(false)} />}
 			{agentSettingsOpen && (
 				<AgentSettingsDialog
 					email={user?.email ?? ""}
@@ -639,6 +862,8 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	onResize: (coordinate: number) => void;
 	fromEnd?: boolean;
 }) {
+	const drag = useRef<{ origin: number; value: number } | null>(null);
+	const resizeTo = (next: number) => onResize(Math.min(max, Math.max(min, next)));
 	return (
 		<hr
 			aria-label={label}
@@ -648,84 +873,86 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 			aria-valuenow={Math.round(value)}
 			tabIndex={0}
 			onKeyDown={(event) => {
-				if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+				const backward = axis === "x" ? "ArrowLeft" : "ArrowUp";
+				const forward = axis === "x" ? "ArrowRight" : "ArrowDown";
+				if (![backward, forward, "Home", "End"].includes(event.key)) return;
 				event.preventDefault();
-				const parent = event.currentTarget.parentElement?.getBoundingClientRect();
-				if (!parent) return;
-				const bar = event.currentTarget.getBoundingClientRect();
-				const local = axis === "x" ? (bar.left + bar.width / 2) - parent.left : (bar.top + bar.height / 2) - parent.top;
-				const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -24 : 24;
-				onResize((fromEnd ? (axis === "x" ? parent.width : parent.height) - local : local) + direction);
+				if (event.key === "Home" || event.key === "End") {
+					resizeTo(event.key === "Home" ? min : max);
+					return;
+				}
+				resizeTo(value + (event.key === backward ? -16 : 16) * (fromEnd ? -1 : 1));
 			}}
 			onPointerDown={(event) => {
+				if (event.button !== 0) return;
+				drag.current = { origin: axis === "x" ? event.clientX : event.clientY, value };
 				event.currentTarget.setPointerCapture(event.pointerId);
-			(event.currentTarget as HTMLHRElement).dataset.dragging = "true";
 			}}
 			onPointerMove={(event) => {
-				if (event.currentTarget.dataset.dragging !== "true") return;
-				const parent = event.currentTarget.parentElement?.getBoundingClientRect();
-				if (!parent) return;
-				const coordinate = axis === "x" ? event.clientX - parent.left : event.clientY - parent.top;
-				onResize(fromEnd ? (axis === "x" ? parent.width : parent.height) - coordinate : coordinate);
+				if (!drag.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+				const offset = (axis === "x" ? event.clientX : event.clientY) - drag.current.origin;
+				resizeTo(drag.current.value + offset * (fromEnd ? -1 : 1));
 			}}
-			onPointerUp={(event) => {
-				event.currentTarget.dataset.dragging = "false";
-				if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-			}}
-			className={`m-0 border-0 bg-transparent p-0 outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 ${axis === "x" ? "w-2 cursor-col-resize" : "h-2 cursor-row-resize"} ${fromEnd ? "-mr-1" : ""}`}
+			onLostPointerCapture={() => { drag.current = null; }}
+			className={`m-0 shrink-0 touch-none self-stretch border-0 bg-transparent p-0 outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 ${axis === "x" ? "h-auto w-2 cursor-col-resize" : "h-2 w-auto cursor-row-resize"}`}
 		/>
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, onToggleProfile, onToggleSound, onOpenSettings, onManageSites, onManageAttributes }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, onOpenSettings, onManageSites, onManageAttributes }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
 	userEmail: string;
+	accessRole?: "support" | "shift" | "qc" | "admin" | "creator";
 	accepting: boolean;
 	acceptingPending: boolean;
 	profileOpen: boolean;
 	soundEnabled: boolean;
 	onAccept: () => void;
 	onSelect: (section: WorkspaceSection) => void;
+	canSupervise: boolean;
 	onToggleProfile: () => void;
 	onToggleSound: () => void;
 	onOpenSettings: () => void;
 	onManageSites?: () => void;
 	onManageAttributes?: () => void;
 }) {
+	const profile = useChatPopover<HTMLElement>(profileOpen, onToggleProfile);
 	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
 		{ id: "inbox", label: "Диалоги", icon: MessagesSquare },
 		{ id: "team", label: "Команда", icon: UsersRound },
 		{ id: "archive", label: "Архив", icon: Archive },
 	];
+	if (canSupervise) items.push({ id: "supervisor", label: "Руководитель", icon: Headphones });
 	return (
-		<aside className={`relative z-30 flex shrink-0 flex-col border-r border-border bg-surface/75 py-3 transition-[width] duration-200 ${collapsed ? "w-[62px] items-center" : "w-[208px]"}`}>
-			{collapsed && <button type="button" title="Развернуть меню" onClick={onToggleCollapsed} className="mb-3 grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftOpen size={15} /></button>}
-			{!collapsed && <div className="mb-2 flex items-center justify-between gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted"><span>Рабочие разделы</span><button type="button" title="Свернуть меню" onClick={onToggleCollapsed} className="-mr-2 grid size-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><PanelLeftClose size={14} /></button></div>}
-			<nav className={`flex w-full flex-col gap-1.5 ${collapsed ? "items-center px-2" : "px-2"}`}>
+		<aside ref={profile} data-compact={collapsed} className="chat-rail relative z-40 flex shrink-0 flex-col items-center border-r border-border py-2 transition-[width] duration-200 md:py-3">
+			<button type="button" aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"} title={collapsed ? "Развернуть меню" : "Свернуть меню"} onClick={onToggleCollapsed} className="chat-rail-toggle mb-1 grid size-8 place-items-center self-end rounded-lg text-muted hover:bg-surface-elevated md:mr-2">
+				{collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+			</button>
+			<nav aria-label="Рабочие разделы чатов" className="flex w-full flex-col gap-1 px-1.5 md:px-2">
 				{items.map(({ id, label, icon: Icon }) => (
-					<button key={id} type="button" title={collapsed ? label : undefined} aria-label={label} onClick={() => onSelect(id)} className={`flex h-10 items-center gap-3 rounded-xl px-3 text-left text-xs font-medium transition ${collapsed ? "w-10 justify-center px-0" : "w-full"} ${activeSection === id ? "bg-accent/15 text-accent" : "text-muted hover:bg-surface-elevated hover:text-foreground"}`}>
+					<button key={id} type="button" title={label} aria-label={label} aria-current={activeSection === id ? "page" : undefined} onClick={() => { if (profileOpen) onToggleProfile(); onSelect(id); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg text-left text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground ${collapsed ? "justify-center" : "px-2.5"}`}>
 						<Icon size={16} className="shrink-0" />
-						{!collapsed && <span>{label}</span>}
+						{!collapsed && <span className="chat-rail-caption truncate">{label}</span>}
 					</button>
 				))}
 			</nav>
-			{!collapsed && <div className="mt-auto mx-3 mb-2 rounded-xl border border-border bg-background/60 p-3"><div className="flex items-center gap-2"><span className={`size-2 rounded-full ${accepting ? "bg-emerald-400" : "bg-muted"}`} /><span className="text-[11px] font-medium">{accepting ? "Принимаю чаты" : "Приём выключен"}</span></div><div className="mt-1 pl-4 text-[10px] text-muted">Управление в профиле</div></div>}
-			<div className={`mt-auto flex w-full items-center px-2 ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
-				<button type="button" title={collapsed ? "Профиль агента" : undefined} aria-label="Профиль агента" onClick={onToggleProfile} className="relative grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold hover:border-accent/60">
+			<div className={`chat-rail-footer mt-auto flex w-full items-center gap-2 border-t border-border px-2 pt-2 ${collapsed ? "justify-center" : ""}`}>
+				<button type="button" title="Профиль агента" aria-label="Профиль агента" aria-expanded={profileOpen} onClick={onToggleProfile} className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold hover:border-accent/60">
 					{initials(userEmail)}
 					<span className={`absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-surface ${accepting ? "bg-emerald-400" : "bg-muted"}`} />
 				</button>
-				{!collapsed && <button type="button" onClick={onToggleProfile} className="min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[10px] text-muted">{userEmail || "Открыть настройки"}</span></button>}
+				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
 			</div>
 			{profileOpen && (
-				<div className="absolute bottom-3 left-[calc(100%+8px)] z-50 w-64 rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+				<div className="chat-rail-profile supportos-scroll absolute bottom-2 left-[calc(100%+8px)] z-50 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-xl">
 					<div className="border-b border-border px-3 py-2.5">
 						<div className="text-xs font-semibold">Настройки агента</div>
 						<div className="mt-1 truncate text-[11px] text-muted">{userEmail || "Аккаунт SupportOS"}</div>
+						{accessRole && <div className="mt-1 text-[10px] font-medium text-accent">Роль SupportOS · {({ support: "Support", shift: "Shift", qc: "QC", admin: "Admin", creator: "Creator" })[accessRole]}</div>}
 					</div>
-					<button type="button" disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
+					<button type="button" role="switch" aria-checked={accepting} disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
 						<span><span className="block text-xs font-medium">Приём чатов</span><span className="mt-0.5 block text-[10px] text-muted">{accepting ? "Вы в очереди распределения" : "Новые диалоги не назначаются"}</span></span>
 						<span className={`h-5 w-9 rounded-full p-0.5 transition ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white transition ${accepting ? "translate-x-4" : ""}`} /></span>
 					</button>
@@ -753,27 +980,31 @@ function AgentSettingsDialog({ email, accepting, acceptingPending, soundEnabled,
 	onClose: () => void;
 }) {
 	return (
-					<div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4">
-			<section role="dialog" aria-modal="true" aria-labelledby="agent-settings-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
-				<div className="flex items-start justify-between"><div><h2 id="agent-settings-title" className="text-base font-semibold">Настройки агента</h2><p className="mt-1 text-xs text-muted">{email || "Личные параметры рабочего места"}</p></div><button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-elevated"><X size={16} /></button></div>
+		<InboxModal labelledBy="agent-settings-title" className="max-w-md overflow-y-auto rounded-2xl border border-border bg-surface p-4 shadow-xl sm:p-5" onClose={onClose}>
+				<div className="flex items-start justify-between gap-2"><div className="min-w-0"><h2 id="agent-settings-title" className="text-base font-semibold">Настройки агента</h2><p className="mt-1 truncate text-xs text-muted">{email || "Личные параметры рабочего места"}</p></div><button type="button" aria-label="Закрыть настройки агента" onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><X size={16} /></button></div>
 				<div className="mt-4 divide-y divide-border rounded-xl border border-border">
 					<button type="button" disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-4 p-3 text-left disabled:opacity-50"><span><span className="block text-xs font-medium">Принимать новые чаты</span><span className="mt-1 block text-[11px] text-muted">{accepting ? "Включено — очередь распределяется автоматически" : "Выключено — новые диалоги не назначаются"}</span></span><span className={`h-5 w-9 shrink-0 rounded-full p-0.5 ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white ${accepting ? "translate-x-4" : ""}`} /></span></button>
 					<button type="button" onClick={onToggleSound} className="flex w-full items-center justify-between gap-4 p-3 text-left"><span><span className="block text-xs font-medium">Звуковые уведомления</span><span className="mt-1 block text-[11px] text-muted">Сигнал при новых событиях в диалогах</span></span>{soundEnabled ? <Volume2 size={16} className="text-accent" /> : <VolumeX size={16} className="text-muted" />}</button>
 				</div>
 				<div className="mt-4 flex justify-end"><button type="button" onClick={onClose} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white">Готово</button></div>
-			</section>
-		</div>
+		</InboxModal>
 	);
 }
 
-function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, capacityPending, onSetCapacity }: {
+function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, canManageWebhookSettings, onManageWebhooks, onManageDirectory, capacityPending, onSetCapacity, loading, error, onRetry }: {
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
 	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; max_active_chats?: number; heartbeat_at: string }>;
 	currentAgentId?: number;
 	canManageChatCapacity: boolean;
+	canManageWebhookSettings: boolean;
+	onManageWebhooks: () => void;
+	onManageDirectory?: () => void;
 	capacityPending: boolean;
 	onSetCapacity: (agentId: number, maxActiveChats: number) => void;
+	loading: boolean;
+	error?: string;
+	onRetry: () => void;
 }) {
 	const [tab, setTab] = useState<"agents" | "teams">("agents");
 	const [search, setSearch] = useState("");
@@ -781,27 +1012,43 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 	const filteredAgents = agents.filter((agent) => `${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 	const filteredTeams = teams.filter((team) => team.name.toLowerCase().includes(search.toLowerCase()));
 	return (
-		<section className="supportos-scroll min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+		<section aria-label="Команда чатов" className="supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-5xl">
-				<div className="grid gap-3 sm:grid-cols-3">
+				<div className="grid grid-cols-3 gap-1.5 sm:gap-3">
 					<StatCard label="Агенты" value={agents.length} icon={<UsersRound size={16} />} />
 					<StatCard label="В SupportOS" value={online.length} icon={<Headphones size={16} />} />
 					<StatCard label="Команды" value={teams.length} icon={<MessagesSquare size={16} />} />
 				</div>
-				<div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface/40">
-					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3">
+				<div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface/40 sm:mt-5">
+					<div className="flex flex-wrap items-center gap-2 border-b border-border p-2.5 sm:p-3">
 						<div className="flex gap-1 rounded-lg bg-background p-1">
-							<button type="button" onClick={() => setTab("agents")} className={`rounded-md px-3 py-2 text-xs ${tab === "agents" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Агенты</button>
-							<button type="button" onClick={() => setTab("teams")} className={`rounded-md px-3 py-2 text-xs ${tab === "teams" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Команды</button>
+							<button type="button" aria-pressed={tab === "agents"} onClick={() => { setTab("agents"); setSearch(""); }} className={`rounded-md px-3 py-2 text-xs ${tab === "agents" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Агенты</button>
+							<button type="button" aria-pressed={tab === "teams"} onClick={() => { setTab("teams"); setSearch(""); }} className={`rounded-md px-3 py-2 text-xs ${tab === "teams" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Команды</button>
 						</div>
-						<div className="relative min-w-[220px] flex-1 sm:max-w-xs"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "agents" ? "Найти агента…" : "Найти команду…"} className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
+						<div className="relative order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input aria-label={tab === "agents" ? "Найти агента" : "Найти команду"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "agents" ? "Найти агента…" : "Найти команду…"} className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
+						{canManageWebhookSettings && <button type="button" onClick={onManageWebhooks} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-elevated"><Settings2 size={14} />Вебхуки</button>}
+						{onManageDirectory && <button type="button" onClick={onManageDirectory} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-elevated"><Settings2 size={14} />Команды и теги</button>}
 					</div>
 					{tab === "agents" ? filteredAgents.map((agent) => {
 						const state = presence.find((item) => item.chatwoot_agent_id === agent.id);
 						const isOnline = state && Date.now() - Date.parse(state.heartbeat_at) < 90_000;
-						return <div key={agent.id} className="flex flex-wrap items-center gap-3 border-b border-border/70 px-4 py-3 last:border-0"><div className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold">{initials(agent.name)}</div><div className="min-w-[180px] flex-1"><div className="truncate text-sm font-medium">{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div><div className="truncate text-xs text-muted">{agent.email || "Почта не указана"}</div></div><span className="hidden rounded-full bg-background px-2 py-1 text-[10px] text-muted sm:block">{agent.role || "Агент"}</span><span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-2 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status || "Не в сети"}</span><AgentCapacityField agent={agent} editable={canManageChatCapacity} saving={capacityPending} onSave={onSetCapacity} /></div>;
+						const status = state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status === "online" ? "В Chatwoot" : "Не в сети";
+						return <div key={agent.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 border-b border-border/70 px-3 py-3 last:border-0 md:flex md:gap-3 md:px-4">
+							<div className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface-elevated text-xs font-semibold">{initials(agent.name)}</div>
+							<div className="min-w-0 flex-1">
+								<div className="truncate text-sm font-medium" title={agent.name}>{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div>
+								<div className="truncate text-xs text-muted" title={agent.email}>{agent.email || "Почта не указана"}</div>
+							</div>
+							<div className="col-start-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+								<span className="hidden rounded-full bg-background px-2 py-1 text-[11px] text-muted lg:block">{agent.role === "administrator" ? "Администратор" : "Агент"}</span>
+								<span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-1.5 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{status}</span>
+								<AgentCapacityField agent={agent} editable={canManageChatCapacity} saving={capacityPending} onSave={onSetCapacity} />
+							</div>
+						</div>;
 					}) : filteredTeams.map((team) => <div key={team.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-4 last:border-0"><div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-accent"><UsersRound size={17} /></div><div className="min-w-0 flex-1"><div className="text-sm font-medium">{team.name}</div><div className="text-xs text-muted">{team.agents?.length ?? 0} агентов{team.description ? ` · ${team.description}` : ""}</div></div><span className="rounded-full bg-background px-2.5 py-1 text-[10px] text-muted">{team.allow_auto_assign ? "Автоназначение" : "Ручное назначение"}</span></div>)}
-					{((tab === "agents" && filteredAgents.length === 0) || (tab === "teams" && filteredTeams.length === 0)) && <div className="p-10 text-center text-sm text-muted">Ничего не найдено</div>}
+					{loading && <div role="status" className="p-7 text-center text-sm text-muted"><LoaderCircle className="mr-2 inline animate-spin" size={15} />Загружаем команду…</div>}
+					{error && <div role="alert" className="space-y-2 p-7 text-center text-sm chat-text-danger"><p>{error}</p><button type="button" onClick={onRetry} className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground">Повторить</button></div>}
+					{!loading && !error && (tab === "agents" ? filteredAgents.length === 0 : filteredTeams.length === 0) && <div className="p-7 text-center text-sm text-muted">{search ? "По запросу ничего не найдено" : tab === "agents" ? "Нет доступных агентов" : "Команд пока нет"}</div>}
 				</div>
 			</div>
 		</section>
@@ -843,89 +1090,22 @@ function AgentCapacityField({ agent, editable, saving, onSave }: {
 }
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
-	return <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-4"><div className="grid size-9 place-items-center rounded-lg bg-accent/10 text-accent">{icon}</div><div><div className="text-lg font-semibold">{value}</div><div className="text-[11px] text-muted">{label}</div></div></div>;
-}
-
-type ActiveSort = "player" | "email" | "agent" | "project" | "updated";
-function ActiveChatsTable({ rows, isLoading, isError, error, canOpen, page, hasMore, onPage, onOpen, inboxes, labels, inboxId, onInbox, label, onLabel, search, onSearch }: {
-	rows: ChatwootConversation[];
-	isLoading: boolean;
-	isError: boolean;
-	error: unknown;
-	canOpen: boolean;
-	page: number;
-	hasMore: boolean;
-	onPage: (page: number) => void;
-	onOpen: (id: number) => void;
-	inboxes: Array<{ id: number; name: string }>;
-	labels: string[];
-	inboxId: string;
-	onInbox: (value: string) => void;
-	label: string;
-	onLabel: (value: string) => void;
-	search: string;
-	onSearch: (value: string) => void;
-}) {
-	const [sort, setSort] = useState<ActiveSort>("updated");
-	const [direction, setDirection] = useState<"asc" | "desc">("desc");
-	const sorted = [...rows].sort((left, right) => {
-		const value = (item: ChatwootConversation) => {
-			if (sort === "player") return item.meta?.sender?.name ?? "";
-			if (sort === "email") return item.meta?.sender?.email ?? "";
-			if (sort === "agent") return item.meta?.assignee?.name ?? "";
-			if (sort === "project") return item.meta?.inbox?.name ?? "";
-			return item.updated_at ?? item.created_at ?? 0;
-		};
-		const a = value(left);
-		const b = value(right);
-		const compare = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "ru", { sensitivity: "base" });
-		return direction === "asc" ? compare : -compare;
-	});
-	const sortBy = (column: ActiveSort) => {
-		if (sort === column) setDirection((value) => value === "asc" ? "desc" : "asc");
-		else { setSort(column); setDirection(column === "updated" ? "desc" : "asc"); }
-	};
-	const dateTime = (value?: number) => value ? new Date(value > 1e12 ? value : value * 1000).toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
-	const heading = (key: ActiveSort, title: string) => <button type="button" onClick={() => sortBy(key)} className="inline-flex items-center gap-1.5 text-left hover:text-foreground">{title}<span className={sort === key ? "text-accent" : "text-muted/60"}>{sort === key ? direction === "asc" ? "↑" : "↓" : "↕"}</span></button>;
-	return (
-		<section className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/20 px-4 py-3">
-				<div className="relative min-w-[200px] flex-1 sm:max-w-sm"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Игрок, почта или диалог" className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
-				<select value={inboxId} onChange={(event) => onInbox(event.target.value)} className="h-9 min-w-32 rounded-lg border border-border bg-background px-2.5 text-xs"><option value="">Все проекты</option>{inboxes.map((inbox) => <option key={inbox.id} value={inbox.id}>{inbox.name}</option>)}</select>
-				<select value={label} onChange={(event) => onLabel(event.target.value)} className="h-9 min-w-28 rounded-lg border border-border bg-background px-2.5 text-xs"><option value="">Все теги</option>{labels.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
-				<div className="ml-auto rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] text-muted">Все активные диалоги · Chatwoot</div>
-			</div>
-			<div className="supportos-scroll min-h-0 flex-1 overflow-auto">
-				<table className="w-full min-w-[960px] border-collapse text-left text-xs">
-					<thead className="sticky top-0 z-10 border-b border-border bg-surface text-[10px] font-semibold uppercase tracking-wide text-muted"><tr>
-						<th className="px-4 py-3">{heading("player", "Игрок")}</th><th className="px-4 py-3">{heading("email", "Email")}</th><th className="px-4 py-3">{heading("agent", "Агент")}</th><th className="px-4 py-3">{heading("project", "Проект")}</th><th className="px-4 py-3">Теги</th><th className="px-4 py-3">Статус</th><th className="px-4 py-3">{heading("updated", "Последняя активность")}</th>
-					</tr></thead>
-					<tbody className="divide-y divide-border/70">
-						{isLoading ? <tr><td colSpan={7} className="p-10 text-center text-muted"><LoaderCircle size={16} className="mr-2 inline animate-spin" />Загружаем активные чаты…</td></tr> : isError ? <tr><td colSpan={7} className="p-8 text-center text-red-400">{error instanceof Error ? error.message : "Не удалось загрузить чаты"}</td></tr> : sorted.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-muted">Активных чатов не найдено</td></tr> : sorted.map((item) => {
-							const sender = item.meta?.sender;
-							return <tr key={item.id} className="transition hover:bg-surface-elevated/50">
-								<td className="px-4 py-3"><div className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface text-[10px] font-semibold">{initials(sender?.name || sender?.email)}</span>{canOpen ? <button type="button" onClick={() => onOpen(item.id)} className="max-w-48 truncate text-left font-medium hover:text-accent">{sender?.name || `Диалог #${item.id}`}</button> : <span className="max-w-48 truncate font-medium">{sender?.name || `Диалог #${item.id}`}</span>}</div></td>
-								<td className="px-4 py-3 text-muted">{sender?.email || "—"}</td><td className="px-4 py-3">{item.meta?.assignee?.name || <span className="text-amber-300">Не назначен</span>}</td><td className="px-4 py-3 text-muted">{item.meta?.inbox?.name || "—"}</td>
-								<td className="px-4 py-3"><div className="flex max-w-52 flex-wrap gap-1">{item.labels?.length ? item.labels.map((tag) => <span key={tag} className="max-w-24 truncate rounded-full bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tag}</span>) : <span className="text-muted">—</span>}</div></td>
-								<td className="px-4 py-3"><span className="inline-flex items-center gap-1.5 text-[10px] text-muted"><i className={`size-1.5 rounded-full ${item.status === "pending" ? "bg-amber-300" : "bg-emerald-400"}`} />{item.status === "pending" ? "Ожидает" : "Открыт"}</span></td><td className="px-4 py-3 text-muted">{dateTime(item.last_non_activity_message?.created_at ?? item.updated_at)}</td>
-							</tr>;
-						})}
-					</tbody>
-				</table>
-			</div>
-			<footer className="flex shrink-0 items-center justify-between border-t border-border px-4 py-2.5 text-[11px] text-muted"><span>Страница {page} · {rows.length} диалогов</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">Назад</button><button type="button" disabled={!hasMore} onClick={() => onPage(page + 1)} className="rounded-lg border border-border px-2.5 py-1.5 disabled:opacity-40">Дальше</button></div></footer>
-		</section>
-	);
+	return <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-surface/60 px-2.5 py-2 sm:flex-row sm:items-center sm:gap-3 sm:p-4">
+		<div aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent sm:size-9">{icon}</div>
+		<div><div className="text-base font-semibold tabular-nums sm:text-lg">{value}</div><div className="text-[11px] leading-tight text-muted">{label}</div></div>
+	</div>;
 }
 
 function ConversationRow({
 	conversation,
+	projectName,
 	active,
 	onClick,
 	onTake,
 	taking = false,
 }: {
 	conversation: ChatwootConversation;
+	projectName?: string;
 	active: boolean;
 	onClick: () => void;
 	onTake?: () => void;
@@ -935,10 +1115,12 @@ function ConversationRow({
 	const last = conversation.last_non_activity_message;
 	return (
 		<div
-			className={`group flex w-full items-center border-b border-border/70 pr-2 transition hover:bg-surface-elevated/70 ${active ? "bg-accent/10" : ""}`}
+			data-active={active}
+			className="chat-list-row group flex w-full items-center border-b border-border/70 pr-2 transition hover:bg-surface-elevated/70"
 		>
 			<button
 				type="button"
+				aria-pressed={active}
 				onClick={onClick}
 				className="min-w-0 flex-1 px-4 py-3 text-left"
 			>
@@ -966,7 +1148,7 @@ function ConversationRow({
 						</div>
 						<div className="mt-2 flex min-w-0 items-center gap-1.5">
 							<span className="max-w-28 truncate rounded bg-background px-1.5 py-0.5 text-[10px] text-muted">
-								{conversation.meta?.inbox?.name ?? "Входящие"}
+								{projectName ?? (conversation.inbox_id ? `Источник #${conversation.inbox_id}` : "Входящие")}
 							</span>
 							{conversation.meta?.assignee?.name && (
 								<span className="truncate text-[10px] text-muted">
@@ -991,7 +1173,7 @@ function ConversationRow({
 					onClick={onTake}
 				disabled={taking}
 					title="Взять в работу"
-					className="hidden shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground disabled:opacity-50 group-hover:block"
+					className="shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground disabled:opacity-50"
 				>
 					{taking ? "Берём…" : "Взять"}
 				</button>
@@ -1002,8 +1184,15 @@ function ConversationRow({
 
 function ConversationPane({
 	id,
-	canEditCustomAttributes,
+	supervising = false,
+	docked = false,
+	realtimeConnected,
+	coachingRealtimeConnected,
 	agents,
+	teams,
+	draft,
+	onDraft,
+	onOpenRelated,
 	inboxes,
 	labels,
 	binds,
@@ -1014,9 +1203,16 @@ function ConversationPane({
 	onChoose,
 }: {
 	id: number | null;
-	canEditCustomAttributes: boolean;
+	supervising?: boolean;
+	docked?: boolean;
+	realtimeConnected: boolean;
+	coachingRealtimeConnected: boolean;
 	agents: ChatwootAgent[];
-	inboxes: Array<{ id: number; name: string }>;
+	teams: ChatwootTeam[];
+	draft?: ChatDraft;
+	onDraft: (id: number, draft: ChatDraft) => void;
+	onOpenRelated: (id: number) => void;
+	inboxes: ChatwootInbox[];
 	labels: string[];
 	binds: Bind[];
 	language: LanguageCode;
@@ -1026,17 +1222,24 @@ function ConversationPane({
 	onChoose: () => void;
 }) {
 	const client = useQueryClient();
-	const [text, setText] = useState("");
+	const [text, setText] = useState(draft?.text ?? "");
 	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 	const [attachmentError, setAttachmentError] = useState("");
 	const fileInput = useRef<HTMLInputElement>(null);
-	const [privateNote, setPrivateNote] = useState(false);
+	const [privateNote, setPrivateNote] = useState(draft?.privateNote ?? false);
+	useEffect(() => {
+		if (id != null) onDraft(id, { text, privateNote });
+	}, [id, text, privateNote, onDraft]);
 	const [assignOpen, setAssignOpen] = useState(false);
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
 	const [tagOpen, setTagOpen] = useState(false);
-	const tagMenuRef = useRef<HTMLDivElement>(null);
+	const tagMenuRef = useChatPopover<HTMLDivElement>(tagOpen, () => setTagOpen(false));
+	const assignMenu = useChatPopover<HTMLDivElement>(assignOpen, () => setAssignOpen(false));
+	const bindMenu = useChatPopover<HTMLDivElement>(showBinds, () => setShowBinds(false));
 	const [showCustomer, setShowCustomer] = useState(false);
+	const customerClose = useRef<HTMLButtonElement>(null);
+	const customerToggle = useRef<HTMLButtonElement>(null);
 	const [customerWidth, setCustomerWidth] = useState(248);
 	const [confirmBlock, setConfirmBlock] = useState(false);
 	const [olderMessages, setOlderMessages] = useState<ChatwootMessage[]>([]);
@@ -1048,45 +1251,92 @@ function ConversationPane({
 	const previousScrollHeight = useRef<number | null>(null);
 	const olderMessagesRequest = useRef(false);
 	const followMessages = useRef(true);
+	const [showLatest, setShowLatest] = useState(false);
 	const currentConversationId = useRef(id);
 	useEffect(() => {
-		if (!tagOpen) return;
-		const closeOnOutside = (event: PointerEvent) => {
-			if (event.target instanceof Node && !tagMenuRef.current?.contains(event.target)) setTagOpen(false);
-		};
-		const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setTagOpen(false); };
-		document.addEventListener("pointerdown", closeOnOutside);
-		document.addEventListener("keydown", closeOnEscape);
-		return () => {
-			document.removeEventListener("pointerdown", closeOnOutside);
-			document.removeEventListener("keydown", closeOnEscape);
-		};
-	}, [tagOpen]);
+		if (showCustomer) customerClose.current?.focus();
+	}, [showCustomer]);
+	const closeCustomer = () => {
+		setShowCustomer(false);
+		customerToggle.current?.focus();
+	};
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
 		queryFn: () => chatwootService.conversation(id as number),
 		enabled: id != null,
-		refetchInterval: 5000,
+		refetchInterval: realtimeConnected ? 12000 : 5000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
+	const canWrite = !supervising && conversation?.access?.write === true;
+	const canNote = !supervising && conversation?.access?.note === true;
+	const canTake = !supervising && conversation?.access?.take === true;
+	const sendAsNote = !canWrite || privateNote;
+	useEffect(() => {
+		if (canNote && !canWrite) setPrivateNote(true);
+	}, [canNote, canWrite]);
 	const latestMessagesQuery = useQuery({
 		queryKey: ["chatwoot", "messages", id, "latest"],
 		queryFn: () => chatwootService.conversationMessages(id as number),
 		enabled: id != null,
-		refetchInterval: 3000,
+		refetchInterval: realtimeConnected ? 12000 : 3000,
 	});
 	const latestMessages = latestMessagesQuery.data
 		? latestMessagesQuery.data.payload ??
 			latestMessagesQuery.data.data?.payload ??
 			latestMessagesQuery.data.messages ??
 			[]
-		: (conversation?.messages ?? query.data?.payload?.messages ?? []);
+		: (conversation?.messages ?? []);
 	const messages = useMemo(() => {
 		const unique = new Map<number, ChatwootMessage>();
 		for (const message of [...olderMessages, ...latestMessages, ...(optimisticMessage ? [optimisticMessage] : [])]) unique.set(message.id, message);
 		return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
 	}, [olderMessages, latestMessages, optimisticMessage]);
 	const latestMessageId = messages.at(-1)?.id;
+	const coachingKey = ["chatwoot", "coaching-notes", id] as const;
+	const coaching = useQuery({
+		queryKey: coachingKey,
+		queryFn: ({ signal }) => chatwootService.coachingNotes(id as number, signal),
+		enabled: id != null && conversation?.access?.read === true,
+		refetchInterval: coachingRealtimeConnected ? 15000 : 3500,
+		retry: false,
+	});
+	const coachingNotes = coaching.data?.notes;
+	const latestCoachingId = coachingNotes?.[0]?.id;
+	const timeline = useMemo(() => [
+		...messages.map((message) => ({
+			key: `message-${message.id}`, time: (message.created_at ?? 0) * 1000, message,
+		})),
+		...(coachingNotes ?? []).map((note) => ({
+			key: `coaching-${note.id}`, time: Date.parse(note.createdAt), note,
+		})),
+	].sort((left, right) => left.time - right.time), [messages, coachingNotes]);
+	const coachingRequest = useRef<{ recipientAgentId: number; content: string; noteId: string } | null>(null);
+	const coachRecipient = conversation?.coachRecipient;
+	const sendCoach = useMutation({
+		mutationFn: (note: NonNullable<typeof coachingRequest.current>) => chatwootService.sendCoachingNote(id as number, note),
+		onSuccess: async (note) => {
+			await client.cancelQueries({ queryKey: coachingKey });
+			client.setQueryData<{ notes: ChatwootCoachingNote[] }>(coachingKey, (cached) => ({
+				notes: [note, ...(cached?.notes ?? []).filter((item) => item.id !== note.id)].slice(0, 100),
+			}));
+			coachingRequest.current = null;
+			if (id != null && text.trim() === note.content) onDraft(id, { text: "", privateNote: false });
+			setText((value) => value.trim() === note.content ? "" : value);
+			void client.invalidateQueries({ queryKey: coachingKey });
+		},
+		onError: () => {
+			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", id] });
+		},
+	});
+	const submitCoach = () => {
+		const content = text.trim();
+		if (!coachRecipient || !content || sendCoach.isPending) return;
+		const previous = coachingRequest.current;
+		const request = previous?.recipientAgentId === coachRecipient.id && previous.content === content
+			? previous : { recipientAgentId: coachRecipient.id, content, noteId: crypto.randomUUID() };
+		coachingRequest.current = request;
+		sendCoach.mutate(request);
+	};
 	useEffect(() => {
 		currentConversationId.current = id;
 		setSelectedFiles([]);
@@ -1098,6 +1348,7 @@ function ConversationPane({
 		olderMessagesRequest.current = false;
 		previousScrollHeight.current = null;
 		followMessages.current = true;
+		setShowLatest(false);
 	}, [id]);
 	useEffect(() => {
 		if (!latestMessagesQuery.data) return;
@@ -1106,7 +1357,7 @@ function ConversationPane({
 	}, [latestMessagesQuery.data]);
 	useEffect(() => {
 		const viewport = messageViewport.current;
-		if (!viewport || latestMessageId == null) return;
+		if (!viewport || (latestMessageId == null && !latestCoachingId)) return;
 		if (previousScrollHeight.current !== null) {
 			viewport.scrollTop += viewport.scrollHeight - previousScrollHeight.current;
 			previousScrollHeight.current = null;
@@ -1114,7 +1365,7 @@ function ConversationPane({
 		}
 		if (!followMessages.current) return;
 		viewport.scrollTop = viewport.scrollHeight;
-	}, [latestMessageId, messages.length]);
+	}, [latestMessageId, latestCoachingId, messages.length]);
 	const loadOlderMessages = async () => {
 		const firstId = messages[0]?.id;
 		if (!id || !firstId || olderMessagesRequest.current || !hasOlderMessages) return;
@@ -1145,9 +1396,15 @@ function ConversationPane({
 	const sender = conversation?.meta?.sender;
 	const contactId = sender?.id ?? conversation?.contact_id;
 	const contact = useQuery({
-		queryKey: ["chatwoot", "contact", contactId],
-		queryFn: () => chatwootService.contact(contactId as number),
-		enabled: contactId != null,
+		queryKey: ["chatwoot", "contact", contactId, id],
+		queryFn: () => chatwootService.contact(contactId as number, id as number),
+		enabled: showCustomer && conversation?.access?.read === true && contactId != null,
+		staleTime: 60000,
+	});
+	const history = useQuery({
+		queryKey: ["chatwoot", "contact-history", contactId, id],
+		queryFn: () => chatwootService.contactHistory(contactId as number, id as number),
+		enabled: showCustomer && conversation?.access?.read === true && contactId != null,
 		staleTime: 60000,
 	});
 	const send = useMutation({
@@ -1159,13 +1416,14 @@ function ConversationPane({
 					binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
 				return { name: file.name, type: file.type || "application/octet-stream", contentBase64: btoa(binary) };
 			}));
-			return chatwootService.sendMessage(id as number, text.trim(), privateNote, attachments);
+			return chatwootService.sendMessage(id as number, text.trim(), sendAsNote, attachments);
 		},
 		onMutate: () => {
-			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: privateNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: selectedFiles.map((file) => ({ file_name: file.name, file_type: file.type })) });
+			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: sendAsNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: selectedFiles.map((file) => ({ file_name: file.name, file_type: file.type })) });
 			return { conversationId: id };
 		},
 		onSuccess: (_result, _variables, context) => {
+			if (context?.conversationId != null) onDraft(context.conversationId, { text: "", privateNote: false });
 			if (currentConversationId.current === context?.conversationId) {
 				setOptimisticMessage(null);
 				setText("");
@@ -1200,10 +1458,10 @@ function ConversationPane({
 		setAttachmentError("");
 	};
 	const status = useMutation({
-		mutationFn: (value: "open" | "resolved") =>
-			chatwootService.setStatus(id as number, value),
+		mutationFn: (value: { status: ChatwootStatus; snoozedUntil?: number }) =>
+			chatwootService.setStatus(id as number, value.status, value.snoozedUntil),
 		onSuccess: (_result, value) => {
-			if (value === "resolved" && id != null) {
+			if (["resolved", "snoozed"].includes(value.status) && id != null) {
 				for (const [key, cached] of client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })) {
 					const request = key[2] as ConversationSearch | undefined;
 					if (request?.scope !== "history") client.setQueryData(key, withoutConversation(cached, id));
@@ -1227,6 +1485,18 @@ function ConversationPane({
 			onChanged();
 		},
 	});
+	const assignTeam = useMutation({
+		mutationFn: (teamId: number | null) => chatwootService.assignTeam(id as number, teamId),
+		onSuccess: () => { void query.refetch(); onChanged(); },
+	});
+	const priority = useMutation({
+		mutationFn: (value: ChatwootPriority | null) => chatwootService.setPriority(id as number, value),
+		onSuccess: () => { void query.refetch(); onChanged(); },
+	});
+	const take = useMutation({
+		mutationFn: () => chatwootService.take(id as number),
+		onSettled: () => { void query.refetch(); onChanged(); },
+	});
 	const tagMutation = useMutation({
 		mutationFn: (next: string[]) =>
 			chatwootService.setLabels(id as number, next),
@@ -1239,7 +1509,7 @@ function ConversationPane({
 	});
 	const block = useMutation({
 		mutationFn: (value: boolean) =>
-			chatwootService.blockContact(contactId as number, value),
+			chatwootService.blockContact(id as number, contactId as number, value),
 		onSuccess: () => {
 			setConfirmBlock(false);
 			void client.invalidateQueries({
@@ -1263,6 +1533,12 @@ function ConversationPane({
 		.slice(0, 8);
 	const currentContact =
 		(contact.data as ChatwootContact | undefined) ?? sender;
+	const source = inboxes.find((inbox) => inbox.id === conversation?.inbox_id);
+	const project = conversation?.meta?.inbox?.name ?? source?.name;
+	const visitor = conversation?.visitor;
+	const rawLogin = currentContact?.custom_attributes?.player_login ?? currentContact?.custom_attributes?.login ?? visitor?.login;
+	const playerLogin = typeof rawLogin === "string" ? rawLogin : undefined;
+	const crmUrl = crmWorkspaceUrl(conversation?.crm);
 	const insertBind = (bind: Bind) => {
 		const translation = getBindTranslation(bind, language);
 		if (!translation) return;
@@ -1270,7 +1546,6 @@ function ConversationPane({
 			(value) =>
 				`${value}${value && !value.endsWith("\n") ? "\n" : ""}${translation.content}`,
 		);
-		setPrivateNote(false);
 		setShowBinds(false);
 		setBindSearch("");
 	};
@@ -1293,13 +1568,21 @@ function ConversationPane({
 				</button>
 			</div>
 		);
+	if (!conversation?.access?.read || query.isError) return (
+		<div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted">
+			<div><p role={query.isError ? "alert" : undefined}>{query.error?.message ?? "Загружаем диалог…"}</p>
+				{query.isError && <button type="button" onClick={onClose} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs">Закрыть</button>}
+			</div>
+		</div>
+	);
 	const tags = conversation?.labels ?? [];
+	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
 		<section
-			className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
+			className="chat-thread relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
 		>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				<header className="flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border bg-surface/60 pl-12 pr-4 py-2.5">
+				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border pr-3 py-2.5 ${docked ? "pl-3" : "pl-12"}`}>
 					<div className="flex min-w-0 items-center gap-2.5">
 						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
 							{initials(sender?.name)}
@@ -1309,26 +1592,28 @@ function ConversationPane({
 								{sender?.name || sender?.email || `Диалог #${id}`}
 							</h2>
 							<p className="truncate text-[11px] text-muted">
-								{conversation?.meta?.inbox?.name || `#${id}`}
-								{conversation?.status === "pending" ? " · ожидает" : ""}
+								{project ? `${project} · #${id}` : `#${id}`}
+								{conversation.status === "pending" ? " · ожидает" : conversation.status === "snoozed" ? " · отложен" : conversation.status === "resolved" ? " · завершён" : ""}
 							</p>
 						</div>
 					</div>
-					<div className="flex shrink-0 items-center gap-1.5">
-						<div className="relative">
+					<div className="chat-thread-actions flex shrink-0 flex-wrap items-center gap-1.5">
+						{canWrite && <div ref={assignMenu} className="relative">
 							<button
 								type="button"
-								onClick={() => setAssignOpen(!assignOpen)}
+								aria-label="Назначить агента"
+								aria-expanded={assignOpen}
+								onClick={() => { setTagOpen(false); setShowBinds(false); setAssignOpen(!assignOpen); }}
 								className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated"
 							>
 								<UserRound size={13} />
-								<span className="hidden max-w-24 truncate sm:block">
+								<span className="chat-assignee-name hidden max-w-24 truncate sm:block">
 									{conversation?.meta?.assignee?.name ?? "Назначить"}
 								</span>
 								<ChevronDown size={12} />
 							</button>
 							{assignOpen && (
-								<div className="absolute right-0 top-9 z-20 max-h-64 w-52 overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-xl">
+								<div className="chat-popover chat-assign-popover absolute left-0 top-9 z-40 w-52 rounded-xl border border-border bg-surface p-1 shadow-xl sm:right-0 sm:left-auto">
 									<button
 										type="button"
 										onClick={() => assign.mutate(null)}
@@ -1348,41 +1633,64 @@ function ConversationPane({
 									))}
 								</div>
 							)}
-						</div>
+						</div>}
 						<button
+							ref={customerToggle}
 							type="button"
-							onClick={() => setShowCustomer(!showCustomer)}
+							onClick={() => { setAssignOpen(false); setTagOpen(false); setShowBinds(false); setShowCustomer(!showCustomer); }}
 							title="Карточка игрока"
+							aria-label="Карточка игрока"
+							aria-expanded={showCustomer}
 							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
 						>
 							<UserRound size={14} />
 						</button>
-						<button
+						{canWrite && <button
 							type="button"
 							title={
-								conversation?.status === "resolved" ? "Открыть" : "Завершить"
+								["resolved", "snoozed"].includes(conversation.status) ? "Открыть" : "Завершить"
 							}
-							onClick={() =>
-								status.mutate(
-									conversation?.status === "resolved" ? "open" : "resolved",
-								)
-							}
+							disabled={status.isPending}
+							onClick={() => status.mutate({ status: ["resolved", "snoozed"].includes(conversation.status) ? "open" : "resolved" })}
 							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
 						>
 							<CheckCheck size={14} />
-						</button>
-						<button
+						</button>}
+						{!docked && <button
 							type="button"
 							title="Закрыть вкладку"
+							aria-label="Закрыть диалог"
 							onClick={onClose}
 							className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"
 						>
 							<X size={15} />
-						</button>
+						</button>}
 					</div>
 				</header>
-				<div className="relative z-20 flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-border px-3 py-1.5">
-					{tags.map((tag) => (
+				{(canWrite || conversation.priority || tags.length > 0) && <div className="chat-thread-meta relative z-20 flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-border px-3 py-1.5">
+					{canWrite && <>
+						<select aria-label="Приоритет" value={conversation.priority ?? ""} disabled={priority.isPending}
+							onChange={(event) => priority.mutate((event.target.value || null) as ChatwootPriority | null)}
+							className="h-7 max-w-28 rounded-md border border-border bg-surface px-1 text-[11px]">
+							<option value="">Приоритет</option><option value="low">Низкий</option><option value="medium">Средний</option><option value="high">Высокий</option><option value="urgent">Срочный</option>
+						</select>
+						<select aria-label="Статус и пауза" value="" disabled={status.isPending} onChange={(event) => {
+							const value = event.target.value;
+							if (value === "pending" || value === "open" || value === "resolved") status.mutate({ status: value });
+							else if (value.startsWith("snooze:")) {
+								const minutes = Number(value.split(":")[1]);
+								status.mutate({ status: "snoozed", snoozedUntil: minutes ? Math.floor(Date.now() / 1000) + minutes * 60 : undefined });
+							}
+						}} className="h-7 max-w-32 rounded-md border border-border bg-surface px-1 text-[11px]">
+							<option value="">Статус / пауза</option><option value="open">В работе</option><option value="pending">Ожидает</option><option value="resolved">Завершён</option>
+							<option value="snooze:30">На 30 минут</option><option value="snooze:120">На 2 часа</option><option value="snooze:1440">На сутки</option><option value="snooze:0">До ответа клиента</option>
+						</select>
+						{teams.length > 0 && <select aria-label="Команда диалога" value={conversation.meta?.team?.id ?? ""} disabled={assignTeam.isPending} onChange={(event) => assignTeam.mutate(Number(event.target.value) || null)} className="h-7 max-w-36 rounded-md border border-border bg-surface px-1 text-[11px]">
+							<option value="">Без команды</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+						</select>}
+					</>}
+					{!canWrite && conversation.priority && <span className="rounded border border-border px-2 py-1 text-[10px]">Приоритет: {({ low: "низкий", medium: "средний", high: "высокий", urgent: "срочный" })[conversation.priority]}</span>}
+					{tags.map((tag) => canWrite ? (
 						<button
 							key={tag}
 							type="button"
@@ -1394,17 +1702,18 @@ function ConversationPane({
 						>
 							{tag} ×
 						</button>
-					))}
-					<div className="relative z-30" ref={tagMenuRef}>
+					) : <span key={tag} className="rounded-full bg-accent/10 px-2 py-1 text-[10px] text-accent">{tag}</span>)}
+					{canWrite && <div className="chat-tag-trigger relative z-30" ref={tagMenuRef}>
 						<button
 							type="button"
-							onClick={() => setTagOpen(!tagOpen)}
+							onClick={() => { setAssignOpen(false); setShowBinds(false); setTagOpen(!tagOpen); }}
+							aria-expanded={tagOpen}
 							className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] text-muted hover:text-foreground"
 						>
 							<Tag size={11} /> Добавить тег
 						</button>
 						{tagOpen && (
-							<div className="supportos-scroll absolute left-0 top-[calc(100%+8px)] z-[90] max-h-64 w-60 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl">
+							<div className="chat-popover chat-tag-popover supportos-scroll absolute left-0 top-[calc(100%+6px)] z-40 w-60 rounded-xl border border-border bg-surface p-1.5 shadow-xl">
 								{labels.filter((tag) => !tags.includes(tag)).length === 0 ? (
 									<p className="px-3 py-3 text-center text-[11px] text-muted">Все доступные теги уже добавлены</p>
 								) : labels.filter((tag) => !tags.includes(tag)).map((tag) => (
@@ -1423,32 +1732,26 @@ function ConversationPane({
 										))}
 							</div>
 						)}
-					</div>
-					<span className="ml-auto shrink-0 text-[10px] text-muted">
-						Проект:{" "}
-						{inboxes.find((box) => box.id === conversation?.inbox_id)?.name ??
-							conversation?.meta?.inbox?.name ??
-							"—"}
-					</span>
-				</div>
-				{(status.error || assign.error || tagMutation.error || block.error) && (
-					<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-4 py-2 text-[11px] text-red-300">
-						{(status.error || assign.error || tagMutation.error || block.error) instanceof Error
-							? (status.error || assign.error || tagMutation.error || block.error)?.message
-							: "Не удалось выполнить действие"}
+					</div>}
+				</div>}
+				{editError && (
+					<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-4 py-2 text-[11px] chat-text-danger">
+						{editError.message}
 					</div>
 				)}
+				<div className="relative min-h-0 flex-1">
 				<div
 					ref={messageViewport}
 					onScroll={(event) => {
 						const viewport = event.currentTarget;
 						followMessages.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
+						setShowLatest(!followMessages.current);
 						if (viewport.scrollTop < 48) void loadOlderMessages();
 					}}
-					className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
+					className="chat-thread-transcript supportos-scroll flex h-full flex-col overflow-y-auto px-3 py-4 sm:px-5"
 				>
 					{hasOlderMessages && messages.length > 0 && (
-						<div className="sticky top-0 z-10 mb-4 flex justify-center">
+						<div className="sticky top-0 z-10 mb-4 flex shrink-0 justify-center">
 							<button
 								type="button"
 								disabled={loadingOlderMessages}
@@ -1461,7 +1764,7 @@ function ConversationPane({
 						</div>
 					)}
 					{olderMessagesError && (
-						<p role="alert" className="mb-3 text-center text-xs text-red-400">
+						<p role="alert" className="mb-3 text-center text-xs chat-text-danger">
 							{olderMessagesError}
 						</p>
 					)}
@@ -1471,24 +1774,64 @@ function ConversationPane({
 							Загружаем переписку
 						</div>
 					) : query.isError || latestMessagesQuery.isError ? (
-						<div className="m-auto max-w-sm rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
+						<div className="m-auto max-w-sm rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm chat-text-danger">
 							{(latestMessagesQuery.error ?? query.error) instanceof Error
 								? (latestMessagesQuery.error ?? query.error)?.message
 								: "Не удалось загрузить диалог"}
 						</div>
-					) : messages.length === 0 ? (
+					) : timeline.length === 0 ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted">
 							Сообщений пока нет
 						</div>
 					) : (
-						<div className="flex w-full flex-col gap-3 px-1 sm:px-3">
-							{messages.map((message) => (
-								<MessageBubble key={message.id} message={message} />
-							))}
+						<div className="mt-auto flex w-full shrink-0 flex-col gap-3 px-1 sm:px-3">
+							{timeline.map((entry) => "note" in entry ? (
+								<CoachingBubble key={entry.key} note={entry.note} />
+							) : <MessageBubble key={entry.key} message={entry.message} />)}
 						</div>
 					)}
 				</div>
-				<footer className="shrink-0 border-t border-border bg-surface/40 p-3">
+				{showLatest && <button type="button" onClick={() => {
+					const viewport = messageViewport.current;
+					if (viewport) viewport.scrollTop = viewport.scrollHeight;
+					followMessages.current = true;
+					setShowLatest(false);
+				}} className="absolute right-3 bottom-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-foreground shadow-sm hover:bg-surface-elevated">
+					<ChevronDown size={14} /> К последним сообщениям
+				</button>}
+				</div>
+				{supervising ? (
+					<footer className="shrink-0 border-t border-violet-500/20 bg-violet-500/5 p-3">
+						{coachRecipient ? (
+							<>
+								<div className="mb-2 flex items-center justify-between gap-2">
+									<div className="min-w-0">
+										<label htmlFor={`coach-${id}`} className="block text-xs font-semibold chat-text-hint">Подсказка агенту</label>
+										<p className="truncate text-[11px] text-muted">
+											{coachRecipient.name ? `Получатель · ${coachRecipient.name}` : "Получатель · назначенный агент"}
+										</p>
+									</div>
+									<button type="button" disabled={!text.trim() || sendCoach.isPending} onClick={submitCoach}
+										className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-violet-700 px-2.5 text-xs font-semibold text-white disabled:opacity-50">
+										<Send size={13} /> {sendCoach.isPending ? "Отправляем" : "Отправить"}
+									</button>
+								</div>
+								<textarea id={`coach-${id}`} rows={2} maxLength={2000}
+									value={text} onChange={(event) => setText(event.target.value)}
+									onKeyDown={(event) => {
+										if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
+										event.preventDefault();
+										submitCoach();
+									}}
+									placeholder="Напишите подсказку сотруднику…"
+									className="block w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-violet-400/60" />
+								{sendCoach.isError && <p role="alert" className="mt-2 text-xs chat-text-danger">{sendCoach.error.message}</p>}
+							</>
+						) : <p className="text-xs text-muted">
+							{["open", "pending"].includes(conversation.status) ? "Подсказку можно отправить, когда у диалога появится ответственный агент." : "Подсказки доступны в активном диалоге."}
+						</p>}
+					</footer>
+				) : (canWrite || canNote) ? <footer className="chat-thread-composer relative shrink-0 border-t border-border p-2.5 sm:p-3">
 					<input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ""; }} />
 					{selectedFiles.length > 0 && (
 						<div className="mb-2 flex flex-wrap gap-2">
@@ -1502,25 +1845,29 @@ function ConversationPane({
 							))}
 						</div>
 					)}
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<div className="flex items-center gap-1.5">
+					<div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+						<div className="flex flex-wrap items-center gap-1.5">
 							<button
 								type="button"
+								disabled={!canWrite || !canNote}
 								onClick={() => setPrivateNote(!privateNote)}
-								className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium ${privateNote ? "bg-amber-500/10 text-amber-300" : "text-muted hover:bg-surface-elevated"}`}
+								className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium ${sendAsNote ? "bg-amber-500/10 chat-text-warning" : "text-muted hover:bg-surface-elevated"}`}
 							>
-								{privateNote ? "Внутренняя заметка" : "Ответ клиенту"}
+								{sendAsNote ? "Внутренняя заметка" : "Ответ клиенту"}
 							</button>
-							<div className="relative">
+							{canWrite && <div ref={bindMenu}>
 								<button
 									type="button"
-									onClick={() => setShowBinds(!showBinds)}
+									onClick={() => { setAssignOpen(false); setTagOpen(false); setShowBinds(!showBinds); }}
+									aria-label="Быстрый бинд"
+									title="Быстрый бинд"
+									aria-expanded={showBinds}
 									className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted hover:text-foreground"
 								>
-									<MessageSquareText size={12} /> Быстрый бинд
+									<MessageSquareText size={12} /> <span className="chat-binds-caption">Быстрый бинд</span>
 								</button>
 								{showBinds && (
-									<div className="absolute bottom-9 left-0 z-30 w-[min(360px,75vw)] rounded-xl border border-border bg-surface p-2 shadow-2xl">
+									<div className="chat-popover absolute bottom-full left-2.5 z-30 mb-1 w-[360px] rounded-xl border border-border bg-surface p-2 shadow-xl">
 										<input
 											value={bindSearch}
 											onChange={(event) => setBindSearch(event.target.value)}
@@ -1564,7 +1911,7 @@ function ConversationPane({
 										</div>
 									</div>
 								)}
-							</div>
+							</div>}
 						</div>
 						<div className="flex items-center gap-2">
 							<button type="button" title="Прикрепить файл" aria-label="Прикрепить файл" onClick={() => fileInput.current?.click()} disabled={send.isPending || selectedFiles.length >= 5} className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"><Paperclip size={14} /></button>
@@ -1573,16 +1920,19 @@ function ConversationPane({
 							</span>
 							<button
 								type="button"
-							disabled={(!text.trim() && !selectedFiles.length) || send.isPending}
+								aria-label="Отправить"
+								title="Отправить"
+								disabled={(!text.trim() && !selectedFiles.length) || send.isPending}
 								onClick={() => send.mutate()}
 								className="inline-flex h-8 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
 							>
 								<Send size={13} />
-								{send.isPending ? "Отправка" : "Отправить"}
+								<span className="chat-send-caption">{send.isPending ? "Отправка" : "Отправить"}</span>
 							</button>
 						</div>
 					</div>
 					<textarea
+						aria-label={sendAsNote ? "Внутренняя заметка" : "Ответ клиенту"}
 						value={text}
 						onChange={(event) => setText(event.target.value)}
 						onKeyDown={(event) => {
@@ -1599,33 +1949,38 @@ function ConversationPane({
 							}
 						}}
 						placeholder={
-							privateNote
+							sendAsNote
 								? "Заметка видна только команде…"
 								: "Напишите ответ клиенту…"
 						}
 						rows={3}
-						className="supportos-scroll block max-h-36 min-h-[76px] w-full resize-y rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none placeholder:text-muted focus:border-accent/60"
+						className="supportos-scroll block max-h-36 min-h-14 w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none placeholder:text-muted focus:border-accent/60"
 					/>
-					{attachmentError && <p role="alert" className="mt-1 text-xs text-red-400">{attachmentError}</p>}
+					{attachmentError && <p role="alert" className="mt-1 text-xs chat-text-danger">{attachmentError}</p>}
 					{send.isError && (
-						<p role="alert" className="mt-1 text-xs text-red-400">
+						<p role="alert" className="mt-1 text-xs chat-text-danger">
 							{send.error instanceof Error
 								? send.error.message
 								: "Не удалось отправить"}
 						</p>
 					)}
-				</footer>
+				</footer> : <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted">
+					<span>{canTake ? "Возьмите диалог, чтобы ответить игроку." : "Диалог доступен для просмотра."}</span>
+					{canTake && <button type="button" disabled={take.isPending} onClick={() => take.mutate()} className="rounded-md bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">Взять в работу</button>}
+				</footer>}
 			</div>
 			{showCustomer && (
 				<>
-				<ResizeHandle axis="x" label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={(width) => setCustomerWidth(Math.min(420, Math.max(200, width)))} />
-				<aside style={{ width: customerWidth }} className="supportos-scroll hidden shrink-0 overflow-y-auto border-l border-border bg-surface/30 p-3 xl:block">
+				<div className="chat-thread-customer-resize"><ResizeHandle axis="x" label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={setCustomerWidth} /></div>
+				<aside aria-label="Карточка игрока" onKeyDown={(event) => { if (event.key === "Escape") closeCustomer(); }} style={{ width: customerWidth }} className="chat-thread-customer supportos-scroll absolute inset-y-0 right-0 z-30 max-w-full shrink-0 overflow-y-auto border-l border-border bg-surface p-3 shadow-xl">
 					<div className="mb-3 flex items-center justify-between">
 						<h3 className="text-xs font-semibold">Игрок</h3>
 						<button
+							ref={customerClose}
 							type="button"
-							onClick={() => setShowCustomer(false)}
-							className="text-muted hover:text-foreground"
+							aria-label="Закрыть карточку игрока"
+							onClick={closeCustomer}
+							className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated hover:text-foreground"
 						>
 							<X size={13} />
 						</button>
@@ -1642,19 +1997,31 @@ function ConversationPane({
 						</div>
 					</div>
 					<div className="space-y-3 text-xs">
-						<Info label="Никнейм" value={currentContact?.identifier} />
-						<Info
-							label="Логин"
-							value={String(
-								currentContact?.custom_attributes?.login ??
-									currentContact?.additional_attributes?.username ??
-									currentContact?.additional_attributes?.login ??
-									"",
-							)}
-						/>
+						<Info label="Логин игрока" value={playerLogin} />
+						{currentContact?.identifier !== playerLogin && <Info label="Идентификатор игрока" value={currentContact?.identifier} />}
 						<Info label="Телефон" value={currentContact?.phone_number} />
 						<Info label="ID контакта" value={String(contactId ?? "")} />
-						<Info label="Проект" value={conversation?.meta?.inbox?.name} />
+						<section className="space-y-2 rounded-lg border border-border p-2.5">
+							<h4 className="font-semibold">Источник обращения</h4>
+							<Info label="Проект" value={project ?? (conversation?.inbox_id ? `Источник #${conversation.inbox_id}` : "Не определён")} />
+							<Info label={visitor?.page ? "Страница входа" : "Сайт проекта"} value={visitor?.page ?? source?.website_url} />
+							<Info label="IP" value={visitor?.ip ?? "Не передан"} />
+							<Info label="Локация" value={[visitor?.city, visitor?.country].filter(Boolean).join(", ")} />
+							<Info label="Устройство" value={[visitor?.device, visitor?.platform, visitor?.browser].filter(Boolean).join(" · ")} />
+						</section>
+						{crmUrl && <a href={crmUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg border border-border px-2 py-2 font-medium hover:bg-surface-elevated"><ExternalLink size={13} /> Открыть CRM проекта</a>}
+						<section className="space-y-1.5 rounded-lg border border-border p-2.5">
+							<h4 className="font-semibold">Предыдущие диалоги</h4>
+							{history.isPending && contactId && <p className="text-muted">Загрузка…</p>}
+							{history.isError && <p className="text-muted">История недоступна</p>}
+							{history.data?.payload.length === 0 && <p className="text-muted">Нет доступных диалогов</p>}
+							{history.data?.payload.map((chat) => (
+								<button key={chat.id} type="button" onClick={() => onOpenRelated(chat.id)} className="flex w-full justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-surface-elevated">
+									<span className="min-w-0 truncate">#{chat.id} · {inboxes.find((box) => box.id === chat.inbox_id)?.name ?? "Проект"}</span>
+									<span className="shrink-0 text-muted">{chat.status === "resolved" ? "Завершён" : chat.status === "snoozed" ? "Отложен" : chat.status === "pending" ? "Ожидает" : "Открыт"}</span>
+								</button>
+							))}
+						</section>
 						<Info
 							label="Ответственный"
 							value={conversation?.meta?.assignee?.name}
@@ -1664,42 +2031,15 @@ function ConversationPane({
 							contactId={contactId}
 							conversationValues={conversation?.custom_attributes ?? {}}
 							contactValues={currentContact?.custom_attributes ?? {}}
-							canEdit={canEditCustomAttributes}
+							canEdit={canWrite}
 						/>
-						<details className="rounded-lg border border-border/70 px-2.5 py-2">
-							<summary className="cursor-pointer text-[11px] font-medium text-muted">Исходные данные Chatwoot</summary>
-							<div className="mt-3 space-y-3">
-							{Object.entries({
-								...currentContact?.additional_attributes,
-								...currentContact?.custom_attributes,
-							})
-							.filter(
-								([key, value]) =>
-									value != null &&
-									value !== "" &&
-									!["login", "username"].includes(key.toLowerCase()),
-							)
-							.slice(0, 8)
-							.map(([key, value]) => (
-								<Info
-									key={key}
-									label={key.replaceAll("_", " ")}
-									value={
-										typeof value === "string" || typeof value === "number"
-											? String(value)
-											: JSON.stringify(value)
-									}
-								/>
-							))}
-							</div>
-						</details>
 					</div>
-					<div className="mt-4 border-t border-border pt-3">
+					{canWrite && <div className="mt-4 border-t border-border pt-3">
 						<button
 							type="button"
 							disabled={!contactId || block.isPending}
 							onClick={() => setConfirmBlock(true)}
-							className={`inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[11px] ${currentContact?.blocked ? "border-amber-500/30 text-amber-300" : "border-red-500/20 text-red-300 hover:bg-red-500/5"}`}
+							className={`inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[11px] ${currentContact?.blocked ? "border-amber-500/30 chat-text-warning" : "border-red-500/20 chat-text-danger hover:bg-red-500/5"}`}
 						>
 							<Ban size={13} />
 							{currentContact?.blocked
@@ -1724,14 +2064,14 @@ function ConversationPane({
 									<button
 										type="button"
 										onClick={() => block.mutate(!currentContact?.blocked)}
-										className="flex-1 rounded bg-red-500/15 px-2 py-1 text-[10px] text-red-300"
+										className="flex-1 rounded bg-red-500/15 px-2 py-1 text-[10px] chat-text-danger"
 									>
 										Подтвердить
 									</button>
 								</div>
 							</div>
 						)}
-					</div>
+					</div>}
 				</aside>
 				</>
 			)}
@@ -1760,10 +2100,10 @@ function CustomFieldsEditor({ conversationId, contactId, conversationValues, con
 	return (
 		<div className="space-y-3 border-t border-border pt-3">
 			<h4 className="text-[11px] font-semibold">Пользовательские поля</h4>
-			{conversationFields.isError || contactFields.isError ? <p className="text-[10px] text-red-300">Не удалось загрузить поля Chatwoot</p> : null}
+			{conversationFields.isError || contactFields.isError ? <p className="text-[10px] chat-text-danger">Не удалось загрузить поля Chatwoot</p> : null}
 			{conversationFields.isLoading || contactFields.isLoading ? <p className="text-[10px] text-muted">Загружаем поля…</p> : null}
 			{chats.length > 0 && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted">Диалог</p>{chats.map((field) => <CustomFieldValue key={field.id} definition={field} value={conversationValues[field.attribute_key]} subjectId={conversationId} conversationId={conversationId} canEdit={canEdit} />)}</div>}
-			{contacts.length > 0 && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted">Игрок</p>{contacts.map((field) => <CustomFieldValue key={field.id} definition={field} value={contactValues[field.attribute_key]} subjectId={contactId} contactId={contactId} canEdit={canEdit} />)}</div>}
+			{contacts.length > 0 && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted">Игрок</p>{contacts.map((field) => <CustomFieldValue key={field.id} definition={field} value={contactValues[field.attribute_key]} subjectId={contactId} conversationId={conversationId} contactId={contactId} canEdit={canEdit} />)}</div>}
 		</div>
 	);
 }
@@ -1790,7 +2130,7 @@ function CustomFieldValue({ definition, value, subjectId, conversationId, contac
 				normalized = number;
 			}
 			return chatwootService.setCustomAttributeValues({
-				...(conversationId ? { conversationId } : { contactId }),
+				conversationId, contactId,
 				attributes: { [definition.attribute_key]: normalized },
 			});
 		},
@@ -1810,7 +2150,7 @@ function CustomFieldValue({ definition, value, subjectId, conversationId, contac
 				{type === 7 ? <select disabled={!canEdit} value={draft || "false"} onChange={(event) => setDraft(event.target.value)} className={className}><option value="false">Нет</option><option value="true">Да</option></select> : type === 6 ? <select disabled={!canEdit} value={draft} onChange={(event) => setDraft(event.target.value)} className={className}><option value="">Не выбрано</option>{(definition.attribute_values ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input disabled={!canEdit} type={type === 5 ? "date" : [1, 2, 3].includes(type) ? "number" : type === 4 ? "url" : "text"} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Не заполнено" className={className} />}
 				{canEdit && draft !== (value == null ? (type === 7 ? "false" : "") : String(value)) && <button type="button" disabled={save.isPending} onClick={() => save.mutate()} className="shrink-0 rounded-md border border-border px-2 py-1.5 text-[10px] hover:bg-surface-elevated disabled:opacity-50">{save.isPending ? "…" : "Сохранить"}</button>}
 			</div>
-			{save.isError && <p role="alert" className="mt-1 text-[10px] text-red-300">{save.error instanceof Error ? save.error.message : "Не удалось сохранить"}</p>}
+			{save.isError && <p role="alert" className="mt-1 text-[10px] chat-text-danger">{save.error instanceof Error ? save.error.message : "Не удалось сохранить"}</p>}
 		</div>
 	);
 }
@@ -1824,6 +2164,21 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 		</div>
 	);
 }
+function CoachingBubble({ note }: { note: ChatwootCoachingNote }) {
+	return (
+		<div className={`flex ${note.own ? "justify-end" : "justify-start"}`}>
+			<article data-thread-bubble aria-label="Личная подсказка" className="min-w-0 max-w-[min(88%,42rem)] rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5">
+				<div className="mb-1 flex flex-wrap items-center gap-x-2 text-[11px]">
+					<span className="font-semibold chat-text-hint">{note.own ? "Подсказка агенту" : "Подсказка от супервайзера"}</span>
+					<span className="text-muted">{note.author}</span>
+				</div>
+				<p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{note.content}</p>
+				<div className="mt-1 text-right text-[10px] text-muted">{dateLabel(Date.parse(note.createdAt) / 1000)}</div>
+			</article>
+		</div>
+	);
+}
+
 function MessageBubble({ message }: { message: ChatwootMessage }) {
 	const type = String(message.message_type ?? "").toLowerCase();
 	const activity = type === "2" || type === "activity";
@@ -1847,10 +2202,11 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 	return (
 		<div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
 			<article
-				className={`max-w-[88%] min-w-0 rounded-2xl px-4 py-3 shadow-sm ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "border border-accent/15 bg-accent/15" : "border border-border/80 bg-surface"}`}
+				data-thread-bubble
+				className={`max-w-[min(88%,42rem)] min-w-0 rounded-2xl px-3 py-2.5 shadow-sm sm:px-4 ${message.private ? "border border-amber-500/20 bg-amber-500/5" : outgoing ? "border border-accent/15 bg-accent/15" : "border border-border/80 bg-surface"}`}
 			>
 				{message.private && (
-					<div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+					<div className="mb-1 text-[10px] font-semibold uppercase tracking-wide chat-text-warning">
 						Внутренняя заметка
 					</div>
 				)}
@@ -1958,7 +2314,7 @@ function SetupCard({
 					почта агента Chatwoot должна совпадать с почтой SupportOS.
 				</p>
 				{error && (
-					<p role="alert" className="mt-3 text-xs text-red-400">
+					<p role="alert" className="mt-3 text-xs chat-text-danger">
 						{error}
 					</p>
 				)}

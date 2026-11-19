@@ -165,6 +165,7 @@ it.each(['table','sequence','maintain'])('fails closed and atomically rolls back
 });
 it('has no production browser business CRUD/RPC/realtime callers', async () => {
  const root = new URL('../src/', import.meta.url);
+ const chatSignal = new URL('services/chatwoot-realtime.ts', root);
  const scan = async directory => {
   for (const entry of await readdir(directory,{withFileTypes:true})) {
    const file = new URL(entry.name+(entry.isDirectory()?'/':''),directory);
@@ -172,7 +173,17 @@ it('has no production browser business CRUD/RPC/realtime callers', async () => {
    else if (/\.[cm]?[jt]sx?$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name)) {
     const source = await readFile(file,'utf8');
     expect(source,file.pathname).not.toMatch(/supabaseService\s*\.\s*(?:select|insert|upsert|updateWhere|delete|rpc)\s*\(/);
-    expect(source,file.pathname).not.toMatch(/(?:supabase|client)\s*\.\s*(?:from|rpc|channel)\s*\(/);
+    expect(source,file.pathname).not.toMatch(/(?:supabase|client)\s*\.\s*(?:from|rpc)\s*\(/);
+    if (file.href === chatSignal.href) {
+     expect(source.match(/\.channel\s*\(/g)).toHaveLength(2);
+     expect(source).toMatch(/\.channel\(\s*"chatwoot:updates"\s*,\s*\{\s*config:\s*\{\s*private:\s*true\s*\}\s*\}\s*\)/);
+     expect(source).toMatch(/\.channel\(\s*`chatwoot:coaching:\$\{coaching\.userId\}`\s*,\s*\{\s*config:\s*\{\s*private:\s*true\s*\},?\s*\},?\s*\)/);
+     expect(source).toContain('.on("broadcast", { event: "chatwoot_event" }, onEvent)');
+     expect(source).toContain('.on("broadcast", { event: "coaching_note" }, coaching.onNote)');
+     expect(source).not.toMatch(/\.(?:send|track)\s*\(/);
+    } else {
+     expect(source,file.pathname).not.toMatch(/(?:supabase|client)\s*\.\s*channel\s*\(/);
+    }
     expect(source,file.pathname).not.toContain('postgres_changes');
    }
   }

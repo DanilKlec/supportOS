@@ -1,14 +1,19 @@
+import { randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
+import { chatCapabilities, chatConversationAccess } from '../../shared/chatwoot-access.js';
+import { activeOverview, changeSupervision, coachingNotes, sendCoachingNote, supervisedIds } from './supervision.js';
 import { requireUser } from '../_auth.js';
 import { allRows, config as serverConfig, db } from '../agent-monitor/_server.js';
+import { getOperations, onShift, saveOperations, slaSnapshot } from './operations.js';
 
 const json = (res, status, body) => {
 	res.statusCode = status;
 	res.setHeader('Content-Type', 'application/json; charset=utf-8');
 	res.setHeader('Cache-Control', 'private, no-store');
-	res.end(JSON.stringify(body));
+	res.end(JSON.stringify(stripSensitive(body)));
 };
 
-function config(env = process.env) {
+export function config(env = process.env) {
 	const base = (env.CHATWOOT_BASE_URL ?? '').trim().replace(/\/+$/, '');
 	const accountId = (env.CHATWOOT_ACCOUNT_ID ?? '').trim();
 	const token = (env.CHATWOOT_ACCESS_TOKEN ?? '').trim();
@@ -21,7 +26,7 @@ function config(env = process.env) {
 	return { base, accountId, token };
 }
 
-async function api(cfg, path, { method = 'GET', body } = {}) {
+async function api(cfg, path, { method = 'GET', body, timeout = 15000 } = {}) {
 	let response;
 	const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
 	try {
@@ -33,7 +38,7 @@ async function api(cfg, path, { method = 'GET', body } = {}) {
 				...(body && !multipart ? { 'Content-Type': 'application/json' } : {}),
 			},
 			body: body ? multipart ? body : JSON.stringify(body) : undefined,
-			signal: AbortSignal.timeout(15000),
+			signal: AbortSignal.timeout(timeout),
 		});
 	} catch {
 		throw Object.assign(new Error('Не удалось подключиться к Chatwoot'), { status: 502 });
@@ -68,6 +73,18 @@ function conversationTotal(data) {
 	const meta = data?.data?.meta ?? data?.meta ?? {};
 	const value = Number(meta.all_count ?? meta.count?.all_count ?? meta.count);
 	return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function countFromMeta(meta, key) {
+	const raw = meta?.[key] ?? meta?.count?.[key];
+	if (raw == null || raw === '') return null;
+	const count = Number(raw);
+	return Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
+function totalFromMeta(pages, key) {
+	const counts = pages.map((meta) => countFromMeta(meta, key));
+	return counts.some((count) => count === null) ? null : counts.reduce((sum, count) => sum + count, 0);
 }
 
 function chatwootError(message, status = 502) {
@@ -146,13 +163,15 @@ function websiteSourcePayload(source) {
 	};
 }
 
-async function websiteInboxMembers(cfg, inboxId) {
-	const result = await api(cfg, `/accounts/${cfg.accountId}/inbox_members/${inboxId}`);
+async function websiteInboxMembers(cfg, inboxId, timeout) {
+	const result = await api(cfg, `/accounts/${cfg.accountId}/inbox_members/${inboxId}`, { timeout });
 	return itemList(result).map((agent) => Number(agent.id)).filter(Number.isSafeInteger);
 }
 
 async function setWebsiteInboxMembers(cfg, inboxId, operatorIds) {
 	await api(cfg, `/accounts/${cfg.accountId}/inbox_members`, { method: 'PATCH', body: { inbox_id: inboxId, user_ids: operatorIds } });
+	membershipCache.delete(`${cfg.base}/${cfg.accountId}/${inboxId}`);
+	inboxDirectoryCache.delete(`${cfg.base}/${cfg.accountId}`);
 }
 
 function isWebsiteInbox(inbox) {
@@ -175,6 +194,17 @@ async function writePresence(env, user, agentId, accepting) {
 	return (await response.json())?.[0];
 }
 
+async function refreshPresence(env, userId) {
+	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_presence?user_id=eq.${encodeURIComponent(userId)}`, {
+		method: 'PATCH',
+		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+		body: JSON.stringify({ heartbeat_at: new Date().toISOString() }),
+		signal: AbortSignal.timeout(5000),
+	});
+	if (!response.ok) throw chatwootError('Не удалось обновить статус агента', 502);
+	return (await response.json())?.[0];
+}
+
 async function getAgentLimits(env) {
 	return allRows(env, 'supportos_chatwoot_agent_limits?select=chatwoot_agent_id,max_active_chats');
 }
@@ -183,87 +213,378 @@ async function listAgents(cfg) {
 	return itemList(await api(cfg, `/accounts/${cfg.accountId}/agents`));
 }
 
+const agentDirectoryCache = new Map();
 async function matchAgent(cfg, email) {
 	if (!email) return null;
 	const normalized = email.trim().toLowerCase();
-	return (await listAgents(cfg)).find((agent) => agent.email?.trim().toLowerCase() === normalized) ?? null;
+	const key = `${cfg.base}/${cfg.accountId}`;
+	let entry = agentDirectoryCache.get(key);
+	if (!entry || entry.expires <= Date.now()) {
+		entry = { expires: Date.now() + 30000, agents: listAgents(cfg) };
+		agentDirectoryCache.set(key, entry);
+		void entry.agents.catch(() => {
+			if (agentDirectoryCache.get(key) === entry) agentDirectoryCache.delete(key);
+		});
+	}
+	return (await entry.agents).find((agent) => agent.email?.trim().toLowerCase() === normalized) ?? null;
 }
 
-async function routeWaitingConversations(env, cfg) {
-	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', { p_min_interval_seconds: 5 });
-	if (routerLease !== true) return { assigned: 0, skipped: true };
-	const queueMeta = await Promise.all(['open', 'pending'].map((status) =>
-		api(cfg, `/accounts/${cfg.accountId}/conversations/meta?status=${status}`),
-	));
-	const queueCounts = queueMeta.map((result) => {
-		const value = Number((result?.data?.meta ?? result?.meta)?.unassigned_count);
-		return Number.isSafeInteger(value) && value >= 0 ? value : null;
-	});
-	if (queueCounts.every((count) => count !== null) && queueCounts.every((count) => count === 0))
-		return { assigned: 0, skipped: true };
-	const [agents, presenceRows, limits] = await Promise.all([
-		listAgents(cfg),
-		allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
-		getAgentLimits(env),
-	]);
-	const cutoff = Date.now() - 90_000;
-	const activePresence = presenceRows.filter((row) => row.accepting && Date.parse(row.heartbeat_at) >= cutoff);
-	const activeIds = [...new Set(activePresence.map((row) => Number(row.chatwoot_agent_id)).filter(Number.isSafeInteger))];
-	if (!activeIds.length) return { assigned: 0 };
-	const known = new Set(agents.map((agent) => Number(agent.id)));
-	const eligible = activeIds.filter((id) => known.has(id));
-	if (!eligible.length) return { assigned: 0 };
-	const queuePages = await Promise.all(['open', 'pending'].map((status) =>
-		api(cfg, `/accounts/${cfg.accountId}/conversations?status=${status}&assignee_type=unassigned&page=1`).then(itemList),
-	));
-	const conversations = [...new Map(queuePages.flat().map((conversation) => [Number(conversation.id), conversation])).values()];
-	if (!conversations.length) return { assigned: 0, skipped: true };
-	const capacities = Object.fromEntries(activePresence.map((row) => {
-		const agentId = Number(row.chatwoot_agent_id);
-		const limit = limits.find((item) => Number(item.chatwoot_agent_id) === agentId)?.max_active_chats;
-		return [String(agentId), Math.max(1, Math.min(50, Number(limit) || 4))];
-	}));
-	const countResults = await Promise.all(eligible.map(async (agentId) => {
-		const filtered = await api(cfg, `/accounts/${cfg.accountId}/conversations/filter?page=1`, {
-			method: 'POST',
-			body: { payload: conversationFilters({ status: ['open', 'pending'], assigneeId: String(agentId) }) },
+const activeStatuses = ['open', 'pending'];
+const conversationRecord = (result) => result?.payload ?? result;
+const conversationInbox = (row) => Number(row.inbox_id ?? row.meta?.inbox?.id);
+const hasBotAssignee = (row) => Boolean(row.assignee_agent_bot_id || String(row.meta?.assignee_type ?? row.meta?.assignee?.type ?? '').replaceAll('_', '').toLowerCase() === 'agentbot');
+const conversationAssignee = (row) => hasBotAssignee(row) ? null : Number(row.meta?.assignee?.id ?? row.assignee_id) || null;
+const conversationContact = (row) => Number(row.meta?.sender?.id ?? row.contact_id) || null;
+const validChatId = (id) => validId(String(id ?? '')) && Number.isSafeInteger(Number(id)) && Number(id) > 0;
+
+function publicInbox({ id, name, channel_type, website_url }) {
+	return { id, name, channel_type, website_url };
+}
+
+const membershipCache = new Map();
+const inboxDirectoryCache = new Map();
+function directoryFor(cfg) {
+	const key = `${cfg.base}/${cfg.accountId}`;
+	let entry = inboxDirectoryCache.get(key);
+	if (!entry || entry.until <= Date.now()) {
+		entry = { until: Date.now() + 15000, items: api(cfg, `/accounts/${cfg.accountId}/inboxes`).then(itemList) };
+		inboxDirectoryCache.set(key, entry);
+		void entry.items.catch(() => { if (inboxDirectoryCache.get(key) === entry) inboxDirectoryCache.delete(key); });
+	}
+	return entry.items;
+}
+
+const teamMemberCache = new Map();
+async function getTeamMembers(cfg, id, fresh = false) {
+	const key = `${cfg.base}/${cfg.accountId}/${id}`;
+	let entry = teamMemberCache.get(key);
+	if (fresh || !entry || entry.until <= Date.now()) {
+		entry = {
+			until: Date.now() + 15000,
+			ids: api(cfg, `/accounts/${cfg.accountId}/teams/${id}/team_members`, { timeout: 4500 }).then((result) => itemList(result).map((agent) => Number(agent.id))),
+		};
+		teamMemberCache.set(key, entry);
+		void entry.ids.catch(() => { if (teamMemberCache.get(key) === entry) teamMemberCache.delete(key); });
+	}
+	return entry.ids;
+}
+async function membersFor(cfg, id, fresh = false) {
+	const key = `${cfg.base}/${cfg.accountId}/${id}`;
+	let entry = membershipCache.get(key);
+	if (fresh || !entry || entry.until <= Date.now()) {
+		entry = { until: Date.now() + 15000, members: websiteInboxMembers(cfg, id, 4500) };
+		membershipCache.set(key, entry);
+		void entry.members.catch(() => {
+			if (membershipCache.get(key) === entry) membershipCache.delete(key);
 		});
-		return [String(agentId), conversationTotal(filtered)];
-	}));
-	if (countResults.some(([, count]) => count === null)) return { assigned: 0, skipped: true };
-	const activeCounts = Object.fromEntries(countResults);
-	const baselineCounts = { ...activeCounts };
-	const inboxIds = [...new Set(conversations.map((conversation) => String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '')).filter(validId))];
-	const inboxMembers = new Map(await Promise.all(inboxIds.map(async (id) => [id, await websiteInboxMembers(cfg, id).catch(() => [])])));
-	const createdAtOf = (conversation) => {
-		const raw = conversation.created_at;
-		return typeof raw === 'string' && !/^\d+$/.test(raw) ? Date.parse(raw) : Number(raw) * (Number(raw) > 1e12 ? 1 : 1000);
+	}
+	return entry.members;
+}
+
+async function availableInboxes(cfg, directory, actorId, capabilities) {
+	if (capabilities.supervise) return directory;
+	if (!actorId) return [];
+	const allowed = [];
+	for (let index = 0; index < directory.length; index += 8) {
+		const batch = directory.slice(index, index + 8);
+		const memberships = await Promise.all(batch.map((item) => membersFor(cfg, item.id).catch(() => [])));
+		allowed.push(...batch.filter((_, i) => memberships[i].includes(actorId)));
+	}
+	return allowed;
+}
+
+function requireChatRight(access, right) {
+	if (!access[right]) throw chatwootError(
+		right === 'read' ? 'Диалог недоступен в вашей рабочей очереди.' : 'Недостаточно прав. Возьмите диалог в работу или обратитесь к администратору.',
+		403,
+	);
+}
+
+function trustedContact(row, rawContactId) {
+	const id = Number(rawContactId);
+	if (!validChatId(rawContactId) || conversationContact(row) !== id)
+		throw chatwootError('Контакт не связан с этим диалогом.', 403);
+	return id;
+}
+
+const secretKeys = new Set([
+	'token', 'accesstoken', 'apiaccesstoken', 'apitoken', 'pubsubtoken', 'refreshtoken', 'apikey',
+	'authorization', 'password', 'secret', 'signingsecret', 'hmactoken', 'hmacsecret', 'hmacidentifier',
+]);
+const ipKeys = new Set(['ip', 'ipaddress', 'clientip', 'clientipaddress']);
+
+function stripSensitive(value, hideIp = false, depth = 0) {
+	if (value === null || typeof value !== 'object') return value;
+	if (depth > 24) return null;
+	if (Array.isArray(value)) return value.map((child) => stripSensitive(child, hideIp, depth + 1));
+	return Object.fromEntries(Object.entries(value)
+		.filter(([key]) => {
+			const normalized = key.replaceAll('_', '').toLowerCase();
+			return !secretKeys.has(normalized) && (!hideIp || !ipKeys.has(normalized));
+		})
+		.map(([key, child]) => [key, stripSensitive(child, hideIp, depth + 1)]));
+}
+
+const stripIp = (value) => stripSensitive(value, true);
+
+function visitorContext(row) {
+	const conversation = row.additional_attributes ?? {};
+	const sender = row.meta?.sender ?? {};
+	const contact = sender.additional_attributes ?? {};
+	const custom = sender.custom_attributes ?? {};
+	const field = (...values) => values.find((value) => typeof value === 'string' && value.trim())?.trim().slice(0, 180);
+	const referer = field(conversation.referer, conversation.source_url, custom.source_url);
+	let page;
+	try {
+		const url = new URL(referer);
+		if (['https:', 'http:'].includes(url.protocol)) page = url.hostname + url.pathname;
+	} catch { /* The inbox website can still identify the source. */ }
+	const ip = [conversation.ip_address, conversation.ip, contact.ip_address, contact.ip, custom.ip_address]
+		.find((value) => typeof value === 'string' && isIP(value.trim()));
+	return {
+		page, ip: ip?.trim(), city: field(contact.city), country: field(contact.country, contact.country_code),
+		browser: field(conversation.browser?.browser_name),
+		device: field(conversation.browser?.device_name), platform: field(conversation.browser?.platform_name),
+		login: field(custom.player_login, custom.login, row.custom_attributes?.player_login, row.custom_attributes?.login, contact.username),
 	};
-	conversations.sort((a, b) => createdAtOf(a) - createdAtOf(b));
-	let assigned = 0;
-	for (const conversation of conversations) {
-		if (!validId(String(conversation.id))) continue;
-		const conversationInboxId = String(conversation.inbox_id ?? conversation.meta?.inbox?.id ?? '');
-		let eligibleForInbox = eligible.filter((id) => activeCounts[String(id)] < capacities[String(id)]);
-		if (validId(conversationInboxId)) {
-			const memberIds = new Set(inboxMembers.get(conversationInboxId));
-			eligibleForInbox = eligibleForInbox.filter((id) => memberIds.has(id));
+}
+
+function reserveConversation(env, id, token, agents, counts = {}, lease = null) {
+	return db(env, 'rpc/supportos_chatwoot_reserve_conversation', {
+		p_conversation_id: id, p_operation_token: token, p_agent_ids: agents,
+		p_active_counts: counts, p_lease_token: lease,
+	});
+}
+
+function finishConversation(env, id, token, assignee) {
+	return db(env, 'rpc/supportos_chatwoot_finish_conversation_operation', {
+		p_conversation_id: id, p_operation_token: token, p_assignee_id: assignee,
+	});
+}
+
+async function changeConversation(env, id, targetAgent, change) {
+	const token = randomUUID();
+	const reservation = await reserveConversation(env, Number(id), token, [targetAgent]);
+	if (!reservation?.reserved) throw chatwootError('Диалог уже меняет другой сотрудник. Обновите список.', 409);
+	// A failed upstream request may have been written before the connection ended.
+	// Keep its short reservation unless an upstream response explicitly rejected it.
+	try {
+		const { result, assignee } = await change();
+		await finishConversation(env, Number(id), token, assignee);
+		return result;
+	} catch (error) {
+		if (error.status === 409 || (error.chatwootStatus >= 400 && error.chatwootStatus < 500))
+			await finishConversation(env, Number(id), token, reservation.previousAgentId ?? null).catch(() => undefined);
+		throw error;
+	}
+}
+
+export async function routeWaitingConversations(env, cfg) {
+	const leaseToken = randomUUID();
+	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', {
+		p_lease_token: leaseToken,
+		p_min_interval_seconds: 1,
+		p_lease_seconds: 35,
+	});
+	if (routerLease !== true) return { assigned: 0, skipped: true };
+	try {
+		return await routeWaitingConversationsLocked(env, cfg, leaseToken);
+	} finally {
+		await db(env, 'rpc/supportos_chatwoot_release_router_lease', { p_lease_token: leaseToken }).catch(() => undefined);
+	}
+}
+
+async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
+	const deadline = Date.now() + 12000;
+	const prefix = `/accounts/${cfg.accountId}/conversations`;
+	const presence = await allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,heartbeat_at&accepting=eq.true');
+	const eligible = presence
+		.filter((row) => Date.now() - Date.parse(row.heartbeat_at) < 90_000)
+		.map((row) => Number(row.chatwoot_agent_id));
+	if (!eligible.length) return { assigned: 0 };
+
+	const [operations, queueCounts] = await Promise.all([
+		getOperations(env),
+		Promise.all(activeStatuses.map(async (status) => {
+			const result = await api(cfg, `${prefix}/meta?status=${status}`, { timeout: 3500 });
+			return result?.data?.meta ?? result?.meta;
+		})),
+	]);
+	if (totalFromMeta(queueCounts, 'unassigned_count') === 0) return { assigned: 0 };
+	const working = eligible.filter((id) => onShift(operations.agents[id]));
+	if (!working.length) return { assigned: 0 };
+	const [limits, state, directory, active] = await Promise.all([
+		getAgentLimits(env),
+		db(env, 'supportos_chatwoot_router_state?select=last_inbox_id&id=eq.main'),
+		api(cfg, `/accounts/${cfg.accountId}/inboxes`, { timeout: 4500 }),
+		loadChatPages(cfg, 'assigned', 16),
+	]);
+	const activeCounts = {};
+	if (active.truncated) {
+		// Under a large backlog, use exact per-agent counts for this pass.
+		// Missing counts exclude an agent from automatic assignment.
+		for (let first = 0; first < working.length && Date.now() < deadline; first += 8) {
+			await Promise.all(working.slice(first, first + 8).map(async (agent) => {
+				const result = await api(cfg, `${prefix}/filter?page=1`, {
+					method: 'POST',
+					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(agent) }) },
+					timeout: 3000,
+				}).catch(() => null);
+				const count = conversationTotal(result);
+				if (count !== null) activeCounts[agent] = count;
+			}));
 		}
-		if (!eligibleForInbox.length) continue;
-		const chosen = await db(env, 'rpc/supportos_chatwoot_claim_route_with_capacity', { p_conversation_id: Number(conversation.id), p_agent_ids: eligibleForInbox, p_active_counts: baselineCounts, p_capacities: capacities });
-		const agentId = Number(chosen);
-		if (!Number.isSafeInteger(agentId) || !eligibleForInbox.includes(agentId)) continue;
-		try {
-			await api(cfg, `/accounts/${cfg.accountId}/conversations/${conversation.id}/assignments`, { method: 'POST', body: { assignee_id: agentId } });
-			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'assigned', updated_at: new Date().toISOString() }, 'PATCH');
-			activeCounts[String(agentId)] += 1;
-			assigned += 1;
-		} catch (error) {
-			await db(env, `supportos_chatwoot_routing?conversation_id=eq.${conversation.id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
-			if (error.status === 401 || error.status === 403) throw error;
+	} else {
+		for (const agent of working) activeCounts[agent] = 0;
+		for (const row of active.rows) {
+			const assignee = conversationAssignee(row);
+			if (Object.hasOwn(activeCounts, assignee)) activeCounts[assignee]++;
+		}
+	}
+
+	const capacities = new Map(limits.map((row) => [Number(row.chatwoot_agent_id), row.max_active_chats]));
+	const free = new Map(Object.entries(activeCounts).map(([agent, used]) => {
+		const id = Number(agent);
+		return [id, Math.max(0, (capacities.get(id) ?? 4) - used)];
+	}).filter(([, slots]) => slots > 0));
+	if (!free.size) return { assigned: 0 };
+
+	const inboxIds = [...new Set(itemList(directory).map((inbox) => Number(inbox.id)))]
+		.filter((id) => Number.isSafeInteger(id) && id > 0).sort((a, b) => a - b);
+	const next = inboxIds.findIndex((id) => id > Number(state?.[0]?.last_inbox_id ?? 0));
+	const start = Math.max(0, next);
+	const batch = [...inboxIds.slice(start), ...inboxIds.slice(0, start)].slice(0, 8);
+	if (!batch.length) return { assigned: 0 };
+
+	// Every pass starts at the oldest chat in each selected project. The persisted
+	// project position lets other sources progress when an earlier source is full.
+	await db(env, `supportos_chatwoot_router_state?id=eq.main&router_lease_token=eq.${leaseToken}`,
+		{ last_inbox_id: batch.at(-1) }, 'PATCH');
+	const queues = new Map();
+	for (let index = 0; index < batch.length && Date.now() < deadline; index += 4) {
+		await Promise.all(batch.slice(index, index + 4).map(async (id) => {
+			const required = operations.inboxes[id]?.skills ?? [];
+			const hasSkills = (agent) => required.every((skill) => operations.agents[agent]?.skills.includes(skill));
+			if (![...free.keys()].some(hasSkills)) return;
+			const members = await websiteInboxMembers(cfg, id, 3500).catch(() => []);
+			const candidates = members.filter((agent) => free.has(agent) && hasSkills(agent));
+			if (!candidates.length) return;
+			const slots = candidates.reduce((count, agent) => count + free.get(agent), 0);
+			const pages = Math.min(4, Math.max(1, Math.ceil(slots / 25)));
+			const queue = await loadChatPages(cfg, 'unassigned', pages, id).catch(() => null);
+			if (queue?.rows.length) queues.set(id, { rows: queue.rows, index: 0, candidates });
+		}));
+	}
+	let assigned = 0;
+	while (queues.size && Date.now() < deadline) {
+		for (const inbox of batch) {
+			if (Date.now() >= deadline) break;
+			const queue = queues.get(inbox);
+			if (!queue) continue;
+			const candidates = queue.candidates.filter((agent) => free.has(agent));
+			const row = queue.rows[queue.index++];
+			if (!row || !candidates.length) {
+				queues.delete(inbox);
+				continue;
+			}
+			const result = await assignQueuedConversation(env, cfg, prefix, row, inbox, candidates, activeCounts, leaseToken);
+			if (result.stop) return { assigned };
+			if (!result.agentId) continue;
+			const remaining = free.get(result.agentId) - 1;
+			if (remaining > 0) free.set(result.agentId, remaining);
+			else free.delete(result.agentId);
+			assigned++;
 		}
 	}
 	return { assigned };
+}
+
+async function assignQueuedConversation(env, cfg, prefix, row, inbox, candidates, activeCounts, leaseToken) {
+	const id = Number(row.id);
+	if (!Number.isSafeInteger(id) || id < 1 || conversationInbox(row) !== inbox) return {};
+	const team = Number(row.meta?.team?.id ?? row.team_id) || 0;
+	if (team > 0) {
+		const members = await getTeamMembers(cfg, team).catch(() => []);
+		candidates = candidates.filter((agent) => members.includes(agent));
+		if (!candidates.length) return {};
+	}
+	const token = randomUUID();
+	const reservation = await reserveConversation(env, id, token, candidates, activeCounts, leaseToken);
+	if (!reservation?.reserved) return {};
+	const agentId = reservation.agentId;
+	try {
+		const fresh = conversationRecord(await api(cfg, `${prefix}/${id}`, { timeout: 3000 }));
+		const assignee = conversationAssignee(fresh);
+		const freshTeam = Number(fresh.meta?.team?.id ?? fresh.team_id) || 0;
+		if (!activeStatuses.includes(fresh.status) || assignee || hasBotAssignee(fresh) || conversationInbox(fresh) !== inbox || freshTeam !== team) {
+			await finishConversation(env, id, token, activeStatuses.includes(fresh.status) ? assignee : null);
+			return {};
+		}
+		await api(cfg, `${prefix}/${id}/assignments`, { method: 'POST', body: { assignee_id: agentId }, timeout: 5000 });
+		await finishConversation(env, id, token, agentId);
+		return { agentId };
+	} catch (error) {
+		if (error.chatwootStatus >= 400 && error.chatwootStatus < 500)
+			await finishConversation(env, id, token, reservation.previousAgentId ?? null).catch(() => undefined);
+		return { stop: [401, 403, 429].includes(error.chatwootStatus) };
+	}
+}
+
+function oldestFirst(a, b) {
+	const time = (row) => {
+		const raw = row.created_at;
+		const timestamp = typeof raw === 'string' && !/^\d+$/.test(raw) ? Date.parse(raw) : Number(raw);
+		return Number.isFinite(timestamp) ? timestamp * (timestamp < 1e12 ? 1000 : 1) : 0;
+	};
+	return time(a) - time(b) || Number(a.id) - Number(b.id);
+}
+
+async function loadChatPages(cfg, assigneeType, maxPages, inboxId) {
+	const path = `/accounts/${cfg.accountId}/conversations`;
+	const load = async (status, page) => {
+		const query = new URLSearchParams({ status, assignee_type: assigneeType, page: String(page) });
+		if (assigneeType === 'unassigned') query.set('sort_by', 'created_at_asc');
+		if (inboxId) query.set('inbox_id', String(inboxId));
+		const result = await api(cfg, `${path}?${query}`, { timeout: 4500 });
+		return { rows: itemList(result), meta: result?.data?.meta ?? result?.meta };
+	};
+	const byStatus = await Promise.all(activeStatuses.map(async (status) => {
+		const first = await load(status, 1);
+		const key = assigneeType === 'unassigned' ? 'unassigned_count' : assigneeType === 'assigned' ? 'assigned_count' : 'all_count';
+		const total = countFromMeta(first.meta, key);
+		const size = first.rows.length;
+		// Chatwoot exposes 25 rows on a full page. If metadata is missing,
+		// read forward to an empty/partial page before using an active snapshot.
+		const hasTotal = total !== null;
+		const pages = hasTotal && size > 0 ? Math.ceil(total / size) : size === 0 ? 1 : maxPages;
+		const rows = [...first.rows];
+		let lastSize = size;
+		for (let start = 2; start <= Math.min(pages, maxPages) && lastSize > 0; start += 4) {
+			const batch = await Promise.all(
+				Array.from({ length: Math.min(4, Math.min(pages, maxPages) - start + 1) }, (_, offset) => load(status, start + offset)),
+			);
+			for (const page of batch) rows.push(...page.rows);
+			lastSize = batch.at(-1).rows.length;
+		}
+		const unique = new Map(rows.map((row) => [row.id, row]));
+		return {
+			rows: [...unique.values()],
+			truncated: hasTotal ? unique.size < total : lastSize > 0,
+			meta: first.meta,
+		};
+	}));
+	let rows = [...new Map(byStatus.flatMap((result) => result.rows).map((row) => [row.id, row])).values()];
+	if (assigneeType === 'unassigned') {
+		// When one status has more pages, avoid assigning a newer chat from the
+		// other status ahead of chats that are still outside the fetched window.
+		const boundaries = byStatus.filter((part) => part.truncated).map((part) => part.rows.at(-1));
+		rows = rows.filter((row) => boundaries.every((boundary) => boundary && oldestFirst(row, boundary) <= 0)).sort(oldestFirst);
+	}
+	return {
+		rows,
+		truncated: byStatus.some((result) => result.truncated),
+		metadata: byStatus.map((result) => result.meta),
+	};
 }
 
 function conversationFilters({ status, assigneeId, agentId, inboxId, label, from, to }) {
@@ -324,47 +645,178 @@ export default async function handler(req, res) {
 			return json(res, 409, { error: inboxes.length ? 'У Website-канала не найден публичный токен виджета' : 'Создайте Website-канал в Chatwoot, чтобы включить тестовый виджет' });
 		}
 		const requestedScope = url.searchParams.get('scope');
-		const permission = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members'].includes(action) || action === 'custom-attributes' && req.method !== 'GET' ? 'technical' : ['conversations', 'agent-capacity'].includes(action) && (action === 'agent-capacity' || requestedScope === 'active') ? 'monitor.read' : 'work';
-		const user = await requireUser(req, { permission });
+		const user = await requireUser(req, { permission: 'work' });
+		const capabilities = chatCapabilities(user.access);
+		const monitorAction = ['agent-capacity', 'chat-operations', 'chat-supervisor', 'active-overview', 'supervision'].includes(action) || action === 'conversations' && requestedScope === 'active';
+		const projectAction = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members', 'chat-label', 'chat-team'].includes(action)
+			|| action === 'custom-attributes' && req.method !== 'GET';
+		if (monitorAction && !capabilities.supervise) throw chatwootError('Раздел доступен руководителю и QC.', 403);
+		if (projectAction && !capabilities.manageProjects) throw chatwootError('Эта настройка доступна администратору.', 403);
+		if (action === 'website-source' && req.method === 'DELETE' && !capabilities.deleteProjects)
+			throw chatwootError('Удалять источники может только Creator.', 403);
+		if (action === 'webhook-secret' && !capabilities.manageWebhooks)
+			throw chatwootError('Вебхуки и секреты может настраивать только Creator.', 403);
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
 		if (action === 'health' && req.method === 'GET') {
 			const cfg = config();
 			if (!cfg) return json(res, 200, { configured: false });
-			const profile = await api(cfg, '/profile');
-			return json(res, 200, { configured: true, profile });
+			const lastEvent = Promise.resolve().then(() =>
+				db(serverConfig(), 'supportos_chatwoot_webhook_events?select=received_at&order=received_at.desc&limit=1'),
+			).catch(() => []);
+			const [, events] = await Promise.all([api(cfg, '/profile'), lastEvent]);
+			return json(res, 200, { configured: true, capabilities, lastWebhookAt: events?.[0]?.received_at ?? null });
 		}
 		const cfg = config();
 		if (!cfg) return json(res, 503, { error: 'Добавьте CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID и CHATWOOT_ACCESS_TOKEN в серверные переменные окружения' });
 		const env = serverConfig(process.env);
 		const prefix = `/accounts/${cfg.accountId}/conversations`;
+		const supervisionContext = { env, account: cfg.accountId, userId: user.id, upstream: (path, options) => api(cfg, path, options) };
+		if (action === 'active-overview' && req.method === 'GET')
+			return json(res, 200, await activeOverview({ ...supervisionContext, params: url.searchParams }));
+		if (action === 'supervision' && req.method === 'GET')
+			return json(res, 200, { ids: await supervisedIds(env, cfg.accountId, user.id) });
+		if (action === 'supervision' && req.method === 'POST')
+			return json(res, 200, await changeSupervision({ ...supervisionContext, conversationId: body.conversationId, enabled: body.enabled }));
+		if (action === 'coaching-notes') {
+			if (req.method !== 'GET' && req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
+			const id = req.method === 'GET' ? url.searchParams.get('id') : body.conversationId;
+			if (!validChatId(id)) throw chatwootError('Некорректный ID диалога', 400);
+			if (req.method === 'GET') return json(res, 200, { notes: await coachingNotes(env, cfg.accountId, id, user.id) });
+			if (!capabilities.supervise) throw chatwootError('Подсказки агенту доступны сотрудникам с правом наблюдения.', 403);
+			const content = typeof body.content === 'string' ? body.content.trim() : '';
+			if (!content || content.length > 2000 || content.includes('\0') || typeof body.noteId !== 'string' ||
+				!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.noteId) || !validChatId(body.recipientAgentId))
+				throw chatwootError('Проверьте адресата и текст подсказки (до 2000 символов).', 400);
+			const [row, agents] = await Promise.all([api(cfg, `${prefix}/${id}`).then(conversationRecord), listAgents(cfg)]);
+			const assignee = conversationAssignee(row);
+			if (!activeStatuses.includes(row.status) || assignee !== Number(body.recipientAgentId))
+				throw chatwootError('Диалог завершён или ответственный изменился. Обновите диалог.', 409);
+			const recipientEmail = agents.find((agent) => Number(agent.id) === assignee)?.email?.trim();
+			if (!recipientEmail) throw chatwootError('У назначенного агента в Chatwoot нет рабочей почты.', 409);
+			return json(res, 200, await sendCoachingNote(env, cfg.accountId, id, user.id, recipientEmail, { id: body.noteId, content }));
+		}
+		let agentRequest;
+		const getAgentId = () => agentRequest ??= matchAgent(cfg, user.email).then((agent) => Number(agent?.id) || null);
+		const getDirectory = async () => availableInboxes(cfg, await directoryFor(cfg), capabilities.supervise ? null : await getAgentId(), capabilities);
+		const accessFor = async (id, { fresh = false, needAgent = false } = {}) => {
+			if (!validChatId(id)) throw chatwootError('Некорректный ID диалога', 400);
+			const [row, agentId] = await Promise.all([
+				api(cfg, `${prefix}/${id}`).then(conversationRecord),
+				capabilities.manageAllChats && !needAgent ? null : getAgentId(),
+			]);
+			const inbox = conversationInbox(row);
+			const member = Boolean(agentId && validChatId(inbox) &&
+				(await membersFor(cfg, inbox, fresh).catch(() => [])).includes(agentId));
+			const assigneeId = conversationAssignee(row);
+			const access = chatConversationAccess(capabilities, {
+				assigneeId, agentId, member, unassigned: !assigneeId && !hasBotAssignee(row), active: activeStatuses.includes(row.status),
+			});
+			return { row, access, agentId };
+		};
+		if (action === 'chat-label' || action === 'chat-team') {
+			const team = action === 'chat-team';
+			const resource = team ? 'teams' : 'labels';
+			const path = `/accounts/${cfg.accountId}/${resource}`;
+			const id = body.id ?? url.searchParams.get('id');
+			if (id != null && !validChatId(id)) return json(res, 400, { error: 'Проверьте идентификатор' });
+			if (req.method === 'GET') {
+				if (team && id) return json(res, 200, { memberIds: await getTeamMembers(cfg, id, true) });
+				return json(res, 200, { payload: itemList(await api(cfg, path)) });
+			}
+			if (req.method === 'DELETE' && id)
+				return json(res, 200, await api(cfg, `${path}/${id}`, { method: 'DELETE' }));
+			if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
+			if (team && id && Array.isArray(body.memberIds)) {
+				const members = [...new Set(body.memberIds.map(Number))];
+				if (members.length > 250 || members.some((value) => !validChatId(value)))
+					return json(res, 400, { error: 'Проверьте список участников команды' });
+				const response = await api(cfg, `${path}/${id}/team_members`, { method: 'PATCH', body: { user_ids: members } });
+				teamMemberCache.delete(`${cfg.base}/${cfg.accountId}/${id}`);
+				return json(res, 200, response);
+			}
+			const name = typeof body.name === 'string' ? body.name.trim() : '';
+			const description = typeof body.description === 'string' ? body.description.trim() : '';
+			if (!name || name.length > 60 || description.length > 400)
+				return json(res, 400, { error: 'Проверьте название и описание' });
+			if (!team && (!/^[a-z0-9][a-z0-9_-]*$/.test(name) || !/^#[\da-f]{6}$/i.test(body.color ?? '')))
+				return json(res, 400, { error: 'Тег должен содержать латинские буквы, цифры, дефисы или подчёркивания. Укажите цвет.' });
+			const data = team ? { name, description, ...(id ? {} : { allow_auto_assign: false }) } :
+				{ title: name, description, color: body.color, show_on_sidebar: body.showOnSidebar === true };
+			return json(res, 200, await api(cfg, id ? `${path}/${id}` : path, { method: id ? 'PATCH' : 'POST', body: data }));
+		}
+		if (action === 'chat-operations' && ['GET', 'POST'].includes(req.method)) {
+			if (req.method === 'GET') return json(res, 200, await getOperations(env));
+			if (!capabilities.manageRouting)
+				return json(res, 403, { error: 'Настроить маршрутизацию могут администратор и QC' });
+			return json(res, 200, await saveOperations(env, user.id, body));
+		}
+		if (action === 'chat-supervisor' && req.method === 'GET') {
+			const [operations, active, limits, presence] = await Promise.all([
+				getOperations(env),
+				loadChatPages(cfg, 'all', 16),
+				getAgentLimits(env),
+				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
+			]);
+			const usage = {};
+			let sampledQueue = 0;
+			for (const row of active.rows) {
+				const agent = conversationAssignee(row);
+				if (agent) usage[agent] = (usage[agent] ?? 0) + 1;
+				else if (!hasBotAssignee(row)) sampledQueue++;
+			}
+			const capacities = new Map(limits.map((row) => [Number(row.chatwoot_agent_id), row.max_active_chats]));
+			const agents = presence.map((row) => {
+				const id = Number(row.chatwoot_agent_id);
+				return { id, online: Date.now() - Date.parse(row.heartbeat_at) < 90_000, accepting: row.accepting, onShift: onShift(operations.agents[id]), used: usage[id] ?? 0, limit: capacities.get(id) ?? 4 };
+			});
+			const queue = totalFromMeta(active.metadata, 'unassigned_count') ?? (active.truncated ? null : sampledQueue);
+			const total = totalFromMeta(active.metadata, 'all_count') ?? (active.truncated ? null : active.rows.length);
+			return json(res, 200, { queue, active: total, truncated: active.truncated, agents, sla: slaSnapshot(active.rows, operations) });
+		}
+		if (action === 'webhook-secret' && ['GET', 'POST'].includes(req.method)) {
+			if (req.method === 'GET') {
+				const saved = (await db(env, 'supportos_chatwoot_webhook_config?select=updated_at&id=eq.main&limit=1'))?.[0];
+				const recent = saved && (await db(env, `supportos_chatwoot_webhook_events?select=received_at&received_at=gte.${encodeURIComponent(saved.updated_at)}&order=received_at.desc&limit=1`))?.[0];
+				return json(res, 200, { configured: Boolean(saved), lastReceivedAt: recent?.received_at ?? null });
+			}
+			const signingSecret = typeof body.signingSecret === 'string' ? body.signingSecret.trim() : '';
+			if (signingSecret.length < 16 || signingSecret.length > 512)
+				return json(res, 400, { error: 'Секрет вебхука должен содержать от 16 до 512 символов' });
+			const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_webhook_config?on_conflict=id`, {
+				method: 'POST',
+				headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+				body: JSON.stringify({ id: 'main', signing_secret: signingSecret, updated_by: user.id, updated_at: new Date().toISOString() }),
+				signal: AbortSignal.timeout(15000),
+			});
+			if (!response.ok) throw Object.assign(new Error('Не удалось сохранить секрет вебхука'), { status: 502 });
+			return json(res, 200, { configured: true });
+		}
 		if (action === 'conversation-counts' && req.method === 'GET') {
-			const inboxId = url.searchParams.get('inbox_id');
+			let inboxId = url.searchParams.get('inbox_id');
 			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
-			const statuses = await Promise.all(['open', 'pending'].map(async (status) => {
+			const actorId = await getAgentId();
+			const allowed = capabilities.supervise ? null : (await getDirectory()).map((item) => String(item.id));
+			if (allowed && inboxId && !allowed.includes(inboxId)) throw chatwootError('Источник недоступен.', 403);
+			const mineInbox = inboxId || allowed || undefined;
+			if (allowed) inboxId ||= allowed[0];
+			const statuses = allowed && !inboxId ? [] : await Promise.all(activeStatuses.map(async (status) => {
 				const query = new URLSearchParams({ status });
 				if (inboxId) query.set('inbox_id', inboxId);
 				const result = await api(cfg, `${prefix}/meta?${query}`);
 				return result?.data?.meta ?? result?.meta ?? {};
 			}));
-			const countFromMeta = (meta, key) => {
-				const count = Number(meta?.[key]);
-				return Number.isSafeInteger(count) && count >= 0 ? count : null;
-			};
 			let mineCount = null;
-			const ownPresence = await presenceFor(env, user.id);
-			const ownAgent = ownPresence?.chatwoot_agent_id ?? Number((await matchAgent(cfg, user.email))?.id);
-			if (Number.isSafeInteger(Number(ownAgent)) && Number(ownAgent) > 0) {
+			if (actorId && (!allowed || allowed.length)) {
 				const filtered = await api(cfg, `${prefix}/filter?page=1`, {
 					method: 'POST',
-					body: { payload: conversationFilters({ status: ['open', 'pending'], assigneeId: String(ownAgent), inboxId }) },
+					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(actorId), inboxId: mineInbox }) },
 				});
 				mineCount = conversationTotal(filtered);
 			}
-			const canSeeAllActive = user.access?.permissions?.includes('monitor.read') === true;
 			return json(res, 200, {
-				queueCount: statuses.reduce((total, meta) => total + (countFromMeta(meta, 'unassigned_count') ?? 0), 0),
+				queueCount: totalFromMeta(statuses, 'unassigned_count'),
 				mineCount,
-				activeCount: canSeeAllActive ? statuses.reduce((total, meta) => total + (countFromMeta(meta, 'all_count') ?? 0), 0) : null,
+				activeCount: capabilities.supervise ? totalFromMeta(statuses, 'all_count') : null,
 			});
 		}
 		if (action === 'custom-attributes') {
@@ -402,20 +854,18 @@ export default async function handler(req, res) {
 			const attributes = body.attributes;
 			if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes) || Object.keys(attributes).length > 50 || Object.values(attributes).some((value) => value !== null && !['string', 'number', 'boolean'].includes(typeof value)))
 				return json(res, 400, { error: 'Передайте значения пользовательских полей' });
-			if (conversationId && validId(conversationId)) {
+			const { row, access } = await accessFor(conversationId, { fresh: true });
+			requireChatRight(access, 'write');
+			if (!contactId) {
 				return json(res, 200, await api(cfg, `${prefix}/${conversationId}/custom_attributes`, { method: 'POST', body: { custom_attributes: attributes, merge: true } }));
 			}
-			if (contactId && validId(contactId)) {
-				const existingResult = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`);
-				const existing = existingResult?.payload ?? existingResult;
-				const merged = { ...(existing.custom_attributes ?? {}), ...attributes };
-				return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`, { method: 'PUT', body: { custom_attributes: merged } }));
-			}
-			return json(res, 400, { error: 'Укажите корректный ID диалога или контакта' });
+			trustedContact(row, contactId);
+			const existing = conversationRecord(await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`));
+			const merged = { ...(existing.custom_attributes ?? {}), ...attributes };
+			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`, { method: 'PUT', body: { custom_attributes: merged } }));
 		}
 		if (action === 'agent-capacity' && req.method === 'POST') {
-			const allowedRole = user.access?.roles?.some((role) => ['admin', 'qc', 'creator'].includes(role.id));
-			if (!allowedRole) return json(res, 403, { error: 'Лимиты чатов может менять только администратор или QC' });
+			if (!capabilities.manageRouting) return json(res, 403, { error: 'Лимиты чатов может менять только администратор или QC' });
 			const agentId = Number(body.agentId);
 			const maxActiveChats = Number(body.maxActiveChats);
 			if (!Number.isSafeInteger(agentId) || agentId <= 0 || !Number.isInteger(maxActiveChats) || maxActiveChats < 1 || maxActiveChats > 50)
@@ -431,7 +881,7 @@ export default async function handler(req, res) {
 			if (!response.ok) throw Object.assign(new Error('Не удалось сохранить лимит агента'), { status: 502 });
 			const presence = await allRows(env, 'supportos_chatwoot_presence?select=accepting,heartbeat_at');
 			if (presence.some((row) => row.accepting && Date.now() - Date.parse(row.heartbeat_at) < 90_000))
-				await routeWaitingConversations(env, cfg);
+				await routeWaitingConversations(env, cfg).catch(() => undefined);
 			return json(res, 200, { agentId, maxActiveChats });
 		}
 		if (action === 'presence' && ['GET', 'POST'].includes(req.method)) {
@@ -439,16 +889,21 @@ export default async function handler(req, res) {
 			if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot, чтобы подключить приём чатов' });
 			const previous = await presenceFor(env, user.id);
 			const accepting = typeof body.accepting === 'boolean' ? body.accepting : previous?.accepting === true;
-			const current = await writePresence(env, user, Number(agent.id), accepting);
+			const canRefresh = Number(previous?.chatwoot_agent_id) === Number(agent.id) && typeof body.accepting !== 'boolean';
+			const current = (canRefresh && await refreshPresence(env, user.id)) || await writePresence(env, user, Number(agent.id), accepting);
 			const [team, limits] = await Promise.all([
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 				getAgentLimits(env),
 			]);
 			const cutoff = Date.now() - 90_000;
 			const activeTeam = team.filter((row) => Date.parse(row.heartbeat_at) >= cutoff).map((row) => ({ agentId: Number(row.chatwoot_agent_id), accepting: row.accepting, maxActiveChats: Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(row.chatwoot_agent_id))?.max_active_chats) || 4, active: true }));
-			const routing = activeTeam.some((row) => row.accepting) ? await routeWaitingConversations(env, cfg) : { assigned: 0 };
+			const routing = activeTeam.some((row) => row.accepting) ? await routeWaitingConversations(env, cfg).catch(() => ({ assigned: 0 })) : { assigned: 0 };
 			const maxActiveChats = Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agent.id))?.max_active_chats) || 4;
-			return json(res, 200, { current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at }, team: activeTeam, routing });
+			return json(res, 200, {
+				current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at },
+				team: capabilities.supervise ? activeTeam : activeTeam.filter((item) => item.agentId === Number(agent.id)),
+				routing: capabilities.supervise ? routing : { assigned: 0 },
+			});
 		}
 		if (action === 'conversations' && req.method === 'GET') {
 			const scope = url.searchParams.get('scope') ?? 'queue';
@@ -456,7 +911,7 @@ export default async function handler(req, res) {
 			const page = Math.min(10000, Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1));
 			const status = url.searchParams.get('status') ?? (scope === 'history' ? 'resolved' : scope === 'mine' ? 'open' : 'open');
 			if (!['open', 'resolved', 'pending', 'snoozed', 'all'].includes(status)) return json(res, 400, { error: 'Некорректный статус' });
-			const inboxId = url.searchParams.get('inbox_id');
+			let inboxId = url.searchParams.get('inbox_id');
 			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
 			const agentId = url.searchParams.get('agent_id');
 			if (agentId && !validId(agentId)) return json(res, 400, { error: 'Некорректный агент' });
@@ -465,23 +920,40 @@ export default async function handler(req, res) {
 			const to = url.searchParams.get('to');
 			const validDate = (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
 			if (!validDate(from) || !validDate(to)) return json(res, 400, { error: 'Некорректный диапазон дат' });
+			const allowed = capabilities.supervise ? null : (await getDirectory()).map((inbox) => String(inbox.id));
+			if (allowed && inboxId && !allowed.includes(inboxId)) throw chatwootError('Источник недоступен.', 403);
+			if (allowed && !allowed.length) return json(res, 200, { payload: [], hasMore: false });
 			if (scope === 'queue') {
+				if (allowed) inboxId ||= allowed[0];
 				const paramsFor = (nextStatus) => {
-					const query = new URLSearchParams({ status: nextStatus, assignee_type: 'unassigned', page: String(page) });
+					const query = new URLSearchParams({ status: nextStatus, assignee_type: 'unassigned', page: String(page), sort_by: 'created_at_asc' });
 					if (inboxId) query.set('inbox_id', inboxId);
 					if (label) query.set('labels', label);
 					const q = url.searchParams.get('q');
 					if (q) query.set('q', q.slice(0, 150));
 					return query;
 				};
-				const [open, pending] = await Promise.all([
-					api(cfg, `${prefix}?${paramsFor(status === 'pending' ? 'pending' : 'open')}`),
-					api(cfg, `${prefix}?${paramsFor('pending')}`),
-				]);
-				const openItems = itemList(open);
-				const pendingItems = itemList(pending);
-				const unique = new Map([...openItems, ...pendingItems].map((conversation) => [conversation.id, conversation]));
-				return json(res, 200, { payload: [...unique.values()], hasMore: openItems.length >= 25 || pendingItems.length >= 25 });
+				const statuses = status === 'pending' ? ['pending'] : activeStatuses;
+				const results = await Promise.all(statuses.map((kind) => api(cfg, `${prefix}?${paramsFor(kind)}`)));
+				const pages = results.map((result) => itemList(result).filter((row) =>
+					activeStatuses.includes(row.status) && !conversationAssignee(row) && !hasBotAssignee(row)
+					&& (!inboxId || Number(inboxId) === conversationInbox(row))));
+				const unique = new Map(pages.flat().map((conversation) => [conversation.id, conversation]));
+				const nextPages = results.map(async (result, index) => {
+					const rows = pages[index];
+					if (!rows.length || page === 10000) return false;
+					const total = countFromMeta(result?.data?.meta ?? result?.meta, 'unassigned_count');
+					if (total !== null) {
+						if (total <= page * rows.length) return false;
+						if (page === 1 || (total - rows.length) % (page - 1) !== 0) return true;
+					}
+					// Self-hosted instances can change the number of rows per page.
+					const query = paramsFor(statuses[index]);
+					query.set('page', String(page + 1));
+					return itemList(await api(cfg, `${prefix}?${query}`)).length > 0;
+				});
+				const payload = [...unique.values()].sort(oldestFirst);
+				return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: (await Promise.all(nextPages)).some(Boolean) });
 			}
 			if (scope === 'active') {
 				const paramsFor = (status) => {
@@ -502,47 +974,76 @@ export default async function handler(req, res) {
 				return json(res, 200, { payload: [...unique.values()], hasMore: openItems.length >= 25 || pendingItems.length >= 25 });
 			}
 			let assigneeId = agentId;
-			if (scope === 'mine') {
-				const agent = await matchAgent(cfg, user.email);
-				if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot' });
-				assigneeId = String(agent.id);
+			if (scope === 'mine' || allowed) {
+				const agentId = await getAgentId();
+				if (!agentId) return json(res, 200, { payload: [], hasMore: false });
+				assigneeId = String(agentId);
 			}
 			if (assigneeId && !validId(assigneeId)) return json(res, 400, { error: 'Некорректный агент' });
-			const filters = conversationFilters({ status: scope === 'mine' && status === 'open' ? ['open', 'pending'] : status, assigneeId, inboxId, label, from, to });
+			const filters = conversationFilters({ status: scope === 'mine' && status === 'open' ? activeStatuses : status, assigneeId, inboxId: inboxId || allowed, label, from, to });
 			const search = url.searchParams.get('q')?.trim().slice(0, 150);
 			const searchQuery = search ? `&q=${encodeURIComponent(search)}` : '';
 			const result = await api(cfg, `${prefix}/filter?page=${page}${searchQuery}`, { method: 'POST', body: { payload: filters } });
-			const payload = itemList(result);
-			return json(res, 200, { ...result, payload, hasMore: payload.length >= 25 });
+			const received = itemList(result);
+			const payload = received.filter((row) => {
+				if (scope === 'history' && status !== 'all' && status !== row.status) return false;
+				return !allowed || (String(conversationAssignee(row)) === assigneeId && allowed.includes(String(conversationInbox(row))));
+			});
+			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: received.length >= 25 });
 		}
 		if (action === 'conversation' && req.method === 'GET') {
 			const id = url.searchParams.get('id');
 			if (!validId(id)) return json(res, 400, { error: 'Некорректный ID диалога' });
-			return json(res, 200, await api(cfg, `${prefix}/${id}`));
+			const [conversation, operations] = await Promise.all([
+				accessFor(id),
+				getOperations(env).catch((error) => {
+					if (error.storageCode === 'PGRST205') return { inboxes: {} };
+					throw error;
+				}),
+			]);
+			const { row, access } = conversation;
+			requireChatRight(access, 'read');
+			const visitor = visitorContext(row);
+			if (!access.seeIp) delete visitor.ip;
+			const coachRecipient = capabilities.supervise && activeStatuses.includes(row.status) && conversationAssignee(row);
+			return json(res, 200, {
+				...(access.seeIp ? row : stripIp(row)), access, visitor,
+				coachRecipient: coachRecipient ? { id: coachRecipient, name: row.meta?.assignee?.name || row.meta?.assignee?.available_name || null } : null,
+				crm: access.seeIp ? operations.inboxes[conversationInbox(row)]?.crm || null : null,
+			});
 		}
 		if (action === 'messages' && req.method === 'GET') {
 			const id = url.searchParams.get('id');
 			const before = url.searchParams.get('before');
 			if (!validId(id)) return json(res, 400, { error: 'Некорректный ID диалога' });
 			if (before && !validId(before)) return json(res, 400, { error: 'Некорректный курсор истории' });
+			const { access } = await accessFor(id);
+			requireChatRight(access, 'read');
 			const cursor = before ? `?before=${encodeURIComponent(before)}` : '';
-			return json(res, 200, await api(cfg, `${prefix}/${id}/messages${cursor}`));
+			const messages = await api(cfg, `${prefix}/${id}/messages${cursor}`);
+			return json(res, 200, access.seeIp ? messages : stripIp(messages));
 		}
 		if (action === 'agents' && req.method === 'GET') {
 			const [agents, inboxes, teams, presence, limits] = await Promise.all([
 				api(cfg, `/accounts/${cfg.accountId}/agents`),
-				api(cfg, `/accounts/${cfg.accountId}/inboxes`),
+				getDirectory(),
 				api(cfg, `/accounts/${cfg.accountId}/teams`).catch(() => []),
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 				getAgentLimits(env),
 			]);
 			const maxFor = (agentId) => Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agentId))?.max_active_chats) || 4;
-			return json(res, 200, { agents: itemList(agents).map((agent) => ({ ...agent, max_active_chats: maxFor(agent.id) })), inboxes: itemList(inboxes), teams: itemList(teams), presence: presence.map((row) => ({ ...row, max_active_chats: maxFor(row.chatwoot_agent_id) })) });
+			const actor = await getAgentId();
+			const visibleMembers = capabilities.supervise ? null : new Set((await Promise.all(
+				inboxes.map((inbox) => membersFor(cfg, inbox.id).catch(() => [])),
+			)).flat());
+			const safeAgents = itemList(agents).filter((agent) => !visibleMembers || visibleMembers.has(Number(agent.id)) || Number(agent.id) === actor)
+				.map(({ id, name, email, role, availability_status }) => ({ id, name, email: capabilities.supervise || Number(id) === actor ? email : undefined, role, availability_status, max_active_chats: maxFor(id) }));
+			return json(res, 200, { agents: safeAgents, inboxes: inboxes.map(publicInbox), teams: itemList(teams).map(({ id, name, description, allow_auto_assign }) => ({ id, name, description, allow_auto_assign })), presence: presence.filter((item) => !visibleMembers || visibleMembers.has(Number(item.chatwoot_agent_id))).map((row) => ({ ...row, max_active_chats: maxFor(row.chatwoot_agent_id) })) });
 		}
 		if (action === 'labels' && req.method === 'GET')
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/labels`));
 		if (action === 'inboxes' && req.method === 'GET')
-			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/inboxes`));
+			return json(res, 200, { payload: (await getDirectory()).map(publicInbox) });
 		if (action === 'website-inboxes' && req.method === 'GET') {
 			const source = itemList(await api(cfg, `/accounts/${cfg.accountId}/inboxes`)).filter(isWebsiteInbox);
 			const inboxes = await Promise.all(source.map(async (item) => {
@@ -560,14 +1061,39 @@ export default async function handler(req, res) {
 			return json(res, 200, { operatorIds: await websiteInboxMembers(cfg, inboxId) });
 		}
 		if (action === 'contact' && req.method === 'GET') {
-			const contactId = url.searchParams.get('id');
-			if (!validId(contactId)) return json(res, 400, { error: 'Некорректный ID контакта' });
-			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`));
+			const { row, access } = await accessFor(url.searchParams.get('conversationId'));
+			requireChatRight(access, 'read');
+			const contactId = trustedContact(row, url.searchParams.get('id'));
+			const contact = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`);
+			return json(res, 200, access.seeIp ? contact : stripIp(contact));
+		}
+		if (action === 'contact-history' && req.method === 'GET') {
+			const id = url.searchParams.get('conversationId');
+			const { row, access, agentId } = await accessFor(id);
+			requireChatRight(access, 'read');
+			const contactId = trustedContact(row, url.searchParams.get('id'));
+			const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}/conversations`);
+			const allowed = capabilities.supervise ? null : new Set((await getDirectory()).map((inbox) => Number(inbox.id)));
+			const payload = itemList(result)
+				.filter((chat) => {
+					if (String(chat.id) === id || (conversationContact(chat) && conversationContact(chat) !== contactId)) return false;
+					const assignee = conversationAssignee(chat);
+					return chatConversationAccess(capabilities, {
+						assigneeId: assignee, agentId, member: allowed?.has(conversationInbox(chat)) === true,
+						unassigned: !assignee && !hasBotAssignee(chat), active: activeStatuses.includes(chat.status),
+					}).read;
+				})
+				.sort((a, b) => oldestFirst(b, a)).slice(0, 12)
+				.map(({ id, inbox_id, status, created_at }) => ({ id, inbox_id, status, created_at }));
+			return json(res, 200, { payload });
 		}
 		if (req.method !== 'POST' && action !== 'website-source') return json(res, 405, { error: 'Метод не поддерживается' });
 		if (action === 'contact-block') {
-			if (!validId(String(body.contactId ?? '')) || typeof body.blocked !== 'boolean') return json(res, 400, { error: 'Некорректный контакт или статус блокировки' });
-			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${body.contactId}`, { method: 'PUT', body: { blocked: body.blocked } }));
+			if (typeof body.blocked !== 'boolean') return json(res, 400, { error: 'Некорректный статус блокировки' });
+			const { row, access } = await accessFor(body.conversationId, { fresh: true });
+			requireChatRight(access, 'write');
+			const contactId = trustedContact(row, body.contactId);
+			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`, { method: 'PUT', body: { blocked: body.blocked } }));
 		}
 		if (action === 'website-domains') {
 			if (!validId(String(body.inboxId ?? ''))) return json(res, 400, { error: 'Некорректный ID сайта' });
@@ -581,6 +1107,8 @@ export default async function handler(req, res) {
 				const inboxId = String(body.inboxId ?? '');
 				if (!validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
 				const result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'DELETE' });
+				inboxDirectoryCache.delete(`${cfg.base}/${cfg.accountId}`);
+				membershipCache.delete(`${cfg.base}/${cfg.accountId}/${inboxId}`);
 				await db(env, `supportos_chatwoot_widget_settings?inbox_id=eq.${inboxId}`, undefined, 'DELETE');
 				return json(res, 200, result);
 			}
@@ -610,8 +1138,15 @@ export default async function handler(req, res) {
 			const detail = result?.payload ?? result;
 			return json(res, 200, { inbox: { id: Number(detail.id ?? inboxId), name: detail.name ?? source.name, website_url: detail.website_url ?? detail.channel?.website_url ?? source.websiteUrl, allowed_domains: detail.allowed_domains ?? detail.channel?.allowed_domains ?? source.allowedDomains.join(','), widget_color: detail.widget_color ?? detail.channel?.widget_color ?? source.widgetColor, widget_position: source.widgetPosition, widget_type: source.widgetType, widget_locale: source.widgetLocale, launcher_title: source.launcherTitle, welcome_title: detail.welcome_title ?? detail.channel?.welcome_title ?? source.welcomeTitle, welcome_tagline: detail.welcome_tagline ?? detail.channel?.welcome_tagline ?? source.welcomeTagline, greeting_enabled: detail.greeting_enabled ?? source.greetingEnabled, greeting_message: detail.greeting_message ?? source.greetingMessage, website_token: detail.website_token ?? detail.channel?.website_token ?? null } });
 		}
-		if (!validId(String(body.conversationId ?? ''))) return json(res, 400, { error: 'Некорректный ID диалога' });
+		if (!['message', 'status', 'assign', 'take', 'labels', 'priority'].includes(action))
+			return json(res, 404, { error: 'Неизвестное действие' });
+		if (!validChatId(body.conversationId)) return json(res, 400, { error: 'Некорректный ID диалога' });
 		const id = String(body.conversationId);
+		const right = action === 'take' ? 'take' : action === 'message' && body.private === true ? 'note' : 'write';
+		const current = await accessFor(id, { fresh: true, needAgent: action === 'take' });
+		if (action === 'take' && current.access.read && !current.access.take)
+			return json(res, 409, { error: 'Диалог уже взяли или закрыли. Обновите очередь.' });
+		requireChatRight(current.access, right);
 		if (action === 'message') {
 			const content = typeof body.content === 'string' ? body.content.trim() : '';
 			const attachments = Array.isArray(body.attachments) ? body.attachments : [];
@@ -648,24 +1183,56 @@ export default async function handler(req, res) {
 			return json(res, 200, result);
 		}
 		if (action === 'status') {
-			if (!['open', 'resolved', 'snoozed'].includes(body.status)) return json(res, 400, { error: 'Некорректный статус' });
-			const result = await api(cfg, `${prefix}/${id}/toggle_status`, { method: 'POST', body: { status: body.status } });
-			if (body.status === 'resolved')
-				await db(env, `supportos_chatwoot_routing?conversation_id=eq.${id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
+			if (!['open', 'pending', 'resolved', 'snoozed'].includes(body.status)) return json(res, 400, { error: 'Некорректный статус' });
+			const seconds = body.snoozedUntil;
+			const now = Math.floor(Date.now() / 1000);
+			if (seconds != null && (body.status !== 'snoozed' || !Number.isSafeInteger(seconds) || seconds <= now || seconds > now + 31 * 86400))
+				return json(res, 400, { error: 'Укажите срок паузы в пределах 31 дня' });
+			const agentId = conversationAssignee(current.row);
+			const active = activeStatuses.includes(body.status);
+			const result = await changeConversation(env, id, active ? agentId : null, async () => {
+				const fresh = await accessFor(id, { fresh: true });
+				if (!fresh.access.write || conversationAssignee(fresh.row) !== agentId)
+					throw chatwootError('Ответственный изменился. Обновите диалог.', 409);
+				const result = await api(cfg, `${prefix}/${id}/toggle_status`, { method: 'POST', body: {
+					status: body.status, ...(seconds == null ? {} : { snoozed_until: seconds }),
+				} });
+				return { result, assignee: active ? agentId : null };
+			});
 			return json(res, 200, result);
 		}
-		if (action === 'assign') {
-			const assigneeId = body.assigneeId == null ? null : Number(body.assigneeId);
+		if (action === 'assign' || action === 'take') {
+			const self = action === 'take';
+			const setTeam = !self && Object.hasOwn(body, 'teamId');
 			const teamId = body.teamId == null ? null : Number(body.teamId);
-			if ((assigneeId !== null && !Number.isSafeInteger(assigneeId)) || (teamId !== null && !Number.isSafeInteger(teamId))) return json(res, 400, { error: 'Некорректное назначение' });
-			const result = await api(cfg, `${prefix}/${id}/assignments`, { method: 'POST', body: { assignee_id: assigneeId, team_id: teamId } });
-			if (assigneeId === null) await db(env, `supportos_chatwoot_routing?conversation_id=eq.${id}`, { status: 'failed', updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
-			else await db(env, `supportos_chatwoot_routing?conversation_id=eq.${id}`, { status: 'assigned', chatwoot_agent_id: assigneeId, updated_at: new Date().toISOString() }, 'PATCH').catch(() => undefined);
+			const assigneeId = setTeam ? conversationAssignee(current.row) : self ? current.agentId : body.assigneeId == null ? null : Number(body.assigneeId);
+			if ([assigneeId, teamId].some((value) => value !== null && (!Number.isSafeInteger(value) || value < 1))) return json(res, 400, { error: 'Некорректное назначение' });
+			const result = await changeConversation(env, id, assigneeId, async () => {
+				const fresh = await accessFor(id, { fresh: true, needAgent: self });
+				if (!fresh.access[right] || (setTeam && conversationAssignee(fresh.row) !== assigneeId))
+					throw chatwootError('Диалог уже изменился. Обновите список.', 409);
+				if (!setTeam && assigneeId !== null && !(await membersFor(cfg, conversationInbox(fresh.row), true)).includes(assigneeId))
+					throw chatwootError('У выбранного сотрудника нет доступа к этому проекту.', 409);
+				const result = await api(cfg, `${prefix}/${id}/assignments`, { method: 'POST', body: setTeam ? { team_id: teamId } : { assignee_id: assigneeId } });
+				return { result, assignee: activeStatuses.includes(fresh.row.status) ? assigneeId : null };
+			});
 			return json(res, 200, result);
 		}
 		if (action === 'labels') {
 			if (!Array.isArray(body.labels) || body.labels.length > 40 || body.labels.some((label) => typeof label !== 'string' || label.trim().length > 60)) return json(res, 400, { error: 'Некорректные метки' });
-			return json(res, 200, await api(cfg, `${prefix}/${id}/labels`, { method: 'POST', body: { labels: [...new Set(body.labels.map((label) => label.trim()).filter(Boolean))] } }));
+			const labels = [...new Set(body.labels.map((label) => label.trim()).filter(Boolean))];
+			const existing = new Set(current.row.labels ?? []);
+			if (labels.some((label) => !existing.has(label))) {
+				const definitions = itemList(await api(cfg, `/accounts/${cfg.accountId}/labels`));
+				const allowed = new Set(definitions.map((item) => item.title));
+				if (labels.some((label) => !existing.has(label) && !allowed.has(label)))
+					return json(res, 400, { error: 'Можно выбрать только зарегистрированные теги.' });
+			}
+			return json(res, 200, await api(cfg, `${prefix}/${id}/labels`, { method: 'POST', body: { labels } }));
+		}
+		if (action === 'priority') {
+			if (![null, 'low', 'medium', 'high', 'urgent'].includes(body.priority)) return json(res, 400, { error: 'Некорректный приоритет' });
+			return json(res, 200, await api(cfg, `${prefix}/${id}/toggle_priority`, { method: 'POST', body: { priority: body.priority } }));
 		}
 		return json(res, 404, { error: 'Неизвестное действие' });
 	} catch (error) {

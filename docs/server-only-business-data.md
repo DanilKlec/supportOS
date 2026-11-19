@@ -6,7 +6,7 @@
 
 ## Проверенные callers
 
-В production `src/` нет вызовов `supabaseService.select/insert/upsert/updateWhere/delete/rpc`, SDK `from/rpc/channel` для business data или `postgres_changes`. Binds, personal branches, history/proposals/signals идут через `/api/binds`; emails/bonuses/currency tools — `/api/content`; catalog — `/api/projects`; AI/QC — `/api/ai`; users/RBAC/security — `/api/accounts`. Старые generic REST methods в `supabase.service.ts` пока остаются неиспользуемыми legacy helpers, не production workflow. Regression test запрещает их повторное использование. Их наличие не предоставляет DB privileges.
+В production `src/` нет вызовов `supabaseService.select/insert/upsert/updateWhere/delete/rpc`, SDK `from/rpc/channel` для business data или `postgres_changes`. Binds, personal branches, history/proposals/signals идут через `/api/binds`; emails/bonuses/currency tools — `/api/content`; catalog — `/api/projects`; AI/QC — `/api/ai`; users/RBAC/security — `/api/accounts`; данные диалогов и контактов — через `/api/chatwoot`. Старые generic REST methods в `supabase.service.ts` пока остаются неиспользуемыми legacy helpers, не production workflow. Regression test запрещает их повторное использование. Их наличие не предоставляет DB privileges.
 
 ## Исключения и границы
 
@@ -14,6 +14,8 @@
 | --- | --- | --- |
 | Business `supportos_*` tables, columns, sequences | Только доверенный backend | Browser exceptions отсутствуют, в том числе для personal records, project catalog, QC, RBAC и security history |
 | Supabase Auth SDK в браузере | Вход, состояние/обновление сессии, выход | Это Auth API, не CRUD `auth.sessions` или business tables; managed Auth objects не меняются |
+| Приватный Broadcast `chatwoot:updates` | Получить сигнал `{"changed":true}` после подписанного вебхука | Без идентификаторов проектов, контактов и диалогов, без текста и прав на публикацию. После сигнала браузер обращается к серверному API, который заново проверяет права |
+| Приватный Broadcast `chatwoot:coaching:<user-id>` | Получить сигнал об адресной подсказке | Канал доступен только владельцу идентификатора с рабочими правами. Текст возвращает серверный API только автору и получателю |
 | `service_role` и серверные RPC/private helpers | Существующие серверные ACL | Ключ только на сервере; journals `supportos_access_audit`/`supportos_login_events` сохраняют SELECT+INSERT без UPDATE/DELETE/TRUNCATE |
 | Legacy RLS policies с `TO authenticated` | Сохранены как defense-in-depth | Это не исключение table access; helper `supportos_access(text)` также server-only, см. [отдельный аудит](access-helper-security.md) |
 | Managed `auth`, `storage`, `realtime`, системные схемы | Вне этой business migration | Не трогаются DDL/grants Supabase; sessions доступны пользователю только через ограниченный backend API |

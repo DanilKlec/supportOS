@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { InboxModal } from "./InboxModal";
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -96,7 +97,7 @@ function sourceForm(inbox: ChatwootWebsiteInbox): SourceForm {
 	};
 }
 
-export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
+export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => void; canDelete: boolean }) {
 	const client = useQueryClient();
 	const [mode, setMode] = useState<"list" | "types" | "form" | "operators">(
 		"list",
@@ -229,14 +230,8 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 	};
 
 	return (
-		<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm">
-			<section
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby="source-dialog-title"
-				className="flex max-h-[min(820px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
-			>
-				<header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+		<InboxModal labelledBy="source-dialog-title" className="flex max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClose={onClose}>
+				<header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-5 sm:py-4">
 					<div className="flex min-w-0 items-center gap-3">
 						<span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-accent">
 							<Globe2 size={18} />
@@ -268,7 +263,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 								}}
 								className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted hover:bg-surface-elevated"
 							>
-								<ArrowLeft size={13} /> Назад
+								<ArrowLeft size={13} /> <span className="sr-only sm:not-sr-only">Назад</span>
 							</button>
 						)}
 						<button
@@ -284,13 +279,14 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 
 				{mode === "list" ? (
 					<>
-						<div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4">
-							<div className="relative min-w-[220px] flex-1">
+						<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-3 sm:px-5">
+							<div className="relative min-w-0 basis-full sm:flex-1">
 								<Search
 									size={14}
 									className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
 								/>
 								<input
+									aria-label="Поиск по названию или домену"
 									value={search}
 									onChange={(event) => setSearch(event.target.value)}
 									placeholder="Поиск по названию или домену"
@@ -308,7 +304,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 								<Plus size={14} /> Добавить источник
 							</button>
 						</div>
-						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-5">
+						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-3 sm:px-5">
 							{query.isLoading || directory.isLoading ? (
 								<div className="flex min-h-56 items-center justify-center text-xs text-muted">
 									<LoaderCircle size={15} className="mr-2 animate-spin" />{" "}
@@ -317,7 +313,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 							) : query.isError || directory.isError ? (
 								<div
 									role="alert"
-									className="my-5 flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-xs text-red-300"
+									className="my-5 flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-xs chat-text-danger"
 								>
 									{query.error instanceof Error
 										? query.error.message
@@ -393,9 +389,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 													) : (
 														<Copy size={13} />
 													)}
-													{copiedSourceId === inbox.id
-														? "Скопировано"
-														: "Код виджета"}
+													<span className="sr-only sm:not-sr-only">{copiedSourceId === inbox.id ? "Скопировано" : "Код виджета"}</span>
 												</button>
 											)}
 											<button
@@ -406,7 +400,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 											>
 												<Settings2 size={15} />
 											</button>
-											<button
+											{canDelete && <button
 												type="button"
 												disabled={remove.isPending}
 												onClick={() => {
@@ -421,13 +415,13 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 												className="grid size-9 shrink-0 place-items-center rounded-lg border border-border text-muted hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
 											>
 												<Trash2 size={15} />
-											</button>
+											</button>}
 										</article>
 									))}
 								</div>
 							)}
 							{remove.isError && (
-								<p role="alert" className="mb-4 text-xs text-red-400">
+								<p role="alert" className="mb-4 text-xs chat-text-danger">
 									{remove.error instanceof Error
 										? remove.error.message
 										: "Не удалось удалить источник"}
@@ -842,7 +836,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 									) : members.isError || directory.isError ? (
 										<div
 											role="alert"
-											className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-xs text-red-300"
+											className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-xs chat-text-danger"
 										>
 											{members.error instanceof Error
 												? members.error.message
@@ -892,7 +886,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 										</div>
 									)}
 									{form.operatorIds.length === 0 && !members.isLoading && (
-										<p className="mt-3 text-[11px] text-amber-300">
+										<p className="mt-3 text-[11px] chat-text-warning">
 											Выберите хотя бы одного оператора, чтобы сохранить
 											источник.
 										</p>
@@ -917,7 +911,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 								{save.isError && (
 									<span
 										role="alert"
-										className="max-w-60 text-[10px] text-red-400"
+										className="max-w-60 text-[10px] chat-text-danger"
 									>
 										{save.error instanceof Error
 											? save.error.message
@@ -950,8 +944,7 @@ export function WebsiteDomainsDialog({ onClose }: { onClose: () => void }) {
 						</footer>
 					</>
 				)}
-			</section>
-		</div>
+		</InboxModal>
 	);
 }
 

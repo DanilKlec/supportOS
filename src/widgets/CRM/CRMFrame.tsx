@@ -39,6 +39,15 @@ const CRM_ITEMS: CRMItem[] = [
 	},
 ];
 
+export function crmWorkspaceUrl(id?: CRMId | null): string | undefined {
+	const value = CRM_ITEMS.find((item) => item.id === id)?.url;
+	if (!value) return undefined;
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" && !url.username && !url.password ? url.href : undefined;
+	} catch { return undefined; }
+}
+
 export function CRMFrame({ initialCrmId }: CRMFrameProps) {
 	const crms = useMemo<CRMItem[]>(
 		() => CRM_ITEMS.filter((crm) => crm.url.trim().length > 0),
