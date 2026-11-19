@@ -532,6 +532,12 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		"true",
 	);
 	await expect(page.getByRole("heading", { name: row.player })).toBeVisible();
+	if (isMobile) {
+		await page.getByRole("button", { name: /^Мои/ }).click();
+		await expect(
+			page.getByRole("textbox", { name: "Поиск диалогов" }),
+		).toBeVisible();
+	}
 	agentView = true;
 	await page.reload();
 	await expect(

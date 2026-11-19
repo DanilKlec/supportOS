@@ -474,7 +474,10 @@ function AgentInboxWorkspace() {
 	const selectSection = (section: WorkspaceSection) => {
 		setActiveSection(section);
 		setProfileOpen(false);
-		if (section === activeSection) return;
+		if (section === activeSection) {
+			if (section === "archive" || (section === "inbox" && scope !== "active")) setQueueOpen(true);
+			return;
+		}
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
 		if (section === "inbox" || section === "archive") {
@@ -484,11 +487,11 @@ function AgentInboxWorkspace() {
 		setActivePage(1);
 	};
 	const selectScope = (next: Scope) => {
+		if (next !== "active") setQueueOpen(true);
 		if (next === scope) return;
 		setScope(next);
 		setConversationId(null);
 		setActivePage(1);
-		if (next !== "active") setQueueOpen(true);
 	};
 	const toggleSound = () => {
 		setSoundEnabled((current) => {
