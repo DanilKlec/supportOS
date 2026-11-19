@@ -8,6 +8,9 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 }, info) => {
 	let watching = false;
 	let agentView = false;
+	let queued = false;
+	let taken = false;
+	let capacity = 4;
 	let assignedAgent = { id: 5, name: "Тестовый агент" };
 	let notesSent = 0;
 	let privateNote:
@@ -102,6 +105,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 							manageAllChats: !agentView,
 							reviewNotes: !agentView,
 							manageProjects: !agentView,
+							deleteProjects: !agentView,
 							manageRouting: !agentView,
 							manageWebhooks: !agentView,
 						},
@@ -116,6 +120,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 								name: row.agent,
 								email: "agent@example.invalid",
 								role: "agent",
+								max_active_chats: capacity,
 							},
 						],
 						teams: [{ id: 9, name: "Поддержка", agents: [{ id: 5 }] }],
@@ -135,21 +140,45 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				});
 			case "conversation-counts":
 				return route.fulfill({
-					json: { activeCount: 1, mineCount: 0, queueCount: 0 },
+					json: {
+						activeCount: 1,
+						mineCount: taken ? 1 : 0,
+						queueCount: queued && !taken ? 1 : 0,
+					},
 				});
 			case "conversations": {
 				const scope = url.searchParams.get("scope");
+				const status = url.searchParams.get("status");
+				const query = url.searchParams.get("q");
 				return route.fulfill({
 					json: {
 						payload:
 							scope === "history"
-								? [{ ...conversation, status: "resolved" }]
-								: agentView
-									? [conversation]
-									: [],
+								? status === "resolved" && !query
+									? [{ ...conversation, status }]
+									: []
+								: scope === "queue"
+									? queued && !taken
+										? [conversation]
+										: []
+									: agentView || taken
+										? [conversation]
+										: [],
 					},
 				});
 			}
+			case "take":
+				expect(request.postDataJSON().conversationId).toBe(row.id);
+				taken = true;
+				return route.fulfill({ json: { id: row.id } });
+			case "agent-capacity": {
+				const body = request.postDataJSON();
+				expect(body.agentId).toBe(5);
+				capacity = body.maxActiveChats;
+				return route.fulfill({ json: body });
+			}
+			case "chat-operations":
+				return route.fulfill({ json: { agents: {}, inboxes: {} } });
 			case "chat-supervisor":
 				return route.fulfill({
 					json: {
@@ -213,6 +242,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				return route.fulfill({
 					json: {
 						...conversation,
+						access: { ...conversation.access, take: queued && !taken },
 						meta: { ...conversation.meta, assignee: assignedAgent },
 						coachRecipient: assignedAgent,
 					},
@@ -320,11 +350,30 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(draft).toHaveCount(0);
 	const tag = observation.getByRole("button", { name: "Добавить тег" });
 	await tag.click();
+	const tagSearch = observation.getByRole("textbox", { name: "Найти тег" });
+	await expect(tagSearch).toBeFocused();
+	await tagSearch.fill("несуществующий");
+	await expect(observation.getByText("Теги не найдены")).toBeVisible();
+	await tagSearch.fill("priority");
 	await expect(
 		observation.getByRole("button", { name: "priority-review" }),
 	).toBeInViewport({ ratio: 1 });
 	await observation.getByRole("heading", { name: row.player }).click();
 	await expect(tag).toHaveAttribute("aria-expanded", "false");
+	const assignee = observation.getByRole("button", {
+		name: "Назначить агента",
+	});
+	await assignee.click();
+	const agentSearch = observation.getByRole("textbox", {
+		name: "Найти агента для назначения",
+	});
+	await expect(agentSearch).toBeInViewport({ ratio: 1 });
+	await agentSearch.fill("agent@example.invalid");
+	await expect(
+		observation.getByRole("button", { name: row.agent, exact: true }),
+	).toBeVisible();
+	await agentSearch.press("Escape");
+	await expect(assignee).toBeFocused();
 	const card = observation.getByRole("button", { name: "Карточка игрока" });
 	await card.click();
 	await expect(
@@ -346,16 +395,69 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 			.getByText(row.player),
 	).toBeVisible();
 	await assertLayout("archive");
+	const archive = page.getByRole("complementary", { name: "Архив диалогов" });
+	await archive.getByRole("button", { name: "Отложенные" }).click();
+	await expect(archive.getByText("Нет отложенных диалогов")).toBeVisible();
+	await archive.getByRole("button", { name: "Завершённые" }).click();
+	await archive.getByRole("button", { name: "Фильтры" }).click();
+	await archive
+		.getByRole("combobox", { name: "Тег", exact: true })
+		.selectOption("billing");
+	await expect(archive.getByRole("button", { name: /Фильтры/ })).toContainText(
+		"1",
+	);
+	await assertLayout("archive-filters");
+	await archive
+		.getByRole("textbox", { name: "Поиск диалогов" })
+		.fill("несуществующий");
+	await expect(archive.getByText("Диалогов не найдено")).toBeVisible();
+	await page.getByRole("button", { name: "Диалоги", exact: true }).click();
+	await expect(
+		page.getByRole("textbox", { name: "Поиск диалогов" }),
+	).toHaveValue("");
+	await page.getByRole("button", { name: "Архив", exact: true }).click();
+	await expect(
+		archive.getByRole("textbox", { name: "Поиск диалогов" }),
+	).toHaveValue("несуществующий");
+	await archive
+		.getByRole("button", { name: "Очистить поиск и фильтры" })
+		.click();
+	await expect(archive.getByText(row.player)).toBeVisible();
 	await page.getByRole("button", { name: "Команда", exact: true }).click();
 	await expect(
 		page.getByRole("textbox", { name: "Найти агента" }),
 	).toBeVisible();
 	await expect(page.getByText(row.agent, { exact: true })).toBeVisible();
+	const limit = page.getByRole("spinbutton", {
+		name: `Максимум чатов для ${row.agent}`,
+	});
+	await limit.fill("0");
+	await expect(
+		page.getByRole("button", { name: "Сохранить", exact: true }),
+	).toBeDisabled();
+	await limit.fill("2");
+	await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+	await expect(page.getByText("Лимит сохранён")).toBeVisible();
+	await expect(limit).toHaveValue("2");
+	await page.getByRole("checkbox", { name: "Только принимающие" }).check();
+	await expect(page.getByText("Сейчас никто не принимает чаты")).toBeVisible();
+	await page.getByRole("checkbox", { name: "Только принимающие" }).uncheck();
 	await assertLayout("team");
+	await page
+		.getByRole("button", { name: "Настройки чатов", exact: true })
+		.click();
+	await assertLayout("settings");
 	await page.getByRole("button", { name: "Команды и теги" }).click();
 	const directory = page.getByRole("dialog", { name: "Команды и теги" });
 	await expect(
 		directory.getByRole("button", { name: "Поддержка", exact: true }),
+	).toBeVisible();
+	await directory.getByRole("textbox", { name: "Поиск команд" }).fill("Под");
+	await directory
+		.getByRole("button", { name: "Поддержка", exact: true })
+		.click();
+	await expect(
+		directory.getByRole("heading", { name: "Настройки команды" }),
 	).toBeVisible();
 	await expect(directory).toBeInViewport({ ratio: 1 });
 	await page.keyboard.press("Escape");
@@ -369,10 +471,30 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await page.getByRole("button", { name: "Руководитель", exact: true }).click();
 	await expect(page.getByText("Открытые и ожидающие")).toBeVisible();
 	await assertLayout("operations");
+	await page.getByRole("button", { name: "Смены и навыки" }).click();
+	await expect(
+		page.getByRole("button", { name: "Добавить смену" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Проекты и SLA" }).click();
+	await expect(
+		page.getByRole("spinbutton", { name: /Цель ответа/ }),
+	).toBeVisible();
 	await page.getByRole("button", { name: "Профиль агента" }).click();
 	await expect(
 		page.getByRole("switch", { name: /Приём чатов/ }),
 	).toBeInViewport({ ratio: 1 });
+	await assertLayout("profile");
+	const sound = page.getByRole("switch", { name: "Звук уведомлений" });
+	await expect(sound).toHaveAttribute("aria-checked", "true");
+	await sound.click();
+	await expect(sound).toHaveAttribute("aria-checked", "false");
+	await expect(
+		page.getByRole("link", { name: "Личные настройки SupportOS" }),
+	).toBeInViewport({ ratio: 1 });
+	await page.keyboard.press("Escape");
+	await page
+		.getByRole("button", { name: "Настройки чатов", exact: true })
+		.click();
 	await page
 		.getByRole("button", { name: "Источники чатов", exact: true })
 		.click();
@@ -380,9 +502,18 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(sources.getByText(row.project, { exact: true })).toBeVisible();
 	await expect(sources).toBeInViewport({ ratio: 1 });
 	await assertLayout("sources");
+	await sources.getByRole("button", { name: "Удалить источник" }).click();
+	await expect(
+		sources.getByText(`Удалить источник «${row.project}»?`),
+	).toBeVisible();
+	await sources.getByRole("button", { name: "Отмена", exact: true }).click();
+	await sources.getByRole("button", { name: "Добавить сайт" }).click();
+	await expect(
+		sources.getByRole("textbox", { name: "Название сайта" }),
+	).toBeVisible();
+	await assertLayout("source-setup");
 	await page.keyboard.press("Escape");
 	await expect(sources).toHaveCount(0);
-	await page.getByRole("button", { name: "Профиль агента" }).click();
 	await page
 		.getByRole("button", { name: "Поля Chatwoot", exact: true })
 		.click();
@@ -392,8 +523,20 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(fields).toBeInViewport({ ratio: 1 });
 	await page.keyboard.press("Escape");
 	await expect(fields).toHaveCount(0);
+	queued = true;
+	await page.reload();
+	await page.getByRole("button", { name: /^Очередь/ }).click();
+	await page.getByRole("button", { name: "Взять в работу диалог #14" }).click();
+	await expect(page.getByRole("button", { name: /^Мои/ })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	await expect(page.getByRole("heading", { name: row.player })).toBeVisible();
 	agentView = true;
 	await page.reload();
+	await expect(
+		page.getByRole("button", { name: "Настройки чатов", exact: true }),
+	).toHaveCount(0);
 	await page.getByRole("button", { name: new RegExp(row.player) }).click();
 	const incomingNote = page.getByRole("article", { name: "Личная подсказка" });
 	await expect(

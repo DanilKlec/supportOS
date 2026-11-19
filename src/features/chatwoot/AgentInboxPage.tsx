@@ -3,12 +3,11 @@ import { Link } from "@tanstack/react-router";
 import {
 	Archive,
 	Ban,
-	CalendarDays,
 	CheckCheck,
 	ChevronDown,
 	ExternalLink,
 	FileText,
-	Globe2,
+	Inbox,
 	Headphones,
 	LoaderCircle,
 	LockKeyhole,
@@ -60,14 +59,15 @@ import type { LanguageCode } from "@/store/knowledge.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ActiveChatsTable } from "./ActiveChatsTable";
+import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
+import { ConversationListToolbar, type ConversationFilters, countConversationFilters, emptyConversationFilters } from "./ConversationListToolbar";
 import { useChatPopover } from "./useChatPopover";
-import { InboxModal } from "./InboxModal";
 import { CoachingComposer, type CoachingRecipient, CoachingThreadTabs, ObservationHeader } from "./ChatCoaching";
 import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
 import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
-type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor";
+type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor" | "settings";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
@@ -157,20 +157,16 @@ function AgentInboxWorkspace() {
 	const [realtimeSubscribed, setRealtimeSubscribed] = useState(false);
 	const [coachingRealtimeConnected, setCoachingRealtimeConnected] = useState(false);
 	const [webhookSeen, setWebhookSeen] = useState(false);
-	const [search, setSearch] = useState("");
 	const [queueOpen, setQueueOpen] = useState(true);
-	const [inboxId, setInboxId] = useState("");
-	const [agentId, setAgentId] = useState("");
-	const [label, setLabel] = useState("");
-	const [from, setFrom] = useState("");
-	const [to, setTo] = useState("");
+	const [listFilters, setListFilters] = useState<Record<Exclude<Scope, "active">, ConversationFilters>>({
+		mine: emptyConversationFilters, queue: emptyConversationFilters, history: emptyConversationFilters,
+	});
 	const [historyStatus, setHistoryStatus] = useState<"resolved" | "snoozed">("resolved");
 	const [sitesOpen, setSitesOpen] = useState(false);
 	const [webhookSettingsOpen, setWebhookSettingsOpen] = useState(false);
 	const [directorySettingsOpen, setDirectorySettingsOpen] = useState(false);
 	const [attributesOpen, setAttributesOpen] = useState(false);
 	const [profileOpen, setProfileOpen] = useState(false);
-	const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
 	const [soundEnabled, setSoundEnabled] = useState(() => {
 		try { return localStorage.getItem("supportos:chatwoot:sound") !== "off"; } catch { return true; }
 	});
@@ -194,6 +190,7 @@ function AgentInboxWorkspace() {
 	const canManageSites = capabilities?.manageProjects === true;
 	const canManageChatCapacity = capabilities?.manageRouting === true;
 	const canManageWebhookSettings = capabilities?.manageWebhooks === true;
+	const canOpenChatSettings = canManageSites || canManageWebhookSettings;
 	const canSupervise = capabilities?.supervise === true;
 	const managingObservedChat = canSupervise && capabilities?.manageAllChats === true && manageObservedChat;
 	const realtimeConnected = realtimeSubscribed && (webhookSeen || Boolean(connection.data?.lastWebhookAt));
@@ -261,6 +258,20 @@ function AgentInboxWorkspace() {
 		refetchInterval: 5000,
 	});
 	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
+	const listScope = displayedScope === "active" ? "mine" : displayedScope;
+	const filters = listFilters[listScope];
+	const { search, inboxId, agentId, label, from, to } = filters;
+	const [searchRequest, setSearchRequest] = useState({ scope: listScope, text: search });
+	useEffect(() => {
+		const timer = window.setTimeout(() => setSearchRequest({ scope: listScope, text: search }), 220);
+		return () => window.clearTimeout(timer);
+	}, [listScope, search]);
+	const queryText = (searchRequest.scope === listScope ? searchRequest.text : search).trim();
+	const updateListFilters = (patch: Partial<ConversationFilters>) => {
+		setListFilters((current) => ({ ...current, [listScope]: { ...current[listScope], ...patch } }));
+		if (patch.search === "") setSearchRequest({ scope: listScope, text: "" });
+		setActivePage(1);
+	};
 	const watching = useQuery({
 		queryKey: ["chatwoot", "supervision"],
 		queryFn: chatwootService.supervision,
@@ -295,11 +306,8 @@ function AgentInboxWorkspace() {
 		...(label ? { label } : {}),
 		...(displayedScope === "history" && from ? { from } : {}),
 		...(displayedScope === "history" && to ? { to } : {}),
-		...(search.trim() ? { query: search.trim() } : {}),
+		...(queryText ? { query: queryText } : {}),
 	};
-	useEffect(() => {
-		setActivePage(1);
-	}, [activeSection, scope, inboxId, agentId, label, from, to, search, historyStatus]);
 	const conversations = useQuery({
 		queryKey: ["chatwoot", "conversations", request],
 		queryFn: () => chatwootService.conversations(request),
@@ -309,8 +317,8 @@ function AgentInboxWorkspace() {
 		retry: 1,
 	});
 	const conversationCounts = useQuery({
-		queryKey: ["chatwoot", "conversation-counts", inboxId, user?.email],
-		queryFn: () => chatwootService.conversationCounts(inboxId ? Number(inboxId) : undefined),
+		queryKey: ["chatwoot", "conversation-counts", listScope === "queue" ? inboxId : "", user?.email],
+		queryFn: () => chatwootService.conversationCounts(listScope === "queue" && inboxId ? Number(inboxId) : undefined),
 		enabled: connection.data?.configured === true && activeSection === "inbox",
 		staleTime: 5000,
 		refetchInterval: realtimeConnected ? 12000 : 5000,
@@ -334,13 +342,19 @@ function AgentInboxWorkspace() {
 	});
 	const chatCapacity = useMutation({
 		mutationFn: ({ agentId, maxActiveChats }: { agentId: number; maxActiveChats: number }) => chatwootService.setAgentCapacity(agentId, maxActiveChats),
-		onSuccess: () => {
-			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
+		onSuccess: async ({ agentId, maxActiveChats }) => {
+			const key = ["chatwoot", "directory"];
+			await client.cancelQueries({ queryKey: key });
+			client.setQueryData<Awaited<ReturnType<typeof chatwootService.inboxDirectory>>>(key, (current) =>
+				current ? { ...current, agents: current.agents.map((agent) => agent.id === agentId ? { ...agent, max_active_chats: maxActiveChats } : agent) } : current,
+			);
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
+			void client.invalidateQueries({ queryKey: key });
 		},
 	});
 	const takeConversation = useMutation({
 		mutationFn: chatwootService.take,
+		onSuccess: (_result, id) => { if (activeSection === "inbox" && scope === "queue") openTakenChat(id); },
 		onMutate: async (id) => {
 			await client.cancelQueries({ queryKey: ["chatwoot", "conversations"] });
 			const queued = client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })
@@ -358,7 +372,8 @@ function AgentInboxWorkspace() {
 			for (const [key, cached] of context?.queued ?? []) client.setQueryData(key, cached);
 			for (const [key, cached] of context?.counts ?? []) client.setQueryData(key, cached);
 		},
-		onSettled: () => {
+		onSettled: (_result, _error, id) => {
+			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", id] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
@@ -459,15 +474,21 @@ function AgentInboxWorkspace() {
 	const selectSection = (section: WorkspaceSection) => {
 		setActiveSection(section);
 		setProfileOpen(false);
+		if (section === activeSection) return;
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
-		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
+		if (section === "inbox" || section === "archive") {
+			setConversationId(null);
+			setQueueOpen(true);
+		}
 		setActivePage(1);
 	};
 	const selectScope = (next: Scope) => {
+		if (next === scope) return;
 		setScope(next);
+		setConversationId(null);
 		setActivePage(1);
-		if (next !== "active" && window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
+		if (next !== "active") setQueueOpen(true);
 	};
 	const toggleSound = () => {
 		setSoundEnabled((current) => {
@@ -485,14 +506,22 @@ function AgentInboxWorkspace() {
 		setListWidth(next);
 		try { localStorage.setItem("supportos:chatwoot:list-width", String(next)); } catch { /* preference remains in session */ }
 	};
+	const openTakenChat = (id: number) => {
+		setScope("mine");
+		setActivePage(1);
+		placeConversation(id);
+	};
 	const prefetchQueue = () => {
 		if (scope === "queue" || activeSection !== "inbox") return;
+		const queueFilters = listFilters.queue;
+		const project = queueFilters.inboxId || (!canSupervise ? directory.data?.inboxes[0]?.id : undefined);
 		const queueRequest: ConversationSearch = {
 			scope: "queue",
 			status: "open",
-			...(inboxId ? { inboxId: Number(inboxId) } : {}),
-			...(label ? { label } : {}),
-			...(search.trim() ? { query: search.trim() } : {}),
+			page: 1,
+			...(project ? { inboxId: Number(project) } : {}),
+			...(queueFilters.label ? { label: queueFilters.label } : {}),
+			...(queueFilters.search.trim() ? { query: queueFilters.search.trim() } : {}),
 		};
 		void client.prefetchQuery({
 			queryKey: ["chatwoot", "conversations", queueRequest],
@@ -535,19 +564,15 @@ function AgentInboxWorkspace() {
 				canSupervise={canSupervise}
 				onToggleProfile={() => setProfileOpen(!profileOpen)}
 				onToggleSound={toggleSound}
-				onOpenSettings={() => { setAgentSettingsOpen(true); setProfileOpen(false); }}
-				onManageSites={canManageSites ? () => { setSitesOpen(true); setProfileOpen(false); } : undefined}
-				onManageAttributes={canManageSites ? () => { setAttributesOpen(true); setProfileOpen(false); } : undefined}
+				canOpenChatSettings={canOpenChatSettings}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			{(presence.isError || accepting.isError || chatCapacity.isError) && (
+			{(presence.isError || accepting.isError) && (
 				<div
 					role="alert"
 					className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs chat-text-warning"
 				>
-					{chatCapacity.error instanceof Error
-						? chatCapacity.error.message
-						: presence.error instanceof Error
+					{presence.error instanceof Error
 						? presence.error.message
 						: accepting.error instanceof Error
 							? accepting.error.message
@@ -575,6 +600,13 @@ function AgentInboxWorkspace() {
 				{activeSection === "supervisor" ? (
 					<ChatOperationsPage agents={agents} inboxes={inboxes} canEdit={canManageChatCapacity}
 						onOpen={(id) => { selectSection("inbox"); setScope("active"); startObservation(id); }} />
+				) : activeSection === "settings" && canOpenChatSettings ? (
+					<ChatSettingsWorkspace
+						onSources={canManageSites ? () => setSitesOpen(true) : undefined}
+						onDirectory={canManageSites ? () => setDirectorySettingsOpen(true) : undefined}
+						onFields={canManageSites ? () => setAttributesOpen(true) : undefined}
+						onWebhooks={canManageWebhookSettings ? () => setWebhookSettingsOpen(true) : undefined}
+					/>
 				) : activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
@@ -582,11 +614,7 @@ function AgentInboxWorkspace() {
 						presence={directory.data?.presence ?? []}
 						currentAgentId={presence.data?.current.agentId}
 						canManageChatCapacity={canManageChatCapacity}
-						canManageWebhookSettings={canManageWebhookSettings}
-						onManageWebhooks={() => setWebhookSettingsOpen(true)}
-						onManageDirectory={canManageSites ? () => setDirectorySettingsOpen(true) : undefined}
-						capacityPending={chatCapacity.isPending}
-						onSetCapacity={(agentId, maxActiveChats) => chatCapacity.mutate({ agentId, maxActiveChats })}
+						onSetCapacity={async (agentId, maxActiveChats) => { await chatCapacity.mutateAsync({ agentId, maxActiveChats }); }}
 						loading={directory.isLoading}
 						error={directory.error?.message}
 						onRetry={() => void directory.refetch()}
@@ -594,95 +622,14 @@ function AgentInboxWorkspace() {
 				) : <>
 				{queueOpen && scope !== "active" && (
 					<aside aria-label={displayedScope === "history" ? "Архив диалогов" : "Список диалогов"} style={{ "--chat-list-width": `${listWidth}px` } as CSSProperties} className="chat-list flex w-full min-w-0 shrink-0 flex-col border-r border-border md:w-[var(--chat-list-width)] md:min-w-[260px] md:max-w-[min(520px,45%)]">
-						<div className="border-b border-border p-3">
-							<div className="relative">
-								<Search
-									size={14}
-									className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-								/>
-								<input
-									value={search}
-									aria-label="Поиск диалогов"
-									onChange={(event) => setSearch(event.target.value)}
-									placeholder="Игрок, сообщение или №"
-									className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none placeholder:text-muted focus:border-accent"
-								/>
-							</div>
-							<div className="mt-2 grid grid-cols-2 gap-2">
-								<select
-									value={queueInbox}
-									onChange={(event) => setInboxId(event.target.value)}
-									className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-xs"
-								>
-									{(displayedScope !== "queue" || canSupervise || !inboxes.length) && <option value="">{displayedScope === "queue" && !canSupervise ? "Нет доступных проектов" : "Все проекты"}</option>}
-									{inboxes.map((box) => (
-										<option key={box.id} value={box.id}>
-											{box.name}
-										</option>
-									))}
-								</select>
-								<select
-									value={label}
-									onChange={(event) => setLabel(event.target.value)}
-									className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-xs"
-								>
-									<option value="">Все теги</option>
-									{labels.map((tag) => (
-										<option key={tag} value={tag}>
-											{tag}
-										</option>
-									))}
-								</select>
-							</div>
-							{displayedScope === "history" && (
-								<div className="mt-2 grid grid-cols-2 gap-2">
-									<select aria-label="Статус в архиве" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value === "snoozed" ? "snoozed" : "resolved")} className="col-span-2 h-8 rounded-lg border border-border bg-background px-2 text-xs">
-										<option value="resolved">Завершённые</option><option value="snoozed">Отложенные</option>
-									</select>
-									{canSupervise && <select
-										value={agentId}
-										onChange={(event) => setAgentId(event.target.value)}
-										className="col-span-2 h-8 rounded-lg border border-border bg-background px-2 text-xs"
-									>
-										<option value="">Все агенты</option>
-										{agents.map((agent) => (
-											<option key={agent.id} value={agent.id}>
-												{agent.name}
-											</option>
-										))}
-									</select>}
-									<label className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[10px] text-muted">
-										<CalendarDays size={12} />
-										<input
-											aria-label="С даты"
-											type="date"
-											value={from}
-											onChange={(event) => setFrom(event.target.value)}
-											className="min-w-0 bg-transparent text-foreground outline-none"
-										/>
-									</label>
-									<label className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[10px] text-muted">
-										<CalendarDays size={12} />
-										<input
-											aria-label="По дату"
-											type="date"
-											value={to}
-											onChange={(event) => setTo(event.target.value)}
-											className="min-w-0 bg-transparent text-foreground outline-none"
-										/>
-									</label>
-								</div>
-							)}
-						</div>
-						<div className="flex items-center justify-between px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-							<span>
-								{displayedScope === "mine"
-									? "Мои активные"
-									: displayedScope === "queue"
-										? "Нераспределённые"
-										: displayedScope === "active" ? "Активные диалоги" : "История диалогов"}
-							</span>
-							<span>{displayedScope === "queue" ? conversationCounts.data?.queueCount ?? "—" : rows.length}</span>
+						<ConversationListToolbar key={listScope} scope={listScope} filters={filters} update={updateListFilters}
+							project={queueInbox} requireProject={listScope === "queue" && !canSupervise}
+							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
+							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
+						/>
+						<div className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs text-muted">
+							<span className="font-medium">{listScope === "mine" ? "Мои диалоги" : listScope === "queue" ? "Ожидают назначения" : "Диалоги в архиве"}</span>
+							{conversations.isSuccess && <span title="На этой странице" className="rounded-md bg-surface-elevated px-1.5 tabular-nums">{rows.length}</span>}
 						</div>
 						{takeConversation.isError && (
 							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] chat-text-danger">
@@ -703,13 +650,16 @@ function AgentInboxWorkspace() {
 									<p>
 									{conversations.error instanceof Error
 										? conversations.error.message
-										: "Не удалось загрузить очередь"}
+										: "Не удалось загрузить диалоги"}
 									</p>
 									<button type="button" onClick={() => void conversations.refetch()} className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface-elevated">Повторить</button>
 								</div>
 							) : rows.length === 0 ? (
-								<div className="p-8 text-center text-sm text-muted">
-									{search || label || inboxId || from || to ? "По выбранным условиям диалогов нет" : displayedScope === "queue" ? "Очередь пуста" : displayedScope === "history" ? "В архиве пока нет диалогов" : "Нет назначенных диалогов"}
+								<div className="chat-list-empty">
+									<Inbox size={22} aria-hidden="true" className="text-muted" />
+									<p className="text-sm font-medium">{search.trim() || countConversationFilters(filters) ? "Диалогов не найдено" : listScope === "queue" ? "Очередь пуста" : listScope === "history" ? (historyStatus === "snoozed" ? "Нет отложенных диалогов" : "Нет завершённых диалогов") : "У вас нет открытых диалогов"}</p>
+									{(search.trim() || countConversationFilters(filters) > 0) && <button type="button" onClick={() => updateListFilters(emptyConversationFilters)} className="rounded-md px-2 py-1.5 text-xs text-accent hover:bg-surface-elevated">Очистить поиск и фильтры</button>}
+									{listScope === "mine" && !search.trim() && countConversationFilters(filters) === 0 && <button type="button" onClick={() => selectScope("queue")} className="rounded-md px-2 py-1.5 text-xs text-accent hover:bg-surface-elevated">Посмотреть очередь</button>}
 								</div>
 							) : (
 								rows.map((item) => (
@@ -725,6 +675,7 @@ function AgentInboxWorkspace() {
 												: undefined
 										}
 										taking={takeConversation.isPending && takeConversation.variables === item.id}
+										takeDisabled={takeConversation.isPending}
 									/>
 								))
 							)}
@@ -783,7 +734,7 @@ function AgentInboxWorkspace() {
 						type="button"
 						aria-label={queueOpen ? "Скрыть список" : "Показать список"}
 						onClick={() => setQueueOpen(!queueOpen)}
-						className="absolute left-2 top-2 z-10 grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted shadow-sm hover:text-foreground"
+						className="absolute left-2 top-2 z-30 grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted shadow-sm hover:text-foreground"
 					>
 						<PanelLeftClose
 							size={15}
@@ -810,6 +761,8 @@ function AgentInboxWorkspace() {
 							language={language}
 							onLanguage={setLanguage}
 							onClose={closeConversation}
+							onTake={displayedScope === "queue" ? (id) => takeConversation.mutate(id) : undefined}
+							takeDisabled={takeConversation.isPending}
 							onChanged={reload}
 							onChoose={openEmptyPane}
 						/>
@@ -830,17 +783,6 @@ function AgentInboxWorkspace() {
 				<CustomAttributesDialog onClose={() => setAttributesOpen(false)} />
 			)}
 			{directorySettingsOpen && canManageSites && <ChatDirectorySettingsDialog agents={agents} onClose={() => setDirectorySettingsOpen(false)} />}
-			{agentSettingsOpen && (
-				<AgentSettingsDialog
-					email={user?.email ?? ""}
-					accepting={presence.data?.current.accepting === true}
-					acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
-					soundEnabled={soundEnabled}
-					onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
-					onToggleSound={toggleSound}
-					onClose={() => setAgentSettingsOpen(false)}
-				/>
-			)}
 		</div>
 	);
 }
@@ -891,7 +833,7 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, onOpenSettings, onManageSites, onManageAttributes }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
@@ -906,9 +848,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	canSupervise: boolean;
 	onToggleProfile: () => void;
 	onToggleSound: () => void;
-	onOpenSettings: () => void;
-	onManageSites?: () => void;
-	onManageAttributes?: () => void;
+	canOpenChatSettings: boolean;
 }) {
 	const profile = useChatPopover<HTMLElement>(profileOpen, onToggleProfile);
 	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
@@ -917,11 +857,9 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 		{ id: "archive", label: "Архив", icon: Archive },
 	];
 	if (canSupervise) items.push({ id: "supervisor", label: "Руководитель", icon: Headphones });
+	if (canOpenChatSettings) items.push({ id: "settings", label: "Настройки чатов", icon: Settings2 });
 	return (
 		<aside ref={profile} data-compact={collapsed} className="chat-rail relative z-40 flex shrink-0 flex-col items-center border-r border-border py-2 transition-[width] duration-200 md:py-3">
-			<button type="button" aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"} title={collapsed ? "Развернуть меню" : "Свернуть меню"} onClick={onToggleCollapsed} className="chat-rail-toggle mb-1 grid size-8 place-items-center self-end rounded-lg text-muted hover:bg-surface-elevated md:mr-2">
-				{collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-			</button>
 			<nav aria-label="Рабочие разделы чатов" className="flex w-full flex-col gap-1 px-1.5 md:px-2">
 				{items.map(({ id, label, icon: Icon }) => (
 					<button key={id} type="button" title={label} aria-label={label} aria-current={activeSection === id ? "page" : undefined} onClick={() => { if (profileOpen) onToggleProfile(); onSelect(id); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg text-left text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground ${collapsed ? "justify-center" : "px-2.5"}`}>
@@ -930,12 +868,17 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 					</button>
 				))}
 			</nav>
-			<div className={`chat-rail-footer mt-auto flex w-full items-center gap-2 border-t border-border px-2 pt-2 ${collapsed ? "justify-center" : ""}`}>
+			<div className="mt-auto w-full">
+			<button type="button" aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"} title={collapsed ? "Развернуть меню" : "Свернуть меню"} onClick={onToggleCollapsed} className="chat-rail-toggle mb-1 ml-auto mr-2 grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated">
+				{collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+			</button>
+			<div className={`chat-rail-footer flex w-full items-center gap-2 border-t border-border px-2 pt-2 ${collapsed ? "justify-center" : ""}`}>
 				<button type="button" title="Профиль агента" aria-label="Профиль агента" aria-expanded={profileOpen} onClick={onToggleProfile} className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold hover:border-accent/60">
 					{initials(userEmail)}
 					<span className={`absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-surface ${accepting ? "bg-emerald-400" : "bg-muted"}`} />
 				</button>
-				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
+				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{acceptingPending ? "Загружаем статус…" : accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
+			</div>
 			</div>
 			{profileOpen && (
 				<div className="chat-rail-profile supportos-scroll absolute bottom-2 left-[calc(100%+8px)] z-50 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-xl">
@@ -944,86 +887,66 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 						<div className="mt-1 truncate text-[11px] text-muted">{userEmail || "Аккаунт SupportOS"}</div>
 						{accessRole && <div className="mt-1 text-[10px] font-medium text-accent">Роль SupportOS · {({ support: "Support", shift: "Shift", qc: "QC", admin: "Admin", creator: "Creator" })[accessRole]}</div>}
 					</div>
-					<button type="button" role="switch" aria-checked={accepting} disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
+					<button type="button" role="switch" aria-label="Приём чатов" aria-checked={accepting} disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
 						<span><span className="block text-xs font-medium">Приём чатов</span><span className="mt-0.5 block text-[10px] text-muted">{accepting ? "Вы в очереди распределения" : "Новые диалоги не назначаются"}</span></span>
 						<span className={`h-5 w-9 rounded-full p-0.5 transition ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white transition ${accepting ? "translate-x-4" : ""}`} /></span>
 					</button>
-					<button type="button" onClick={onToggleSound} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated">
-						{soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} Звуковые уведомления {soundEnabled ? "включены" : "выключены"}
+					<button type="button" role="switch" aria-label="Звук уведомлений" aria-checked={soundEnabled} onClick={onToggleSound} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-xs hover:bg-surface-elevated">
+						{soundEnabled ? <Volume2 size={15} className="shrink-0" /> : <VolumeX size={15} className="shrink-0" />}
+						<span className="flex-1">Звук уведомлений</span>
+						<span className="text-[11px] text-muted">{soundEnabled ? "Вкл." : "Выкл."}</span>
 					</button>
-					<button type="button" onClick={onOpenSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Личные настройки</button>
-					{onManageSites && <button type="button" onClick={onManageSites} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Globe2 size={15} /> Источники чатов</button>}
-					{onManageAttributes && <button type="button" onClick={onManageAttributes} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs hover:bg-surface-elevated"><Settings2 size={15} /> Поля Chatwoot</button>}
-					<a href="/chatwoot-demo.html" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs hover:bg-surface-elevated"><ExternalLink size={15} /> Тестовый сайт с чатом</a>
-					<Link to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Headphones size={15} /> Настройки SupportOS</Link>
+					<Link to="/settings" className="flex items-center gap-2.5 rounded-lg px-3 py-3 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Settings2 size={15} /> Личные настройки SupportOS</Link>
 				</div>
 			)}
 		</aside>
 	);
 }
 
-function AgentSettingsDialog({ email, accepting, acceptingPending, soundEnabled, onAccept, onToggleSound, onClose }: {
-	email: string;
-	accepting: boolean;
-	acceptingPending: boolean;
-	soundEnabled: boolean;
-	onAccept: () => void;
-	onToggleSound: () => void;
-	onClose: () => void;
-}) {
-	return (
-		<InboxModal labelledBy="agent-settings-title" className="max-w-md overflow-y-auto rounded-2xl border border-border bg-surface p-4 shadow-xl sm:p-5" onClose={onClose}>
-				<div className="flex items-start justify-between gap-2"><div className="min-w-0"><h2 id="agent-settings-title" className="text-base font-semibold">Настройки агента</h2><p className="mt-1 truncate text-xs text-muted">{email || "Личные параметры рабочего места"}</p></div><button type="button" aria-label="Закрыть настройки агента" onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated"><X size={16} /></button></div>
-				<div className="mt-4 divide-y divide-border rounded-xl border border-border">
-					<button type="button" disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-4 p-3 text-left disabled:opacity-50"><span><span className="block text-xs font-medium">Принимать новые чаты</span><span className="mt-1 block text-[11px] text-muted">{accepting ? "Включено — очередь распределяется автоматически" : "Выключено — новые диалоги не назначаются"}</span></span><span className={`h-5 w-9 shrink-0 rounded-full p-0.5 ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white ${accepting ? "translate-x-4" : ""}`} /></span></button>
-					<button type="button" onClick={onToggleSound} className="flex w-full items-center justify-between gap-4 p-3 text-left"><span><span className="block text-xs font-medium">Звуковые уведомления</span><span className="mt-1 block text-[11px] text-muted">Сигнал при новых событиях в диалогах</span></span>{soundEnabled ? <Volume2 size={16} className="text-accent" /> : <VolumeX size={16} className="text-muted" />}</button>
-				</div>
-				<div className="mt-4 flex justify-end"><button type="button" onClick={onClose} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white">Готово</button></div>
-		</InboxModal>
-	);
-}
-
-function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, canManageWebhookSettings, onManageWebhooks, onManageDirectory, capacityPending, onSetCapacity, loading, error, onRetry }: {
+function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, onSetCapacity, loading, error, onRetry }: {
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
 	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; max_active_chats?: number; heartbeat_at: string }>;
 	currentAgentId?: number;
 	canManageChatCapacity: boolean;
-	canManageWebhookSettings: boolean;
-	onManageWebhooks: () => void;
-	onManageDirectory?: () => void;
-	capacityPending: boolean;
-	onSetCapacity: (agentId: number, maxActiveChats: number) => void;
+	onSetCapacity: (agentId: number, maxActiveChats: number) => Promise<void>;
 	loading: boolean;
 	error?: string;
 	onRetry: () => void;
 }) {
 	const [tab, setTab] = useState<"agents" | "teams">("agents");
 	const [search, setSearch] = useState("");
-	const online = presence.filter((item) => Date.now() - Date.parse(item.heartbeat_at) < 90_000);
-	const filteredAgents = agents.filter((agent) => `${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(search.toLowerCase()));
-	const filteredTeams = teams.filter((team) => team.name.toLowerCase().includes(search.toLowerCase()));
+	const [acceptingOnly, setAcceptingOnly] = useState(false);
+	const online = new Map(presence.filter((item) => Date.now() - Date.parse(item.heartbeat_at) < 90_000).map((item) => [item.chatwoot_agent_id, item]));
+	const query = search.trim().toLowerCase();
+	const filteredAgents = agents.filter((agent) =>
+		(!acceptingOnly || online.get(agent.id)?.accepting) &&
+		`${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(query),
+	);
+	const filteredTeams = teams.filter((team) => team.name.toLowerCase().includes(query));
 	return (
 		<section aria-label="Команда чатов" className="supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-5xl">
 				<div className="grid grid-cols-3 gap-1.5 sm:gap-3">
 					<StatCard label="Агенты" value={agents.length} icon={<UsersRound size={16} />} />
-					<StatCard label="В SupportOS" value={online.length} icon={<Headphones size={16} />} />
+					<StatCard label="Принимают чаты" value={[...online.values()].filter((agent) => agent.accepting).length} icon={<Headphones size={16} />} />
 					<StatCard label="Команды" value={teams.length} icon={<MessagesSquare size={16} />} />
 				</div>
 				<div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface/40 sm:mt-5">
 					<div className="flex flex-wrap items-center gap-2 border-b border-border p-2.5 sm:p-3">
-						<div className="flex gap-1 rounded-lg bg-background p-1">
-							<button type="button" aria-pressed={tab === "agents"} onClick={() => { setTab("agents"); setSearch(""); }} className={`rounded-md px-3 py-2 text-xs ${tab === "agents" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Агенты</button>
-							<button type="button" aria-pressed={tab === "teams"} onClick={() => { setTab("teams"); setSearch(""); }} className={`rounded-md px-3 py-2 text-xs ${tab === "teams" ? "bg-surface-elevated text-foreground" : "text-muted"}`}>Команды</button>
+						<div role="group" aria-label="Справочник команды" className="chat-menu-tabs flex">
+							<button type="button" aria-pressed={tab === "agents"} onClick={() => { setTab("agents"); setSearch(""); }}>Агенты</button>
+							<button type="button" aria-pressed={tab === "teams"} onClick={() => { setTab("teams"); setSearch(""); }}>Команды</button>
 						</div>
 						<div className="relative order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input aria-label={tab === "agents" ? "Найти агента" : "Найти команду"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "agents" ? "Найти агента…" : "Найти команду…"} className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-accent" /></div>
-						{canManageWebhookSettings && <button type="button" onClick={onManageWebhooks} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-elevated"><Settings2 size={14} />Вебхуки</button>}
-						{onManageDirectory && <button type="button" onClick={onManageDirectory} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-elevated"><Settings2 size={14} />Команды и теги</button>}
 					</div>
+					{tab === "agents" && <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs text-muted">
+						<label className="inline-flex min-h-7 items-center gap-2"><input type="checkbox" checked={acceptingOnly} onChange={(event) => setAcceptingOnly(event.target.checked)} /> Только принимающие</label>
+						<span className="shrink-0 tabular-nums" title="Показано агентов">{filteredAgents.length} / {agents.length}</span>
+					</div>}
 					{tab === "agents" ? filteredAgents.map((agent) => {
-						const state = presence.find((item) => item.chatwoot_agent_id === agent.id);
-						const isOnline = state && Date.now() - Date.parse(state.heartbeat_at) < 90_000;
+						const state = online.get(agent.id);
+						const isOnline = state != null;
 						const status = state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status === "online" ? "В Chatwoot" : "Не в сети";
 						return <div key={agent.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 border-b border-border/70 px-3 py-3 last:border-0 md:flex md:gap-3 md:px-4">
 							<div className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface-elevated text-xs font-semibold">{initials(agent.name)}</div>
@@ -1034,50 +957,57 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 							<div className="col-start-2 flex flex-wrap items-center gap-x-3 gap-y-2">
 								<span className="hidden rounded-full bg-background px-2 py-1 text-[11px] text-muted lg:block">{agent.role === "administrator" ? "Администратор" : "Агент"}</span>
 								<span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted"><i className={`size-1.5 rounded-full ${state?.accepting && isOnline ? "bg-emerald-400" : isOnline ? "bg-amber-300" : "bg-zinc-500"}`} />{status}</span>
-								<AgentCapacityField agent={agent} editable={canManageChatCapacity} saving={capacityPending} onSave={onSetCapacity} />
+								<AgentCapacityField agent={agent} editable={canManageChatCapacity} onSave={onSetCapacity} />
 							</div>
 						</div>;
-					}) : filteredTeams.map((team) => <div key={team.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-4 last:border-0"><div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-accent"><UsersRound size={17} /></div><div className="min-w-0 flex-1"><div className="text-sm font-medium">{team.name}</div><div className="text-xs text-muted">{team.agents?.length ?? 0} агентов{team.description ? ` · ${team.description}` : ""}</div></div><span className="rounded-full bg-background px-2.5 py-1 text-[10px] text-muted">{team.allow_auto_assign ? "Автоназначение" : "Ручное назначение"}</span></div>)}
+					}) : filteredTeams.map((team) => <div key={team.id} className="flex flex-wrap items-center gap-3 border-b border-border/70 p-3 last:border-0 sm:p-4"><div className="chat-settings-icon"><UsersRound size={17} /></div><div className="min-w-0 flex-1"><div className="text-sm font-medium">{team.name}</div><div className="text-xs text-muted">{team.description || (team.agents ? `Участников: ${team.agents.length}` : "")}</div></div>{typeof team.allow_auto_assign === "boolean" && <span className="rounded-full bg-background px-2.5 py-1 text-[11px] text-muted">{team.allow_auto_assign ? "Автоназначение" : "Ручное назначение"}</span>}</div>)}
 					{loading && <div role="status" className="p-7 text-center text-sm text-muted"><LoaderCircle className="mr-2 inline animate-spin" size={15} />Загружаем команду…</div>}
 					{error && <div role="alert" className="space-y-2 p-7 text-center text-sm chat-text-danger"><p>{error}</p><button type="button" onClick={onRetry} className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground">Повторить</button></div>}
-					{!loading && !error && (tab === "agents" ? filteredAgents.length === 0 : filteredTeams.length === 0) && <div className="p-7 text-center text-sm text-muted">{search ? "По запросу ничего не найдено" : tab === "agents" ? "Нет доступных агентов" : "Команд пока нет"}</div>}
+					{!loading && !error && (tab === "agents" ? filteredAgents.length === 0 : filteredTeams.length === 0) && <div className="p-7 text-center text-sm text-muted">{query ? "По запросу ничего не найдено" : tab === "agents" ? (acceptingOnly ? "Сейчас никто не принимает чаты" : "Нет доступных агентов") : "Команд пока нет"}</div>}
 				</div>
 			</div>
 		</section>
 	);
 }
 
-function AgentCapacityField({ agent, editable, saving, onSave }: {
+function AgentCapacityField({ agent, editable, onSave }: {
 	agent: ChatwootAgent;
 	editable: boolean;
-	saving: boolean;
-	onSave: (agentId: number, maxActiveChats: number) => void;
+	onSave: (agentId: number, maxActiveChats: number) => Promise<void>;
 }) {
 	const limit = agent.max_active_chats ?? 4;
+	const [value, setValue] = useState<string | null>(null);
+	const [saving, setSaving] = useState(false);
+	const [message, setMessage] = useState<{ text: string; error: boolean }>();
 	if (!editable)
-		return <span className="rounded-lg border border-border/70 px-2.5 py-1.5 text-[10px] text-muted">Лимит · {limit}</span>;
+		return <span className="rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted">Лимит · {limit}</span>;
+	const number = value === null ? limit : Number(value);
+	const valid = value !== "" && Number.isInteger(number) && number >= 1 && number <= 50;
 	return (
-		<label className="flex items-center gap-2 text-[10px] text-muted">
-			<span>Лимит чатов</span>
-			<input
-				key={`${agent.id}:${limit}`}
-				aria-label={`Максимум чатов для ${agent.name}`}
-				defaultValue={limit}
-				type="number"
-				min={1}
-				max={50}
-				disabled={saving}
-				onBlur={(event) => {
-					const value = Number(event.currentTarget.value);
-					if (!Number.isInteger(value) || value < 1 || value > 50) {
-						event.currentTarget.value = String(limit);
-						return;
-					}
-					if (value !== limit) onSave(agent.id, value);
-				}}
-				className="h-8 w-16 rounded-lg border border-border bg-background px-2 text-center text-xs text-foreground outline-none focus:border-accent disabled:opacity-50"
-			/>
-		</label>
+		<form className="flex flex-wrap items-center gap-1.5" onSubmit={async (event) => {
+			event.preventDefault();
+			if (!valid || number === limit || saving) return;
+			setSaving(true);
+			try {
+				await onSave(agent.id, number);
+				setValue(null);
+				setMessage({ text: "Лимит сохранён", error: false });
+			} catch (error) {
+				setMessage({ text: error instanceof Error ? error.message : "Не удалось сохранить лимит", error: true });
+			} finally {
+				setSaving(false);
+			}
+		}}>
+			<label className="flex items-center gap-1.5 text-[11px] text-muted">
+				<span>Лимит</span>
+				<input aria-label={`Максимум чатов для ${agent.name}`} value={value ?? limit} type="number" min={1} max={50} required disabled={saving}
+					onChange={(event) => { setValue(event.target.value); setMessage(undefined); }}
+					className="h-8 w-14 rounded-lg border border-border bg-background px-1 text-center text-xs text-foreground disabled:opacity-50" />
+			</label>
+			{(number !== limit || !valid) && <button type="submit" disabled={!valid || saving} className="min-h-8 rounded-md border border-border px-2 text-[11px] font-medium text-accent hover:bg-surface-elevated disabled:opacity-50">{saving ? "Сохраняем…" : "Сохранить"}</button>}
+			{!valid && <span className="text-[11px] chat-text-warning">От 1 до 50</span>}
+			{message && <span role={message.error ? "alert" : "status"} className={`text-[11px] ${message.error ? "chat-text-danger" : "chat-text-success"}`}>{message.text}</span>}
+		</form>
 	);
 }
 
@@ -1095,6 +1025,7 @@ function ConversationRow({
 	onClick,
 	onTake,
 	taking = false,
+	takeDisabled = false,
 }: {
 	conversation: ChatwootConversation;
 	projectName?: string;
@@ -1102,6 +1033,7 @@ function ConversationRow({
 	onClick: () => void;
 	onTake?: () => void;
 	taking?: boolean;
+	takeDisabled?: boolean;
 }) {
 	const sender = conversation.meta?.sender;
 	const last = conversation.last_non_activity_message;
@@ -1163,8 +1095,9 @@ function ConversationRow({
 				<button
 					type="button"
 					onClick={onTake}
-				disabled={taking}
+				disabled={takeDisabled}
 					title="Взять в работу"
+					aria-label={`Взять в работу диалог #${conversation.id}`}
 					className="shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[10px] font-medium text-muted hover:text-foreground disabled:opacity-50"
 				>
 					{taking ? "Берём…" : "Взять"}
@@ -1191,6 +1124,8 @@ function ConversationPane({
 	language,
 	onLanguage,
 	onClose,
+	onTake,
+	takeDisabled = false,
 	onChanged,
 	onChoose,
 }: {
@@ -1210,6 +1145,8 @@ function ConversationPane({
 	language: LanguageCode;
 	onLanguage: (language: LanguageCode) => void;
 	onClose: () => void;
+	onTake?: (id: number) => void;
+	takeDisabled?: boolean;
 	onChanged: () => void;
 	onChoose: () => void;
 }) {
@@ -1224,9 +1161,15 @@ function ConversationPane({
 		if (id != null) onDraft(id, { text, privateNote, coachTo: draftCoachTo ?? undefined });
 	}, [id, text, privateNote, draftCoachTo, onDraft]);
 	const [assignOpen, setAssignOpen] = useState(false);
+	const [assignSearch, setAssignSearch] = useState("");
+	const assignSearchInput = useRef<HTMLInputElement>(null);
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
 	const [tagOpen, setTagOpen] = useState(false);
+	const [tagSearch, setTagSearch] = useState("");
+	const tagSearchInput = useRef<HTMLInputElement>(null);
+	useEffect(() => { if (assignOpen) assignSearchInput.current?.focus(); }, [assignOpen]);
+	useEffect(() => { if (tagOpen) tagSearchInput.current?.focus(); }, [tagOpen]);
 	const tagMenuRef = useChatPopover<HTMLDivElement>(tagOpen, () => setTagOpen(false));
 	const assignMenu = useChatPopover<HTMLDivElement>(assignOpen, () => setAssignOpen(false));
 	const bindMenu = useChatPopover<HTMLDivElement>(showBinds, () => setShowBinds(false));
@@ -1601,6 +1544,10 @@ function ConversationPane({
 		</div>
 	);
 	const tags = conversation?.labels ?? [];
+	const unusedTags = labels.filter((tag) => !tags.includes(tag));
+	const matchingTags = unusedTags.filter((tag) => tag.toLowerCase().includes(tagSearch.trim().toLowerCase()));
+	const matchingAgents = agents.filter((agent) => `${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(assignSearch.trim().toLowerCase()));
+	const assigneeId = conversation.meta?.assignee?.id;
 	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
 		<section
@@ -1626,12 +1573,12 @@ function ConversationPane({
 						</div>
 					</div>
 					<div className="chat-thread-actions flex shrink-0 flex-wrap items-center gap-1.5">
-						{canWrite && <div ref={assignMenu} className="relative">
+						{canWrite && <div ref={assignMenu} className="chat-assign-trigger relative">
 							<button
 								type="button"
 								aria-label="Назначить агента"
 								aria-expanded={assignOpen}
-								onClick={() => { setTagOpen(false); setShowBinds(false); setAssignOpen(!assignOpen); }}
+								onClick={() => { setTagOpen(false); setShowBinds(false); setAssignSearch(""); setAssignOpen(!assignOpen); }}
 								className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted hover:bg-surface-elevated"
 							>
 								<UserRound size={13} />
@@ -1641,22 +1588,30 @@ function ConversationPane({
 								<ChevronDown size={12} />
 							</button>
 							{assignOpen && (
-								<div className="chat-popover chat-assign-popover absolute left-0 top-9 z-40 w-52 rounded-xl border border-border bg-surface p-1 shadow-xl sm:right-0 sm:left-auto">
-									<button
+								<div className="chat-popover chat-assign-popover supportos-scroll absolute left-0 top-9 z-40 w-60 rounded-xl border border-border bg-surface p-1.5 shadow-xl sm:right-0 sm:left-auto">
+									<div className="sticky top-0 bg-surface p-1">
+										<input ref={assignSearchInput} value={assignSearch} onChange={(event) => setAssignSearch(event.target.value)} aria-label="Найти агента для назначения" placeholder="Имя или почта агента"
+											className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs" />
+									</div>
+									{assigneeId != null && <button
 										type="button"
+										disabled={assign.isPending}
 										onClick={() => assign.mutate(null)}
-										className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-elevated"
+										className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-surface-elevated disabled:opacity-50"
 									>
 										Снять назначение
-									</button>
-									{agents.map((agent) => (
+									</button>}
+									{matchingAgents.length === 0 && <p className="p-2.5 text-xs text-muted">Агенты не найдены</p>}
+									{matchingAgents.map((agent) => (
 										<button
 											key={agent.id}
 											type="button"
+											disabled={assign.isPending || agent.id === assigneeId}
 											onClick={() => assign.mutate(agent.id)}
-											className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-elevated"
+											className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-surface-elevated"
 										>
-											{agent.name}
+											<span className="truncate">{agent.name}</span>
+											{agent.id === assigneeId && <span className="shrink-0 text-[10px] text-accent">Назначен</span>}
 										</button>
 									))}
 								</div>
@@ -1725,6 +1680,8 @@ function ConversationPane({
 							onClick={() =>
 								tagMutation.mutate(tags.filter((item) => item !== tag))
 							}
+							disabled={tagMutation.isPending}
+							aria-label={`Убрать тег ${tag}`}
 							title="Нажмите, чтобы убрать метку"
 							className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[10px] text-accent"
 						>
@@ -1734,7 +1691,7 @@ function ConversationPane({
 					{canWrite && <div className="chat-tag-trigger relative z-30" ref={tagMenuRef}>
 						<button
 							type="button"
-							onClick={() => { setAssignOpen(false); setShowBinds(false); setTagOpen(!tagOpen); }}
+							onClick={() => { setAssignOpen(false); setShowBinds(false); setTagSearch(""); setTagOpen(!tagOpen); }}
 							aria-expanded={tagOpen}
 							className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] text-muted hover:text-foreground"
 						>
@@ -1742,9 +1699,13 @@ function ConversationPane({
 						</button>
 						{tagOpen && (
 							<div className="chat-popover chat-tag-popover supportos-scroll absolute left-0 top-[calc(100%+6px)] z-40 w-60 rounded-xl border border-border bg-surface p-1.5 shadow-xl">
-								{labels.filter((tag) => !tags.includes(tag)).length === 0 ? (
-									<p className="px-3 py-3 text-center text-[11px] text-muted">Все доступные теги уже добавлены</p>
-								) : labels.filter((tag) => !tags.includes(tag)).map((tag) => (
+								<div className="sticky top-0 bg-surface p-1">
+									<input ref={tagSearchInput} value={tagSearch} onChange={(event) => setTagSearch(event.target.value)} aria-label="Найти тег" placeholder="Название тега"
+										className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs" />
+								</div>
+								{matchingTags.length === 0 ? (
+									<p className="px-3 py-3 text-center text-xs text-muted">{tagSearch.trim() ? "Теги не найдены" : unusedTags.length === 0 && tags.length > 0 ? "Все доступные теги уже добавлены" : "Нет доступных тегов"}</p>
+								) : matchingTags.map((tag) => (
 										<button
 											key={tag}
 											type="button"
@@ -1986,7 +1947,7 @@ function ConversationPane({
 					)}
 				</footer> : <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted">
 					<span>{canTake ? "Возьмите диалог, чтобы ответить игроку." : "Диалог доступен для просмотра."}</span>
-					{canTake && <button type="button" disabled={take.isPending} onClick={() => take.mutate()} className="rounded-md bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">Взять в работу</button>}
+					{canTake && <button type="button" disabled={takeDisabled || take.isPending} onClick={() => { if (onTake) onTake(id); else take.mutate(); }} className="rounded-md bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">Взять в работу</button>}
 				</footer>}
 			</div>
 			{showCustomer && (

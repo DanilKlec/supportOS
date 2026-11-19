@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, Headphones, ListFilter, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Clock3, Headphones, ListFilter, RefreshCw } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { chatwootService, type ChatwootAgent, type ChatwootInbox, type ChatwootOperations } from "@/services/chatwoot.service";
 
@@ -49,15 +49,15 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 	return (
 		<section aria-label="Управление работой чатов" className="supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-6xl space-y-4">
-				<header className="flex flex-wrap items-center justify-between gap-3">
-					<div className="flex flex-wrap gap-1.5">
-						<button type="button" className={button} aria-pressed={tab === "overview"} onClick={() => selectTab("overview")}>Обзор</button>
+				<header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:items-center">
+					<div role="group" aria-label="Разделы руководителя" className="chat-menu-tabs flex w-fit max-w-full flex-wrap">
+						<button type="button" aria-pressed={tab === "overview"} onClick={() => selectTab("overview")}>Обзор</button>
 						{canEdit && <>
-							<button type="button" className={button} aria-pressed={tab === "shifts"} onClick={() => selectTab("shifts")}>Смены и навыки</button>
-							<button type="button" className={button} aria-pressed={tab === "projects"} onClick={() => selectTab("projects")}>Проекты и SLA</button>
+							<button type="button" aria-pressed={tab === "shifts"} onClick={() => selectTab("shifts")}>Смены и навыки</button>
+							<button type="button" aria-pressed={tab === "projects"} onClick={() => selectTab("projects")}>Проекты и SLA</button>
 						</>}
-						<button type="button" aria-label="Обновить" className={button} disabled={tab === "overview" ? snapshot.isFetching : settings.isFetching} onClick={() => void (tab === "overview" ? snapshot.refetch() : settings.refetch())}><RefreshCw size={14} /></button>
 					</div>
+					<button type="button" aria-label="Обновить данные" title="Обновить данные" className={button} disabled={tab === "overview" ? snapshot.isFetching : settings.isFetching} onClick={() => void (tab === "overview" ? snapshot.refetch() : settings.refetch())}><RefreshCw size={14} /></button>
 				</header>
 				{tab === "overview" ? <>
 					{snapshot.isPending && <p className="text-sm text-muted">Загружаем состояние очереди…</p>}
@@ -80,10 +80,11 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 							<div className="overflow-hidden rounded-xl border border-border bg-surface/60">
 								<h3 className="border-b border-border p-3 text-sm font-semibold">Нагрузка агентов</h3>
 								{!data.agents.length && <p className="p-3 text-xs text-muted">Пока нет агентов со статусом SupportOS.</p>}
-								{data.agents.map((agent) => <div key={agent.id} className="flex items-center gap-2 border-b border-border/60 p-3 text-xs last:border-0">
-									<span className="mr-auto truncate">{names.get(agent.id) ?? `Агент #${agent.id}`}</span>
+								{data.agents.map((agent) => <div key={agent.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-border/60 p-3 text-xs last:border-0">
+									<span className="truncate font-medium">{names.get(agent.id) ?? `Агент #${agent.id}`}</span>
 									<span className="shrink-0 text-muted">{!agent.online ? "Не в сети" : !agent.onShift ? "Вне смены" : agent.accepting ? "Принимает" : "Пауза"}</span>
-									<span className={agent.used >= agent.limit ? "shrink-0 font-medium chat-text-warning" : "shrink-0 tabular-nums"}>{agent.used}/{agent.limit}</span>
+									<meter className="chat-load-meter" min={0} max={Math.max(agent.limit, 1)} value={Math.min(agent.used, agent.limit)} aria-label="Занятые места для чатов" />
+									<span className={agent.used >= agent.limit ? "text-right font-medium tabular-nums chat-text-warning" : "text-right tabular-nums text-muted"} title="Активные чаты / лимит">{agent.used} / {agent.limit}</span>
 								</div>)}
 							</div>
 							<div className="overflow-hidden rounded-xl border border-border bg-surface/60">
@@ -94,9 +95,10 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 									</select>
 								</div>
 								{!sla.length && <p className="p-3 text-xs text-muted">Нет ожидающих диалогов с настроенным SLA.</p>}
-								{sla.map((row) => <button type="button" key={row.id} onClick={() => onOpen(row.id)} className="flex w-full items-center justify-between gap-2 border-b border-border/60 p-3 text-left text-xs last:border-0 hover:bg-surface-elevated">
+								{sla.map((row) => <button type="button" key={row.id} onClick={() => onOpen(row.id)} title="Открыть в наблюдении" className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border/60 p-3 text-left text-xs last:border-0 hover:bg-surface-elevated">
 									<span className="truncate">#{row.id} · {projects.get(row.inboxId) ?? `Источник #${row.inboxId}`}</span>
 									<span className={row.overdue ? "shrink-0 chat-text-danger" : "shrink-0 text-muted"}>{duration(row.seconds)} / {row.goal} мин</span>
+									<ArrowUpRight size={13} aria-hidden="true" className="text-accent" />
 								</button>)}
 							</div>
 						</div>

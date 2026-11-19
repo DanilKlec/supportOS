@@ -17,7 +17,7 @@ import {
 	UsersRound,
 	X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ChatwootAgent,
 	type ChatwootWebsiteInbox,
@@ -99,7 +99,7 @@ function sourceForm(inbox: ChatwootWebsiteInbox): SourceForm {
 
 export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => void; canDelete: boolean }) {
 	const client = useQueryClient();
-	const [mode, setMode] = useState<"list" | "types" | "form" | "operators">(
+	const [mode, setMode] = useState<"list" | "form" | "operators">(
 		"list",
 	);
 	const [form, setForm] = useState<SourceForm>(blankSource);
@@ -107,6 +107,12 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 	const [search, setSearch] = useState("");
 	const [agentSearch, setAgentSearch] = useState("");
 	const [copiedSourceId, setCopiedSourceId] = useState<number | null>(null);
+	const [deleteTarget, setDeleteTarget] = useState<ChatwootWebsiteInbox | null>(null);
+	const [manualCode, setManualCode] = useState("");
+	const confirmation = useRef<HTMLParagraphElement>(null);
+	const codeField = useRef<HTMLTextAreaElement>(null);
+	useEffect(() => { if (deleteTarget) confirmation.current?.focus(); }, [deleteTarget]);
+	useEffect(() => { if (manualCode) codeField.current?.focus(); }, [manualCode]);
 	const query = useQuery({
 		queryKey: ["chatwoot", "website-inboxes"],
 		queryFn: chatwootService.websiteInboxes,
@@ -167,6 +173,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 	const remove = useMutation({
 		mutationFn: chatwootService.deleteWebsiteSource,
 		onSuccess: async () => {
+			setDeleteTarget(null);
 			await Promise.all([
 				client.invalidateQueries({ queryKey: ["chatwoot", "website-inboxes"] }),
 				client.invalidateQueries({ queryKey: ["chatwoot", "directory"] }),
@@ -178,12 +185,16 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 	const openNew = () => {
 		save.reset();
 		setForm(blankSource);
-		setMode("types");
+		setDomainInput("");
+		setAgentSearch("");
+		setMode("form");
 	};
 	const openEdit = (inbox: ChatwootWebsiteInbox) => {
 		save.reset();
 		remove.reset();
 		setForm(sourceForm(inbox));
+		setDomainInput("");
+		setAgentSearch("");
 		setMode("form");
 	};
 	const addDomains = () => {
@@ -213,6 +224,8 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 		typeof window === "undefined" ? "" : window.location.hostname;
 	const copyWidgetCode = async (inbox: ChatwootWebsiteInbox) => {
 		if (!baseUrl || !inbox.website_token) return;
+		setManualCode("");
+		setDeleteTarget(null);
 		const code = widgetSnippet(baseUrl, inbox.website_token, inbox);
 		try {
 			await navigator.clipboard.writeText(code);
@@ -225,7 +238,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 				1800,
 			);
 		} catch {
-			window.prompt("Скопируйте код виджета", code);
+			setManualCode(code);
 		}
 	};
 
@@ -251,15 +264,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 								type="button"
 								onClick={() => {
 									save.reset();
-									setMode(
-										mode === "operators"
-											? "form"
-											: mode === "form"
-												? editing
-													? "list"
-													: "types"
-												: "list",
-									);
+									setMode(mode === "operators" ? "form" : "list");
 								}}
 								className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted hover:bg-surface-elevated"
 							>
@@ -301,7 +306,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 								onClick={openNew}
 								className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:brightness-110"
 							>
-								<Plus size={14} /> Добавить источник
+								<Plus size={14} /> Добавить сайт
 							</button>
 						</div>
 						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto px-3 sm:px-5">
@@ -373,8 +378,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 													Сайт · {inbox.website_url || "домен не указан"}
 												</div>
 												<div className="mt-1 text-[10px] text-muted">
-													{splitDomains(inbox.allowed_domains).length || "Все"}{" "}
-													разрешённых доменов
+													{splitDomains(inbox.allowed_domains).length ? `Разрешено доменов: ${splitDomains(inbox.allowed_domains).length}` : "Доступен для всех доменов"}
 												</div>
 											</div>
 											{inbox.website_token && (
@@ -403,14 +407,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 											{canDelete && <button
 												type="button"
 												disabled={remove.isPending}
-												onClick={() => {
-													if (
-														window.confirm(
-															`Удалить источник «${inbox.name}»? Чаты и настройки этого Website-канала будут удалены в Chatwoot.`,
-														)
-													)
-														remove.mutate(inbox.id);
-												}}
+												onClick={() => { remove.reset(); setManualCode(""); setDeleteTarget(inbox); }}
 												title="Удалить источник"
 												className="grid size-9 shrink-0 place-items-center rounded-lg border border-border text-muted hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
 											>
@@ -418,6 +415,24 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 											</button>}
 										</article>
 									))}
+								</div>
+							)}
+							{manualCode && (
+								<div className="my-3 space-y-2 rounded-xl border border-border p-3">
+									<label className="block text-xs font-medium">Скопируйте код виджета вручную
+										<textarea ref={codeField} readOnly value={manualCode} rows={4} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded-lg border border-border bg-background p-2 font-mono text-xs" />
+									</label>
+									<button type="button" onClick={() => setManualCode("")} className="rounded-md border border-border px-2 py-1.5 text-xs">Скрыть код</button>
+								</div>
+							)}
+							{deleteTarget && (
+								<div className="my-3 space-y-2 rounded-xl border border-red-500/35 bg-red-500/5 p-3">
+									<p ref={confirmation} tabIndex={-1} className="text-sm font-medium">Удалить источник «{deleteTarget.name}»?</p>
+									<p className="text-xs text-muted">Его диалоги и настройки виджета будут удалены в Chatwoot.</p>
+									<div className="flex flex-wrap gap-2">
+										<button type="button" disabled={remove.isPending} onClick={() => { remove.reset(); setDeleteTarget(null); }} className="rounded-md border border-border px-2.5 py-2 text-xs">Отмена</button>
+										<button type="button" disabled={remove.isPending} onClick={() => remove.mutate(deleteTarget.id)} className="rounded-md border border-red-500/35 px-2.5 py-2 text-xs font-medium chat-text-danger disabled:opacity-50">{remove.isPending ? "Удаляем…" : "Удалить источник"}</button>
+									</div>
 								</div>
 							)}
 							{remove.isError && (
@@ -428,10 +443,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 								</p>
 							)}
 						</div>
-						<footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-							<span className="text-[10px] text-muted">
-								Управление каналами и операторами выполняется в SupportOS
-							</span>
+						<footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
 							<button
 								type="button"
 								onClick={onClose}
@@ -441,73 +453,10 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 							</button>
 						</footer>
 					</>
-				) : mode === "types" ? (
-					<>
-						<div className="supportos-scroll min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">
-							<div className="mx-auto max-w-3xl">
-								<div className="mb-6">
-									<h3 className="text-base font-semibold">Выберите источник</h3>
-									<p className="mt-1 text-xs text-muted">
-										Выберите канал, из которого клиенты будут обращаться к
-										команде.
-									</p>
-								</div>
-								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-									<button
-										type="button"
-										onClick={() => setMode("form")}
-										className="group min-h-40 rounded-2xl border border-accent/40 bg-accent/5 p-5 text-left transition hover:border-accent hover:bg-accent/10"
-									>
-										<span className="grid size-10 place-items-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
-											<Globe2 size={18} />
-										</span>
-										<span className="mt-4 block text-sm font-semibold">
-											Сайт
-										</span>
-										<span className="mt-1.5 block text-xs leading-relaxed text-muted">
-											Добавьте виджет онлайн-чата на сайт и настройте его
-											внешний вид.
-										</span>
-										<span className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-accent">
-											Настроить <ArrowRight size={12} />
-										</span>
-									</button>
-									<div className="min-h-40 rounded-2xl border border-border bg-background/50 p-5 opacity-60">
-										<span className="grid size-10 place-items-center rounded-xl border border-border bg-surface text-muted">
-											<MessageCircle size={18} />
-										</span>
-										<span className="mt-4 block text-sm font-semibold">
-											Другие каналы
-										</span>
-										<span className="mt-1.5 block text-xs leading-relaxed text-muted">
-											Мессенджеры и почта будут подключаться отдельными
-											мастерами.
-										</span>
-										<span className="mt-4 inline-flex rounded-full border border-border px-2 py-1 text-[10px] text-muted">
-											Скоро
-										</span>
-									</div>
-								</div>
-							</div>
-						</div>
-						<footer className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
-							<span className="text-[10px] text-muted">
-								Пока доступно подключение сайта
-							</span>
-							<button
-								type="button"
-								onClick={() => setMode("list")}
-								className="h-8 rounded-lg border border-border px-3 text-xs hover:bg-surface-elevated"
-							>
-								Отмена
-							</button>
-						</footer>
-					</>
 				) : mode === "form" ? (
 					<>
 						<div className="flex min-h-0 flex-1 flex-col md:flex-row">
 							<aside className="flex shrink-0 gap-3 border-b border-border bg-background/40 px-5 py-3 md:w-56 md:flex-col md:gap-4 md:border-b-0 md:border-r md:py-6">
-								<Step label="Источник" icon={Globe2} done />
 								<Step label="Настройка сайта" icon={Settings2} active />
 								<Step label="Операторы" icon={UsersRound} />
 							</aside>
@@ -520,8 +469,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 										<div>
 											<h3 className="text-base font-semibold">Сайт</h3>
 											<p className="mt-1 text-xs leading-relaxed text-muted">
-												Создайте источник для сайта и подключите чат-виджет.
-												Другие каналы добавим в этом разделе отдельно.
+												Укажите адрес сайта и настройте виджет.
 											</p>
 										</div>
 									</div>
@@ -794,7 +742,6 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 					<>
 						<div className="flex min-h-0 flex-1 flex-col md:flex-row">
 							<aside className="flex shrink-0 gap-3 border-b border-border bg-background/40 px-5 py-3 md:w-56 md:flex-col md:gap-4 md:border-b-0 md:border-r md:py-6">
-								<Step label="Источник" icon={Globe2} done />
 								<Step label="Настройка сайта" icon={Settings2} done />
 								<Step label="Операторы" icon={UsersRound} active />
 							</aside>
