@@ -11,9 +11,11 @@ import {
 	Headphones,
 	LoaderCircle,
 	LockKeyhole,
+	Maximize2,
 	MessageCircle,
 	MessageSquareText,
 	MessagesSquare,
+	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
 	Paperclip,
@@ -28,7 +30,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createElement, Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createElement, Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
@@ -61,6 +63,7 @@ import { ActiveChatsTable } from "./ActiveChatsTable";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ConversationListToolbar, type ConversationFilters, countConversationFilters, emptyConversationFilters } from "./ConversationListToolbar";
+import { chatWindowsReducer, ConversationWindows, initialChatWindows, MAX_CHAT_WINDOWS } from "./ConversationWindows";
 import { useChatPopover } from "./useChatPopover";
 import { CoachingComposer, type CoachingRecipient, CoachingThreadTabs, ObservationHeader } from "./ChatCoaching";
 import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
@@ -150,8 +153,16 @@ function AgentInboxWorkspace() {
 		try { return Number(localStorage.getItem("supportos:chatwoot:list-width")) || 320; } catch { return 320; }
 	});
 	const [activePage, setActivePage] = useState(1);
-	const [conversationId, setConversationId] = useState<number | null>(null);
+	const [chatWindows, dispatchChatWindow] = useReducer(chatWindowsReducer, initialChatWindows);
+	const [addingChat, setAddingChat] = useState(false);
 	const drafts = useRef(new Map<number, ChatDraft>());
+	const rememberDraft = useCallback((id: number, draft: ChatDraft) => {
+		if (draft.text) drafts.current.set(id, draft);
+		else drafts.current.delete(id);
+	}, []);
+	const rememberTitle = useCallback((id: number, title: string) => {
+		dispatchChatWindow({ type: "title", id, title });
+	}, []);
 	const [supervisionId, setSupervisionId] = useState<number | null>(null);
 	const observationTrigger = useRef<HTMLElement | null>(null);
 	const supervisionDrafts = useRef(new Map<number, ChatDraft>());
@@ -180,6 +191,7 @@ function AgentInboxWorkspace() {
 	);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
+	const composerBinds = useMemo(() => [...remoteBinds, ...binds], [remoteBinds, binds]);
 	const language = useKnowledgeStore((s) => s.language);
 	const setLanguage = useKnowledgeStore((s) => s.setLanguage);
 	const connection = useQuery({
@@ -353,9 +365,9 @@ function AgentInboxWorkspace() {
 		},
 	});
 	const takeConversation = useMutation({
-		mutationFn: chatwootService.take,
-		onSuccess: (_result, id) => { if (activeSection === "inbox" && scope === "queue") openTakenChat(id); },
-		onMutate: async (id) => {
+		mutationFn: ({ id }: { id: number; add?: boolean; replaceId?: number }) => chatwootService.take(id),
+		onSuccess: (_result, { id, add, replaceId }) => { if (activeSection === "inbox" && scope === "queue") openTakenChat(id, { add, replaceId }); },
+		onMutate: async ({ id }) => {
 			await client.cancelQueries({ queryKey: ["chatwoot", "conversations"] });
 			const queued = client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })
 				.filter(([key]) => (key[2] as ConversationSearch | undefined)?.scope === "queue");
@@ -372,7 +384,7 @@ function AgentInboxWorkspace() {
 			for (const [key, cached] of context?.queued ?? []) client.setQueryData(key, cached);
 			for (const [key, cached] of context?.counts ?? []) client.setQueryData(key, cached);
 		},
-		onSettled: (_result, _error, id) => {
+		onSettled: (_result, _error, { id }) => {
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation", id] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
@@ -438,13 +450,17 @@ function AgentInboxWorkspace() {
 			new Notification(fresh.length === 1 ? "Новый диалог" : `${fresh.length} новых диалогов`, { body: "Новое обращение в рабочем пространстве SupportOS" });
 		}
 	}, [conversations.data, rows, soundEnabled]);
-	const placeConversation = (id: number) => {
-		setConversationId(id);
+	const placeConversation = (id: number, options: { title?: string; add?: boolean; replaceId?: number } = {}) => {
+		dispatchChatWindow({ type: "open", id, ...options });
+		setAddingChat(false);
 		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(false);
 	};
-	const closeConversation = () => {
-		setConversationId(null);
-		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
+	const closeConversation = (id: number) => {
+		dispatchChatWindow({ type: "close", id });
+		if (chatWindows.panes.length === 1) {
+			setAddingChat(false);
+			if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
+		}
 	};
 	const openObservation = (id: number) => {
 		setSupervisionId(id);
@@ -479,16 +495,15 @@ function AgentInboxWorkspace() {
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
 		if (section === "inbox" || section === "archive") {
-			setConversationId(null);
 			setQueueOpen(true);
-		}
+		} else setAddingChat(false);
 		setActivePage(1);
 	};
 	const selectScope = (next: Scope) => {
 		if (next !== "active") setQueueOpen(true);
 		if (next === scope) return;
 		setScope(next);
-		setConversationId(null);
+		if (next === "active") setAddingChat(false);
 		setActivePage(1);
 	};
 	const toggleSound = () => {
@@ -507,10 +522,10 @@ function AgentInboxWorkspace() {
 		setListWidth(next);
 		try { localStorage.setItem("supportos:chatwoot:list-width", String(next)); } catch { /* preference remains in session */ }
 	};
-	const openTakenChat = (id: number) => {
+	const openTakenChat = (id: number, placement: { add?: boolean; replaceId?: number }) => {
 		setScope("mine");
 		setActivePage(1);
-		placeConversation(id);
+		placeConversation(id, placement);
 	};
 	const prefetchQueue = () => {
 		if (scope === "queue" || activeSection !== "inbox") return;
@@ -623,11 +638,18 @@ function AgentInboxWorkspace() {
 				) : <>
 				{queueOpen && scope !== "active" && (
 					<aside aria-label={displayedScope === "history" ? "Архив диалогов" : "Список диалогов"} style={{ "--chat-list-width": `${listWidth}px` } as CSSProperties} className="chat-list flex w-full min-w-0 shrink-0 flex-col border-r border-border md:w-[var(--chat-list-width)] md:min-w-[260px] md:max-w-[min(520px,45%)]">
+						{chatWindows.panes.length > 0 && <button type="button" className="chat-window-list-back md:hidden" onClick={() => { setAddingChat(false); setQueueOpen(false); }}>
+							<PanelLeftClose size={14} /> К открытым чатам
+						</button>}
 						<ConversationListToolbar key={listScope} scope={listScope} filters={filters} update={updateListFilters}
 							project={queueInbox} requireProject={listScope === "queue" && !canSupervise}
 							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
 							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
 						/>
+						{addingChat && <div className="chat-window-choose">
+							<p role="status">Выберите чат для нового окна <span className="whitespace-nowrap">({chatWindows.panes.length + 1} из {MAX_CHAT_WINDOWS})</span></p>
+							<button type="button" className="shrink-0 rounded-md px-2 py-1.5 text-xs hover:bg-surface-elevated" onClick={() => setAddingChat(false)}>Отмена</button>
+						</div>}
 						<div className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs text-muted">
 							<span className="font-medium">{listScope === "mine" ? "Мои диалоги" : listScope === "queue" ? "Ожидают назначения" : "Диалоги в архиве"}</span>
 							{conversations.isSuccess && <span title="На этой странице" className="rounded-md bg-surface-elevated px-1.5 tabular-nums">{rows.length}</span>}
@@ -668,14 +690,15 @@ function AgentInboxWorkspace() {
 										key={item.id}
 										conversation={item}
 										projectName={item.meta?.inbox?.name ?? inboxes.find((project) => project.id === item.inbox_id)?.name}
-										active={conversationId === item.id}
-										onClick={() => placeConversation(item.id)}
+										active={chatWindows.activeId === item.id}
+										opened={chatWindows.panes.some((pane) => pane.id === item.id)}
+										onClick={() => placeConversation(item.id, { add: addingChat, title: item.meta?.sender?.name || item.meta?.sender?.email })}
 										onTake={
 											displayedScope === "queue"
-												? () => takeConversation.mutate(item.id)
+												? () => takeConversation.mutate({ id: item.id, add: addingChat, replaceId: chatWindows.activeId ?? undefined })
 												: undefined
 										}
-										taking={takeConversation.isPending && takeConversation.variables === item.id}
+										taking={takeConversation.isPending && takeConversation.variables?.id === item.id}
 										takeDisabled={takeConversation.isPending}
 									/>
 								))
@@ -727,45 +750,38 @@ function AgentInboxWorkspace() {
 								</aside>
 							)}
 						</div>
-					) : <>
-					<button
-						type="button"
-						aria-label={queueOpen ? "Скрыть список" : "Показать список"}
-						onClick={() => setQueueOpen(!queueOpen)}
-						className="absolute left-2 top-2 z-30 grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted shadow-sm hover:text-foreground"
-					>
-						<PanelLeftClose
-							size={15}
-							className={queueOpen ? "" : "rotate-180"}
-						/>
-					</button>
-					<div className="flex min-h-0 flex-1 overflow-hidden">
-						<ConversationPane
-							key={conversationId ?? "empty"}
-							id={conversationId}
-							draft={conversationId == null ? undefined : drafts.current.get(conversationId)}
-							onDraft={(id, draft) => {
-								if (draft.text) drafts.current.set(id, draft);
-								else drafts.current.delete(id);
-							}}
-							onOpenRelated={placeConversation}
+					) : (
+					<ConversationWindows state={chatWindows} listOpen={queueOpen} choosing={addingChat}
+						onToggleList={() => { if (queueOpen) setAddingChat(false); setQueueOpen(!queueOpen); }}
+						onAdd={() => { setAddingChat(!addingChat); setQueueOpen(true); }}
+						onFocus={(id) => dispatchChatWindow({ type: "focus", id })}
+						renderPane={(id, { visible, tiled, canExpand, expanded }) => <ConversationPane
+							id={id}
+							visible={visible}
+							tiled={tiled}
+							expanded={expanded}
+							onExpand={canExpand && id !== null ? () => dispatchChatWindow({ type: "expand", id }) : undefined}
+							draft={id == null ? undefined : drafts.current.get(id)}
+							onDraft={rememberDraft}
+							onTitle={rememberTitle}
+							onOpenRelated={(relatedId) => placeConversation(relatedId, { replaceId: id ?? undefined })}
 							realtimeConnected={realtimeConnected}
 							coachingRealtimeConnected={coachingRealtimeConnected}
 							agents={agents}
 							teams={directory.data?.teams ?? []}
 							inboxes={inboxes}
 							labels={labels}
-							binds={[...remoteBinds, ...binds]}
+							binds={composerBinds}
 							language={language}
 							onLanguage={setLanguage}
-							onClose={closeConversation}
-							onTake={displayedScope === "queue" ? (id) => takeConversation.mutate(id) : undefined}
+							onClose={() => { if (id !== null) closeConversation(id); }}
+							onTake={displayedScope === "queue" ? (id) => takeConversation.mutate({ id, replaceId: id }) : undefined}
 							takeDisabled={takeConversation.isPending}
 							onChanged={reload}
 							onChoose={openEmptyPane}
-						/>
-					</div>
-					</>}
+						/>}
+					/>
+					)}
 				</main>
 				</>}
 			</div>
@@ -1020,6 +1036,7 @@ function ConversationRow({
 	conversation,
 	projectName,
 	active,
+	opened,
 	onClick,
 	onTake,
 	taking = false,
@@ -1028,6 +1045,7 @@ function ConversationRow({
 	conversation: ChatwootConversation;
 	projectName?: string;
 	active: boolean;
+	opened: boolean;
 	onClick: () => void;
 	onTake?: () => void;
 	taking?: boolean;
@@ -1038,6 +1056,7 @@ function ConversationRow({
 	return (
 		<div
 			data-active={active}
+			data-opened={opened}
 			className="chat-list-row group flex w-full items-center border-b border-border/70 pr-2 transition hover:bg-surface-elevated/70"
 		>
 			<button
@@ -1109,12 +1128,17 @@ function ConversationPane({
 	id,
 	supervising = false,
 	docked = false,
+	visible = true,
+	tiled = false,
+	expanded = false,
+	onExpand,
 	realtimeConnected,
 	coachingRealtimeConnected,
 	agents,
 	teams,
 	draft,
 	onDraft,
+	onTitle,
 	onOpenRelated,
 	inboxes,
 	labels,
@@ -1130,12 +1154,17 @@ function ConversationPane({
 	id: number | null;
 	supervising?: boolean;
 	docked?: boolean;
+	visible?: boolean;
+	tiled?: boolean;
+	expanded?: boolean;
+	onExpand?: () => void;
 	realtimeConnected: boolean;
 	coachingRealtimeConnected: boolean;
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
 	draft?: ChatDraft;
 	onDraft: (id: number, draft: ChatDraft) => void;
+	onTitle?: (id: number, title: string) => void;
 	onOpenRelated: (id: number) => void;
 	inboxes: ChatwootInbox[];
 	labels: string[];
@@ -1160,7 +1189,7 @@ function ConversationPane({
 	}, [id, text, privateNote, draftCoachTo, onDraft]);
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
-	const bindMenu = useChatPopover<HTMLDivElement>(showBinds, () => setShowBinds(false));
+	const bindMenu = useChatPopover<HTMLDivElement>(visible && showBinds, () => setShowBinds(false));
 	const [contextTab, setContextTab] = useState<"player" | "actions" | null>(null);
 	const [contextOverlay, setContextOverlay] = useState(false);
 	const showCustomer = contextTab === "player";
@@ -1202,10 +1231,14 @@ function ConversationPane({
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
 		queryFn: () => chatwootService.conversation(id as number),
-		enabled: id != null,
+		enabled: visible && id != null,
 		refetchInterval: realtimeConnected ? 12000 : 5000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
+	const conversationTitle = conversation?.access?.read ? conversation.meta?.sender?.name || conversation.meta?.sender?.email : undefined;
+	useEffect(() => {
+		if (id != null && conversationTitle) onTitle?.(id, conversationTitle);
+	}, [id, conversationTitle, onTitle]);
 	const canWrite = !supervising && conversation?.access?.write === true;
 	const canNote = !supervising && conversation?.access?.note === true;
 	const canTake = !supervising && conversation?.access?.take === true;
@@ -1216,7 +1249,7 @@ function ConversationPane({
 	const latestMessagesQuery = useQuery({
 		queryKey: ["chatwoot", "messages", id, "latest"],
 		queryFn: () => chatwootService.conversationMessages(id as number),
-		enabled: id != null,
+		enabled: visible && id != null,
 		refetchInterval: realtimeConnected ? 12000 : 3000,
 	});
 	const latestMessages = latestMessagesQuery.data
@@ -1235,7 +1268,7 @@ function ConversationPane({
 	const coaching = useQuery({
 		queryKey: coachingKey,
 		queryFn: ({ signal }) => chatwootService.coachingNotes(id as number, signal),
-		enabled: id != null && conversation?.access?.read === true,
+		enabled: visible && id != null && conversation?.access?.read === true,
 		refetchInterval: coachingRealtimeConnected ? 15000 : 3500,
 		retry: false,
 	});
@@ -1317,7 +1350,7 @@ function ConversationPane({
 	}, [latestMessagesQuery.data]);
 	useLayoutEffect(() => {
 		const viewport = messageViewport.current;
-		if (!viewport || (latestMessageId == null && !latestCoachingId)) return;
+		if (!visible || !viewport || (latestMessageId == null && !latestCoachingId)) return;
 		if (previousScrollHeight.current !== null) {
 			viewport.scrollTop += viewport.scrollHeight - previousScrollHeight.current;
 			previousScrollHeight.current = null;
@@ -1325,7 +1358,7 @@ function ConversationPane({
 		}
 		if (!followMessages.current) return;
 		viewport.scrollTop = viewport.scrollHeight;
-	}, [latestMessageId, latestCoachingId, messages.length, privateOnly]);
+	}, [latestMessageId, latestCoachingId, messages.length, privateOnly, visible]);
 	const conversationVisible = conversation?.access?.read === true && !query.isError;
 	useEffect(() => {
 		if (!conversationVisible || !thread.current) return;
@@ -1336,14 +1369,14 @@ function ConversationPane({
 		return () => observer.disconnect();
 	}, [conversationVisible]);
 	useEffect(() => {
-		if (!conversationVisible || !messageViewport.current) return;
+		if (!visible || !conversationVisible || !messageViewport.current) return;
 		const viewport = messageViewport.current;
 		const observer = new ResizeObserver(() => {
 			if (followMessages.current && previousScrollHeight.current === null) viewport.scrollTop = viewport.scrollHeight;
 		});
 		observer.observe(viewport);
 		return () => observer.disconnect();
-	}, [conversationVisible]);
+	}, [conversationVisible, visible]);
 	const loadOlderMessages = async () => {
 		const firstId = messages[0]?.id;
 		if (!id || !firstId || olderMessagesRequest.current || !hasOlderMessages) return;
@@ -1376,13 +1409,13 @@ function ConversationPane({
 	const contact = useQuery({
 		queryKey: ["chatwoot", "contact", contactId, id],
 		queryFn: () => chatwootService.contact(contactId as number, id as number),
-		enabled: showCustomer && conversation?.access?.read === true && contactId != null,
+		enabled: visible && showCustomer && conversation?.access?.read === true && contactId != null,
 		staleTime: 60000,
 	});
 	const history = useQuery({
 		queryKey: ["chatwoot", "contact-history", contactId, id],
 		queryFn: () => chatwootService.contactHistory(contactId as number, id as number),
-		enabled: showCustomer && conversation?.access?.read === true && contactId != null,
+		enabled: visible && showCustomer && conversation?.access?.read === true && contactId != null,
 		staleTime: 60000,
 	});
 	const send = useMutation({
@@ -1549,7 +1582,8 @@ function ConversationPane({
 			</div>
 		);
 	if (!conversation?.access?.read || query.isError) return (
-		<div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted">
+		<div className="relative grid flex-1 place-items-center p-6 text-center text-sm text-muted">
+			{!docked && <button type="button" className="chat-window-control absolute top-2 right-2" aria-label="Закрыть диалог" onClick={onClose}><X size={15} /></button>}
 			<div><p role={query.isError ? "alert" : "status"}>{query.error?.message ?? (query.isLoading ? "Загружаем диалог…" : "Диалог недоступен")}</p>
 				{query.isError && <button type="button" onClick={() => void query.refetch()} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs">Повторить</button>}
 			</div>
@@ -1564,9 +1598,10 @@ function ConversationPane({
 		<section
 			ref={thread}
 			className="chat-thread relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
+			data-tiled={tiled}
 		>
 			<div inert={contextVisible && contextOverlay} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border pr-3 py-2.5 ${docked ? "chat-docked-thread-header pl-3" : "pl-12"}`}>
+				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5 ${docked ? "chat-docked-thread-header" : ""}`}>
 					<div className="flex min-w-0 items-center gap-2.5">
 						<div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-elevated text-[11px] font-semibold">
 							{initials(sender?.name)}
@@ -1611,9 +1646,13 @@ function ConversationPane({
 							<CheckCheck size={14} aria-hidden="true" />
 							<span>{inactive ? "Открыть снова" : "Завершить"}</span>
 						</button>}
+						{onExpand && <button type="button" className="chat-window-control"
+							aria-label={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} title={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} onClick={onExpand}>
+							{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+						</button>}
 						{!docked && <button
 							type="button"
-							title="Закрыть вкладку"
+							title="Закрыть окно чата"
 							aria-label="Закрыть диалог"
 							onClick={onClose}
 							className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-elevated"
@@ -1622,7 +1661,7 @@ function ConversationPane({
 						</button>}
 					</div>
 				</header>
-				{(conversation.priority || tags.length > 0) && <div className="flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
+				{(conversation.priority || tags.length > 0) && <div className="chat-thread-meta flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
 					{conversation.priority && <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted">Приоритет · {conversationPriorityLabels[conversation.priority]}</span>}
 					{tags.map((tag) => <span key={tag} className="chat-context-tag break-all">{tag}</span>)}
 				</div>}
@@ -1868,7 +1907,7 @@ function ConversationPane({
 					{canTake && <button type="button" disabled={takeDisabled || take.isPending} onClick={() => { if (onTake) onTake(id); else take.mutate(); }} className="rounded-md bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">Взять в работу</button>}
 				</footer>}
 			</div>
-			{contextVisible && (
+			{visible && contextVisible && (
 				<>
 				<div className="chat-thread-customer-resize"><ResizeHandle axis="x" label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={setCustomerWidth} /></div>
 				<aside aria-label={showCustomer ? "Карточка игрока" : "Действия с диалогом"} onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) closeCustomer(); }} style={{ "--chat-context-width": `${customerWidth}px` } as CSSProperties} className="chat-thread-customer supportos-scroll absolute inset-y-0 right-0 z-30 max-w-full shrink-0 overflow-y-auto border-l border-border bg-surface p-3 shadow-xl">
