@@ -307,6 +307,56 @@ function trustedContact(row, rawContactId) {
 	return id;
 }
 
+function contactSummary(row) {
+	const { id, name, email, phone_number, identifier, blocked, label_list, last_activity_at } = row;
+	return { id: Number(id), name, email, phone_number, identifier, blocked, label_list, last_activity_at };
+}
+
+const editableContactFields = { name: 160, email: 254, phone_number: 40 };
+
+function contactProfileInput(value) {
+	if (!value || typeof value !== 'object' || Array.isArray(value))
+		throw chatwootError('Передайте поля контакта.', 400);
+	const entries = Object.entries(value);
+	if (!entries.length) throw chatwootError('Укажите хотя бы одно поле контакта.', 400);
+	return Object.fromEntries(entries.map(([key, raw]) => {
+		if (!Object.hasOwn(editableContactFields, key) ||
+			(raw !== null && (typeof raw !== 'string' || raw.length > editableContactFields[key] || /[\x00-\x1f\x7f]/.test(raw))))
+			throw chatwootError('Переданы недопустимые поля или значения контакта.', 400);
+		let text = raw?.trim();
+		if (!text) return [key, null];
+		if (key === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text))
+			throw chatwootError('Проверьте адрес электронной почты.', 400);
+		if (key === 'phone_number') {
+			text = text.replace(/[\s().-]/g, '');
+			if (!/^\+[1-9]\d{1,14}$/.test(text)) throw chatwootError('Введите телефон с международным кодом страны.', 400);
+		}
+		return [key, text];
+	}));
+}
+
+async function updateContactProfile(cfg, contactId, fields) {
+	try {
+		const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}?include_contact_inboxes=false`, {
+			method: 'PUT', body: contactProfileInput(fields),
+		});
+		const contact = result.payload ?? result;
+		if (Number(contact.id) !== Number(contactId)) throw chatwootError('Chatwoot не вернул обновлённый контакт.', 502);
+		return contactSummary(contact);
+	} catch (error) {
+		if ([400, 409, 422].includes(error.chatwootStatus))
+			throw chatwootError('Chatwoot отклонил изменения. Проверьте поля и убедитесь, что почта и телефон не заняты другим контактом.', 422);
+		throw error;
+	}
+}
+
+function recentContactChats(result, contactId, include) {
+	return itemList(result)
+		.filter((chat) => validChatId(chat.id) && (!conversationContact(chat) || conversationContact(chat) === contactId) && include(chat))
+		.sort((a, b) => oldestFirst(b, a)).slice(0, 12)
+		.map(({ id, inbox_id, status, created_at }) => ({ id, inbox_id, status, created_at }));
+}
+
 const secretKeys = new Set([
 	'token', 'accesstoken', 'apiaccesstoken', 'apitoken', 'pubsubtoken', 'refreshtoken', 'apikey',
 	'authorization', 'password', 'secret', 'signingsecret', 'hmactoken', 'hmacsecret', 'hmacidentifier',
@@ -652,6 +702,8 @@ export default async function handler(req, res) {
 			|| action === 'custom-attributes' && req.method !== 'GET';
 		if (monitorAction && !capabilities.supervise) throw chatwootError('Раздел доступен руководителю и QC.', 403);
 		if (projectAction && !capabilities.manageProjects) throw chatwootError('Эта настройка доступна администратору.', 403);
+		if (['contact-directory', 'directory-contact-history'].includes(action) && !capabilities.manageAllChats)
+			throw chatwootError('Каталог контактов доступен администратору.', 403);
 		if (action === 'website-source' && req.method === 'DELETE' && !capabilities.deleteProjects)
 			throw chatwootError('Удалять источники может только Creator.', 403);
 		if (action === 'webhook-secret' && !capabilities.manageWebhooks)
@@ -1067,6 +1119,27 @@ export default async function handler(req, res) {
 			const contact = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`);
 			return json(res, 200, access.seeIp ? contact : stripIp(contact));
 		}
+		if (action === 'contact-directory' && req.method === 'GET') {
+			const page = Number(url.searchParams.get('page') ?? 1);
+			const query = (url.searchParams.get('q') ?? '').trim();
+			if (!Number.isSafeInteger(page) || page < 1 || page > 10000 || query.length > 160)
+				throw chatwootError('Некорректная страница или слишком длинный запрос.', 400);
+			const params = new URLSearchParams({ page: String(page), include_contact_inboxes: 'false', sort: '-last_activity_at' });
+			if (query) params.set('q', query);
+			const result = await api(cfg, `/accounts/${cfg.accountId}/contacts${query ? '/search' : ''}?${params}`);
+			const rows = itemList(result);
+			const count = countFromMeta(result.meta ?? result.data?.meta, 'count');
+			const searchHasMore = result.meta?.has_more ?? result.data?.meta?.has_more;
+			const listedMore = count == null ? rows.length >= 15 : page * 15 < count;
+			const hasMore = query ? (typeof searchHasMore === 'boolean' ? searchHasMore : rows.length >= 15) : listedMore;
+			return json(res, 200, { payload: rows.filter((row) => validChatId(row?.id)).map(contactSummary), hasMore: page < 10000 && hasMore });
+		}
+		if (action === 'directory-contact-history' && req.method === 'GET') {
+			const id = url.searchParams.get('id');
+			if (!validChatId(id)) throw chatwootError('Некорректный ID контакта.', 400);
+			const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/${id}/conversations`);
+			return json(res, 200, { payload: recentContactChats(result, Number(id), () => true) });
+		}
 		if (action === 'contact-history' && req.method === 'GET') {
 			const id = url.searchParams.get('conversationId');
 			const { row, access, agentId } = await accessFor(id);
@@ -1074,20 +1147,26 @@ export default async function handler(req, res) {
 			const contactId = trustedContact(row, url.searchParams.get('id'));
 			const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}/conversations`);
 			const allowed = capabilities.supervise ? null : new Set((await getDirectory()).map((inbox) => Number(inbox.id)));
-			const payload = itemList(result)
-				.filter((chat) => {
-					if (String(chat.id) === id || (conversationContact(chat) && conversationContact(chat) !== contactId)) return false;
-					const assignee = conversationAssignee(chat);
-					return chatConversationAccess(capabilities, {
-						assigneeId: assignee, agentId, member: allowed?.has(conversationInbox(chat)) === true,
-						unassigned: !assignee && !hasBotAssignee(chat), active: activeStatuses.includes(chat.status),
-					}).read;
-				})
-				.sort((a, b) => oldestFirst(b, a)).slice(0, 12)
-				.map(({ id, inbox_id, status, created_at }) => ({ id, inbox_id, status, created_at }));
+			const payload = recentContactChats(result, contactId, (chat) => {
+				if (String(chat.id) === id) return false;
+				const assignee = conversationAssignee(chat);
+				return chatConversationAccess(capabilities, {
+					assigneeId: assignee, agentId, member: allowed?.has(conversationInbox(chat)) === true,
+					unassigned: !assignee && !hasBotAssignee(chat), active: activeStatuses.includes(chat.status),
+				}).read;
+			});
 			return json(res, 200, { payload });
 		}
 		if (req.method !== 'POST' && action !== 'website-source') return json(res, 405, { error: 'Метод не поддерживается' });
+		if (action === 'contact-profile') {
+			const { row, access } = await accessFor(body.conversationId, { fresh: true });
+			requireChatRight(access, 'write');
+			return json(res, 200, await updateContactProfile(cfg, trustedContact(row, body.contactId), body.fields));
+		}
+		if (action === 'contact-directory') {
+			if (!validChatId(body.contactId)) throw chatwootError('Некорректный ID контакта.', 400);
+			return json(res, 200, await updateContactProfile(cfg, body.contactId, body.fields));
+		}
 		if (action === 'contact-block') {
 			if (typeof body.blocked !== 'boolean') return json(res, 400, { error: 'Некорректный статус блокировки' });
 			const { row, access } = await accessFor(body.conversationId, { fresh: true });

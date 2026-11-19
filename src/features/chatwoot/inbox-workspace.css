@@ -65,6 +65,86 @@
 	width: 3.5rem;
 }
 
+.chat-contact-panel,
+.chat-contact-form {
+	min-inline-size: 0;
+	border: 1px solid var(--chat-line);
+	border-radius: 0.8rem;
+	background: var(--chat-panel);
+}
+
+.chat-contact-form {
+	padding: 0.65rem;
+	font-size: 0.75rem;
+}
+
+.chat-contact-form input {
+	min-inline-size: 0;
+	width: 100%;
+	border: 1px solid var(--chat-line);
+	border-radius: 0.5rem;
+	background: var(--chat-control);
+	padding: 0.45rem 0.6rem;
+}
+
+.chat-contact-button,
+.chat-contact-history {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border: 1px solid var(--chat-line);
+	border-radius: 0.55rem;
+	padding: 0.35rem 0.6rem;
+	background: var(--color-surface);
+	text-align: left;
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.chat-contact-button:disabled {
+	opacity: 0.5;
+}
+
+.chat-contact-button[data-primary="true"] {
+	border-color: var(--chat-strong-line);
+	background: var(--chat-selected);
+	color: var(--color-accent);
+}
+
+.chat-contact-row {
+	display: flex;
+	width: 100%;
+	min-inline-size: 0;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 0.58rem 0.75rem;
+	text-align: left;
+}
+
+.chat-contact-panel li + li > .chat-contact-row {
+	border-block-start: 1px solid var(--chat-line);
+}
+
+.chat-contact-row[aria-pressed="true"],
+.chat-contact-row:hover,
+.chat-contact-button:not(:disabled):hover,
+.chat-contact-history:hover {
+	background: var(--chat-selected);
+}
+
+.chat-contact-history {
+	width: 100%;
+	min-inline-size: 0;
+}
+
+.chat-contact-form input:focus-visible,
+.chat-contact-button:focus-visible,
+.chat-contact-history:focus-visible,
+.chat-contact-row:focus-visible {
+	outline: 2px solid var(--chat-focus);
+	outline-offset: -2px;
+}
+
 .chat-rail button[aria-current="page"] {
 	background: var(--chat-selected);
 	color: var(--color-accent);

@@ -43,6 +43,11 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		access: { read: true, note: true, write: true, take: false, seeIp: true },
 		coachRecipient: { id: 5, name: row.agent },
 	};
+	let playerContact = {
+		...conversation.meta.sender,
+		phone_number: null as string | null,
+	};
+	let contactQuery = "";
 	const assertLayout = async (name: string) => {
 		const bounds = await page
 			.locator(".supportos-inbox")
@@ -269,7 +274,30 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 					},
 				});
 			case "contact":
-				return route.fulfill({ json: conversation.meta.sender });
+				return route.fulfill({ json: playerContact });
+			case "contact-profile":
+			case "contact-directory": {
+				if (request.method() === "POST") {
+					const body = request.postDataJSON();
+					expect(body.contactId).toBe(playerContact.id);
+					expect(body.conversationId).toBe(
+						action === "contact-profile" ? row.id : undefined,
+					);
+					if (body.fields.email === "duplicate@example.invalid")
+						return route.fulfill({
+							status: 422,
+							json: { error: "Почта уже используется" },
+						});
+					playerContact = { ...playerContact, ...body.fields };
+					return route.fulfill({ json: playerContact });
+				}
+				expect(agentView).toBe(false);
+				contactQuery = url.searchParams.get("q") ?? "";
+				return route.fulfill({
+					json: { payload: [playerContact], hasMore: false },
+				});
+			}
+			case "directory-contact-history":
 			case "contact-history":
 				return route.fulfill({
 					json: {
@@ -537,6 +565,43 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(page.getByText("Сейчас никто не принимает чаты")).toBeVisible();
 	await page.getByRole("checkbox", { name: "Только принимающие" }).uncheck();
 	await assertLayout("team");
+	await page.getByRole("button", { name: "Контакты", exact: true }).click();
+	const contacts = page.getByRole("region", { name: "Контакты", exact: true });
+	await contacts
+		.getByRole("textbox", { name: "Поиск контактов" })
+		.fill(row.email);
+	await expect.poll(() => contactQuery).toBe(row.email);
+	await contacts.getByRole("button", { name: new RegExp(row.player) }).click();
+	const profile = contacts.getByRole("region", { name: "Сведения о контакте" });
+	await profile.getByRole("button", { name: "Редактировать контакт" }).click();
+	await expect(
+		profile.getByRole("textbox", { name: "Имя", exact: true }),
+	).toBeFocused();
+	const email = profile.getByRole("textbox", {
+		name: "Электронная почта",
+		exact: true,
+	});
+	await email.fill("duplicate@example.invalid");
+	await profile.getByRole("button", { name: "Сохранить", exact: true }).click();
+	await expect(profile.getByRole("alert")).toHaveText("Почта уже используется");
+	await expect(email).toHaveValue("duplicate@example.invalid");
+	await email.fill(row.email);
+	await profile
+		.getByRole("textbox", { name: "Телефон", exact: true })
+		.fill("+40712345678");
+	await profile.getByRole("button", { name: "Сохранить", exact: true }).click();
+	await expect(
+		profile.getByText("+40712345678", { exact: true }),
+	).toBeVisible();
+	await assertLayout("contacts");
+	await profile
+		.getByRole("button", {
+			name: new RegExp(`#${otherChat.id} · ${row.project}`),
+		})
+		.click();
+	await expect(
+		page.getByRole("heading", { name: otherChat.name }),
+	).toBeVisible();
 	await page
 		.getByRole("button", { name: "Настройки чатов", exact: true })
 		.click();
@@ -635,6 +700,9 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	agentView = true;
 	await page.reload();
 	await expect(
+		page.getByRole("button", { name: "Контакты", exact: true }),
+	).toHaveCount(0);
+	await expect(
 		page.getByRole("button", { name: "Настройки чатов", exact: true }),
 	).toHaveCount(0);
 	await page.getByRole("button", { name: new RegExp(row.player) }).click();
@@ -695,11 +763,27 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	).toBeVisible();
 	await assertLayout("conversation-actions");
 	await actions.getByRole("button", { name: "Игрок", exact: true }).click();
+	const playerCard = page.getByRole("complementary", {
+		name: "Карточка игрока",
+	});
+	await expect(playerCard.getByText(row.email)).toBeVisible();
+	await playerCard
+		.getByRole("button", { name: "Редактировать контакт" })
+		.click();
+	const cardPhone = playerCard.getByRole("textbox", {
+		name: "Телефон",
+		exact: true,
+	});
+	await expect(cardPhone).toHaveValue("+40712345678");
+	await cardPhone.fill("");
+	await assertLayout("contact-form");
+	await playerCard
+		.getByRole("button", { name: "Сохранить", exact: true })
+		.click();
+	await expect(playerCard.getByRole("status")).toHaveText("Сохранено");
 	await expect(
-		page
-			.getByRole("complementary", { name: "Карточка игрока" })
-			.getByText(row.email),
-	).toBeVisible();
+		playerCard.getByText("+40712345678", { exact: true }),
+	).toHaveCount(0);
 	await page.getByRole("button", { name: "Закрыть карточку игрока" }).click();
 	await expect(actionsToggle).toBeFocused();
 	const reply = page.getByRole("textbox", { name: "Ответ игроку" });

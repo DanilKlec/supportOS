@@ -38,6 +38,7 @@ chats.get(4).status = 'pending';
 const watches = new Map();
 const coaching = new Map();
 const upstreamWrites = [];
+const playerContact = { id: 101, name: 'Player', email: 'player@example.invalid', additional_attributes: { ip_address: ip }, contact_inboxes: [{ source_id: 'private-source' }] };
 const response = (data, status = 200) => new Response(JSON.stringify(data), { status });
 
 async function mockFetch(input, init = {}) {
@@ -112,7 +113,8 @@ async function mockFetch(input, init = {}) {
 			if (sort === 'created_at_asc') rows.reverse();
 			return response({ payload: rows, meta: { all_count: rows.length } });
 		}
-		if (path === 'contacts/search') return response({ payload: url.searchParams.get('q') === 'player@example.invalid' ? [{ id: 101 }] : [], meta: { count: 1 } });
+		if (path === 'contacts') return response({ payload: [playerContact], meta: { count: 30 } });
+		if (path === 'contacts/search') return response({ payload: url.searchParams.get('q') === 'player@example.invalid' ? [playerContact] : [], meta: { count: 1, has_more: true } });
 		if (path === 'conversations') return response({ data: { payload: [...chats.values()], meta: { unassigned_count: 2 } } });
 		if (path === 'labels') {
 			if (method === 'GET') return response({ payload: [{ id: 1, title: 'billing' }] });
@@ -132,7 +134,14 @@ async function mockFetch(input, init = {}) {
 				return response({ id: 1, ok: true });
 			}
 		}
-		if (path === 'contacts/101' && method === 'GET') return response({ payload: { id: 101 } });
+		if (path === 'contacts/101') {
+			if (method === 'GET') return response({ payload: playerContact });
+			assert.equal(method, 'PUT');
+			upstreamWrites.push({ path, method, body });
+			if (body.email === 'already-used@example.invalid') return response({ error: 'duplicate' }, 422);
+			Object.assign(playerContact, body);
+			return response({ payload: playerContact });
+		}
 		if (path === 'contacts/101/conversations' && method === 'GET') return response({ payload: [...chats.values()] });
 	}
 	throw new Error(`Unhandled fixture request ${method} ${url.pathname}`);
@@ -169,6 +178,30 @@ try {
 	assert.deepEqual(related.payload.map((item) => item.id), [5, 3]);
 	assert.ok(related.payload.every((item) => !item.meta));
 	await expectStatus('support', 'contact-block', 403, post({ conversationId: 1, contactId: 102, blocked: true }));
+	const profile = { contactId: 101, conversationId: 1, fields: { name: ' Player updated ', phone_number: '+40 (712) 345 678' } };
+	const contactWrites = upstreamWrites.length;
+	await expectStatus('support', 'contact-profile', 403, post({ ...profile, contactId: 102 }));
+	await expectStatus('support', 'contact-profile', 403, post({ ...profile, conversationId: 3 }));
+	await expectStatus('qc', 'contact-profile', 403, post(profile));
+	await expectStatus('support', 'contact-profile', 400, post({ ...profile, fields: { identifier: 'forbidden' } }));
+	await expectStatus('support', 'contact-profile', 400, post({ ...profile, fields: { phone_number: '0712 345 678' } }));
+	assert.equal(upstreamWrites.length, contactWrites);
+	assert.equal((await expectStatus('support', 'contact-profile', 200, post(profile))).name, 'Player updated');
+	assert.deepEqual(upstreamWrites.at(-1).body, { name: 'Player updated', phone_number: '+40712345678' });
+	for (const role of ['support', 'qc', 'shift', 'disabled']) {
+		await expectStatus(role, 'contact-directory', 403);
+		await expectStatus(role, 'contact-directory', 403, post(profile));
+		await expectStatus(role, 'directory-contact-history', 403, { query: '&id=101' });
+	}
+	const directory = await expectStatus('admin', 'contact-directory', 200);
+	assert.equal(directory.hasMore, true);
+	assert.equal(directory.payload[0].contact_inboxes, undefined);
+	assert.equal(JSON.stringify(directory).includes(ip), false);
+	assert.equal((await expectStatus('admin', 'contact-directory', 200, { query: '&page=2' })).hasMore, false);
+	assert.equal((await expectStatus('creator', 'contact-directory', 200, { query: '&q=player%40example.invalid' })).hasMore, true);
+	assert.equal((await expectStatus('admin', 'directory-contact-history', 200, { query: '&id=101' })).payload.some(({ id }) => id === 2), true);
+	await expectStatus('admin', 'contact-directory', 422, post({ contactId: 101, fields: { email: 'already-used@example.invalid' } }));
+	assert.equal((await expectStatus('admin', 'contact-directory', 200, post({ contactId: 101, fields: { phone_number: null } }))).phone_number, null);
 	await expectStatus('support', 'custom-attribute-values', 403, post({ conversationId: 1, contactId: 102, attributes: { login: 'local' } }));
 	const preview = await expectStatus('support', 'conversation', 200, { query: '&id=3' });
 	assert.equal(preview.access.take, true);

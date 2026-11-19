@@ -7,6 +7,7 @@ import {
 	Ban,
 	CheckCheck,
 	ChevronDown,
+	ContactRound,
 	ExternalLink,
 	FileText,
 	Inbox,
@@ -42,7 +43,6 @@ import { subscribeToChatwootEvents } from "@/services/chatwoot-realtime";
 import {
 	type ChatwootAgent,
 	type ChatwootCoachingNote,
-	type ChatwootContact,
 	type ChatwootConversation,
 	type ChatwootCustomAttributeDefinition,
 	type ChatwootInbox,
@@ -66,6 +66,8 @@ import { ConversationActions, conversationPriorityLabels, conversationStatusLabe
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ChatSearch } from "./ChatFilters";
 import { ChatBulkActions } from "./ChatBulkActions";
+import { ChatContactEditor } from "./ChatContactEditor";
+import { ChatContactsWorkspace } from "./ChatContactsWorkspace";
 import { ConversationListToolbar, type ConversationFilters, countConversationFilters, emptyConversationFilters } from "./ConversationListToolbar";
 import { chatWindowsReducer, ConversationWindows, initialChatWindows, MAX_CHAT_WINDOWS } from "./ConversationWindows";
 import { useChatPopover } from "./useChatPopover";
@@ -74,7 +76,7 @@ import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
 import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
-type WorkspaceSection = "inbox" | "team" | "archive" | "supervisor" | "settings";
+type WorkspaceSection = "inbox" | "team" | "archive" | "contacts" | "supervisor" | "settings";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
@@ -231,6 +233,7 @@ function AgentInboxWorkspace() {
 	const canManageChatCapacity = capabilities?.manageRouting === true;
 	const canManageWebhookSettings = capabilities?.manageWebhooks === true;
 	const canOpenChatSettings = canManageSites || canManageWebhookSettings;
+	const canBrowseContacts = capabilities?.manageAllChats === true;
 	const canSupervise = capabilities?.supervise === true;
 	const realtimeConnected = realtimeSubscribed && (webhookSeen || Boolean(connection.data?.lastWebhookAt));
 	useEffect(() => {
@@ -616,6 +619,7 @@ function AgentInboxWorkspace() {
 				onToggleProfile={() => setProfileOpen(!profileOpen)}
 				onToggleSound={toggleSound}
 				canOpenChatSettings={canOpenChatSettings}
+				canBrowseContacts={canBrowseContacts}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			{(presence.isError || accepting.isError) && (
@@ -659,6 +663,8 @@ function AgentInboxWorkspace() {
 						onFields={canManageSites ? () => setAttributesOpen(true) : undefined}
 						onWebhooks={canManageWebhookSettings ? () => setWebhookSettingsOpen(true) : undefined}
 					/>
+				) : activeSection === "contacts" && canBrowseContacts ? (
+					<ChatContactsWorkspace inboxes={inboxes} onConversation={(id, title) => { selectSection("inbox"); placeConversation(id, { title }); }} />
 				) : activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
@@ -893,7 +899,7 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings, canBrowseContacts }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
@@ -909,6 +915,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	onToggleProfile: () => void;
 	onToggleSound: () => void;
 	canOpenChatSettings: boolean;
+	canBrowseContacts: boolean;
 }) {
 	const profile = useChatPopover<HTMLElement>(profileOpen, onToggleProfile);
 	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
@@ -916,6 +923,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 		{ id: "team", label: "Команда", icon: UsersRound },
 		{ id: "archive", label: "Архив", icon: Archive },
 	];
+	if (canBrowseContacts) items.push({ id: "contacts", label: "Контакты", icon: ContactRound });
 	if (canSupervise) items.push({ id: "supervisor", label: "Руководитель", icon: Headphones });
 	if (canOpenChatSettings) items.push({ id: "settings", label: "Настройки чатов", icon: Settings2 });
 	return (
@@ -1579,8 +1587,7 @@ function ConversationPane({
 		.slice(0, 8);
 	const selectedBindIndex = Math.min(bindIndex, Math.max(0, filteredBinds.length - 1));
 	const selectedBind = filteredBinds[selectedBindIndex];
-	const currentContact =
-		(contact.data as ChatwootContact | undefined) ?? sender;
+	const currentContact = contact.data ?? sender;
 	const source = inboxes.find((inbox) => inbox.id === conversation?.inbox_id);
 	const project = conversation?.meta?.inbox?.name ?? source?.name;
 	const visitor = conversation?.visitor;
@@ -2002,18 +2009,19 @@ function ConversationPane({
 							pending={{ agent: assign.isPending, team: assignTeam.isPending, priority: priority.isPending, status: status.isPending, tags: tagMutation.isPending }}
 							onAgent={assign.mutate} onTeam={assignTeam.mutate} onPriority={priority.mutate} onStatus={status.mutate} onTags={tagMutation.mutate} />
 					</> : <>
-					<div className="mb-4 flex flex-col items-center rounded-xl border border-border bg-surface p-3 text-center">
+					<div className="mb-3 flex flex-col items-center rounded-xl border border-border bg-surface p-3 text-center">
 						<div className="grid size-12 place-items-center rounded-full border border-border bg-surface-elevated text-sm font-semibold">
-							{initials(currentContact?.name ?? sender?.name)}
+							{initials(currentContact?.name ?? undefined)}
 						</div>
 						<div className="mt-2 w-full truncate text-sm font-semibold">
-							{currentContact?.name || sender?.name || "Без имени"}
+							{currentContact?.name || "Без имени"}
 						</div>
 						<div className="w-full truncate text-[11px] text-muted">
-							{currentContact?.email || sender?.email || "Email не указан"}
+							{currentContact?.email || "Email не указан"}
 						</div>
 					</div>
 					<div className="space-y-3 text-xs">
+						{canWrite && id != null && contact.data && <ChatContactEditor key={contact.data.id} contact={contact.data} conversationId={id} />}
 						<Info label="Логин игрока" value={playerLogin} />
 						{currentContact?.identifier !== playerLogin && <Info label="Идентификатор игрока" value={currentContact?.identifier} />}
 						<Info label="Телефон" value={currentContact?.phone_number} />

@@ -151,6 +151,8 @@ export type ChatwootContact = {
 	last_activity_at?: string | number;
 	label_list?: string[];
 };
+export type ChatwootContactFields = Partial<Pick<ChatwootContact, "name" | "email" | "phone_number">>;
+export type ChatwootContactHistory = Pick<ChatwootConversation, "id" | "inbox_id" | "status" | "created_at">[];
 
 export type ChatwootCustomAttributeDefinition = {
 	id: number;
@@ -330,14 +332,27 @@ export const chatwootService = {
 					},
 		),
 	contact: async (id: number, conversationId: number) => {
-		const result = await request<
-			ChatwootContact | { payload?: ChatwootContact }
-		>("contact", undefined, `&id=${id}&conversationId=${conversationId}`);
-		return "payload" in result && result.payload ? result.payload : result;
+		const result = await request<ChatwootContact | { payload: ChatwootContact }>(
+			"contact", undefined, `&id=${id}&conversationId=${conversationId}`,
+		);
+		return "payload" in result ? result.payload : result;
 	},
-	contactHistory: (id: number, conversationId: number) => request<{
-		payload: Pick<ChatwootConversation, "id" | "inbox_id" | "status" | "created_at">[];
-	}>("contact-history", undefined, `&id=${id}&conversationId=${conversationId}`),
+	contactHistory: (id: number, conversationId: number) => request<{ payload: ChatwootContactHistory }>(
+		"contact-history", undefined, `&id=${id}&conversationId=${conversationId}`,
+	),
+	contactDirectory: (query: string, page: number, signal?: AbortSignal) => request<{
+		payload: ChatwootContact[];
+		hasMore: boolean;
+	}>("contact-directory", { signal }, `&${new URLSearchParams({ q: query, page: String(page) })}`),
+	directoryContactHistory: (id: number, signal?: AbortSignal) => request<{ payload: ChatwootContactHistory }>(
+		"directory-contact-history", { signal }, `&id=${id}`,
+	),
+	updateContact: (contactId: number, fields: ChatwootContactFields, conversationId?: number) => request<ChatwootContact>(
+		conversationId === undefined ? "contact-directory" : "contact-profile", {
+			method: "POST", headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ contactId, conversationId, fields }),
+		},
+	),
 	labels: () =>
 		request<
 			| { payload?: Array<{ title?: string; name?: string; color?: string }> }
