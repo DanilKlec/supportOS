@@ -7,7 +7,6 @@ import {
 	LockKeyhole,
 	MessageSquareText,
 	Send,
-	Settings2,
 	UserRound,
 	X,
 } from "lucide-react";
@@ -17,19 +16,13 @@ import "./chat-coaching.css";
 export type CoachingRecipient = { id: number; name: string | null };
 
 export function ObservationHeader({
-	managing,
-	canManage,
 	watching,
 	watchPending,
-	onMode,
 	onStop,
 	onClose,
 }: {
-	managing: boolean;
-	canManage: boolean;
 	watching: boolean;
 	watchPending: boolean;
-	onMode: () => void;
 	onStop: () => void;
 	onClose: () => void;
 }) {
@@ -38,7 +31,7 @@ export function ObservationHeader({
 		mode.current?.focus({ preventScroll: true });
 	}, []);
 	return (
-		<header className="chat-observation-header" data-managing={managing}>
+		<header className="chat-observation-header">
 			<button
 				type="button"
 				className="chat-observation-icon xl:hidden"
@@ -49,20 +42,10 @@ export function ObservationHeader({
 				<ArrowLeft size={17} />
 			</button>
 			<div ref={mode} tabIndex={-1} className="chat-observation-mode">
-				{managing ? <Settings2 size={16} /> : <Eye size={17} />}
-				<span>{managing ? "Управление чатом" : "Наблюдение"}</span>
+				<Eye size={17} />
+				<span>Наблюдение</span>
 			</div>
 			<div className="chat-observation-actions">
-				{canManage && (
-					<button
-						type="button"
-						className="chat-observation-action"
-						onClick={onMode}
-					>
-						{managing ? <Eye size={14} /> : <Settings2 size={14} />}
-						<span>{managing ? "К наблюдению" : "Управлять чатом"}</span>
-					</button>
-				)}
 				{watching && (
 					<button
 						type="button"

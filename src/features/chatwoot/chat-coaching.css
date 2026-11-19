@@ -23,16 +23,6 @@
 	background: var(--coach-panel);
 }
 
-.chat-observation-header[data-managing="true"] {
-	color: var(--chat-warning);
-	border-color: color-mix(
-		in srgb,
-		var(--chat-warning) 32%,
-		var(--color-border)
-	);
-	background: color-mix(in srgb, var(--chat-warning) 11%, var(--color-surface));
-}
-
 .chat-observation-mode {
 	display: inline-flex;
 	align-items: center;
@@ -49,10 +39,6 @@
 .chat-coaching-submit svg {
 	flex: none;
 }
-.chat-observation-header[data-managing="true"] .chat-observation-mode {
-	color: inherit;
-}
-
 .chat-observation-actions {
 	display: flex;
 	align-items: center;
@@ -108,10 +94,6 @@
 	}
 	.chat-observation-mode > svg {
 		display: none;
-	}
-	.chat-observation-action {
-		max-width: 6rem;
-		text-align: start;
 	}
 	.chat-observation-header .chat-observation-icon {
 		width: 1.75rem;

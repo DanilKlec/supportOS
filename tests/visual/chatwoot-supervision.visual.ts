@@ -13,6 +13,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	let capacity = 4;
 	let assignedAgent = { id: 5, name: "Тестовый агент" };
 	let notesSent = 0;
+	const sentMessages: Array<{ content: string; private: boolean }> = [];
+	const otherChat = { id: 15, name: "Предыдущий диалог игрока" };
 	let privateNote:
 		| { id: string; author: string; content: string; createdAt: string }
 		| undefined;
@@ -34,7 +36,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		status: row.status,
 		labels: row.tags,
 		meta: {
-			sender: { name: row.player, email: row.email },
+			sender: { id: 40, name: row.player, email: row.email },
 			assignee: { id: 5, name: row.agent },
 		},
 		access: { read: true, note: true, write: true, take: false, seeIp: true },
@@ -133,6 +135,10 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 					json: { current: { accepting: false }, rows: [] },
 				});
 			case "labels":
+				if (request.method() === "POST") {
+					conversation.labels = request.postDataJSON().labels;
+					return route.fulfill({ json: { payload: conversation.labels } });
+				}
 				return route.fulfill({
 					json: {
 						payload: [{ title: "billing" }, { title: "priority-review" }],
@@ -239,6 +245,19 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				});
 			}
 			case "conversation":
+				if (url.searchParams.get("id") === String(otherChat.id)) {
+					return route.fulfill({
+						json: {
+							...conversation,
+							id: otherChat.id,
+							status: "resolved",
+							meta: {
+								...conversation.meta,
+								sender: { id: 40, name: otherChat.name },
+							},
+						},
+					});
+				}
 				return route.fulfill({
 					json: {
 						...conversation,
@@ -247,6 +266,20 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 						coachRecipient: assignedAgent,
 					},
 				});
+			case "contact":
+				return route.fulfill({ json: conversation.meta.sender });
+			case "contact-history":
+				return route.fulfill({
+					json: {
+						payload: [
+							{ id: otherChat.id, inbox_id: row.inboxId, status: "resolved" },
+						],
+					},
+				});
+			case "message":
+				expect(agentView).toBe(true);
+				sentMessages.push(request.postDataJSON());
+				return route.fulfill({ json: { id: 41 + sentMessages.length } });
 			case "messages":
 				return route.fulfill({ json: { payload: readMessages } });
 			case "coaching-notes":
@@ -338,42 +371,18 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(
 		observation.getByText("Проверьте статус заявки", { exact: true }),
 	).toBeVisible();
-	await observation
-		.getByRole("button", { name: "Управлять чатом", exact: true })
-		.click();
 	await expect(
-		observation.getByRole("textbox", { name: "Ответ игроку" }),
+		observation.getByRole("button", { name: "Управлять чатом" }),
+	).toHaveCount(0);
+	await expect(
+		observation.getByRole("button", { name: "Действия с диалогом" }),
+	).toHaveCount(0);
+	await expect(
+		observation.getByRole("button", { name: "Отправить игроку" }),
+	).toHaveCount(0);
+	await expect(
+		observation.getByRole("textbox", { name: "Подсказка агенту" }),
 	).toBeVisible();
-	await expect(
-		observation.getByText("Управление чатом", { exact: true }),
-	).toBeVisible();
-	await expect(draft).toHaveCount(0);
-	const tag = observation.getByRole("button", { name: "Добавить тег" });
-	await tag.click();
-	const tagSearch = observation.getByRole("textbox", { name: "Найти тег" });
-	await expect(tagSearch).toBeFocused();
-	await tagSearch.fill("несуществующий");
-	await expect(observation.getByText("Теги не найдены")).toBeVisible();
-	await tagSearch.fill("priority");
-	await expect(
-		observation.getByRole("button", { name: "priority-review" }),
-	).toBeInViewport({ ratio: 1 });
-	await observation.getByRole("heading", { name: row.player }).click();
-	await expect(tag).toHaveAttribute("aria-expanded", "false");
-	const assignee = observation.getByRole("button", {
-		name: "Назначить агента",
-	});
-	await assignee.click();
-	const agentSearch = observation.getByRole("textbox", {
-		name: "Найти агента для назначения",
-	});
-	await expect(agentSearch).toBeInViewport({ ratio: 1 });
-	await agentSearch.fill("agent@example.invalid");
-	await expect(
-		observation.getByRole("button", { name: row.agent, exact: true }),
-	).toBeVisible();
-	await agentSearch.press("Escape");
-	await expect(assignee).toBeFocused();
 	const card = observation.getByRole("button", { name: "Карточка игрока" });
 	await card.click();
 	await expect(
@@ -381,6 +390,20 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	).toBeInViewport();
 	await page.keyboard.press("Escape");
 	await expect(card).toBeFocused();
+	await card.click();
+	await observation
+		.getByRole("button", { name: new RegExp(`#${otherChat.id}`) })
+		.click();
+	await expect(
+		observation.getByRole("heading", { name: otherChat.name }),
+	).toBeVisible();
+	await expect(
+		observation.getByRole("textbox", { name: "Ответ игроку" }),
+	).toHaveCount(0);
+	await expect(
+		observation.getByRole("button", { name: "Отправить игроку" }),
+	).toHaveCount(0);
+	expect(sentMessages).toHaveLength(0);
 	await observation.getByRole("button", { name: "Закрыть наблюдение" }).click();
 	await page.getByRole("button", { name: /Наблюдаемые/ }).click();
 	await expect(table.getByText(row.player)).toBeVisible();
@@ -559,6 +582,77 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(
 		page.getByRole("textbox", { name: "Ответ игроку" }),
 	).toBeVisible();
+	const actionsToggle = page.getByRole("button", {
+		name: "Действия с диалогом",
+	});
+	await actionsToggle.click();
+	const actions = page.getByRole("complementary", {
+		name: "Действия с диалогом",
+	});
+	if (isMobile) {
+		await expect(page.locator(".chat-thread > [inert]")).toHaveCount(1);
+		const coveredReply = page.locator('textarea[aria-label="Ответ игроку"]');
+		await coveredReply.evaluate((editor: HTMLTextAreaElement) =>
+			editor.focus(),
+		);
+		await expect(coveredReply).not.toBeFocused();
+	}
+	await expect(
+		actions.getByRole("combobox", { name: "Приоритет" }),
+	).toBeVisible();
+	const assignee = actions.getByRole("button", { name: "Назначить агента" });
+	await assignee.click();
+	const agentSearch = actions.getByRole("textbox", {
+		name: "Найти агента для назначения",
+	});
+	await expect(agentSearch).toBeFocused();
+	await agentSearch.fill("agent@example.invalid");
+	await expect(
+		actions.getByRole("button", { name: row.agent, exact: true }),
+	).toBeVisible();
+	await agentSearch.press("Escape");
+	await expect(assignee).toBeFocused();
+	const tag = actions.getByRole("button", { name: "Добавить тег" });
+	await tag.click();
+	const tagSearch = actions.getByRole("textbox", { name: "Найти тег" });
+	await tagSearch.fill("несуществующий");
+	await expect(actions.getByText("Теги не найдены")).toBeVisible();
+	await tagSearch.fill("priority");
+	await actions.getByRole("button", { name: "priority-review" }).click();
+	await expect(
+		actions.getByRole("button", { name: "Убрать тег priority-review" }),
+	).toBeVisible();
+	await assertLayout("conversation-actions");
+	await actions.getByRole("button", { name: "Игрок", exact: true }).click();
+	await expect(
+		page
+			.getByRole("complementary", { name: "Карточка игрока" })
+			.getByText(row.email),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Закрыть карточку игрока" }).click();
+	await expect(actionsToggle).toBeFocused();
+	const reply = page.getByRole("textbox", { name: "Ответ игроку" });
+	await reply.fill("Тестовый ответ игроку");
+	await page.getByRole("button", { name: "Свернуть редактор" }).click();
+	await expect(reply).toHaveCount(0);
+	await page.getByRole("button", { name: "Ответ игроку", exact: true }).click();
+	await expect(reply).toHaveValue("Тестовый ответ игроку");
+	await reply.press("Enter");
+	await expect
+		.poll(() => sentMessages[0])
+		.toMatchObject({ content: "Тестовый ответ игроку", private: false });
+	await expect(reply).toHaveValue("");
+	await page
+		.getByRole("button", { name: "Заметка команде", exact: true })
+		.click();
+	const teamNote = page.getByRole("textbox", { name: "Заметка команде" });
+	await teamNote.fill("Тестовая заметка");
+	await assertLayout("private-composer");
+	await teamNote.press("Enter");
+	await expect
+		.poll(() => sentMessages[1])
+		.toMatchObject({ content: "Тестовая заметка", private: true });
+	await page.getByRole("button", { name: "Ответ игроку", exact: true }).click();
 	const quickReplies = page.getByRole("button", { name: "Быстрый бинд" });
 	await quickReplies.click();
 	await expect(page.getByPlaceholder("Найти бинд…")).toBeInViewport({

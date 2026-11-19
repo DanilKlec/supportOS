@@ -88,7 +88,7 @@ export function ConversationListToolbar({
 					<input
 						type="text"
 						aria-label="Поиск диалогов"
-						placeholder="Игрок, сообщение или №"
+						placeholder="Игрок, текст или №"
 						value={filters.search}
 						onChange={(event) => update({ search: event.target.value })}
 						className="h-9 w-full min-w-0 rounded-lg border border-border bg-background pl-8 pr-7 text-xs placeholder:text-muted"
