@@ -34,6 +34,7 @@ import {
 	ChatSearch,
 } from "./ChatFilters";
 import { useChatPopover } from "./useChatPopover";
+import { ChatSavedViews, readViewFields } from "./ChatSavedViews";
 
 const filtersDefault: ActiveChatFilters = {
 	mode: "all",
@@ -58,6 +59,42 @@ const priorities = {
 	high: "Высокий",
 	urgent: "Срочный",
 };
+const viewFields = [
+	"mode",
+	"sort",
+	"inbox",
+	"agent",
+	"team",
+	"label",
+	"priority",
+] as const;
+const viewSorts: readonly string[] = [
+	"last_activity_at_desc",
+	"last_activity_at_asc",
+	"created_at_asc",
+	"created_at_desc",
+	"waiting_since_asc",
+	"priority_desc",
+];
+type ActiveView = Omit<ActiveChatFilters, "page" | "search">;
+function decodeActiveView(input: unknown): ActiveView | null {
+	const fields = readViewFields(input, viewFields);
+	if (
+		!fields ||
+		!tabs.some((tab) => tab.id === fields.mode) ||
+		!viewSorts.includes(fields.sort) ||
+		![fields.inbox, fields.agent, fields.team].every(
+			(value) => !value || /^\d+$/.test(value),
+		) ||
+		(fields.priority && !Object.hasOwn(priorities, fields.priority))
+	)
+		return null;
+	return {
+		...fields,
+		mode: fields.mode as ActiveChatMode,
+		sort: fields.sort as ActiveChatSort,
+	};
+}
 const dateFormat = new Intl.DateTimeFormat("ru-RU", {
 	day: "2-digit",
 	month: "short",
@@ -116,6 +153,7 @@ const primaryColumns = [
 ] as const;
 
 export function ActiveChatsTable({
+	userId,
 	agents,
 	inboxes,
 	teams,
@@ -128,6 +166,7 @@ export function ActiveChatsTable({
 	onOpen,
 	onStop,
 }: {
+	userId?: string;
 	agents: ChatwootAgent[];
 	inboxes: ChatwootInbox[];
 	teams: ChatwootTeam[];
@@ -276,6 +315,15 @@ export function ActiveChatsTable({
 			page: 1,
 		}));
 	const filterCount = chips.length;
+	const activeView: ActiveView = {
+		mode: filters.mode,
+		sort: filters.sort,
+		inbox: filters.inbox,
+		agent: filters.agent,
+		team: filters.team,
+		label: filters.label,
+		priority: filters.priority,
+	};
 	const header = (
 		title: string,
 		ascending: ActiveChatSort,
@@ -412,6 +460,25 @@ export function ActiveChatsTable({
 					</button>
 				</div>
 			</div>
+			{userId && (
+				<div className="chat-active-saved">
+					<ChatSavedViews
+						storageKey={`supportos:chats:views:${userId}:active`}
+						value={activeView}
+						canSave={
+							filterCount > 0 ||
+							filters.mode !== filtersDefault.mode ||
+							filters.sort !== filtersDefault.sort
+						}
+						decode={decodeActiveView}
+						onApply={(view) => {
+							setSearch("");
+							setFilters({ ...view, page: 1, search: "" });
+							setFilterOpen(false);
+						}}
+					/>
+				</div>
+			)}
 			<div
 				className="chat-active-refinements"
 				hidden={!filterOpen && filterCount === 0}

@@ -7,6 +7,8 @@ test("work in up to four independent chat windows", async ({
 	page,
 }, info) => {
 	let publicMessages = 0;
+	let rejectPriority = true;
+	const priorityWrites: number[] = [];
 	const chats = [21, 22, 23, 24, 25].map((id) => ({
 		id,
 		inbox_id: 2,
@@ -79,6 +81,14 @@ test("work in up to four independent chat windows", async ({
 				return route.fulfill({ json: { notes: [] } });
 			case "labels":
 				return route.fulfill({ json: { payload: [] } });
+			case "priority": {
+				const { conversationId, priority } = request.postDataJSON();
+				expect(priority).toBe("high");
+				priorityWrites.push(conversationId);
+				return rejectPriority && conversationId === 22
+					? route.fulfill({ status: 409, json: { error: "Чат уже изменился" } })
+					: route.fulfill({ json: { priority } });
+			}
 			case "message":
 				expect(request.postDataJSON()).toMatchObject({
 					conversationId: 22,
@@ -114,7 +124,28 @@ test("work in up to four independent chat windows", async ({
 	await openRow(21);
 	await expect(windows).toHaveCount(1);
 	await expect(grid).toHaveAttribute("data-grid-size", "1");
+	await reply(21).fill("/Проверка статуса");
+	await expect(
+		pane(21).getByRole("option", { name: /Проверка статуса/ }),
+	).toBeVisible();
+	await reply(21).press("Enter");
+	await expect(reply(21)).toHaveValue(
+		knowledge.binds[1].translations[0].content,
+	);
+	expect(publicMessages).toBe(0);
 	await reply(21).fill("Черновик первого чата");
+	const openNote = () =>
+		pane(21)
+			.getByRole("button", { name: "Заметка команде", exact: true })
+			.click();
+	const openReply = () =>
+		pane(21).getByRole("button", { name: "Ответ игроку", exact: true }).click();
+	const note = pane(21).getByRole("textbox", { name: "Заметка команде" });
+	await openNote();
+	await expect(note).toHaveValue("");
+	await note.fill("Черновик внутренней заметки");
+	await openReply();
+	await expect(reply(21)).toHaveValue("Черновик первого чата");
 	if (isMobile)
 		await page.getByRole("button", { name: "Показать список" }).click();
 	await openRow(22);
@@ -124,6 +155,9 @@ test("work in up to four independent chat windows", async ({
 		await page.getByRole("button", { name: "Показать список" }).click();
 	await openRow(21);
 	await expect(reply(21)).toHaveValue("Черновик первого чата");
+	await openNote();
+	await expect(note).toHaveValue("Черновик внутренней заметки");
+	await openReply();
 
 	await addChat(22);
 	await expect(windows).toHaveCount(2);
@@ -181,4 +215,28 @@ test("work in up to four independent chat windows", async ({
 		await list.getByRole("button", { name: "К открытым чатам" }).click();
 	await expect(windows).toHaveCount(4);
 	await expect(pane(25)).toBeVisible();
+	await page.getByRole("button", { name: /^Мои/ }).click();
+	await list.getByRole("button", { name: "Выбрать несколько" }).click();
+	const bulk = list.getByRole("region", { name: "Массовые действия" });
+	const picked = (id: number) =>
+		list.getByRole("checkbox", { name: `Выбрать диалог #${id}` });
+	await picked(21).check();
+	await picked(22).check();
+	await bulk
+		.getByRole("combobox", { name: "Массовое действие" })
+		.selectOption("priority:high");
+	await bulk.getByRole("button", { name: "Применить к выбранным" }).click();
+	expect(priorityWrites).toEqual([]);
+	await bulk.getByRole("button", { name: "Подтвердить" }).click();
+	await expect(bulk.getByRole("status")).toContainText("Обновлено 1 из 2");
+	await expect(bulk.getByRole("list")).toContainText(
+		"#22 · Чат уже изменился",
+	);
+	await expect(picked(21)).not.toBeChecked();
+	await expect(picked(22)).toBeChecked();
+	rejectPriority = false;
+	await bulk.getByRole("button", { name: "Применить к выбранным" }).click();
+	await bulk.getByRole("button", { name: "Подтвердить" }).click();
+	await expect(bulk.getByRole("status")).toContainText("Обновлено 1 из 1");
+	expect(priorityWrites.sort((a, b) => a - b)).toEqual([21, 22, 22]);
 });

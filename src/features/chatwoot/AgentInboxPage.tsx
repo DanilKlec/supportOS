@@ -12,6 +12,7 @@ import {
 	Inbox,
 	Headphones,
 	LoaderCircle,
+	ListChecks,
 	LockKeyhole,
 	Maximize2,
 	MessageCircle,
@@ -31,7 +32,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createElement, Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
@@ -64,6 +65,7 @@ import { ActiveChatsTable } from "./ActiveChatsTable";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ChatSearch } from "./ChatFilters";
+import { ChatBulkActions } from "./ChatBulkActions";
 import { ConversationListToolbar, type ConversationFilters, countConversationFilters, emptyConversationFilters } from "./ConversationListToolbar";
 import { chatWindowsReducer, ConversationWindows, initialChatWindows, MAX_CHAT_WINDOWS } from "./ConversationWindows";
 import { useChatPopover } from "./useChatPopover";
@@ -144,7 +146,13 @@ function InboxSession({ parentClient }: { parentClient: QueryClient }) {
 	return <QueryClientProvider client={client}><AgentInboxWorkspace /></QueryClientProvider>;
 }
 
-type ChatDraft = { text: string; privateNote: boolean; coachTo?: CoachingRecipient };
+type CoachingDraft = { text: string; coachTo?: CoachingRecipient };
+type MessageDraft = { text: string; files: File[] };
+type ComposerMode = "reply" | "note";
+type OperatorDraft = { mode: ComposerMode; reply: MessageDraft; note: MessageDraft };
+type UpdateOperatorDraft = (id: number, change: (current: OperatorDraft) => OperatorDraft) => void;
+const emptyMessageDraft: MessageDraft = { text: "", files: [] };
+const emptyOperatorDraft: OperatorDraft = { mode: "reply", reply: emptyMessageDraft, note: emptyMessageDraft };
 
 function AgentInboxWorkspace() {
 	const client = useQueryClient();
@@ -155,19 +163,33 @@ function AgentInboxWorkspace() {
 		try { return Number(localStorage.getItem("supportos:chatwoot:list-width")) || 320; } catch { return 320; }
 	});
 	const [activePage, setActivePage] = useState(1);
+	const [bulkSelection, setBulkSelection] = useState<{ key: string; ids: Set<number> } | null>(null);
+	const [bulkBusy, setBulkBusy] = useState(false);
 	const [chatWindows, dispatchChatWindow] = useReducer(chatWindowsReducer, initialChatWindows);
 	const [addingChat, setAddingChat] = useState(false);
-	const drafts = useRef(new Map<number, ChatDraft>());
-	const rememberDraft = useCallback((id: number, draft: ChatDraft) => {
-		if (draft.text) drafts.current.set(id, draft);
-		else drafts.current.delete(id);
+	const [drafts, setDrafts] = useState(() => new Map<number, OperatorDraft>());
+	const updateOperatorDraft: UpdateOperatorDraft = useCallback((id, change) => {
+		setDrafts((previous) => {
+			const draft = previous.get(id) ?? emptyOperatorDraft;
+			const next = change(draft);
+			if (next === draft) return previous;
+			const updated = new Map(previous);
+			if (next.mode === "reply" && !next.reply.text && !next.note.text && !next.reply.files.length && !next.note.files.length)
+				updated.delete(id);
+			else updated.set(id, next);
+			return updated;
+		});
 	}, []);
 	const rememberTitle = useCallback((id: number, title: string) => {
 		dispatchChatWindow({ type: "title", id, title });
 	}, []);
 	const [supervisionId, setSupervisionId] = useState<number | null>(null);
 	const observationTrigger = useRef<HTMLElement | null>(null);
-	const supervisionDrafts = useRef(new Map<number, ChatDraft>());
+	const supervisionDrafts = useRef(new Map<number, CoachingDraft>());
+	const rememberCoachingDraft = useCallback((id: number, draft: CoachingDraft) => {
+		if (draft.text) supervisionDrafts.current.set(id, draft);
+		else supervisionDrafts.current.delete(id);
+	}, []);
 	const [realtimeSubscribed, setRealtimeSubscribed] = useState(false);
 	const [coachingRealtimeConnected, setCoachingRealtimeConnected] = useState(false);
 	const [webhookSeen, setWebhookSeen] = useState(false);
@@ -193,7 +215,10 @@ function AgentInboxWorkspace() {
 	);
 	const binds = useKnowledgeStore((s) => s.binds);
 	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
-	const composerBinds = useMemo(() => [...remoteBinds, ...binds], [remoteBinds, binds]);
+	const composerBinds = useMemo(
+		() => Array.from(new Map([...binds, ...remoteBinds].map((bind) => [bind.id, bind])).values()),
+		[binds, remoteBinds],
+	);
 	const language = useKnowledgeStore((s) => s.language);
 	const setLanguage = useKnowledgeStore((s) => s.setLanguage);
 	const connection = useQuery({
@@ -404,6 +429,12 @@ function AgentInboxWorkspace() {
 		() => rowsFrom(conversations.data),
 		[conversations.data],
 	);
+	const bulkKey = JSON.stringify([activeSection, request, filters.search]);
+	const canSelectChats = activeSection === "inbox" && displayedScope === "mine" && canWork;
+	const selectedChats = canSelectChats && bulkSelection?.key === bulkKey ? bulkSelection.ids : undefined;
+	const updateSelectedChats = (ids: number[]) => setBulkSelection((current) =>
+		current?.key === bulkKey ? { key: bulkKey, ids: new Set(ids) } : current,
+	);
 	const unlockAudio = () => {
 		if (audioContext.current || typeof window === "undefined") return;
 		const Context = window.AudioContext;
@@ -494,6 +525,7 @@ function AgentInboxWorkspace() {
 			if (section === "archive" || (section === "inbox" && scope !== "active")) setQueueOpen(true);
 			return;
 		}
+		setBulkSelection(null);
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
 		if (section === "inbox" || section === "archive") {
@@ -504,6 +536,7 @@ function AgentInboxWorkspace() {
 	const selectScope = (next: Scope) => {
 		if (next !== "active") setQueueOpen(true);
 		if (next === scope) return;
+		setBulkSelection(null);
 		setScope(next);
 		if (next === "active") setAddingChat(false);
 		setActivePage(1);
@@ -651,7 +684,7 @@ function AgentInboxWorkspace() {
 							<h2>{listScope === "mine" ? "Мои диалоги" : listScope === "queue" ? "Ожидают назначения" : "Архив диалогов"}</h2>
 							{conversations.isSuccess && <span title="На этой странице" className="chat-scope-count">{rows.length}</span>}
 						</div>
-						<ConversationListToolbar key={listScope} scope={listScope} filters={filters} update={updateListFilters}
+						<ConversationListToolbar key={listScope} userId={user?.id} scope={listScope} filters={filters} update={updateListFilters}
 							project={queueInbox} requireProject={listScope === "queue" && !canSupervise}
 							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
 							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
@@ -660,6 +693,13 @@ function AgentInboxWorkspace() {
 							<p role="status">Выберите чат для нового окна <span className="whitespace-nowrap">({chatWindows.panes.length + 1} из {MAX_CHAT_WINDOWS})</span></p>
 							<button type="button" className="shrink-0 rounded-md px-2 py-1.5 text-xs hover:bg-surface-elevated" onClick={() => setAddingChat(false)}>Отмена</button>
 						</div>}
+						{selectedChats && !addingChat ? <ChatBulkActions key={bulkKey} available={rows.map((row) => row.id)} selected={selectedChats}
+							agents={agents} onSelect={updateSelectedChats} onClose={() => setBulkSelection(null)} onChanged={reload} onBusy={setBulkBusy} />
+							: canSelectChats && rows.length > 1 && !addingChat && (
+								<button type="button" disabled={bulkBusy} onClick={() => setBulkSelection({ key: bulkKey, ids: new Set() })} className="chat-batch-trigger">
+									<ListChecks size={14} aria-hidden="true" /> Выбрать несколько
+								</button>
+							)}
 						{takeConversation.isError && (
 							<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] chat-text-danger">
 								{takeConversation.error instanceof Error ? takeConversation.error.message : "Не удалось взять чат"}
@@ -698,6 +738,9 @@ function AgentInboxWorkspace() {
 										projectName={item.meta?.inbox?.name ?? inboxes.find((project) => project.id === item.inbox_id)?.name}
 										active={chatWindows.activeId === item.id}
 										opened={chatWindows.panes.some((pane) => pane.id === item.id)}
+										checked={selectedChats?.has(item.id)}
+										onCheck={selectedChats && !addingChat ? (checked) => updateSelectedChats(checked ? [...selectedChats, item.id] : [...selectedChats].filter((id) => id !== item.id)) : undefined}
+										checkBusy={bulkBusy}
 										onClick={() => placeConversation(item.id, { add: addingChat, title: item.meta?.sender?.name || item.meta?.sender?.email })}
 										onTake={
 											displayedScope === "queue"
@@ -725,7 +768,7 @@ function AgentInboxWorkspace() {
 				<main className={`relative min-h-0 min-w-0 flex-1 flex-col ${queueOpen && scope !== "active" ? "hidden md:flex" : "flex"}`}>
 					{scope === "active" && canSupervise ? (
 						<div className="chat-observation-layout relative flex min-h-0 min-w-0 flex-1" data-observation-open={supervisionId !== null}>
-							<ActiveChatsTable agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
+							<ActiveChatsTable userId={user?.id} agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
 								labels={labels} realtime={realtimeConnected} selectedId={supervisionId} watched={watched}
 								watchingError={(changeWatch.error ?? watching.error)?.message}
 								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
@@ -742,11 +785,8 @@ function AgentInboxWorkspace() {
 									)}
 									<ConversationPane key={supervisionId} id={supervisionId}
 										supervising docked
-										draft={supervisionDrafts.current.get(supervisionId)}
-										onDraft={(id, draft) => {
-											if (draft.text) supervisionDrafts.current.set(id, draft);
-											else supervisionDrafts.current.delete(id);
-										}}
+										coachingDraft={supervisionDrafts.current.get(supervisionId)}
+										onCoachingDraft={rememberCoachingDraft}
 										onOpenRelated={openObservation} realtimeConnected={realtimeConnected}
 										coachingRealtimeConnected={coachingRealtimeConnected}
 										agents={agents} teams={directory.data?.teams ?? []} inboxes={inboxes} labels={labels}
@@ -759,7 +799,7 @@ function AgentInboxWorkspace() {
 					) : (
 					<ConversationWindows state={chatWindows} listOpen={queueOpen} choosing={addingChat}
 						onToggleList={() => { if (queueOpen) setAddingChat(false); setQueueOpen(!queueOpen); }}
-						onAdd={() => { setAddingChat(!addingChat); setQueueOpen(true); }}
+						onAdd={() => { if (!bulkBusy) setBulkSelection(null); setAddingChat(!addingChat); setQueueOpen(true); }}
 						onFocus={(id) => dispatchChatWindow({ type: "focus", id })}
 						renderPane={(id, { visible, tiled, canExpand, expanded }) => <ConversationPane
 							id={id}
@@ -767,8 +807,8 @@ function AgentInboxWorkspace() {
 							tiled={tiled}
 							expanded={expanded}
 							onExpand={canExpand && id !== null ? () => dispatchChatWindow({ type: "expand", id }) : undefined}
-							draft={id == null ? undefined : drafts.current.get(id)}
-							onDraft={rememberDraft}
+							operatorDraft={id == null ? undefined : drafts.get(id)}
+							onOperatorDraft={updateOperatorDraft}
 							onTitle={rememberTitle}
 							onOpenRelated={(relatedId) => placeConversation(relatedId, { replaceId: id ?? undefined })}
 							realtimeConnected={realtimeConnected}
@@ -1045,6 +1085,9 @@ function ConversationRow({
 	projectName,
 	active,
 	opened,
+	checked,
+	onCheck,
+	checkBusy,
 	onClick,
 	onTake,
 	taking = false,
@@ -1054,6 +1097,9 @@ function ConversationRow({
 	projectName?: string;
 	active: boolean;
 	opened: boolean;
+	checked?: boolean;
+	onCheck?: (checked: boolean) => void;
+	checkBusy: boolean;
 	onClick: () => void;
 	onTake?: () => void;
 	taking?: boolean;
@@ -1066,7 +1112,9 @@ function ConversationRow({
 	const tags = conversation.labels ?? [];
 	const timestamp = dateLabel(last?.created_at ?? conversation.updated_at);
 	return (
-		<div data-active={active} data-opened={opened} className="chat-list-row">
+		<div data-active={active} data-opened={opened} data-checked={checked} className="chat-list-row">
+			{onCheck && <input type="checkbox" checked={checked} disabled={checkBusy} aria-label={`Выбрать диалог #${conversation.id}`}
+				className="chat-batch-check" onChange={(event) => onCheck(event.target.checked)} />}
 			<button type="button" aria-pressed={active} onClick={onClick} className="chat-list-item">
 				<span className="chat-avatar" data-tone={conversation.id % 4} aria-hidden="true">{initials(name)}</span>
 				<span className="chat-list-main">
@@ -1107,8 +1155,10 @@ function ConversationPane({
 	coachingRealtimeConnected,
 	agents,
 	teams,
-	draft,
-	onDraft,
+	operatorDraft = emptyOperatorDraft,
+	onOperatorDraft,
+	coachingDraft,
+	onCoachingDraft,
 	onTitle,
 	onOpenRelated,
 	inboxes,
@@ -1133,8 +1183,10 @@ function ConversationPane({
 	coachingRealtimeConnected: boolean;
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
-	draft?: ChatDraft;
-	onDraft: (id: number, draft: ChatDraft) => void;
+	operatorDraft?: OperatorDraft;
+	onOperatorDraft?: UpdateOperatorDraft;
+	coachingDraft?: CoachingDraft;
+	onCoachingDraft?: (id: number, value: CoachingDraft) => void;
 	onTitle?: (id: number, title: string) => void;
 	onOpenRelated: (id: number) => void;
 	inboxes: ChatwootInbox[];
@@ -1149,18 +1201,21 @@ function ConversationPane({
 	onChoose: () => void;
 }) {
 	const client = useQueryClient();
-	const [text, setText] = useState(draft?.text ?? "");
-	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+	const [coachingText, setCoachingText] = useState(coachingDraft?.text ?? "");
 	const [attachmentError, setAttachmentError] = useState("");
 	const fileInput = useRef<HTMLInputElement>(null);
-	const [privateNote, setPrivateNote] = useState(draft?.privateNote ?? false);
-	const [draftCoachTo, setDraftCoachTo] = useState<CoachingRecipient | null>(draft?.coachTo ?? null);
+	const [draftCoachTo, setDraftCoachTo] = useState<CoachingRecipient | null>(coachingDraft?.coachTo ?? null);
 	useEffect(() => {
-		if (id != null) onDraft(id, { text, privateNote, coachTo: draftCoachTo ?? undefined });
-	}, [id, text, privateNote, draftCoachTo, onDraft]);
+		if (id != null) onCoachingDraft?.(id, { text: coachingText, coachTo: draftCoachTo ?? undefined });
+	}, [id, coachingText, draftCoachTo, onCoachingDraft]);
 	const [bindSearch, setBindSearch] = useState("");
 	const [showBinds, setShowBinds] = useState(false);
-	const bindMenu = useChatPopover<HTMLDivElement>(visible && showBinds, () => setShowBinds(false));
+	const [slash, setSlash] = useState<{ start: number; end: number; search: string } | null>(null);
+	const [bindIndex, setBindIndex] = useState(0);
+	const bindOptionsId = useId();
+	const bindPickerOpen = showBinds || slash !== null;
+	const closeBinds = () => { setShowBinds(false); setSlash(null); };
+	const bindMenu = useChatPopover<HTMLDivElement>(visible && bindPickerOpen, closeBinds);
 	const [contextTab, setContextTab] = useState<"player" | "actions" | null>(null);
 	const [contextOverlay, setContextOverlay] = useState(false);
 	const showCustomer = contextTab === "player";
@@ -1196,7 +1251,7 @@ function ConversationPane({
 	const closeCustomer = () => setContextTab(null);
 	const toggleContext = (tab: "player" | "actions") => {
 		contextOpener.current = tab;
-		setShowBinds(false);
+		closeBinds();
 		setContextTab(contextTab === tab ? null : tab);
 	};
 	const query = useQuery({
@@ -1213,10 +1268,19 @@ function ConversationPane({
 	const canWrite = !supervising && conversation?.access?.write === true;
 	const canNote = !supervising && conversation?.access?.note === true;
 	const canTake = !supervising && conversation?.access?.take === true;
-	const sendAsNote = !canWrite || privateNote;
-	useEffect(() => {
-		if (canNote && !canWrite) setPrivateNote(true);
-	}, [canNote, canWrite]);
+	const mode: ComposerMode = canNote && (!canWrite || operatorDraft.mode === "note") ? "note" : "reply";
+	const sendAsNote = mode === "note";
+	const draft = operatorDraft[mode];
+	const { text, files: selectedFiles } = draft;
+	const updateDraft = (patch: Partial<MessageDraft>) => {
+		if (id != null) onOperatorDraft?.(id, (current) => ({ ...current, [mode]: { ...current[mode], ...patch } }));
+	};
+	const changeComposer = (next: ComposerMode) => {
+		if (id != null) onOperatorDraft?.(id, (current) => current.mode === next ? current : { ...current, mode: next });
+		closeBinds();
+		setAttachmentError("");
+		setEditorExpanded(true);
+	};
 	const latestMessagesQuery = useQuery({
 		queryKey: ["chatwoot", "messages", id, "latest"],
 		queryFn: () => chatwootService.conversationMessages(id as number),
@@ -1257,7 +1321,7 @@ function ConversationPane({
 	const showCoachingTabs = supervising || privateOnly || Boolean(coachingNotes?.length);
 	const coachingRequest = useRef<{ recipientAgentId: number; content: string; noteId: string } | null>(null);
 	const coachRecipient = conversation?.coachRecipient;
-	const changedRecipient = text.trim() && draftCoachTo && coachRecipient && draftCoachTo.id !== coachRecipient.id ? draftCoachTo : null;
+	const changedRecipient = coachingText.trim() && draftCoachTo && coachRecipient && draftCoachTo.id !== coachRecipient.id ? draftCoachTo : null;
 	const sendCoach = useMutation({
 		mutationFn: (note: NonNullable<typeof coachingRequest.current>) => chatwootService.sendCoachingNote(id as number, note),
 		onSuccess: async (note) => {
@@ -1270,8 +1334,8 @@ function ConversationPane({
 			}));
 			coachingRequest.current = null;
 			setDraftCoachTo(null);
-			setText("");
-			if (id != null) onDraft(id, { text: "", privateNote: false });
+			setCoachingText("");
+			if (id != null) onCoachingDraft?.(id, { text: "" });
 			void client.invalidateQueries({ queryKey: coachingKey });
 		},
 		onError: () => {
@@ -1279,7 +1343,7 @@ function ConversationPane({
 		},
 	});
 	const submitCoach = () => {
-		const content = text.trim();
+		const content = coachingText.trim();
 		if (!coachRecipient || !content || changedRecipient || sendCoach.isPending) return;
 		const previous = coachingRequest.current;
 		const request = previous?.recipientAgentId === coachRecipient.id && previous.content === content
@@ -1291,7 +1355,7 @@ function ConversationPane({
 		if (!value.trim()) setDraftCoachTo(null);
 		else if (!draftCoachTo && coachRecipient) setDraftCoachTo(coachRecipient);
 		if (sendCoach.isSuccess || sendCoach.isError) sendCoach.reset();
-		setText(value);
+		setCoachingText(value);
 	};
 	const changeThreadView = (onlyNotes: boolean) => {
 		if (onlyNotes === privateOnly) return;
@@ -1302,7 +1366,6 @@ function ConversationPane({
 	};
 	useEffect(() => {
 		currentConversationId.current = id;
-		setSelectedFiles([]);
 		setAttachmentError("");
 		setOlderMessages([]);
 		setHasOlderMessages(true);
@@ -1390,40 +1453,38 @@ function ConversationPane({
 		staleTime: 60000,
 	});
 	const send = useMutation({
-		mutationFn: async () => {
-			if (id == null || supervising || (sendAsNote ? !canNote : !canWrite))
+		mutationFn: async (message: { id: number; mode: ComposerMode; draft: MessageDraft }) => {
+			const isNote = message.mode === "note";
+			if (supervising || (isNote ? !canNote : !canWrite))
 				throw new Error("Отправка в этом режиме недоступна");
-			const attachments = await Promise.all(selectedFiles.map(async (file) => {
+			const attachments = await Promise.all(message.draft.files.map(async (file) => {
 				const bytes = new Uint8Array(await file.arrayBuffer());
 				let binary = "";
 				for (let offset = 0; offset < bytes.length; offset += 0x8000)
 					binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
 				return { name: file.name, type: file.type || "application/octet-stream", contentBase64: btoa(binary) };
 			}));
-			return chatwootService.sendMessage(id, text.trim(), sendAsNote, attachments);
+			return chatwootService.sendMessage(message.id, message.draft.text.trim(), isNote, attachments);
 		},
-		onMutate: () => {
-			setOptimisticMessage({ id: -Date.now(), content: text.trim(), private: sendAsNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: selectedFiles.map((file) => ({ file_name: file.name, file_type: file.type })) });
-			return { conversationId: id };
+		onMutate: (message) => {
+			setOptimisticMessage({ id: -Date.now(), content: message.draft.text.trim(), private: message.mode === "note", message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: message.draft.files.map((file) => ({ file_name: file.name, file_type: file.type })) });
 		},
-		onSuccess: (_result, _variables, context) => {
-			if (context?.conversationId != null) onDraft(context.conversationId, { text: "", privateNote: false });
-			if (currentConversationId.current === context?.conversationId) {
+		onSuccess: (_result, message) => {
+			onOperatorDraft?.(message.id, (current) => current[message.mode] === message.draft ? { ...current, [message.mode]: emptyMessageDraft } : current);
+			if (currentConversationId.current === message.id) {
 				setOptimisticMessage(null);
-				setText("");
-				setSelectedFiles([]);
 				setAttachmentError("");
 			}
-			void client.invalidateQueries({ queryKey: ["chatwoot", "messages", id, "latest"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "messages", message.id, "latest"] });
 			void client.invalidateQueries({
-				queryKey: ["chatwoot", "conversation", id],
+				queryKey: ["chatwoot", "conversation", message.id],
 			});
 			void client.invalidateQueries({
 				queryKey: ["chatwoot", "conversations"],
 			});
 		},
-		onError: (_error, _variables, context) => {
-			if (currentConversationId.current === context?.conversationId) setOptimisticMessage(null);
+		onError: (_error, message) => {
+			if (currentConversationId.current === message.id) setOptimisticMessage(null);
 		},
 	});
 	const addFiles = (files: FileList | null) => {
@@ -1438,7 +1499,7 @@ function ConversationPane({
 			setAttachmentError("Общий размер вложений не должен превышать 2,8 МБ");
 			return;
 		}
-		setSelectedFiles(next);
+		updateDraft({ files: next });
 		setAttachmentError("");
 	};
 	const status = useMutation({
@@ -1507,13 +1568,17 @@ function ConversationPane({
 		() => binds.filter((bind) => !bind.archived),
 		[binds],
 	);
-	const filteredBinds = allBinds
+	const bindQuery = (slash?.search ?? bindSearch).trim().toLowerCase();
+	const filteredBinds = (bindPickerOpen ? allBinds : [])
 		.filter((bind) =>
+			getBindTranslation(bind, language)?.content &&
 			`${getBindTitle(bind, language)} ${getBindTranslation(bind, language)?.content ?? ""}`
 				.toLowerCase()
-				.includes(bindSearch.toLowerCase()),
+				.includes(bindQuery),
 		)
 		.slice(0, 8);
+	const selectedBindIndex = Math.min(bindIndex, Math.max(0, filteredBinds.length - 1));
+	const selectedBind = filteredBinds[selectedBindIndex];
 	const currentContact =
 		(contact.data as ChatwootContact | undefined) ?? sender;
 	const source = inboxes.find((inbox) => inbox.id === conversation?.inbox_id);
@@ -1525,13 +1590,52 @@ function ConversationPane({
 	const insertBind = (bind: Bind) => {
 		const translation = getBindTranslation(bind, language);
 		if (!translation) return;
-		setText(
-			(value) =>
-				`${value}${value && !value.endsWith("\n") ? "\n" : ""}${translation.content}`,
-		);
-		setShowBinds(false);
+		const before = slash ? text.slice(0, slash.start) : text && !text.endsWith("\n") ? `${text}\n` : text;
+		const after = slash ? text.slice(slash.end) : "";
+		const caret = before.length + translation.content.length;
+		updateDraft({ text: before + translation.content + after });
+		closeBinds();
 		setBindSearch("");
-		editor.current?.focus();
+		requestAnimationFrame(() => {
+			editor.current?.focus();
+			editor.current?.setSelectionRange(caret, caret);
+		});
+	};
+	const changeMessageText = (value: string, caret: number) => {
+		updateDraft({ text: value });
+		const match = canWrite && mode === "reply" && !showBinds ? /(?:^|\n)\/([^\n/]{0,48})$/.exec(value.slice(0, caret)) : null;
+		setSlash(match ? { start: caret - match[1].length - 1, end: caret, search: match[1] } : null);
+		setBindIndex(0);
+	};
+	const submitMessage = () => {
+		if (id == null || slash || (!text.trim() && !selectedFiles.length) || send.isPending) return;
+		send.mutate({ id, mode, draft });
+	};
+	const handleMessageKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+		if (slash && event.key === "Escape") {
+			event.preventDefault();
+			closeBinds();
+			return;
+		}
+		if (slash && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+			event.preventDefault();
+			const count = filteredBinds.length;
+			if (count) {
+				const next = (selectedBindIndex + count + (event.key === "ArrowDown" ? 1 : -1)) % count;
+				setBindIndex(next);
+				document.getElementById(`${bindOptionsId}-${next}`)?.scrollIntoView({ block: "nearest" });
+			}
+			return;
+		}
+		if (event.key !== "Enter" || event.shiftKey) return;
+		if (slash) {
+			event.preventDefault();
+			if (selectedBind) insertBind(selectedBind);
+		} else if (text.trim() || selectedFiles.length) {
+			event.preventDefault();
+			submitMessage();
+		}
 	};
 	if (!id)
 		return (
@@ -1717,7 +1821,7 @@ function ConversationPane({
 				</button>}
 				</div>
 				{supervising ? (
-					<CoachingComposer recipient={coachRecipient} previousRecipient={changedRecipient} text={text}
+					<CoachingComposer recipient={coachRecipient} previousRecipient={changedRecipient} text={coachingText}
 						pending={sendCoach.isPending} sent={sendCoach.isSuccess} error={sendCoach.error?.message}
 						inactive={!["open", "pending"].includes(conversation.status)} onChange={updateCoachingDraft}
 						onRetarget={() => { if (coachRecipient) setDraftCoachTo(coachRecipient); sendCoach.reset(); }}
@@ -1732,14 +1836,14 @@ function ConversationPane({
 					<div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5">
 							<fieldset className="chat-operator-composer flex w-fit max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-border p-0.5">
 								<legend className="sr-only">Кому отправить сообщение</legend>
-								{canWrite && <button type="button" disabled={send.isPending} aria-pressed={!sendAsNote} onClick={() => { setPrivateNote(false); setEditorExpanded(true); }}
+								{canWrite && <button type="button" disabled={send.isPending} aria-pressed={!sendAsNote} onClick={() => changeComposer("reply")}
 									className="rounded-md px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground">Ответ игроку</button>}
-								{canNote && <button type="button" disabled={send.isPending} aria-label="Заметка команде" aria-pressed={sendAsNote} data-private={sendAsNote} onClick={() => { setPrivateNote(true); setEditorExpanded(true); }}
+								{canNote && <button type="button" disabled={send.isPending} aria-label="Заметка команде" aria-pressed={sendAsNote} data-private={sendAsNote} onClick={() => changeComposer("note")}
 									className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground">
 									<LockKeyhole size={11} /> <span>Заметка<span className="chat-note-caption"> команде</span></span>
 								</button>}
 							</fieldset>
-						<button type="button" aria-label={editorExpanded ? "Свернуть редактор" : "Развернуть редактор"} aria-expanded={editorExpanded} title={editorExpanded ? "Свернуть редактор" : "Развернуть редактор"} onClick={() => { setShowBinds(false); setEditorExpanded(!editorExpanded); }} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated">
+						<button type="button" aria-label={editorExpanded ? "Свернуть редактор" : "Развернуть редактор"} aria-expanded={editorExpanded} title={editorExpanded ? "Свернуть редактор" : "Развернуть редактор"} onClick={() => { closeBinds(); setEditorExpanded(!editorExpanded); }} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-elevated">
 							<ChevronDown size={16} className={editorExpanded ? "" : "rotate-180"} />
 						</button>
 					</div>
@@ -1752,7 +1856,7 @@ function ConversationPane({
 									<FileText size={13} className="shrink-0 text-accent" />
 									<span className="max-w-56 truncate">{file.name}</span>
 									<span className="shrink-0 text-muted">{(file.size / 1024).toFixed(0)} КБ</span>
-									<button type="button" aria-label={`Удалить файл ${file.name}`} onClick={() => { setSelectedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index)); setAttachmentError(""); }} className="text-muted hover:text-foreground"><X size={13} /></button>
+									<button type="button" aria-label={`Удалить файл ${file.name}`} onClick={() => { updateDraft({ files: selectedFiles.filter((_, fileIndex) => fileIndex !== index) }); setAttachmentError(""); }} className="text-muted hover:text-foreground"><X size={13} /></button>
 								</div>
 							))}
 						</div>
@@ -1760,25 +1864,16 @@ function ConversationPane({
 					<textarea
 						ref={editor}
 						aria-label={sendAsNote ? "Заметка команде" : "Ответ игроку"}
+						aria-controls={slash ? bindOptionsId : undefined}
+						aria-activedescendant={slash && selectedBind ? `${bindOptionsId}-${selectedBindIndex}` : undefined}
 						value={text}
-						onChange={(event) => setText(event.target.value)}
-						onKeyDown={(event) => {
-							if (
-								event.key === "Enter" &&
-								!event.shiftKey &&
-								!event.nativeEvent.isComposing &&
-								event.keyCode !== 229 &&
-								(text.trim() || selectedFiles.length > 0) &&
-								!send.isPending
-							) {
-								event.preventDefault();
-								send.mutate();
-							}
-						}}
+						onChange={(event) => changeMessageText(event.target.value, event.target.selectionStart)}
+						onKeyDown={handleMessageKey}
+						onPointerDown={() => { if (slash) setSlash(null); }}
 						placeholder={
 							sendAsNote
 								? "Заметка видна только команде…"
-								: "Напишите ответ клиенту…"
+								: "Напишите ответ игроку или введите /"
 						}
 						rows={3}
 						className="supportos-scroll block max-h-36 min-h-14 w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none placeholder:text-muted focus:border-accent/60"
@@ -1789,22 +1884,22 @@ function ConversationPane({
 							{canWrite && <div ref={bindMenu}>
 								<button
 									type="button"
-									onClick={() => setShowBinds(!showBinds)}
+									onClick={() => { setSlash(null); setBindSearch(""); setShowBinds(!showBinds); }}
 									aria-label="Быстрый бинд"
 									title="Быстрый бинд"
-									aria-expanded={showBinds}
+									aria-expanded={bindPickerOpen}
 									className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted hover:text-foreground"
 								>
 									<MessageSquareText size={12} /> <span className="chat-binds-caption">Быстрый бинд</span>
 								</button>
-								{showBinds && (
+								{bindPickerOpen && (
 									<div className="chat-popover absolute bottom-full left-2.5 z-30 mb-1 w-[360px] rounded-xl border border-border bg-surface p-2 shadow-xl">
-										<input
+										{showBinds ? <input
 											value={bindSearch}
 											onChange={(event) => setBindSearch(event.target.value)}
 											placeholder="Найти бинд…"
 											className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-accent"
-										/>
+										/> : <p className="px-2 py-1 text-xs font-medium">Быстрые бинды</p>}
 										<div className="my-2 flex gap-1">
 											{languages.map((item) => (
 												<button
@@ -1817,14 +1912,17 @@ function ConversationPane({
 												</button>
 											))}
 										</div>
-										<div className="max-h-52 overflow-y-auto">
+										<div id={bindOptionsId} role={slash ? "listbox" : undefined} aria-label={slash ? "Быстрые бинды" : undefined} className="max-h-52 overflow-y-auto">
 											{filteredBinds.length ? (
-												filteredBinds.map((bind) => (
+												filteredBinds.map((bind, index) => (
 													<button
 														key={bind.id}
+														id={`${bindOptionsId}-${index}`}
 														type="button"
+														role={slash ? "option" : undefined}
+														aria-selected={slash ? selectedBindIndex === index : undefined}
 														onClick={() => insertBind(bind)}
-														className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-surface-elevated"
+														className="block w-full rounded-lg px-2.5 py-2 text-left aria-selected:bg-surface-elevated hover:bg-surface-elevated"
 													>
 														<span className="block truncate text-xs font-medium">
 															{getBindTitle(bind, language)}
@@ -1852,8 +1950,8 @@ function ConversationPane({
 								type="button"
 								aria-label={sendAsNote ? "Отправить заметку команде" : "Отправить игроку"}
 								title={sendAsNote ? "Отправить заметку команде" : "Отправить игроку"}
-								disabled={(!text.trim() && !selectedFiles.length) || send.isPending}
-								onClick={() => send.mutate()}
+								disabled={Boolean(slash) || (!text.trim() && !selectedFiles.length) || send.isPending}
+								onClick={submitMessage}
 								className="inline-flex h-8 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
 							>
 								<Send size={13} />

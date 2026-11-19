@@ -336,6 +336,27 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		.toBe(String(row.inboxId));
 	await expect.poll(() => activeParameters.get("label")).toBe("billing");
 	await assertLayout("active-filters");
+	const savedLists = active.getByRole("button", {
+		name: /^Сохранённые списки/,
+	});
+	await savedLists.click();
+	const savedMenu = active.getByRole("region", { name: "Сохранённые списки" });
+	await savedMenu
+		.getByRole("button", { name: "Сохранить текущие фильтры" })
+		.click();
+	await savedMenu
+		.getByRole("textbox", { name: "Название списка" })
+		.fill("Платежи по проекту");
+	await savedMenu
+		.getByRole("button", { name: "Сохранить список", exact: true })
+		.click();
+	await expect(
+		savedMenu.getByRole("button", { name: "Платежи по проекту", exact: true }),
+	).toBeVisible();
+	expect(
+		await page.evaluate(() => document.documentElement.scrollWidth),
+	).toBeLessThanOrEqual(info.project.use.viewport?.width ?? 1440);
+	await savedLists.press("Escape");
 	await active.getByRole("button", { name: "Закрыть фильтры" }).click();
 	await expect(filterToggle).toBeFocused();
 	await expect(project).toBeHidden();
@@ -359,6 +380,17 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(activeSearch).toHaveValue(row.player);
 	await active.getByRole("button", { name: "Очистить поиск" }).click();
 	await expect.poll(() => activeParameters.has("search")).toBe(false);
+	await page.reload();
+	await page.getByRole("button", { name: /^Активные/ }).click();
+	await savedLists.click();
+	await savedMenu
+		.getByRole("button", { name: "Платежи по проекту", exact: true })
+		.click();
+	await expect
+		.poll(() => activeParameters.get("inbox"))
+		.toBe(String(row.inboxId));
+	await expect.poll(() => activeParameters.get("label")).toBe("billing");
+	await active.getByRole("button", { name: "Сбросить фильтры" }).click();
 	await table.getByRole("button", { name: "Наблюдать" }).click();
 	const observation = page.getByRole("complementary", {
 		name: "Наблюдение за диалогом",

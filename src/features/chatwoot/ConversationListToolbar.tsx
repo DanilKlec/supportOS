@@ -16,6 +16,7 @@ import {
 	ChatSearch,
 	type FilterChip,
 } from "./ChatFilters";
+import { ChatSavedViews, readViewFields } from "./ChatSavedViews";
 
 export const emptyConversationFilters = {
 	search: "",
@@ -28,6 +29,7 @@ export const emptyConversationFilters = {
 export type ConversationFilters = typeof emptyConversationFilters;
 
 type Props = {
+	userId?: string;
 	scope: "mine" | "queue" | "history";
 	filters: ConversationFilters;
 	update: (patch: Partial<ConversationFilters>) => void;
@@ -41,6 +43,33 @@ type Props = {
 	onHistoryStatus: (status: "resolved" | "snoozed") => void;
 };
 
+const viewFields = [
+	"inboxId",
+	"agentId",
+	"label",
+	"from",
+	"to",
+	"historyStatus",
+] as const;
+type ListView = Omit<ConversationFilters, "search"> &
+	Pick<Props, "historyStatus">;
+
+function decodeListView(input: unknown): ListView | null {
+	const fields = readViewFields(input, viewFields);
+	if (
+		!fields ||
+		![fields.inboxId, fields.agentId].every(
+			(value) => !value || /^\d+$/.test(value),
+		) ||
+		![fields.from, fields.to].every(
+			(value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value),
+		) ||
+		(fields.historyStatus !== "resolved" && fields.historyStatus !== "snoozed")
+	)
+		return null;
+	return { ...fields, historyStatus: fields.historyStatus };
+}
+
 export function countConversationFilters(filters: ConversationFilters) {
 	return [
 		filters.inboxId,
@@ -53,6 +82,7 @@ export function countConversationFilters(filters: ConversationFilters) {
 const shortDate = (date: string) => date.split("-").reverse().join(".");
 
 export function ConversationListToolbar({
+	userId,
 	scope,
 	filters,
 	update,
@@ -143,6 +173,29 @@ export function ConversationListToolbar({
 					onToggle={() => setExpanded(!expanded)}
 				/>
 			</div>
+			{userId && (
+				<ChatSavedViews
+					key={scope}
+					storageKey={`supportos:chats:views:${userId}:${scope}`}
+					canSave={
+						chips.length > 0 ||
+						(scope === "history" && historyStatus === "snoozed")
+					}
+					value={{
+						inboxId: filters.inboxId,
+						agentId: filters.agentId,
+						label: filters.label,
+						from: filters.from,
+						to: filters.to,
+						historyStatus,
+					}}
+					decode={decodeListView}
+					onApply={({ historyStatus: status, ...saved }) => {
+						update({ ...saved, search: "" });
+						if (scope === "history") onHistoryStatus(status);
+					}}
+				/>
+			)}
 			{requireProject && !filters.inboxId && (
 				<p className="chat-filter-source" title={projectName}>
 					<Globe2 size={13} aria-hidden="true" />
