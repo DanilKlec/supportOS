@@ -16,6 +16,7 @@ import { Route as SharedBindsRouteImport } from './routes/shared-binds'
 import { Route as RecentRouteImport } from './routes/recent'
 import { Route as QcRouteImport } from './routes/qc'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
+import { Route as MailRouteImport } from './routes/mail'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LivechatRouteImport } from './routes/livechat'
 import { Route as InboxRouteImport } from './routes/inbox'
@@ -71,6 +72,11 @@ const QcRoute = QcRouteImport.update({
 const ProjectEmailsRoute = ProjectEmailsRouteImport.update({
   id: '/project-emails',
   path: '/project-emails',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MailRoute = MailRouteImport.update({
+  id: '/mail',
+  path: '/mail',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
+  '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
+  '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/inbox': typeof InboxRoute
   '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
+  '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
   '/qc': typeof QcRoute
   '/recent': typeof RecentRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/livechat'
     | '/login'
+    | '/mail'
     | '/project-emails'
     | '/qc'
     | '/recent'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/livechat'
     | '/login'
+    | '/mail'
     | '/project-emails'
     | '/qc'
     | '/recent'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/livechat'
     | '/login'
+    | '/mail'
     | '/project-emails'
     | '/qc'
     | '/recent'
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   InboxRoute: typeof InboxRoute
   LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
+  MailRoute: typeof MailRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
   QcRoute: typeof QcRoute
   RecentRoute: typeof RecentRoute
@@ -443,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/project-emails'
       fullPath: '/project-emails'
       preLoaderRoute: typeof ProjectEmailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mail': {
+      id: '/mail'
+      path: '/mail'
+      fullPath: '/mail'
+      preLoaderRoute: typeof MailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -609,6 +629,7 @@ const rootRouteChildren: RootRouteChildren = {
   InboxRoute: InboxRoute,
   LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
+  MailRoute: MailRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,
   QcRoute: QcRoute,
   RecentRoute: RecentRoute,

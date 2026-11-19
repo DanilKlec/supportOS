@@ -702,7 +702,7 @@ export default async function handler(req, res) {
 			|| action === 'custom-attributes' && req.method !== 'GET';
 		if (monitorAction && !capabilities.supervise) throw chatwootError('Раздел доступен руководителю и QC.', 403);
 		if (projectAction && !capabilities.manageProjects) throw chatwootError('Эта настройка доступна администратору.', 403);
-		if (['contact-directory', 'directory-contact-history'].includes(action) && !capabilities.manageAllChats)
+		if (['contact-directory', 'directory-contact-history', 'directory-contact-notes', 'directory-contact-merge'].includes(action) && !capabilities.manageAllChats)
 			throw chatwootError('Каталог контактов доступен администратору.', 403);
 		if (action === 'website-source' && req.method === 'DELETE' && !capabilities.deleteProjects)
 			throw chatwootError('Удалять источники может только Creator.', 403);
@@ -1139,6 +1139,23 @@ export default async function handler(req, res) {
 			if (!validChatId(id)) throw chatwootError('Некорректный ID контакта.', 400);
 			const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/${id}/conversations`);
 			return json(res, 200, { payload: recentContactChats(result, Number(id), () => true) });
+		}
+		if (action === 'directory-contact-notes' && ['GET', 'POST'].includes(req.method)) {
+			const id = req.method === 'GET' ? url.searchParams.get('id') : body.contactId;
+			if (!validChatId(id)) throw chatwootError('Некорректный ID контакта.', 400);
+			const path = `/accounts/${cfg.accountId}/contacts/${id}/notes`;
+			const note = ({ id, content, created_at, user }) => ({ id, content, created_at, author: user?.name });
+			if (req.method === 'GET') return json(res, 200, { notes: itemList(await api(cfg, path)).filter((row) => validChatId(row?.id)).map(note) });
+			const content = typeof body.content === 'string' ? body.content.trim() : '';
+			if (!content || content.length > 2000 || content.includes('\0')) throw chatwootError('Введите заметку длиной до 2000 символов.', 400);
+			return json(res, 200, note(await api(cfg, path, { method: 'POST', body: { note: { content } } })));
+		}
+		if (action === 'directory-contact-merge' && req.method === 'POST') {
+			const { baseId, duplicateId } = body;
+			if (!validChatId(baseId) || !validChatId(duplicateId) || Number(baseId) === Number(duplicateId) || body.confirmed !== true)
+				throw chatwootError('Выберите два разных контакта и подтвердите объединение.', 400);
+			await api(cfg, `/accounts/${cfg.accountId}/actions/contact_merge`, { method: 'POST', body: { base_contact_id: Number(baseId), mergee_contact_id: Number(duplicateId) } });
+			return json(res, 200, { ok: true });
 		}
 		if (action === 'contact-history' && req.method === 'GET') {
 			const id = url.searchParams.get('conversationId');

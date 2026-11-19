@@ -5,6 +5,7 @@ import { PasswordForm } from "@/features/auth/PasswordForm";
 import { PendingApproval } from "@/features/auth/PendingApproval";
 import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
 import { ProjectEmailServerCache } from "@/features/project-emails/ProjectEmailServerCache";
+import { MailNotifications } from "@/features/mail/MailNotifications";
 import { supabaseService } from "@/services/supabase.service";
 import { canAccessPage } from "../../shared/access.js";
 import "#/styles.css";
@@ -142,6 +143,7 @@ function RootComponent() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
+				{accessGranted && <MailNotifications />}
 				{!loading && session?.mfaRequired ? (
 					<AuthenticatorGate key={session.sessionId ?? session.user.id} />
 				) : !loading && session && !session.authVerified ? (

@@ -1,10 +1,15 @@
 import proxy from './index.js';
 import webhook from './webhook.js';
 import { readBytes } from './_body.js';
+import mail from '../mail/index.js';
+import mailCallback from '../mail/callback.js';
 
 export default async function chatwootHttp(req, res) {
 	const url = new URL(req.url ?? '/', 'http://localhost');
-	if (url.pathname === '/api/chatwoot/webhook' || url.searchParams.get('action') === 'webhook') {
+	const surface = url.searchParams.get('surface');
+	if (url.pathname === '/api/mail/callback' || surface === 'mail-callback') return mailCallback(req, res);
+	const proxyHandler = url.pathname === '/api/mail' || surface === 'mail' ? mail : proxy;
+	if (proxyHandler === proxy && (url.pathname === '/api/chatwoot/webhook' || url.searchParams.get('action') === 'webhook')) {
 		return webhook(req, res);
 	}
 	let body;
@@ -22,5 +27,5 @@ export default async function chatwootHttp(req, res) {
 		res.setHeader('Cache-Control', 'no-store');
 		return res.end(JSON.stringify({ error: res.statusCode === 413 ? 'Размер запроса превышает 4 МБ' : 'Некорректный запрос' }));
 	}
-	return proxy(Object.create(req, { body: { value: body ?? {} } }), res);
+	return proxyHandler(Object.create(req, { body: { value: body ?? {} } }), res);
 }

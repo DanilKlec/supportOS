@@ -153,6 +153,7 @@ export type ChatwootContact = {
 };
 export type ChatwootContactFields = Partial<Pick<ChatwootContact, "name" | "email" | "phone_number">>;
 export type ChatwootContactHistory = Pick<ChatwootConversation, "id" | "inbox_id" | "status" | "created_at">[];
+export type ChatwootContactNote = { id: number; content: string; created_at: number; author?: string };
 
 export type ChatwootCustomAttributeDefinition = {
 	id: number;
@@ -347,6 +348,15 @@ export const chatwootService = {
 	directoryContactHistory: (id: number, signal?: AbortSignal) => request<{ payload: ChatwootContactHistory }>(
 		"directory-contact-history", { signal }, `&id=${id}`,
 	),
+	directoryContactNotes: (id: number, signal?: AbortSignal) => request<{ notes: ChatwootContactNote[] }>(
+		"directory-contact-notes", { signal }, `&id=${id}`,
+	),
+	addContactNote: (contactId: number, content: string) => request<ChatwootContactNote>("directory-contact-notes", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contactId, content }),
+	}),
+	mergeContacts: (baseId: number, duplicateId: number) => request<{ ok: true }>("directory-contact-merge", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseId, duplicateId, confirmed: true }),
+	}),
 	updateContact: (contactId: number, fields: ChatwootContactFields, conversationId?: number) => request<ChatwootContact>(
 		conversationId === undefined ? "contact-directory" : "contact-profile", {
 			method: "POST", headers: { "Content-Type": "application/json" },

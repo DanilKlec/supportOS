@@ -48,6 +48,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		phone_number: null as string | null,
 	};
 	let contactQuery = "";
+	let contactNote = "";
+	let merges = 0;
 	const assertLayout = async (name: string) => {
 		const bounds = await page
 			.locator(".supportos-inbox")
@@ -294,9 +296,42 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				expect(agentView).toBe(false);
 				contactQuery = url.searchParams.get("q") ?? "";
 				return route.fulfill({
-					json: { payload: [playerContact], hasMore: false },
+					json: {
+						payload:
+							contactQuery === "duplicate@example.invalid"
+								? [{ id: 41, email: contactQuery, name: "Дубль игрока" }]
+								: [playerContact],
+						hasMore: false,
+					},
 				});
 			}
+			case "directory-contact-notes":
+				if (request.method() === "POST") {
+					expect(request.postDataJSON().contactId).toBe(40);
+					contactNote = request.postDataJSON().content;
+					return route.fulfill({ json: { id: 61, content: contactNote } });
+				}
+				return route.fulfill({
+					json: {
+						notes: contactNote
+							? [
+									{
+										id: 61,
+										content: contactNote,
+										author: "Тестовый администратор",
+									},
+								]
+							: [],
+					},
+				});
+			case "directory-contact-merge":
+				expect(request.postDataJSON()).toEqual({
+					baseId: 40,
+					duplicateId: 41,
+					confirmed: true,
+				});
+				merges++;
+				return route.fulfill({ json: { ok: true } });
 			case "directory-contact-history":
 			case "contact-history":
 				return route.fulfill({
@@ -594,6 +629,26 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		profile.getByText("+40712345678", { exact: true }),
 	).toBeVisible();
 	await assertLayout("contacts");
+	await profile.getByRole("button", { name: "Заметки", exact: true }).click();
+	await profile
+		.getByRole("textbox", { name: "Новая заметка к контакту" })
+		.fill("Уточнён рабочий адрес");
+	await profile.getByRole("button", { name: "Добавить заметку" }).click();
+	await expect(
+		profile.getByText("Уточнён рабочий адрес", { exact: true }),
+	).toBeVisible();
+	await profile.getByRole("button", { name: "Объединить дубли" }).click();
+	await profile
+		.getByRole("textbox", { name: "Найти дубль" })
+		.fill("duplicate@example.invalid");
+	await profile.getByRole("button", { name: /#41/ }).click();
+	await expect(profile.getByText(/Сохранится контакт #40/)).toBeVisible();
+	expect(merges).toBe(0);
+	await profile
+		.getByRole("button", { name: "Подтвердить объединение" })
+		.click();
+	await expect(profile.getByText("Контакты объединены")).toBeVisible();
+	expect(merges).toBe(1);
 	await profile
 		.getByRole("button", {
 			name: new RegExp(`#${otherChat.id} · ${row.project}`),

@@ -5,6 +5,7 @@ export const spaces = [
 		items: [
 			{ label: "Бинды", to: "/" },
 			{ label: "Чаты", to: "/inbox" },
+			{ label: "Почта", to: "/mail" },
 			{ label: "Личный архив", to: "/archive" },
 			{
 				label: "Помощник ответа",

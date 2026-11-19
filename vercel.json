@@ -5,6 +5,8 @@
   "regions": ["dub1"],
   "rewrites": [
     { "source": "/api/chatwoot/webhook", "destination": "/api/chatwoot?action=webhook" },
+    { "source": "/api/mail", "destination": "/api/chatwoot?surface=mail" },
+    { "source": "/api/mail/callback", "destination": "/api/chatwoot?surface=mail-callback" },
     { "source": "/((?!api(?:/|$)|assets(?:/|$)|.*\\.).*)", "destination": "/index.html" }
   ],
   "headers": [

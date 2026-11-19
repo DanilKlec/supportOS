@@ -46,6 +46,7 @@ type AppRoute =
 	| "/content"
 	| "/team"
 	| "/project-emails"
+	| "/mail"
 	| "/bonuses"
 	| "/shared-binds"
 	| "/settings/users"

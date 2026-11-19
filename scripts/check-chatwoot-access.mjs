@@ -143,6 +143,15 @@ async function mockFetch(input, init = {}) {
 			return response({ payload: playerContact });
 		}
 		if (path === 'contacts/101/conversations' && method === 'GET') return response({ payload: [...chats.values()] });
+		if (path === 'contacts/101/notes') {
+			if (method === 'GET') return response([{ id: 1, content: 'Previous', created_at: 1700000000, user: { name: 'Agent', email: 'private@example.invalid' } }]);
+			upstreamWrites.push({ path, method, body });
+			return response({ id: 2, content: body.note.content, created_at: 1700000001, user: { name: 'Agent' } });
+		}
+		if (path === 'actions/contact_merge') {
+			upstreamWrites.push({ path, method, body });
+			return response({ id: body.base_contact_id });
+		}
 	}
 	throw new Error(`Unhandled fixture request ${method} ${url.pathname}`);
 }
@@ -202,6 +211,17 @@ try {
 	assert.equal((await expectStatus('admin', 'directory-contact-history', 200, { query: '&id=101' })).payload.some(({ id }) => id === 2), true);
 	await expectStatus('admin', 'contact-directory', 422, post({ contactId: 101, fields: { email: 'already-used@example.invalid' } }));
 	assert.equal((await expectStatus('admin', 'contact-directory', 200, post({ contactId: 101, fields: { phone_number: null } }))).phone_number, null);
+	await expectStatus('support', 'directory-contact-notes', 403, { query: '&id=101' });
+	await expectStatus('qc', 'directory-contact-merge', 403, post({ baseId: 101, duplicateId: 102, confirmed: true }));
+	const contactNotes = await expectStatus('admin', 'directory-contact-notes', 200, { query: '&id=101' });
+	assert.deepEqual(contactNotes.notes[0], { id: 1, content: 'Previous', created_at: 1700000000, author: 'Agent' });
+	assert.equal((await expectStatus('creator', 'directory-contact-notes', 200, post({ contactId: 101, content: 'Active note' }))).content, 'Active note');
+	const beforeMerge = upstreamWrites.length;
+	await expectStatus('admin', 'directory-contact-merge', 400, post({ baseId: 101, duplicateId: 102 }));
+	await expectStatus('admin', 'directory-contact-merge', 400, post({ baseId: 101, duplicateId: 101, confirmed: true }));
+	assert.equal(upstreamWrites.length, beforeMerge);
+	await expectStatus('admin', 'directory-contact-merge', 200, post({ baseId: 101, duplicateId: 102, confirmed: true }));
+	assert.deepEqual(upstreamWrites.at(-1).body, { base_contact_id: 101, mergee_contact_id: 102 });
 	await expectStatus('support', 'custom-attribute-values', 403, post({ conversationId: 1, contactId: 102, attributes: { login: 'local' } }));
 	const preview = await expectStatus('support', 'conversation', 200, { query: '&id=3' });
 	assert.equal(preview.access.take, true);

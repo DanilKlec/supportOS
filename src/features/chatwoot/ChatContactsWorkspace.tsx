@@ -13,6 +13,7 @@ import {
 	chatwootService,
 } from "@/services/chatwoot.service";
 import { ChatContactEditor } from "./ChatContactEditor";
+import { ChatContactTools } from "./ChatContactTools";
 import { ChatSearch } from "./ChatFilters";
 import { conversationStatusLabels } from "./ConversationActions";
 
@@ -280,6 +281,10 @@ export function ChatContactsWorkspace({
 											: current,
 									)
 								}
+							/>
+							<ChatContactTools
+								key={`tools-${selected.id}`}
+								contact={selected}
 							/>
 							<div className="space-y-2 border-t border-border pt-3">
 								<h4 className="text-sm font-semibold">Недавние диалоги</h4>

@@ -7,11 +7,11 @@ export function chatwootPlugin() {
 		configureServer(server) {
 			const env = loadEnv(server.config.mode, server.config.root, '');
 			for (const [key, value] of Object.entries(env)) {
-				if (/^CHATWOOT_/.test(key) && process.env[key] === undefined) process.env[key] = value;
+				if (/^(CHATWOOT_|MAIL_)/.test(key) && process.env[key] === undefined) process.env[key] = value;
 			}
 			server.middlewares.use(async (req, res, next) => {
 				const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-				if (pathname !== '/api/chatwoot' && pathname !== '/api/chatwoot/webhook') return next();
+				if (!['/api/chatwoot', '/api/chatwoot/webhook', '/api/mail', '/api/mail/callback'].includes(pathname)) return next();
 				return handler(req, res);
 			});
 		},

@@ -713,6 +713,7 @@ export function Topbar() {
 					{[
 						{ to: "/", label: "Бинды" },
 						{ to: "/inbox", label: "Чаты" },
+						{ to: "/mail", label: "Почта" },
 						{ to: "/qc", label: "QC" },
 						{ to: "/admin", label: "Администрирование" },
 					]
