@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { Paperclip, Send, X } from "lucide-react";
-import { type FormEvent, useRef, useState } from "react";
+import { Clock3, Paperclip, Send, X } from "lucide-react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import {
 	type Mailbox,
 	type MailDraft,
@@ -27,13 +27,36 @@ async function encodeFile(file: File) {
 	return { name: file.name, data };
 }
 
+function recipientAddresses(value: string) {
+	return value
+		.split(/[,;](?=(?:[^"]*"[^"]*")*[^"]*$)/)
+		.map((part) => {
+			const entry = part.trim();
+			return /<([^<>]+)>$/.exec(entry)?.[1] ?? entry;
+		})
+		.filter(Boolean);
+}
+
+function readRecentRecipients(key: string | undefined): string[] {
+	try {
+		const saved: unknown = key && JSON.parse(localStorage.getItem(key) ?? "[]");
+		return Array.isArray(saved)
+			? saved.filter((email): email is string => typeof email === "string")
+			: [];
+	} catch {
+		return [];
+	}
+}
+
 export function MailComposer({
 	box,
+	userId,
 	draft,
 	onDone,
 	onClose,
 }: {
 	box: Mailbox;
+	userId?: string;
 	draft: MailDraft;
 	onDone: (message: string) => void;
 	onClose: () => void;
@@ -43,7 +66,19 @@ export function MailComposer({
 	const [copies, setCopies] = useState(Boolean(draft.cc || draft.bcc));
 	const [error, setError] = useState("");
 	const [confirmClose, setConfirmClose] = useState(false);
+	const recentKey =
+		userId && `supportos:mail:recent-recipients:${userId}:${box.id}`;
+	const [recentRecipients] = useState(() => readRecentRecipients(recentKey));
+	const [showRecent, setShowRecent] = useState(false);
+	const recentId = useId();
+	const addressesInField = new Set(
+		recipientAddresses(fields.to).map((email) => email.toLowerCase()),
+	);
+	const availableRecipients = recentRecipients.filter(
+		(email) => !addressesInField.has(email.toLowerCase()),
+	);
 	const fileInput = useRef<HTMLInputElement>(null);
+	const toInput = useRef<HTMLInputElement>(null);
 	const mutation = useMutation({
 		mutationFn: async (action: "send" | "save" | "delete") => {
 			if (action === "delete" && fields.draftId)
@@ -58,14 +93,33 @@ export function MailComposer({
 				? mailService.send(box.id, payload)
 				: mailService.save(box.id, payload);
 		},
-		onSuccess: (_, action) =>
+		onSuccess: (_, action) => {
+			if (action === "send" && recentKey) {
+				const recipients = new Map<string, string>();
+				for (const email of [
+					...recipientAddresses(fields.to),
+					...readRecentRecipients(recentKey),
+				]) {
+					const normalized = email.toLowerCase();
+					if (!recipients.has(normalized)) recipients.set(normalized, email);
+				}
+				try {
+					localStorage.setItem(
+						recentKey,
+						JSON.stringify([...recipients.values()].slice(0, 12)),
+					);
+				} catch {
+					// A browser storage failure must not affect an already sent message.
+				}
+			}
 			onDone(
 				action === "send"
 					? "Письмо отправлено"
 					: action === "delete"
 						? "Черновик удалён"
 						: "Черновик сохранён",
-			),
+			);
+		},
 		onError: (issue) => setError(issue.message),
 	});
 	const change = (
@@ -121,6 +175,7 @@ export function MailComposer({
 							<label className="mail-field grow">
 								Кому
 								<input
+									ref={toInput}
 									autoComplete="off"
 									value={fields.to}
 									onChange={(e) => change("to", e.target.value)}
@@ -137,6 +192,48 @@ export function MailComposer({
 								</button>
 							)}
 						</div>
+						{availableRecipients.length > 0 && (
+							<div className="mail-recent">
+								<button
+									type="button"
+									className="mail-button"
+									aria-expanded={showRecent}
+									aria-controls={recentId}
+									onClick={() => setShowRecent(!showRecent)}
+								>
+									<Clock3 size={14} aria-hidden="true" /> Недавние адресаты
+								</button>
+								{showRecent && (
+									<ul
+										className="mail-recent-options"
+										id={recentId}
+										aria-label="Недавние адресаты"
+									>
+										{availableRecipients.map((email) => (
+											<li key={email}>
+												<button
+													type="button"
+													className="mail-button"
+													onClick={() => {
+														const current = fields.to.trim();
+														change(
+															"to",
+															current
+																? `${current.replace(/[,;]\s*$/, "")}, ${email}`
+																: email,
+														);
+														setShowRecent(false);
+														toInput.current?.focus();
+													}}
+												>
+													{email}
+												</button>
+											</li>
+										))}
+									</ul>
+								)}
+							</div>
+						)}
 						{copies && (
 							<div className="mail-copies">
 								<label className="mail-field">

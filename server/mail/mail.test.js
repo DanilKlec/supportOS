@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, expect, test, vi } from 'vitest';
-import { completeGoogle, composeRaw, googleConfig, readMessage, startGoogle } from './google.js';
+import { completeGoogle, composeRaw, googleConfig, readMessage, seal, startGoogle } from './google.js';
 import handler from './index.js';
 
 const identities = vi.hoisted(() => ({ actor: undefined }));
@@ -82,7 +82,47 @@ test('mailbox membership is checked before mail is read or sent and support cann
 	expect((await call('POST', 'send', `&box=${mailboxId}`, {})).status).toBe(403);
 	expect((await call('POST', 'grant', `&box=${mailboxId}`, { email: address })).status).toBe(403);
 	expect((await call('POST', 'oauth-start', '', { address })).status).toBe(403);
-	expect(fetch).toHaveBeenCalledTimes(3);
+	expect((await call('POST', 'create-label', `&box=${mailboxId}`, { name: 'Private' })).status).toBe(403);
+	expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('mailbox members create Gmail labels and move a thread without removing its other labels', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
+	const encrypted_token = seal(googleConfig(testEnv), 'example-refresh', `gmail:${address}`);
+	const mutations = [];
+	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		if (parsed.hostname === 'database.invalid') {
+			return Response.json(parsed.searchParams.get('select') === 'user_id'
+				? [{ user_id: userId }]
+				: [{ id: mailboxId, address, encrypted_token }]);
+		}
+		if (parsed.hostname === 'oauth2.googleapis.com')
+			return Response.json({ access_token: 'example-access', expires_in: 3600 });
+		expect(parsed.hostname).toBe('gmail.googleapis.com');
+		const folders = [{ id: 'Label_1', type: 'user' }, { id: 'Label_2', type: 'user' }, { id: 'UNREAD', type: 'system' }];
+		if (options.method === 'GET') {
+			expect(parsed.searchParams.get('fields')).toBe('labels(id,type)');
+			return Response.json({ labels: folders });
+		}
+		const payload = JSON.parse(options.body);
+		mutations.push([parsed.pathname, payload]);
+		if (parsed.pathname.endsWith('/labels'))
+			return Response.json({ ...folders[1], name: payload.name });
+		return Response.json({ id: 'thread' });
+	}));
+	const query = `&box=${mailboxId}`;
+	expect(await call('POST', 'create-label', query, { name: '  Проекты/Разбор  ' })).toMatchObject({
+		status: 200, body: { id: 'Label_2', name: 'Проекты/Разбор', type: 'user' },
+	});
+	const move = { id: 'thread', operation: 'move-label', label: 'Label_2', source: 'Label_1' };
+	expect((await call('POST', 'change-thread', query, move)).status).toBe(200);
+	expect((await call('POST', 'change-thread', query, { ...move, label: 'UNREAD' })).status).toBe(400);
+	expect(mutations).toEqual([
+		['/gmail/v1/users/me/labels', { name: 'Проекты/Разбор', labelListVisibility: 'labelShow', messageListVisibility: 'show' }],
+		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_2'], removeLabelIds: ['Label_1'] }],
+	]);
 });
 
 test('migration grants service access only and reconnect keeps the original mailbox and operators', async () => {

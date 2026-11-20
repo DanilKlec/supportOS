@@ -274,6 +274,84 @@
 	font-weight: 600;
 	color: var(--color-muted);
 }
+.mail-sidebar-labels {
+	padding-inline: 0.35rem;
+}
+.mail-label-form,
+.mail-organizer-panel {
+	display: grid;
+	gap: 0.5rem;
+}
+.mail-label-form-actions,
+.mail-organizer-actions,
+.mail-recent-options,
+.mail-row-tags {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+.mail-label-form-actions,
+.mail-organizer-actions,
+.mail-recent-options {
+	flex-wrap: wrap;
+}
+.mail-thread-organizer {
+	flex: 0 0 auto;
+	min-width: 0;
+	padding: 0.4rem 0.75rem;
+	border-bottom: 1px solid var(--mail-line);
+	background: var(--color-surface);
+}
+.mail-tag {
+	display: inline-block;
+	max-width: min(100%, 12rem);
+	overflow: hidden;
+	border-radius: 0.35rem;
+	background: var(--mail-selected);
+	padding: 0.12rem 0.4rem;
+	color: var(--color-foreground);
+	font-size: 0.7rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.mail-organizer-panel {
+	width: min(100%, 24rem);
+	margin-top: 0.5rem;
+	padding: 0.5rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.55rem;
+	background: var(--color-background);
+}
+.mail-label-options {
+	max-height: min(24dvh, 10rem);
+	overflow: auto;
+}
+.mail-label-option {
+	display: flex;
+	align-items: baseline;
+	gap: 0.45rem;
+	padding: 0.35rem;
+	border-radius: 0.35rem;
+	font-size: 0.8rem;
+	overflow-wrap: anywhere;
+}
+.mail-label-option:hover,
+.mail-organizer-actions .mail-button[aria-expanded="true"] {
+	background: var(--mail-selected);
+}
+.mail-label-option input {
+	flex-shrink: 0;
+	accent-color: var(--color-primary);
+}
+.mail-move-form {
+	display: flex;
+	align-items: end;
+	gap: 0.4rem;
+}
+.mail-move-form .mail-field {
+	flex: 1;
+	min-width: 0;
+}
 .mail-row {
 	flex-direction: column;
 	align-items: stretch;
@@ -483,6 +561,21 @@
 	display: grid;
 	gap: 0.5rem;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mail-recent-options {
+	max-height: 8rem;
+	overflow: auto;
+	margin-top: 0.35rem;
+}
+.mail-recent-options li {
+	max-width: 100%;
+}
+.mail-recent-options .mail-button {
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .mail-notice {
 	display: grid;

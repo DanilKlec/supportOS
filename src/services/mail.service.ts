@@ -102,6 +102,8 @@ export const mailService = {
 		request("revoke", { box }, { userId }),
 	labels: (box: string, signal?: AbortSignal) =>
 		request<{ labels: MailLabel[] }>("labels", { box }, undefined, signal),
+	createLabel: (box: string, name: string) =>
+		request<MailLabel>("create-label", { box }, { name }),
 	folder: (
 		box: string,
 		label: string,
@@ -124,8 +126,13 @@ export const mailService = {
 		),
 	draft: (box: string, id: string) =>
 		request<{ id: string; message: MailMessage }>("draft", { box, id }),
-	change: (box: string, id: string, operation: string, label?: string) =>
-		request("change-thread", { box }, { id, operation, label }),
+	change: (
+		box: string,
+		id: string,
+		operation: string,
+		label?: string,
+		source?: string,
+	) => request("change-thread", { box }, { id, operation, label, source }),
 	deleteDraft: (box: string, id: string) =>
 		request("delete-draft", { box }, { id }),
 	save: (box: string, draft: MailDraft) =>

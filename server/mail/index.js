@@ -115,7 +115,7 @@ async function getAttachment(g, mid, id) {
 }
 
 const adminOnly = new Set(['oauth-start', 'oauth-finish', 'members', 'grant', 'revoke']);
-const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'change-thread', 'save-draft', 'send', 'delete-draft']);
+const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'change-thread', 'save-draft', 'send', 'delete-draft']);
 
 export default async function handler(req, res) {
 	res.setHeader('Cache-Control', 'private, no-store');
@@ -174,6 +174,15 @@ export default async function handler(req, res) {
 		const token = await mailboxToken(cfg, box);
 		const g = (path, options) => gmail(token, path, options);
 		if (action === 'labels') return send(200, await g('/labels?fields=labels(id,name,type)'));
+		if (action === 'create-label') {
+			const name = typeof body.name === 'string' ? body.name.trim() : '';
+			if (!name || name.length > 225 || /[\r\n\t\0]/.test(name))
+				throw mailError('Введите название ярлыка длиной до 225 символов.');
+			return send(200, await g('/labels', {
+				method: 'POST',
+				body: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show' },
+			}));
+		}
 		if (action === 'folder') return send(200, await folder(g, url));
 		if (action === 'thread') {
 			const id = safeId(url.searchParams.get('id'));
@@ -208,7 +217,18 @@ export default async function handler(req, res) {
 			const id = safeId(body.id);
 			const operation = body.operation;
 			if (operation === 'trash' || operation === 'untrash') await g(`/threads/${id}/${operation}`, { method: 'POST' });
-			else {
+			else if (operation === 'move-label') {
+				const destination = safeId(body.label);
+				const source = body.source == null ? null : safeId(body.source);
+				const { labels = [] } = await g('/labels?fields=labels(id,type)');
+				const folders = new Set(['INBOX', ...labels.filter(({ type }) => type === 'user').map(({ id }) => id)]);
+				if (!folders.has(destination) || (source && !folders.has(source)) || source === destination)
+					throw mailError('Выберите другую папку из списка.');
+				await g(`/threads/${id}/modify`, {
+					method: 'POST',
+					body: { addLabelIds: [destination], removeLabelIds: source ? [source] : [] },
+				});
+			} else {
 				const changes = {
 					read: [[], ['UNREAD']], unread: [['UNREAD'], []], star: [['STARRED'], []], unstar: [[], ['STARRED']],
 					archive: [[], ['INBOX']], inbox: [['INBOX'], []], spam: [['SPAM'], ['INBOX']], unspam: [['INBOX'], ['SPAM']],

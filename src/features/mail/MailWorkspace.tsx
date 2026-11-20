@@ -14,6 +14,7 @@ import {
 	Send,
 	ShieldAlert,
 	Star,
+	Tag,
 	Trash2,
 	Users,
 } from "lucide-react";
@@ -21,12 +22,14 @@ import { useEffect, useRef, useState } from "react";
 import {
 	type Mailbox,
 	type MailDraft,
+	type MailLabel,
 	type MailRow,
 	mailService,
 } from "@/services/mail.service";
 import { useAuthStore } from "@/store/auth.store";
 import { MailAdministration, oauthSessionKey } from "./MailAdministration";
 import { emptyMailDraft, MailComposer } from "./MailComposer";
+import { MailLabelControls, MailLabelCreator } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
 import { mailDate, MailThread, plainMailBody } from "./MailThread";
 import "./mail.css";
@@ -148,51 +151,89 @@ export function MailWorkspace() {
 		void client.invalidateQueries({ queryKey: ["mail", "thread", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "stats", userId] });
 	};
+	const createLabel = useMutation({
+		mutationFn: ({ box, name }: { box: string; name: string }) =>
+			mailService.createLabel(box, name),
+		onSuccess: (created, { box }) => {
+			const queryKey = ["mail", "labels", box];
+			client.setQueryData<{ labels: MailLabel[] }>(queryKey, (current) => ({
+				labels: [
+					...(current?.labels ?? []).filter(({ id }) => id !== created.id),
+					created,
+				],
+			}));
+			void client.invalidateQueries({ queryKey });
+		},
+	});
 	const threadAction = useMutation({
 		mutationFn: (request: {
 			id: string;
 			box: string;
 			action: string;
 			label?: string;
+			source?: string;
 		}) =>
 			mailService.change(
 				request.box,
 				request.id,
 				request.action,
 				request.label,
+				request.source,
 			),
 		onSuccess: (_, request) => {
-			if (request.action === "read" || request.action === "unread") {
-				const updateUnread = (row: MailRow) => {
-					const unread = request.action === "unread";
-					if (
-						row.threadId !== request.id ||
-						row.labels.includes("UNREAD") === unread
-					)
-						return row;
-					return {
-						...row,
-						labels: unread
-							? [...row.labels, "UNREAD"]
-							: row.labels.filter((label) => label !== "UNREAD"),
-					};
+			const addLabel =
+				request.action === "unread"
+					? "UNREAD"
+					: ["add-label", "move-label"].includes(request.action)
+						? request.label
+						: undefined;
+			const removeLabel =
+				request.action === "read"
+					? "UNREAD"
+					: request.action === "remove-label"
+						? request.label
+						: request.source;
+			if (addLabel || removeLabel) {
+				const updateLabels = (row: MailRow) => {
+					if (row.threadId !== request.id) return row;
+					const labels = row.labels.filter((id) => id !== removeLabel);
+					if (addLabel && !labels.includes(addLabel)) labels.push(addLabel);
+					return { ...row, labels };
 				};
-				client.setQueriesData<Awaited<ReturnType<typeof mailService.folder>>>(
-					{ queryKey: ["mail", "folder", request.box] },
-					(folder) =>
-						folder && { ...folder, rows: folder.rows.map(updateUnread) },
-				);
+				const folders = client.getQueriesData<
+					Awaited<ReturnType<typeof mailService.folder>>
+				>({ queryKey: ["mail", "folder", request.box] });
+				for (const [queryKey, folder] of folders) {
+					if (!folder) continue;
+					const folderLabel = String(queryKey[3]);
+					const leavesFolder =
+						folderLabel === removeLabel ||
+						(removeLabel === "INBOX" && folderLabel.startsWith("CATEGORY_"));
+					client.setQueryData(queryKey, {
+						...folder,
+						rows: leavesFolder
+							? folder.rows.filter((row) => row.threadId !== request.id)
+							: folder.rows.map(updateLabels),
+					});
+				}
 				setOpenRow((current) =>
 					current?.boxId === request.box
-						? { ...current, row: updateUnread(current.row) }
+						? { ...current, row: updateLabels(current.row) }
 						: current,
 				);
 			}
 			refreshFolder(request.box);
+			if (request.action === "move-label") setNotice("Письмо перемещено");
 			if (
-				["archive", "trash", "untrash", "inbox", "spam", "unspam"].includes(
-					request.action,
-				)
+				[
+					"archive",
+					"trash",
+					"untrash",
+					"inbox",
+					"spam",
+					"unspam",
+					"move-label",
+				].includes(request.action)
 			)
 				setOpenRow((row) =>
 					row?.row.threadId === request.id && request.box === row.boxId
@@ -297,13 +338,19 @@ export function MailWorkspace() {
 	}, [list.data, selectedBox]);
 	const permissionsChanged = list.data ? box : undefined;
 	const active = Boolean(permissionsChanged && selected);
-	const onThread = (action: string, nextLabel?: string) => {
+	const moveSource = userLabels.some((item) => item.id === label)
+		? label
+		: selected?.labels.includes("INBOX")
+			? "INBOX"
+			: undefined;
+	const onThread = (action: string, nextLabel?: string, source?: string) => {
 		if (!selected || !box || threadAction.isPending) return;
 		threadAction.mutate({
 			id: selected.threadId,
 			box: box.id,
 			action,
 			label: nextLabel,
+			source,
 		});
 	};
 	const operationError = finish.error ?? threadAction.error ?? openDraft.error;
@@ -542,7 +589,7 @@ export function MailWorkspace() {
 									<span>{title}</span>
 								</button>
 							))}
-							{userLabels.length > 0 && <h3>Ярлыки</h3>}
+							<h3>Ярлыки</h3>
 							{userLabels.map((item) => (
 								<button
 									type="button"
@@ -551,10 +598,19 @@ export function MailWorkspace() {
 									aria-pressed={item.id === label}
 									onClick={() => changeFolder(item.id)}
 								>
+									<Tag size={14} aria-hidden="true" />
 									<span>{item.name}</span>
 								</button>
 							))}
 						</nav>
+						<div className="mail-sidebar-labels">
+							<MailLabelCreator
+								key={box.id}
+								create={(name) =>
+									createLabel.mutateAsync({ box: box.id, name })
+								}
+							/>
+						</div>
 					</aside>
 					<section className="mail-list" aria-label="Список писем">
 						<header className="mail-list-header">
@@ -640,62 +696,89 @@ export function MailWorkspace() {
 								</p>
 							) : (
 								<ul>
-									{resultRows.map((row) => (
-										<li key={row.draftId ?? row.id}>
-											<button
-												type="button"
-												className="mail-row"
-												data-unread={row.labels.includes("UNREAD")}
-												aria-pressed={row.threadId === selected?.threadId}
-												onClick={() => {
-													if (row.draftId) {
-														if (!openDraft.isPending)
-															openDraft.mutate({
-																mailbox: box,
-																id: row.draftId,
+									{resultRows.map((row) => {
+										const applied = userLabels.filter(
+											({ id }) => id !== label && row.labels.includes(id),
+										);
+										return (
+											<li key={row.draftId ?? row.id}>
+												<button
+													type="button"
+													className="mail-row"
+													data-unread={row.labels.includes("UNREAD")}
+													aria-pressed={row.threadId === selected?.threadId}
+													onClick={() => {
+														if (row.draftId) {
+															if (!openDraft.isPending)
+																openDraft.mutate({
+																	mailbox: box,
+																	id: row.draftId,
+																});
+															return;
+														}
+														setOpenRow({ boxId: box.id, row });
+														if (
+															row.labels.includes("UNREAD") &&
+															!threadAction.isPending
+														)
+															threadAction.mutate({
+																box: box.id,
+																id: row.threadId,
+																action: "read",
 															});
-														return;
-													}
-													setOpenRow({ boxId: box.id, row });
-													if (
-														row.labels.includes("UNREAD") &&
-														!threadAction.isPending
-													)
-														threadAction.mutate({
-															box: box.id,
-															id: row.threadId,
-															action: "read",
-														});
-												}}
-											>
-												<span className="mail-row-top">
-													<span>
-														{label === "SENT" || label === "DRAFT"
-															? row.to || "Без адресата"
-															: row.from || "Без отправителя"}
+													}}
+												>
+													<span className="mail-row-top">
+														<span>
+															{label === "SENT" || label === "DRAFT"
+																? row.to || "Без адресата"
+																: row.from || "Без отправителя"}
+														</span>
+														<time>{mailDate(row.date)}</time>
 													</span>
-													<time>{mailDate(row.date)}</time>
-												</span>
-												<span className="mail-row-details">
-													<span className="mail-row-subject">
-														{row.labels.includes("STARRED") && (
-															<Star
-																size={12}
-																fill="currentColor"
-																aria-label="Помечено"
-															/>
+													<span className="mail-row-details">
+														<span className="mail-row-subject">
+															{row.labels.includes("STARRED") && (
+																<Star
+																	size={12}
+																	fill="currentColor"
+																	aria-label="Помечено"
+																/>
+															)}
+															{row.subject || "Без темы"}
+															{row.count > 1 && <small>{row.count}</small>}
+														</span>
+														{row.labels.includes("UNREAD") && (
+															<span className="mail-row-unread">
+																Непрочитано
+															</span>
 														)}
-														{row.subject || "Без темы"}
-														{row.count > 1 && <small>{row.count}</small>}
 													</span>
-													{row.labels.includes("UNREAD") && (
-														<span className="mail-row-unread">Непрочитано</span>
+													<span className="mail-row-preview">
+														{row.snippet}
+													</span>
+													{applied.length > 0 && (
+														<span className="mail-row-tags">
+															{applied.slice(0, 2).map(({ id, name }) => (
+																<span
+																	key={id}
+																	className="mail-tag"
+																	title={name}
+																>
+																	{name}
+																</span>
+															))}
+															{applied.length > 2 && (
+																<span className="mail-tag">
+																	+{applied.length - 2}
+																</span>
+															)}
+														</span>
 													)}
-												</span>
-												<span className="mail-row-preview">{row.snippet}</span>
-											</button>
-										</li>
-									))}
+												</button>
+											</li>
+										);
+									})}
 								</ul>
 							)}
 						</div>
@@ -738,6 +821,33 @@ export function MailWorkspace() {
 							row={selected}
 							onBack={() => setOpenRow(undefined)}
 							onCompose={(draft) => setComposer({ box, draft })}
+							organizer={
+								<MailLabelControls
+									labels={userLabels}
+									applied={selected.labels}
+									source={moveSource}
+									disabled={threadAction.isPending}
+									canMove={
+										!selected.labels.some(
+											(id) => id === "TRASH" || id === "SPAM",
+										) &&
+										label !== "TRASH" &&
+										label !== "SPAM"
+									}
+									onToggle={(id) =>
+										onThread(
+											selected.labels.includes(id)
+												? "remove-label"
+												: "add-label",
+											id,
+										)
+									}
+									onMove={(id) => onThread("move-label", id, moveSource)}
+									onCreate={(name) =>
+										createLabel.mutateAsync({ box: box.id, name })
+									}
+								/>
+							}
 							toolbar={
 								<div className="mail-thread-actions">
 									<button
@@ -771,15 +881,7 @@ export function MailWorkspace() {
 										disabled={threadAction.isPending}
 										onChange={(event) => {
 											const action = event.target.value;
-											if (action.startsWith("label:")) {
-												const id = action.slice(6);
-												onThread(
-													selected.labels.includes(id)
-														? "remove-label"
-														: "add-label",
-													id,
-												);
-											} else if (action) onThread(action);
+											if (action) onThread(action);
 										}}
 									>
 										<option value="">Действия</option>
@@ -813,17 +915,6 @@ export function MailWorkspace() {
 										<option value={label === "SPAM" ? "unspam" : "spam"}>
 											{label === "SPAM" ? "Не спам" : "В спам"}
 										</option>
-										{userLabels.length > 0 && (
-											<optgroup label="Ярлыки">
-												{userLabels.map(({ id, name }) => (
-													<option key={id} value={`label:${id}`}>
-														{selected.labels.includes(id)
-															? `Снять «${name}»`
-															: `Добавить «${name}»`}
-													</option>
-												))}
-											</optgroup>
-										)}
 									</select>
 								</div>
 							}
@@ -846,7 +937,9 @@ export function MailWorkspace() {
 			)}
 			{composer && mailboxes.some(({ id }) => composer.box.id === id) && (
 				<MailComposer
+					key={`${userId ?? ""}:${composer.box.id}`}
 					box={composer.box}
+					userId={userId}
 					draft={composer.draft}
 					onClose={() => setComposer(undefined)}
 					onDone={(message) => {

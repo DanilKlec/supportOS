@@ -1,7 +1,7 @@
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
-test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
+test("browse shared Gmail, organize mail, reuse a recipient and grant access", async ({
 	context,
 	page,
 	isMobile,
@@ -11,6 +11,8 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 	let received = false;
 	let recentDate = Date.UTC(2026, 10, 19, 10);
 	let activeMailboxes = 0;
+	const labels = [{ id: "Label_1", name: "Проекты/Платежи", type: "user" }];
+	const threadLabels = new Set(["INBOX"]);
 	const mailboxes = Array.from({ length: 32 }, (_, i) => ({
 		id: `test-${i}`,
 		address: `desk${i}@example.invalid`,
@@ -69,16 +71,22 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 					},
 				});
 			case "labels":
+				return route.fulfill({ json: { labels } });
+			case "create-label": {
+				expect(box).toBe("test-31");
+				expect(request.postDataJSON()).toEqual({ name: "На проверку" });
+				const created = { id: "Label_2", name: "На проверку", type: "user" };
+				labels.push(created);
 				return route.fulfill({
-					json: {
-						labels: [{ id: "Label_1", name: "Проекты/Платежи", type: "user" }],
-					},
+					json: created,
 				});
+			}
 			case "folder":
 				return route.fulfill({
 					json: {
 						rows:
-							box === "test-31"
+							box === "test-31" &&
+							threadLabels.has(url.searchParams.get("label") ?? "INBOX")
 								? [
 										url.searchParams.get("page")
 											? {
@@ -88,7 +96,10 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 												}
 											: {
 													...message,
-													labels: unread ? ["INBOX", "UNREAD"] : ["INBOX"],
+													labels: [
+														...threadLabels,
+														...(unread ? ["UNREAD"] : []),
+													],
 												},
 									]
 								: [],
@@ -96,11 +107,24 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 					},
 				});
 			case "change-thread": {
-				const { id, operation } = request.postDataJSON();
+				const { id, operation, label, source } = request.postDataJSON();
 				expect(box).toBe("test-31");
 				expect(id).toBe(message.threadId);
-				expect(["read", "unread"]).toContain(operation);
-				unread = operation === "unread";
+				if (operation === "add-label" || operation === "remove-label") {
+					expect(label).toBe("Label_1");
+					if (operation === "add-label") threadLabels.add(label);
+					else threadLabels.delete(label);
+				} else if (operation === "move-label") {
+					expect({ label, source }).toEqual({
+						label: "Label_2",
+						source: "INBOX",
+					});
+					threadLabels.add(label);
+					threadLabels.delete(source);
+				} else {
+					expect(["read", "unread"]).toContain(operation);
+					unread = operation === "unread";
+				}
 				return route.fulfill({ json: { ok: true } });
 			}
 			case "thread":
@@ -220,8 +244,59 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 		.click();
 	await expect.poll(() => sends).toBe(1);
 	await expect(mail.getByText("Письмо отправлено")).toBeVisible();
-	if (isMobile)
-		await mail.getByRole("button", { name: "К списку писем" }).click();
+	const openForward = () =>
+		mail
+			.getByRole("article")
+			.filter({ hasText: "Последнее письмо" })
+			.getByRole("button", { name: "Переслать", exact: true })
+			.click();
+	await openForward();
+	const forward = mail.getByRole("region", { name: "Редактор письма" });
+	await forward.getByRole("button", { name: "Недавние адресаты" }).click();
+	await forward.getByRole("button", { name: "player@example.invalid" }).click();
+	await expect(forward.getByRole("textbox", { name: "Кому" })).toHaveValue(
+		"player@example.invalid",
+	);
+	await forward.getByRole("button", { name: "Закрыть редактор" }).click();
+	await forward.getByRole("button", { name: "Закрыть без сохранения" }).click();
+	await expect(forward).toHaveCount(0);
+	const thread = mail.getByRole("region", { name: "Переписка" });
+	await thread.getByRole("button", { name: "Ярлыки", exact: true }).click();
+	const tag = thread.getByRole("checkbox", { name: "Проекты/Платежи" });
+	await tag.click();
+	await expect(tag).toBeChecked();
+	await tag.click();
+	await expect(tag).not.toBeChecked();
+	await tag.click();
+	await expect(tag).toBeChecked();
+	await thread.getByRole("button", { name: "Новый ярлык" }).click();
+	await thread
+		.getByRole("textbox", { name: "Название ярлыка" })
+		.fill("На проверку");
+	await thread.getByRole("button", { name: "Создать", exact: true }).click();
+	await expect(
+		thread.getByRole("checkbox", { name: "На проверку" }),
+	).toBeVisible();
+	await thread.getByRole("button", { name: "В папку" }).click();
+	await thread
+		.getByRole("combobox", { name: "Папка назначения" })
+		.selectOption("Label_2");
+	await page.screenshot({
+		path: info.outputPath("mail-organizer.png"),
+		animations: "disabled",
+	});
+	await thread.getByRole("button", { name: "Переместить" }).click();
+	await expect(mail.getByRole("button", { name: /Заявка игрока/ })).toHaveCount(
+		0,
+	);
+	await expect(mail.getByText("Письмо перемещено")).toBeVisible();
+	await mail
+		.getByRole("navigation", { name: "Папки Gmail" })
+		.getByRole("button", { name: "На проверку", exact: true })
+		.click();
+	await expect(
+		incoming.getByText("Проекты/Платежи", { exact: true }),
+	).toBeVisible();
 	await mail.getByRole("button", { name: "Доступ к ящику" }).click();
 	const admin = mail.getByRole("region", { name: "Доступ к ящику" });
 	await admin

@@ -197,6 +197,7 @@ export function MailThread({
 	onCompose,
 	onBack,
 	toolbar,
+	organizer,
 }: {
 	box: string;
 	address: string;
@@ -204,6 +205,7 @@ export function MailThread({
 	onCompose: (draft: MailDraft) => void;
 	onBack: () => void;
 	toolbar: React.ReactNode;
+	organizer: React.ReactNode;
 }) {
 	const thread = useInfiniteQuery({
 		queryKey: ["mail", "thread", box, row.threadId],
@@ -237,6 +239,7 @@ export function MailThread({
 				<h2>{row.subject || "Без темы"}</h2>
 				{toolbar}
 			</header>
+			{organizer}
 			<div className="mail-messages supportos-scroll">
 				{thread.isPending ? (
 					<p className="mail-empty">Загружаем переписку…</p>
