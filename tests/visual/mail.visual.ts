@@ -11,6 +11,17 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	let received = false;
 	let recentDate = Date.UTC(2026, 10, 19, 10);
 	let activeMailboxes = 0;
+	const templateId = "template-1";
+	let template:
+		| {
+				id: string;
+				title: string;
+				subject: string;
+				body: string;
+				revision: number;
+		  }
+		| undefined;
+	const greeting = "Проверяем ваше обращение.";
 	const labels = [
 		{ id: "Label_1", name: "Проекты/Платежи", type: "user" },
 		{ id: "Label_3", name: "Уточнить", type: "user" },
@@ -181,10 +192,44 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 					subject: "Re: Заявка игрока",
 					replyId: "<original@example.invalid>",
 					threadId: "tid",
-					text: "Тестовый ответ",
+					text: `Тестовый ответ\n\n${greeting}`,
 				});
 				sends++;
 				return route.fulfill({ json: { id: "sent-mock" } });
+			case "templates": {
+				expect(box).toBe("test-31");
+				if (url.searchParams.has("id"))
+					return route.fulfill({ json: template ?? null });
+				const query = url.searchParams.get("q") ?? "";
+				const rows =
+					template?.title.toLowerCase().includes(query.toLowerCase())
+						? [
+								{
+									id: template.id,
+									title: template.title,
+									subject: template.subject,
+									revision: template.revision,
+								},
+							]
+						: [];
+				return route.fulfill({ json: { templates: rows, next: null } });
+			}
+			case "save-template": {
+				expect(box).toBe("test-31");
+				const draft = request.postDataJSON();
+				if (draft.id) expect(draft.revision).toBe(template?.revision);
+				template = {
+					...draft,
+					id: templateId,
+					revision: (template?.revision ?? 0) + 1,
+				};
+				return route.fulfill({ json: template });
+			}
+			case "delete-template":
+				expect(box).toBe("test-31");
+				expect(request.postDataJSON()).toEqual({ id: templateId, revision: 2 });
+				template = undefined;
+				return route.fulfill({ json: { ok: true } });
 			case "members":
 				return route.fulfill({ json: { members: recipients } });
 			case "grant":
@@ -297,9 +342,40 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		.getByRole("button", { name: "Ответить", exact: true })
 		.click();
 	const composer = mail.getByRole("region", { name: "Ответ на письмо" });
-	await composer
-		.getByRole("textbox", { name: "Сообщение" })
-		.fill("Тестовый ответ");
+	const reply = composer.getByRole("textbox", { name: "Сообщение" });
+	await reply.fill("Тестовый ответ");
+	await reply.press("End");
+	await composer.getByRole("button", { name: "Шаблоны", exact: true }).click();
+	const templatePanel = mail.getByRole("region", { name: "Шаблоны писем" });
+	await templatePanel
+		.getByRole("button", { name: "Новый шаблон", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("textbox", { name: "Название" })
+		.fill("Проверка обращения");
+	await templatePanel
+		.getByRole("textbox", { name: "Тема письма (необязательно)" })
+		.fill("Уточнение по заявке");
+	await templatePanel
+		.getByRole("textbox", { name: "Текст шаблона" })
+		.fill(greeting);
+	await templatePanel
+		.getByRole("button", { name: "Сохранить шаблон", exact: true })
+		.click();
+	await expect(
+		templatePanel.getByText(greeting, { exact: true }),
+	).toBeVisible();
+	await page.screenshot({
+		path: info.outputPath("mail-templates.png"),
+		animations: "disabled",
+	});
+	await templatePanel
+		.getByRole("button", { name: "Вставить в письмо", exact: true })
+		.click();
+	await expect(reply).toHaveValue(`Тестовый ответ\n\n${greeting}`);
+	await expect(composer.getByRole("textbox", { name: "Тема" })).toHaveValue(
+		"Re: Заявка игрока",
+	);
 	await composer
 		.getByRole("button", { name: "Отправить", exact: true })
 		.click();
@@ -321,6 +397,22 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await forward.getByRole("button", { name: "player@example.invalid" }).click();
 	await expect(forward.getByRole("textbox", { name: "Кому" })).toHaveValue(
 		"player@example.invalid",
+	);
+	await forward.getByRole("button", { name: "Шаблоны", exact: true }).click();
+	await templatePanel
+		.getByRole("searchbox", { name: "Найти шаблон" })
+		.fill("проверка");
+	await templatePanel
+		.getByRole("button", { name: /Проверка обращения/ })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: "Вставить в письмо", exact: true })
+		.click();
+	await expect(forward.getByRole("textbox", { name: "Сообщение" })).toHaveValue(
+		/Последнее письмо/,
+	);
+	await expect(forward.getByRole("textbox", { name: "Сообщение" })).toHaveValue(
+		/Проверяем ваше обращение/,
 	);
 	await forward.getByRole("button", { name: "Закрыть редактор" }).click();
 	await forward.getByRole("button", { name: "Закрыть без сохранения" }).click();
@@ -386,6 +478,54 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		.getByRole("button", { name: "На проверку", exact: true })
 		.click();
 	await expect(incoming.getByText("Платежи", { exact: true })).toBeVisible();
+	await mail.getByRole("button", { name: "Написать", exact: true }).click();
+	const newComposer = mail.getByRole("region", { name: "Редактор письма" });
+	await newComposer
+		.getByRole("button", { name: "Шаблоны", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: /Проверка обращения/ })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: "Редактировать шаблон", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("textbox", { name: "Текст шаблона" })
+		.fill("Текст после правки.");
+	await templatePanel
+		.getByRole("button", { name: "Сохранить шаблон", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: "Вставить в письмо", exact: true })
+		.click();
+	await expect(newComposer.getByRole("textbox", { name: "Тема" })).toHaveValue(
+		"Уточнение по заявке",
+	);
+	await expect(
+		newComposer.getByRole("textbox", { name: "Сообщение" }),
+	).toHaveValue("Текст после правки.");
+	await newComposer
+		.getByRole("button", { name: "Шаблоны", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: /Проверка обращения/ })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: "Удалить шаблон", exact: true })
+		.click();
+	await templatePanel
+		.getByRole("button", { name: "Удалить", exact: true })
+		.click();
+	await expect(
+		templatePanel.getByText("У этого ящика пока нет шаблонов"),
+	).toBeVisible();
+	await newComposer
+		.getByRole("button", { name: "К письму", exact: true })
+		.click();
+	await newComposer.getByRole("button", { name: "Закрыть редактор" }).click();
+	await newComposer
+		.getByRole("button", { name: "Закрыть без сохранения" })
+		.click();
 	await mail.getByRole("button", { name: "Доступ к ящику" }).click();
 	const admin = mail.getByRole("region", { name: "Доступ к ящику" });
 	await admin

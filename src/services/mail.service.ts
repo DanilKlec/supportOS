@@ -16,6 +16,18 @@ export type MailLabel = {
 	color?: MailLabelColor;
 };
 export type MailLabelChanges = { add: string[]; remove: string[] };
+export type MailTemplateSummary = {
+	id: string;
+	title: string;
+	subject: string;
+	revision: number;
+};
+export type MailTemplate = MailTemplateSummary & { body: string };
+export type MailTemplateInput = Pick<
+	MailTemplate,
+	"title" | "subject" | "body"
+> &
+	Partial<Pick<MailTemplate, "id" | "revision">>;
 export type StaffMember = { id: string; email: string; display_name: string };
 export type MailRow = {
 	id: string;
@@ -107,6 +119,19 @@ export const mailService = {
 	grant: (box: string, email: string) => request("grant", { box }, { email }),
 	revoke: (box: string, userId: string) =>
 		request("revoke", { box }, { userId }),
+	templates: (box: string, q: string, offset: number, signal?: AbortSignal) =>
+		request<{ templates: MailTemplateSummary[]; next: number | null }>(
+			"templates",
+			{ box, q, offset: String(offset) },
+			undefined,
+			signal,
+		),
+	template: (box: string, id: string, signal?: AbortSignal) =>
+		request<MailTemplate>("templates", { box, id }, undefined, signal),
+	saveTemplate: (box: string, draft: MailTemplateInput) =>
+		request<MailTemplate>("save-template", { box }, draft),
+	deleteTemplate: (box: string, { id, revision }: MailTemplateSummary) =>
+		request("delete-template", { box }, { id, revision }),
 	labels: (box: string, signal?: AbortSignal) =>
 		request<{ labels: MailLabel[] }>("labels", { box }, undefined, signal),
 	labelColors: (box: string, ids: string, signal?: AbortSignal) =>

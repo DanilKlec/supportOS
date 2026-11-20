@@ -12,9 +12,9 @@ export function config(env = process.env, extra = []) {
  if (missing.length) throw Object.assign(new Error(`Настройте серверные переменные: ${missing.join(', ')}`), {status:503});
  return resolved;
 }
-export async function db(env, path, body, method = body === undefined ? 'GET' : 'POST') {
+export async function db(env, path, body, method = body === undefined ? 'GET' : 'POST', { returnRows = false } = {}) {
  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/,'')}/rest/v1/${path}`, {
-  method, headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},
+  method, headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json', ...(returnRows ? { Prefer: 'return=representation' } : {})},
   body:body === undefined ? undefined : JSON.stringify(body), signal:AbortSignal.timeout(15000)
  });
  if(!response.ok) {

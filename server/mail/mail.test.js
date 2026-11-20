@@ -144,12 +144,66 @@ test('mailbox members create Gmail labels and move a thread without removing its
 	]);
 });
 
-test('migration grants service access only and reconnect keeps the original mailbox and operators', async () => {
+test('template actions use mailbox membership and reject overwriting a newer version', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
+	const templateId = '40000000-0000-4000-8000-000000000010';
+	const input = { title: 'Проверка', subject: 'Уточнение', body: 'Проверяем обращение.' };
+	let template;
+	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		expect(parsed.hostname).toBe('database.invalid');
+		const params = parsed.searchParams;
+		if (parsed.pathname.endsWith('/supportos_mailbox_members'))
+			return Response.json(params.get('mailbox_id') === `eq.${mailboxId}` ? [{ user_id: userId }] : []);
+		if (parsed.pathname.endsWith('/supportos_mailboxes')) return Response.json([{ id: mailboxId }]);
+		expect(parsed.pathname).toBe('/rest/v1/supportos_mail_templates');
+		if (options.method === 'POST') {
+			expect(options.headers.Prefer).toBe('return=representation');
+			expect(JSON.parse(options.body)).toEqual({ ...input, mailbox_id: mailboxId });
+			template = { id: templateId, ...input, revision: 1 };
+			return Response.json([template]);
+		}
+		expect(params.get('mailbox_id')).toBe(`eq.${mailboxId}`);
+		if (options.method === 'GET') {
+			if (params.get('id')) return Response.json(template ? [template] : []);
+			expect(params.get('select')).toBe('id,title,subject,revision');
+			expect(params.get('title')).toBe('ilike.%Провер%');
+			return Response.json([{ id: template.id, title: template.title, subject: template.subject, revision: template.revision }]);
+		}
+		expect(options.headers.Prefer).toBe('return=representation');
+		expect(params.get('id')).toBe(`eq.${templateId}`);
+		if (params.get('revision') !== `eq.${template.revision}`) return Response.json([]);
+		if (options.method === 'PATCH') {
+			template = { ...template, ...JSON.parse(options.body) };
+			return Response.json([template]);
+		}
+		expect(options.method).toBe('DELETE');
+		const removed = template;
+		template = undefined;
+		return Response.json([removed]);
+	}));
+	const query = `&box=${mailboxId}`;
+	expect((await call('POST', 'save-template', query, { ...input, body: ' ' })).status).toBe(400);
+	expect((await call('POST', 'save-template', query, input))).toMatchObject({ status: 200, body: { id: templateId, revision: 1 } });
+	expect((await call('GET', 'templates', `${query}&q=${encodeURIComponent('Провер')}`))).toMatchObject({ status: 200, body: { templates: [{ id: templateId }], next: null } });
+	expect((await call('GET', 'templates', `${query}&id=${templateId}`)).body).toMatchObject(input);
+	const update = { ...input, body: 'Обновлённый текст.', id: templateId, revision: 1 };
+	expect((await call('POST', 'save-template', query, update)).body).toMatchObject({ revision: 2 });
+	expect((await call('POST', 'save-template', query, update)).status).toBe(409);
+	expect((await call('POST', 'delete-template', `&box=${userId}`, { id: templateId, revision: 2 })).status).toBe(403);
+	expect((await call('POST', 'delete-template', query, { id: templateId, revision: 1 })).status).toBe(409);
+	expect((await call('POST', 'delete-template', query, { id: templateId, revision: 2 })).status).toBe(200);
+	expect((await call('GET', 'templates', `${query}&id=${templateId}`)).status).toBe(404);
+});
+
+test('migrations keep mailboxes across reconnects and scope service-only templates per mailbox', async () => {
 	const sql = await readFile(new URL('../../supabase/migrations/20261119222248_shared_mailboxes.sql', import.meta.url), 'utf8');
 	const db = new PGlite();
 	try {
 		await db.exec(`create role anon; create role authenticated; create role service_role bypassrls; create table public.supportos_users (id uuid primary key); insert into public.supportos_users values ('${userId}');`);
 		await db.exec(sql);
+		await db.exec(await readFile(new URL('../../supabase/migrations/20261120054123_shared_mail_templates.sql', import.meta.url), 'utf8'));
 		const first = await db.query('select public.supportos_connect_gmail_mailbox($1,$2,$3) as id', [address, 'encoded-token-a', userId]);
 		const id = first.rows[0].id;
 		await db.query('insert into public.supportos_mailbox_members (mailbox_id,user_id) values ($1,$2)', [id, userId]);
@@ -158,5 +212,13 @@ test('migration grants service access only and reconnect keeps the original mail
 		expect((await db.query('select mailbox_id from public.supportos_mailbox_members')).rows).toEqual([{ mailbox_id: id }]);
 		const acl = await db.query(`select has_table_privilege('authenticated','public.supportos_mailboxes','select') as browser, has_table_privilege('service_role','public.supportos_mailboxes','select') as server, has_function_privilege('anon','public.supportos_connect_gmail_mailbox(text,text,uuid)','execute') as connect`);
 		expect(acl.rows[0]).toEqual({ browser: false, server: true, connect: false });
+		const insert = 'insert into public.supportos_mail_templates (mailbox_id,title,body) values ($1,$2,$3) returning revision';
+		const saved = await db.query(insert, [id, 'Проверка', 'Шаблон для ответа.']);
+		expect(saved.rows[0].revision).toBe(1);
+		await expect(db.query(insert, [id, 'проверка', 'Другой текст.'])).rejects.toMatchObject({ code: '23505' });
+		const another = await db.query('select public.supportos_connect_gmail_mailbox($1,$2,$3) as id', ['second@example.invalid', 'encoded-token-c', userId]);
+		await expect(db.query(insert, [another.rows[0].id, 'проверка', 'Другой ящик.'])).resolves.toMatchObject({ rows: [{ revision: 1 }] });
+		const templatesAcl = await db.query(`select has_table_privilege('authenticated','public.supportos_mail_templates','select') as browser, has_table_privilege('service_role','public.supportos_mail_templates','insert') as server`);
+		expect(templatesAcl.rows[0]).toEqual({ browser: false, server: true });
 	} finally { await db.close(); }
 }, 15000);
