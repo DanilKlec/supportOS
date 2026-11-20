@@ -90,6 +90,12 @@ function MessageCard({
 	});
 	const specificAddress = (value: string) =>
 		(/<([^<>]+)>$/.exec(value)?.[1] ?? value).trim().toLowerCase();
+	const from = message.from.trim();
+	const fromParts = /^(.*?)\s*<([^<>]+)>$/.exec(from);
+	const senderName = fromParts?.[1].trim().replace(/^"|"$/g, "");
+	const senderAddress = fromParts?.[2] ?? from;
+	const initial =
+		Array.from(senderName || senderAddress)[0]?.toLocaleUpperCase() ?? "·";
 	const reply = (all = false) => {
 		const sender = message.replyTo || message.from;
 		const to = specificAddress(sender) === address ? message.to : sender;
@@ -122,8 +128,16 @@ function MessageCard({
 	return (
 		<article className="mail-message">
 			<header className="mail-message-meta">
-				<div>
-					<h3>{message.from || "Отправитель не указан"}</h3>
+				<span className="mail-message-avatar" aria-hidden="true">
+					{initial}
+				</span>
+				<div className="mail-message-sender">
+					<h3 title={from}>
+						{senderName || senderAddress || "Отправитель не указан"}
+					</h3>
+					{senderName && (
+						<span className="mail-message-address">{senderAddress}</span>
+					)}
 					<p>
 						Кому {message.to || "—"}
 						{message.cc ? ` · Копия ${message.cc}` : ""}
@@ -160,7 +174,11 @@ function MessageCard({
 				</p>
 			)}
 			<footer className="mail-message-actions">
-				<button type="button" className="mail-button" onClick={() => reply()}>
+				<button
+					type="button"
+					className="mail-button mail-message-reply"
+					onClick={() => reply()}
+				>
 					<Reply size={14} /> Ответить
 				</button>
 				{message.cc && (

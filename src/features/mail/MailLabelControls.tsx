@@ -70,6 +70,7 @@ function MailLabelCreator({
 }) {
 	const [name, setName] = useState("");
 	const [parent, setParent] = useState("");
+	const [chooseParent, setChooseParent] = useState(false);
 	const [color, setColor] = useState<MailLabelColor>();
 	const [error, setError] = useState("");
 	const [saving, setSaving] = useState(false);
@@ -108,23 +109,47 @@ function MailLabelCreator({
 				/>
 			</label>
 			{folder && labels.length > 0 && (
-				<label className="mail-field">
-					Родительская папка
-					<select
-						value={parent}
+				<div className="mail-field">
+					<span>Родительская папка</span>
+					<button
+						type="button"
+						className="mail-parent-trigger"
+						aria-label={`Родительская папка: ${prefix ?? "Верхний уровень"}`}
+						aria-expanded={chooseParent}
 						disabled={saving}
-						onChange={(event) => setParent(event.target.value)}
+						onClick={() => setChooseParent(!chooseParent)}
 					>
-						<option value="">Верхний уровень</option>
-						{labels
-							.filter(({ name }) => name.length < 223)
-							.map(({ id, name }) => (
-								<option key={id} value={id}>
-									{name}
-								</option>
-							))}
-					</select>
-				</label>
+						<FolderOpen size={15} aria-hidden="true" />
+						<span>{prefix ?? "Верхний уровень"}</span>
+						<ChevronDown size={14} aria-hidden="true" />
+					</button>
+					{chooseParent && (
+						<section
+							className="mail-parent-options supportos-scroll"
+							aria-label="Выбор родительской папки"
+						>
+							<button
+								type="button"
+								className="mail-folder-item"
+								aria-pressed={!parent}
+								onClick={() => {
+									setParent("");
+									setChooseParent(false);
+								}}
+							>
+								Верхний уровень
+							</button>
+							<MailFolderTree
+								labels={labels.filter(({ name }) => name.length < 223)}
+								active={parent}
+								onSelect={(id) => {
+									setParent(id);
+									setChooseParent(false);
+								}}
+							/>
+						</section>
+					)}
+				</div>
 			)}
 			<LabelPalette color={color} change={setColor} disabled={saving} />
 			<div className="mail-label-form-actions">
@@ -261,7 +286,13 @@ function MailThreadPicker({
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const search = useRef<HTMLInputElement>(null);
-	useEffect(() => search.current?.focus({ preventScroll: true }), []);
+	const close = useRef<HTMLButtonElement>(null);
+	useEffect(() => {
+		const target = window.matchMedia("(max-width: 780px)").matches
+			? close
+			: search;
+		target.current?.focus({ preventScroll: true });
+	}, []);
 	const isMove = mode === "move";
 	const visibleLabels = labels.filter(({ name }) =>
 		name.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase()),
@@ -300,6 +331,7 @@ function MailThreadPicker({
 			<div className="mail-picker-heading">
 				<h3>{isMove ? "Переместить в папку" : "Ярлыки письма"}</h3>
 				<button
+					ref={close}
 					type="button"
 					className="mail-picker-close"
 					aria-label="Закрыть выбор"
@@ -547,24 +579,33 @@ export function MailLabelControls({
 				)}
 			</div>
 			{panel && (
-				<section
-					id={id}
-					className="mail-organizer-panel"
-					aria-label={panel === "move" ? "Выбор папки" : "Выбор ярлыков"}
-				>
-					<MailThreadPicker
-						key={panel}
-						mode={panel}
-						labels={labels}
-						applied={applied}
-						source={source}
-						onClose={() => setPanel(undefined)}
-						onApply={onApply}
-						onMove={onMove}
-						onCreate={onCreate}
-						onColor={onColor}
+				<>
+					<button
+						type="button"
+						className="mail-picker-scrim"
+						aria-label="Закрыть панель выбора"
+						tabIndex={-1}
+						onClick={() => setPanel(undefined)}
 					/>
-				</section>
+					<section
+						id={id}
+						className="mail-organizer-panel mail-float"
+						aria-label={panel === "move" ? "Выбор папки" : "Выбор ярлыков"}
+					>
+						<MailThreadPicker
+							key={panel}
+							mode={panel}
+							labels={labels}
+							applied={applied}
+							source={source}
+							onClose={() => setPanel(undefined)}
+							onApply={onApply}
+							onMove={onMove}
+							onCreate={onCreate}
+							onColor={onColor}
+						/>
+					</section>
+				</>
 			)}
 		</div>
 	);

@@ -29,12 +29,14 @@ import {
 	mailService,
 } from "@/services/mail.service";
 import { useAuthStore } from "@/store/auth.store";
+import { MailAccountPicker } from "./MailAccountPicker";
 import { MailAdministration, oauthSessionKey } from "./MailAdministration";
 import { emptyMailDraft, MailComposer } from "./MailComposer";
 import { MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
 import { mailDate, MailThread, plainMailBody } from "./MailThread";
+import { MailThreadActions } from "./MailThreadActions";
 import "./mail.css";
 
 const folders = [
@@ -65,7 +67,6 @@ export function MailWorkspace() {
 	const userId = useAuthStore((state) => state.session?.user.id);
 	const [selectedBox, setSelectedBox] = useState("");
 	const [showMoreFolders, setShowMoreFolders] = useState(false);
-	const [filter, setFilter] = useState("");
 	const [label, setLabel] = useState("INBOX");
 	const [search, setSearch] = useState("");
 	const [query, setQuery] = useState("");
@@ -117,9 +118,6 @@ export function MailWorkspace() {
 	const resultRows = folder.data?.rows ?? [];
 	const statusByMailbox = new Map(
 		stats.data?.stats.map((status) => [status.id, status]),
-	);
-	const visibleMailboxes = mailboxes.filter((item) =>
-		item.address.toLowerCase().includes(filter.trim().toLowerCase()),
 	);
 	const customLabels = useMemo(
 		() =>
@@ -451,7 +449,9 @@ export function MailWorkspace() {
 		>
 			<header className="mail-top">
 				<div className="mail-title">
-					<Mail size={20} aria-hidden="true" />
+					<span className="mail-title-icon">
+						<Mail size={20} aria-hidden="true" />
+					</span>
 					<h1>Почта</h1>
 				</div>
 				<div className="mail-top-actions">
@@ -502,12 +502,17 @@ export function MailWorkspace() {
 						<button
 							type="button"
 							className="mail-button"
+							aria-label="Подключить Gmail"
 							onClick={() => {
 								setOauthIssue("");
 								setAdminMode("connect");
 							}}
 						>
-							<Plus size={15} /> Подключить Gmail
+							<Plus size={15} aria-hidden="true" />
+							<span className="mail-connect-label">Подключить Gmail</span>
+							<span className="mail-connect-short" aria-hidden="true">
+								Gmail
+							</span>
 						</button>
 					)}
 				</div>
@@ -595,62 +600,16 @@ export function MailWorkspace() {
 						>
 							<Pencil size={15} /> Написать
 						</button>
-						<label className="mail-field mail-account-picker">
-							Почтовый ящик
-							<select
-								value={boxId}
-								onChange={(event) => chooseBox(event.target.value)}
-							>
-								{mailboxes.map((item) => (
-									<option key={item.id} value={item.id}>
-										{item.address}
-										{statusByMailbox.get(item.id)?.unread
-											? ` (${statusByMailbox.get(item.id)?.unread})`
-											: ""}
-									</option>
-								))}
-							</select>
-						</label>
-						<div className="mail-account-list">
-							<label className="mail-search">
-								<Search size={14} />
-								<input
-									aria-label="Найти ящик"
-									placeholder="Найти ящик"
-									value={filter}
-									onChange={(event) => setFilter(event.target.value)}
-								/>
-							</label>
-							<ul className="supportos-scroll">
-								{visibleMailboxes.map((item) => {
-									const status = statusByMailbox.get(item.id);
-									return (
-										<li key={item.id}>
-											<button
-												type="button"
-												className="mail-nav"
-												aria-pressed={boxId === item.id}
-												onClick={() => chooseBox(item.id)}
-											>
-												<span>{item.address}</span>
-												{status?.reconnect ? (
-													<ShieldAlert
-														size={13}
-														aria-label="Нужно переподключить"
-													/>
-												) : status?.unread ? (
-													<b>{status.unread}</b>
-												) : null}
-											</button>
-										</li>
-									);
-								})}
-							</ul>
-						</div>
+						<MailAccountPicker
+							active={box}
+							mailboxes={mailboxes}
+							statusByMailbox={statusByMailbox}
+							onChange={chooseBox}
+						/>
 						{admin && (
 							<button
 								type="button"
-								className="mail-button"
+								className="mail-nav mail-sidebar-manage"
 								onClick={() => setAdminMode("access")}
 							>
 								<Users size={14} /> Доступ к ящику
@@ -710,7 +669,6 @@ export function MailWorkspace() {
 						<header className="mail-list-header">
 							<div>
 								<h2>{currentTitle}</h2>
-								<p>{box.address}</p>
 							</div>
 							<form
 								className="mail-search"
@@ -748,7 +706,7 @@ export function MailWorkspace() {
 									<button
 										key={id}
 										type="button"
-										className="mail-button"
+										className="mail-category"
 										aria-pressed={id === label}
 										onClick={() => changeFolder(id)}
 									>
@@ -948,81 +906,20 @@ export function MailWorkspace() {
 								/>
 							}
 							toolbar={
-								<div className="mail-thread-actions">
-									<button
-										type="button"
-										className="mail-icon"
-										aria-label={
-											selected.labels.includes("STARRED")
-												? "Снять отметку"
-												: "Пометить письмо"
-										}
-										title="Отметка"
-										disabled={threadAction.isPending}
-										onClick={() =>
-											onThread(
-												selected.labels.includes("STARRED") ? "unstar" : "star",
-											)
-										}
-									>
-										<Star
-											size={16}
-											fill={
-												selected.labels.includes("STARRED")
-													? "currentColor"
-													: "none"
-											}
-										/>
-									</button>
-									<select
-										aria-label="Действия с перепиской"
-										value=""
-										disabled={threadAction.isPending}
-										onChange={(event) => {
-											const action = event.target.value;
-											if (action) onThread(action);
-										}}
-									>
-										<option value="">Действия</option>
-										<option
-											value={
-												selected.labels.includes("UNREAD") ? "read" : "unread"
-											}
-										>
-											{selected.labels.includes("UNREAD")
-												? "Отметить прочитанным"
-												: "Отметить непрочитанным"}
-										</option>
-										{label === "TRASH" ? (
-											<option value="untrash">Восстановить из корзины</option>
-										) : (
-											<>
-												<option
-													value={
-														selected.labels.includes("INBOX")
-															? "archive"
-															: "inbox"
-													}
-												>
-													{selected.labels.includes("INBOX")
-														? "В архив"
-														: "Во входящие"}
-												</option>
-												<option value="trash">В корзину</option>
-											</>
-										)}
-										<option value={label === "SPAM" ? "unspam" : "spam"}>
-											{label === "SPAM" ? "Не спам" : "В спам"}
-										</option>
-									</select>
-								</div>
+								<MailThreadActions
+									labels={selected.labels}
+									folder={label}
+									busy={threadAction.isPending}
+									onAction={onThread}
+								/>
 							}
 						/>
 					) : (
 						<div className="mail-empty mail-thread-placeholder">
-							<Mail size={32} />
+							<span className="mail-empty-icon">
+								<Mail size={23} aria-hidden="true" />
+							</span>
 							<h2>Выберите письмо</h2>
-							<p>Здесь откроется переписка.</p>
 						</div>
 					)}
 				</div>

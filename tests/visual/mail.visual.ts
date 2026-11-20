@@ -206,16 +206,21 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	});
 	await page.goto("/mail");
 	const mail = page.getByRole("region", { name: "Почтовые ящики" });
-	if (isMobile)
-		await mail
-			.getByRole("combobox", { name: "Почтовый ящик" })
-			.selectOption("test-31");
-	else {
-		await mail.getByRole("textbox", { name: "Найти ящик" }).fill("desk31");
-		await mail
-			.getByRole("button", { name: "desk31@example.invalid", exact: true })
-			.click();
-	}
+	const boxPicker = mail.getByRole("button", {
+		name: "Почтовый ящик",
+		exact: true,
+	});
+	await boxPicker.click();
+	const boxes = mail.getByRole("region", { name: "Выбор почтового ящика" });
+	await boxes.getByRole("textbox", { name: "Найти ящик" }).fill("desk31");
+	await page.screenshot({
+		path: info.outputPath("mail-accounts.png"),
+		animations: "disabled",
+	});
+	await boxes
+		.getByRole("button", { name: "desk31@example.invalid", exact: true })
+		.click();
+	await expect(boxes).toHaveCount(0);
 	const folderNav = mail.getByRole("navigation", { name: "Папки ящика" });
 	if (isMobile)
 		await folderNav.getByRole("button", { name: "Папки", exact: true }).click();
@@ -250,15 +255,28 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		animations: "disabled",
 	});
 	await incoming.click();
-	const actions = mail.getByRole("combobox", { name: "Действия с перепиской" });
-	await expect(
-		actions.getByRole("option", {
-			name: "Отметить непрочитанным",
-			exact: true,
-		}),
-	).toHaveCount(1);
 	await expect(unreadBadge).toHaveCount(0);
-	await actions.selectOption("unread");
+	const actions = mail.getByRole("button", { name: "Действия с перепиской" });
+	await expect(actions).toBeEnabled();
+	await actions.press("ArrowDown");
+	const markUnread = page.getByRole("menuitem", {
+		name: "Отметить непрочитанным",
+		exact: true,
+	});
+	await expect(markUnread).toBeFocused();
+	await page.keyboard.press("ArrowDown");
+	await expect(
+		page.getByRole("menuitem", { name: "В архив", exact: true }),
+	).toBeFocused();
+	await page.keyboard.press("Escape");
+	await expect(actions).toBeFocused();
+	await expect(markUnread).toHaveCount(0);
+	await actions.click();
+	await page.screenshot({
+		path: info.outputPath("mail-actions.png"),
+		animations: "disabled",
+	});
+	await markUnread.click();
 	if (isMobile)
 		await mail.getByRole("button", { name: "К списку писем" }).click();
 	await expect(unreadBadge).toBeVisible();
@@ -296,6 +314,10 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await openForward();
 	const forward = mail.getByRole("region", { name: "Редактор письма" });
 	await forward.getByRole("button", { name: "Недавние адресаты" }).click();
+	await page.screenshot({
+		path: info.outputPath("mail-compose.png"),
+		animations: "disabled",
+	});
 	await forward.getByRole("button", { name: "player@example.invalid" }).click();
 	await expect(forward.getByRole("textbox", { name: "Кому" })).toHaveValue(
 		"player@example.invalid",
@@ -334,9 +356,11 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await folderNav
 		.getByRole("textbox", { name: "Название папки" })
 		.fill("На проверку");
+	await folderNav.getByRole("button", { name: /^Родительская папка/ }).click();
 	await folderNav
-		.getByRole("combobox", { name: "Родительская папка" })
-		.selectOption("Label_4");
+		.getByRole("region", { name: "Выбор родительской папки" })
+		.getByRole("button", { name: "Проекты", exact: true })
+		.click();
 	await folderNav.getByRole("button", { name: "Создать", exact: true }).click();
 	await expect(
 		folderNav.getByRole("button", { name: "На проверку", exact: true }),

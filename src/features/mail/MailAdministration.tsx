@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Search, X } from "lucide-react";
 import { useState } from "react";
 import { ShareRecipientPicker } from "@/features/shared-binds/ShareRecipientPicker";
 import { type Mailbox, mailService } from "@/services/mail.service";
@@ -159,18 +159,22 @@ export function MailAdministration({
 								placeholder="account@example.com"
 							/>
 						</label>
-						<details>
-							<summary className="cursor-pointer text-sm">
-								Найти сотрудника
+						<details className="mail-admin-directory">
+							<summary className="mail-directory-heading">
+								<Search size={15} aria-hidden="true" />
+								<span>Найти сотрудника</span>
+								<ChevronDown size={14} aria-hidden="true" />
 							</summary>
-							<ShareRecipientPicker
-								value={recipient}
-								onChange={setRecipient}
-								disabled={access.isPending}
-								sharedEmails={
-									members.data?.members.map(({ email }) => email) ?? []
-								}
-							/>
+							<div className="mail-directory-body">
+								<ShareRecipientPicker
+									value={recipient}
+									onChange={setRecipient}
+									disabled={access.isPending}
+									sharedEmails={
+										members.data?.members.map(({ email }) => email) ?? []
+									}
+								/>
+							</div>
 						</details>
 						{access.error && (
 							<p role="alert" className="mail-error">

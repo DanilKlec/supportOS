@@ -1,5 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
-import { Clock3, Paperclip, Send, X } from "lucide-react";
+import {
+	ChevronDown,
+	Clock3,
+	Mail,
+	Paperclip,
+	Plus,
+	Send,
+	X,
+} from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import {
 	type Mailbox,
@@ -135,6 +143,13 @@ export function MailComposer({
 		event.preventDefault();
 		if (!mutation.isPending) mutation.mutate("send");
 	};
+	const title = draft.threadId
+		? "Ответ на письмо"
+		: draft.draftId
+			? "Черновик"
+			: /^fwd:/i.test(draft.subject)
+				? "Переслать письмо"
+				: "Новое письмо";
 	return (
 		<div className="mail-overlay">
 			<section
@@ -143,13 +158,7 @@ export function MailComposer({
 			>
 				<header className="mail-modal-heading">
 					<div>
-						<h2>
-							{draft.threadId
-								? "Ответ на письмо"
-								: draft.draftId
-									? "Черновик"
-									: "Новое письмо"}
-						</h2>
+						<h2>{title}</h2>
 						<p>{box.address}</p>
 					</div>
 					<button
@@ -171,7 +180,7 @@ export function MailComposer({
 				>
 					<fieldset className="contents" disabled={mutation.isPending}>
 						<legend className="sr-only">Письмо</legend>
-						<div className="flex items-center gap-2">
+						<div className="mail-recipient-line">
 							<label className="mail-field grow">
 								Кому
 								<input
@@ -185,7 +194,7 @@ export function MailComposer({
 							{!copies && (
 								<button
 									type="button"
-									className="mail-button self-end"
+									className="mail-button mail-copy-trigger self-end"
 									onClick={() => setCopies(true)}
 								>
 									Копия
@@ -196,16 +205,17 @@ export function MailComposer({
 							<div className="mail-recent">
 								<button
 									type="button"
-									className="mail-button"
+									className="mail-button mail-recents-trigger"
 									aria-expanded={showRecent}
 									aria-controls={recentId}
 									onClick={() => setShowRecent(!showRecent)}
 								>
 									<Clock3 size={14} aria-hidden="true" /> Недавние адресаты
+									<ChevronDown size={13} aria-hidden="true" />
 								</button>
 								{showRecent && (
 									<ul
-										className="mail-recent-options"
+										className="mail-recent-options mail-float supportos-scroll"
 										id={recentId}
 										aria-label="Недавние адресаты"
 									>
@@ -213,7 +223,8 @@ export function MailComposer({
 											<li key={email}>
 												<button
 													type="button"
-													className="mail-button"
+													className="mail-recent-option"
+													title={email}
 													onClick={() => {
 														const current = fields.to.trim();
 														change(
@@ -226,7 +237,9 @@ export function MailComposer({
 														toInput.current?.focus();
 													}}
 												>
-													{email}
+													<Mail size={15} aria-hidden="true" />
+													<span>{email}</span>
+													<Plus size={14} aria-hidden="true" />
 												</button>
 											</li>
 										))}
@@ -338,9 +351,13 @@ export function MailComposer({
 							<button
 								type="button"
 								className="mail-button"
+								aria-label="Сохранить черновик"
 								onClick={() => mutation.mutate("save")}
 							>
-								Сохранить черновик
+								<span className="mail-draft-label">Сохранить черновик</span>
+								<span className="mail-draft-short" aria-hidden="true">
+									В черновик
+								</span>
 							</button>
 							<button
 								type="button"
