@@ -8,7 +8,14 @@ export type MailStats = {
 	recentDate?: number | null;
 	reconnect?: boolean;
 };
-export type MailLabel = { id: string; name: string; type: "system" | "user" };
+export type MailLabelColor = { backgroundColor: string; textColor: string };
+export type MailLabel = {
+	id: string;
+	name: string;
+	type: "system" | "user";
+	color?: MailLabelColor;
+};
+export type MailLabelChanges = { add: string[]; remove: string[] };
 export type StaffMember = { id: string; email: string; display_name: string };
 export type MailRow = {
 	id: string;
@@ -102,8 +109,17 @@ export const mailService = {
 		request("revoke", { box }, { userId }),
 	labels: (box: string, signal?: AbortSignal) =>
 		request<{ labels: MailLabel[] }>("labels", { box }, undefined, signal),
-	createLabel: (box: string, name: string) =>
-		request<MailLabel>("create-label", { box }, { name }),
+	labelColors: (box: string, ids: string, signal?: AbortSignal) =>
+		request<{ colors: Record<string, MailLabelColor | null> }>(
+			"label-colors",
+			{ box, ids },
+			undefined,
+			signal,
+		),
+	createLabel: (box: string, name: string, color?: MailLabelColor) =>
+		request<MailLabel>("create-label", { box }, { name, color }),
+	setLabelColor: (box: string, id: string, color: MailLabelColor) =>
+		request<MailLabel>("set-label-color", { box }, { id, color }),
 	folder: (
 		box: string,
 		label: string,
@@ -132,7 +148,13 @@ export const mailService = {
 		operation: string,
 		label?: string,
 		source?: string,
-	) => request("change-thread", { box }, { id, operation, label, source }),
+		labels?: MailLabelChanges,
+	) =>
+		request(
+			"change-thread",
+			{ box },
+			{ id, operation, label, source, ...labels },
+		),
 	deleteDraft: (box: string, id: string) =>
 		request("delete-draft", { box }, { id }),
 	save: (box: string, draft: MailDraft) =>

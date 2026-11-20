@@ -11,7 +11,16 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	let received = false;
 	let recentDate = Date.UTC(2026, 10, 19, 10);
 	let activeMailboxes = 0;
-	const labels = [{ id: "Label_1", name: "Проекты/Платежи", type: "user" }];
+	const labels = [
+		{ id: "Label_1", name: "Проекты/Платежи", type: "user" },
+		{ id: "Label_3", name: "Уточнить", type: "user" },
+		{ id: "Label_4", name: "Проекты", type: "user" },
+	];
+	const colors: Record<string, { backgroundColor: string; textColor: string }> =
+		{
+			Label_1: { backgroundColor: "#a4c2f4", textColor: "#0d3472" },
+		};
+	let labelWrites = 0;
 	const threadLabels = new Set(["INBOX"]);
 	const mailboxes = Array.from({ length: 32 }, (_, i) => ({
 		id: `test-${i}`,
@@ -72,10 +81,29 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				});
 			case "labels":
 				return route.fulfill({ json: { labels } });
+			case "label-colors":
+				return route.fulfill({ json: { colors } });
+			case "set-label-color": {
+				const { color, id } = request.postDataJSON();
+				expect(box).toBe("test-31");
+				expect(id).toBe("Label_1");
+				expect(color).toEqual({
+					backgroundColor: "#89d3b2",
+					textColor: "#0b4f30",
+				});
+				colors[id] = color;
+				return route.fulfill({
+					json: { ...labels.find((label) => label.id === id), color },
+				});
+			}
 			case "create-label": {
 				expect(box).toBe("test-31");
-				expect(request.postDataJSON()).toEqual({ name: "На проверку" });
-				const created = { id: "Label_2", name: "На проверку", type: "user" };
+				expect(request.postDataJSON()).toEqual({ name: "Проекты/На проверку" });
+				const created = {
+					id: "Label_2",
+					name: "Проекты/На проверку",
+					type: "user",
+				};
 				labels.push(created);
 				return route.fulfill({
 					json: created,
@@ -107,13 +135,15 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 					},
 				});
 			case "change-thread": {
-				const { id, operation, label, source } = request.postDataJSON();
+				const { id, operation, label, source, add, remove } =
+					request.postDataJSON();
 				expect(box).toBe("test-31");
 				expect(id).toBe(message.threadId);
-				if (operation === "add-label" || operation === "remove-label") {
-					expect(label).toBe("Label_1");
-					if (operation === "add-label") threadLabels.add(label);
-					else threadLabels.delete(label);
+				if (operation === "set-labels") {
+					expect(add).toEqual(["Label_1", "Label_3"]);
+					expect(remove).toEqual([]);
+					for (const id of add) threadLabels.add(id);
+					labelWrites++;
 				} else if (operation === "move-label") {
 					expect({ label, source }).toEqual({
 						label: "Label_2",
@@ -186,11 +216,24 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 			.getByRole("button", { name: "desk31@example.invalid", exact: true })
 			.click();
 	}
-	await expect(
-		mail
-			.getByRole("navigation", { name: "Папки Gmail" })
-			.getByRole("button", { name: "Проекты/Платежи" }),
-	).toBeVisible();
+	const folderNav = mail.getByRole("navigation", { name: "Папки ящика" });
+	if (isMobile)
+		await folderNav.getByRole("button", { name: "Папки", exact: true }).click();
+	const nestedFolder = folderNav.getByRole("button", {
+		name: "Платежи",
+		exact: true,
+	});
+	await expect(nestedFolder).toBeVisible();
+	await folderNav
+		.getByRole("button", { name: "Свернуть папку Проекты" })
+		.click();
+	await expect(nestedFolder).toHaveCount(0);
+	await folderNav
+		.getByRole("button", { name: "Раскрыть папку Проекты" })
+		.click();
+	await expect(nestedFolder).toBeVisible();
+	if (isMobile)
+		await folderNav.getByRole("button", { name: "Папки", exact: true }).click();
 	await expect(
 		mail.getByRole("button", { name: "Форумы", exact: true }),
 	).toBeVisible();
@@ -268,19 +311,44 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await tag.click();
 	await expect(tag).not.toBeChecked();
 	await tag.click();
-	await expect(tag).toBeChecked();
-	await thread.getByRole("button", { name: "Новый ярлык" }).click();
+	await thread.getByRole("checkbox", { name: "Уточнить" }).click();
+	expect(labelWrites).toBe(0);
 	await thread
-		.getByRole("textbox", { name: "Название ярлыка" })
-		.fill("На проверку");
-	await thread.getByRole("button", { name: "Создать", exact: true }).click();
+		.getByRole("button", { name: "Цвет ярлыка Проекты/Платежи" })
+		.click();
+	await thread.getByRole("button", { name: "Зелёный", exact: true }).click();
 	await expect(
-		thread.getByRole("checkbox", { name: "На проверку" }),
+		thread.getByRole("button", { name: "Зелёный", exact: true }),
+	).toHaveCount(0);
+	await page.screenshot({
+		path: info.outputPath("mail-labels.png"),
+		animations: "disabled",
+	});
+	await thread.getByRole("button", { name: "Применить", exact: true }).click();
+	await expect.poll(() => labelWrites).toBe(1);
+	const chip = thread.getByText("Платежи", { exact: true });
+	await expect(chip).toHaveCSS("background-color", "rgb(137, 211, 178)");
+	if (isMobile)
+		await thread.getByRole("button", { name: "К списку писем" }).click();
+	await folderNav.getByRole("button", { name: "Новая папка" }).click();
+	await folderNav
+		.getByRole("textbox", { name: "Название папки" })
+		.fill("На проверку");
+	await folderNav
+		.getByRole("combobox", { name: "Родительская папка" })
+		.selectOption("Label_4");
+	await folderNav.getByRole("button", { name: "Создать", exact: true }).click();
+	await expect(
+		folderNav.getByRole("button", { name: "На проверку", exact: true }),
 	).toBeVisible();
+	if (isMobile) await incoming.click();
 	await thread.getByRole("button", { name: "В папку" }).click();
 	await thread
-		.getByRole("combobox", { name: "Папка назначения" })
-		.selectOption("Label_2");
+		.getByRole("searchbox", { name: "Найти папку" })
+		.fill("На проверку");
+	await thread
+		.getByRole("button", { name: "Проекты/На проверку", exact: true })
+		.click();
 	await page.screenshot({
 		path: info.outputPath("mail-organizer.png"),
 		animations: "disabled",
@@ -290,13 +358,10 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		0,
 	);
 	await expect(mail.getByText("Письмо перемещено")).toBeVisible();
-	await mail
-		.getByRole("navigation", { name: "Папки Gmail" })
+	await folderNav
 		.getByRole("button", { name: "На проверку", exact: true })
 		.click();
-	await expect(
-		incoming.getByText("Проекты/Платежи", { exact: true }),
-	).toBeVisible();
+	await expect(incoming.getByText("Платежи", { exact: true })).toBeVisible();
 	await mail.getByRole("button", { name: "Доступ к ящику" }).click();
 	const admin = mail.getByRole("region", { name: "Доступ к ящику" });
 	await admin

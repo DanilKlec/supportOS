@@ -8,6 +8,16 @@ const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const idPattern = /^[a-z0-9_-]{1,1600}$/i;
 const pageSize = 16;
 const statsCache = new Map();
+const labelColorCache = new Map();
+
+function labelColor(input) {
+	const { backgroundColor, textColor } = input ?? {};
+	const hex = /^#[0-9a-f]{6}$/i;
+	if (typeof backgroundColor !== 'string' || !hex.test(backgroundColor) ||
+		typeof textColor !== 'string' || !hex.test(textColor))
+		throw mailError('Выберите цвет из палитры Gmail.');
+	return { backgroundColor, textColor };
+}
 
 function safeId(raw) {
 	if (typeof raw !== 'string' || !idPattern.test(raw)) throw mailError('Некорректный ID письма или ярлыка.');
@@ -115,7 +125,7 @@ async function getAttachment(g, mid, id) {
 }
 
 const adminOnly = new Set(['oauth-start', 'oauth-finish', 'members', 'grant', 'revoke']);
-const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'change-thread', 'save-draft', 'send', 'delete-draft']);
+const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft']);
 
 export default async function handler(req, res) {
 	res.setHeader('Cache-Control', 'private, no-store');
@@ -174,14 +184,40 @@ export default async function handler(req, res) {
 		const token = await mailboxToken(cfg, box);
 		const g = (path, options) => gmail(token, path, options);
 		if (action === 'labels') return send(200, await g('/labels?fields=labels(id,name,type)'));
+		if (action === 'label-colors') {
+			const ids = [...new Set((url.searchParams.get('ids') ?? '').split(',').filter(Boolean))].map(safeId);
+			if (ids.length > 32 || ids.some((id) => id.length > 80)) throw mailError('Выберите до 32 ярлыков.');
+			const entries = await collect(ids, async (id) => {
+				const key = `${box.id}:${id}`;
+				const cached = labelColorCache.get(key);
+				if (cached?.expires > Date.now()) return [id, await cached.get];
+				const record = {
+					expires: Date.now() + 5 * 60_000,
+					get: g(`/labels/${id}?fields=color`).then(({ color }) => color ?? null).catch(() => {
+						if (labelColorCache.get(key) === record) labelColorCache.delete(key);
+						return null;
+					}),
+				};
+				if (labelColorCache.size >= 2000) labelColorCache.delete(labelColorCache.keys().next().value);
+				labelColorCache.set(key, record);
+				return [id, await record.get];
+			});
+			return send(200, { colors: Object.fromEntries(entries) });
+		}
 		if (action === 'create-label') {
 			const name = typeof body.name === 'string' ? body.name.trim() : '';
 			if (!name || name.length > 225 || /[\r\n\t\0]/.test(name))
 				throw mailError('Введите название ярлыка длиной до 225 символов.');
 			return send(200, await g('/labels', {
 				method: 'POST',
-				body: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show' },
+				body: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show', ...(body.color ? { color: labelColor(body.color) } : {}) },
 			}));
+		}
+		if (action === 'set-label-color') {
+			const id = safeId(body.id);
+			const edited = await g(`/labels/${id}`, { method: 'PATCH', body: { color: labelColor(body.color) } });
+			labelColorCache.delete(`${box.id}:${id}`);
+			return send(200, edited);
 		}
 		if (action === 'folder') return send(200, await folder(g, url));
 		if (action === 'thread') {
@@ -228,6 +264,19 @@ export default async function handler(req, res) {
 					method: 'POST',
 					body: { addLabelIds: [destination], removeLabelIds: source ? [source] : [] },
 				});
+			} else if (operation === 'set-labels') {
+				if (!Array.isArray(body.add) || !Array.isArray(body.remove) || body.add.length + body.remove.length > 100)
+					throw mailError('Выберите до 100 изменений ярлыков за раз.');
+				const addLabelIds = [...new Set(body.add.map(safeId))];
+				const removeLabelIds = [...new Set(body.remove.map(safeId))];
+				if (addLabelIds.length || removeLabelIds.length) {
+					const { labels = [] } = await g('/labels?fields=labels(id,type)');
+					const editable = new Set(labels.filter(({ type }) => type === 'user').map(({ id }) => id));
+					if ([...addLabelIds, ...removeLabelIds].some((id) => !editable.has(id)) ||
+						addLabelIds.some((id) => removeLabelIds.includes(id)))
+						throw mailError('Обновите список ярлыков и повторите.');
+					await g(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds, removeLabelIds } });
+				}
 			} else {
 				const changes = {
 					read: [[], ['UNREAD']], unread: [['UNREAD'], []], star: [['STARRED'], []], unstar: [[], ['STARRED']],

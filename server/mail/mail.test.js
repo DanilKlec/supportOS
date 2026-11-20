@@ -91,6 +91,7 @@ test('mailbox members create Gmail labels and move a thread without removing its
 	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
 	const encrypted_token = seal(googleConfig(testEnv), 'example-refresh', `gmail:${address}`);
 	const mutations = [];
+	const colors = { backgroundColor: '#a4c2f4', textColor: '#0d3472' };
 	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
 		const parsed = new URL(url);
 		if (parsed.hostname === 'database.invalid') {
@@ -103,6 +104,10 @@ test('mailbox members create Gmail labels and move a thread without removing its
 		expect(parsed.hostname).toBe('gmail.googleapis.com');
 		const folders = [{ id: 'Label_1', type: 'user' }, { id: 'Label_2', type: 'user' }, { id: 'UNREAD', type: 'system' }];
 		if (options.method === 'GET') {
+			if (parsed.pathname.endsWith('/labels/Label_1')) {
+				expect(parsed.searchParams.get('fields')).toBe('color');
+				return Response.json({ color: colors });
+			}
 			expect(parsed.searchParams.get('fields')).toBe('labels(id,type)');
 			return Response.json({ labels: folders });
 		}
@@ -110,6 +115,8 @@ test('mailbox members create Gmail labels and move a thread without removing its
 		mutations.push([parsed.pathname, payload]);
 		if (parsed.pathname.endsWith('/labels'))
 			return Response.json({ ...folders[1], name: payload.name });
+		if (options.method === 'PATCH')
+			return Response.json({ id: 'Label_1', name: 'Проекты', type: 'user', color: payload.color });
 		return Response.json({ id: 'thread' });
 	}));
 	const query = `&box=${mailboxId}`;
@@ -119,9 +126,21 @@ test('mailbox members create Gmail labels and move a thread without removing its
 	const move = { id: 'thread', operation: 'move-label', label: 'Label_2', source: 'Label_1' };
 	expect((await call('POST', 'change-thread', query, move)).status).toBe(200);
 	expect((await call('POST', 'change-thread', query, { ...move, label: 'UNREAD' })).status).toBe(400);
+	const changes = { id: 'thread', operation: 'set-labels', add: ['Label_1'], remove: ['Label_2'] };
+	expect((await call('POST', 'change-thread', query, changes)).status).toBe(200);
+	expect((await call('POST', 'change-thread', query, { ...changes, add: ['TRASH'] })).status).toBe(400);
+	expect((await call('POST', 'change-thread', query, { ...changes, add: changes.remove })).status).toBe(400);
+	expect(await call('GET', 'label-colors', `${query}&ids=Label_1`)).toMatchObject({
+		status: 200, body: { colors: { Label_1: colors } },
+	});
+	expect(await call('POST', 'set-label-color', query, { id: 'Label_1', color: colors })).toMatchObject({
+		status: 200, body: { color: colors },
+	});
 	expect(mutations).toEqual([
 		['/gmail/v1/users/me/labels', { name: 'Проекты/Разбор', labelListVisibility: 'labelShow', messageListVisibility: 'show' }],
 		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_2'], removeLabelIds: ['Label_1'] }],
+		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_1'], removeLabelIds: ['Label_2'] }],
+		['/gmail/v1/users/me/labels/Label_1', { color: colors }],
 	]);
 });
 

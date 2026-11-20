@@ -4,6 +4,7 @@ import {
 	Bell,
 	ChevronLeft,
 	ChevronRight,
+	ChevronDown,
 	FileText,
 	Inbox,
 	Mail,
@@ -14,22 +15,24 @@ import {
 	Send,
 	ShieldAlert,
 	Star,
-	Tag,
 	Trash2,
 	Users,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	type Mailbox,
 	type MailDraft,
 	type MailLabel,
+	type MailLabelChanges,
+	type MailLabelColor,
 	type MailRow,
 	mailService,
 } from "@/services/mail.service";
 import { useAuthStore } from "@/store/auth.store";
 import { MailAdministration, oauthSessionKey } from "./MailAdministration";
 import { emptyMailDraft, MailComposer } from "./MailComposer";
-import { MailLabelControls, MailLabelCreator } from "./MailLabelControls";
+import { MailLabelChip } from "./MailFolderTree";
+import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
 import { mailDate, MailThread, plainMailBody } from "./MailThread";
 import "./mail.css";
@@ -61,6 +64,7 @@ export function MailWorkspace() {
 	const client = useQueryClient();
 	const userId = useAuthStore((state) => state.session?.user.id);
 	const [selectedBox, setSelectedBox] = useState("");
+	const [showMoreFolders, setShowMoreFolders] = useState(false);
 	const [filter, setFilter] = useState("");
 	const [label, setLabel] = useState("INBOX");
 	const [search, setSearch] = useState("");
@@ -117,20 +121,57 @@ export function MailWorkspace() {
 	const visibleMailboxes = mailboxes.filter((item) =>
 		item.address.toLowerCase().includes(filter.trim().toLowerCase()),
 	);
-	const userLabels = (labels.data?.labels ?? [])
-		.filter((item) => item.type === "user")
-		.sort((a, b) => a.name.localeCompare(b.name));
+	const customLabels = useMemo(
+		() =>
+			(labels.data?.labels ?? [])
+				.filter((item) => item.type === "user")
+				.sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true })),
+		[labels.data],
+	);
 	const selected =
 		openRow?.boxId === boxId
 			? (resultRows.find((item) => item.threadId === openRow.row.threadId) ??
 				openRow.row)
 			: undefined;
+	const customIds = new Set(customLabels.map(({ id }) => id));
+	const colorIds = [
+		...new Set([
+			label,
+			...(selected?.labels ?? []),
+			...resultRows.flatMap((row) =>
+				row.labels
+					.filter((id) => id !== label && customIds.has(id))
+					.slice(0, 2),
+			),
+			...customLabels.map(({ id }) => id),
+		]),
+	]
+		.filter((id) => customIds.has(id))
+		.slice(0, 32)
+		.sort()
+		.join(",");
+	const colors = useQuery({
+		queryKey: ["mail", "label-colors", boxId, colorIds],
+		queryFn: ({ signal }) => mailService.labelColors(boxId, colorIds, signal),
+		enabled: Boolean(boxId && colorIds),
+		staleTime: 4 * 60_000,
+		retry: false,
+	});
+	const userLabels = useMemo(
+		() =>
+			customLabels.map((label) => ({
+				...label,
+				color: colors.data?.colors[label.id] ?? label.color,
+			})),
+		[customLabels, colors.data],
+	);
 	const currentTitle =
 		folders.find((item) => item.id === label)?.title ??
 		categories.find(([id]) => id === label)?.[1] ??
 		userLabels.find((item) => item.id === label)?.name ??
 		"Письма";
 	const isInbox = label === "INBOX" || label.startsWith("CATEGORY_");
+	const activeExtraFolder = folders.slice(5).some(({ id }) => id === label);
 	const reset = () => {
 		setPages([""]);
 		setOpenRow(undefined);
@@ -151,19 +192,51 @@ export function MailWorkspace() {
 		void client.invalidateQueries({ queryKey: ["mail", "thread", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "stats", userId] });
 	};
+	const updateLabelCache = (box: string, changed: MailLabel) => {
+		const queryKey = ["mail", "labels", box];
+		const colorKey = ["mail", "label-colors", box];
+		client.setQueryData<{ labels: MailLabel[] }>(queryKey, (current) => ({
+			labels: [
+				...(current?.labels ?? []).filter(({ id }) => id !== changed.id),
+				changed,
+			],
+		}));
+		if (changed.color) {
+			client.setQueriesData<
+				Awaited<ReturnType<typeof mailService.labelColors>>
+			>(
+				{ queryKey: colorKey },
+				(current) =>
+					current && {
+						colors: { ...current.colors, [changed.id]: changed.color ?? null },
+					},
+			);
+		}
+		void client.invalidateQueries({ queryKey: colorKey });
+	};
 	const createLabel = useMutation({
-		mutationFn: ({ box, name }: { box: string; name: string }) =>
-			mailService.createLabel(box, name),
-		onSuccess: (created, { box }) => {
-			const queryKey = ["mail", "labels", box];
-			client.setQueryData<{ labels: MailLabel[] }>(queryKey, (current) => ({
-				labels: [
-					...(current?.labels ?? []).filter(({ id }) => id !== created.id),
-					created,
-				],
-			}));
-			void client.invalidateQueries({ queryKey });
-		},
+		mutationFn: ({
+			box,
+			name,
+			color,
+		}: {
+			box: string;
+			name: string;
+			color?: MailLabelColor;
+		}) => mailService.createLabel(box, name, color),
+		onSuccess: (created, { box }) => updateLabelCache(box, created),
+	});
+	const updateColor = useMutation({
+		mutationFn: ({
+			box,
+			id,
+			color,
+		}: {
+			box: string;
+			id: string;
+			color: MailLabelColor;
+		}) => mailService.setLabelColor(box, id, color),
+		onSuccess: (edited, { box }) => updateLabelCache(box, edited),
 	});
 	const threadAction = useMutation({
 		mutationFn: (request: {
@@ -172,6 +245,7 @@ export function MailWorkspace() {
 			action: string;
 			label?: string;
 			source?: string;
+			labels?: MailLabelChanges;
 		}) =>
 			mailService.change(
 				request.box,
@@ -179,6 +253,7 @@ export function MailWorkspace() {
 				request.action,
 				request.label,
 				request.source,
+				request.labels,
 			),
 		onSuccess: (_, request) => {
 			const addLabel =
@@ -193,12 +268,22 @@ export function MailWorkspace() {
 					: request.action === "remove-label"
 						? request.label
 						: request.source;
-			if (addLabel || removeLabel) {
+			const add = request.labels?.add ?? (addLabel ? [addLabel] : []);
+			const remove = new Set(
+				request.labels?.remove ?? (removeLabel ? [removeLabel] : []),
+			);
+			if (add.length || remove.size) {
 				const updateLabels = (row: MailRow) => {
 					if (row.threadId !== request.id) return row;
-					const labels = row.labels.filter((id) => id !== removeLabel);
-					if (addLabel && !labels.includes(addLabel)) labels.push(addLabel);
-					return { ...row, labels };
+					return {
+						...row,
+						labels: [
+							...new Set([
+								...row.labels.filter((id) => !remove.has(id)),
+								...add,
+							]),
+						],
+					};
 				};
 				const folders = client.getQueriesData<
 					Awaited<ReturnType<typeof mailService.folder>>
@@ -207,8 +292,8 @@ export function MailWorkspace() {
 					if (!folder) continue;
 					const folderLabel = String(queryKey[3]);
 					const leavesFolder =
-						folderLabel === removeLabel ||
-						(removeLabel === "INBOX" && folderLabel.startsWith("CATEGORY_"));
+						remove.has(folderLabel) ||
+						(remove.has("INBOX") && folderLabel.startsWith("CATEGORY_"));
 					client.setQueryData(queryKey, {
 						...folder,
 						rows: leavesFolder
@@ -343,17 +428,21 @@ export function MailWorkspace() {
 		: selected?.labels.includes("INBOX")
 			? "INBOX"
 			: undefined;
-	const onThread = (action: string, nextLabel?: string, source?: string) => {
+	const onThread = (action: string) => {
 		if (!selected || !box || threadAction.isPending) return;
 		threadAction.mutate({
 			id: selected.threadId,
 			box: box.id,
 			action,
-			label: nextLabel,
-			source,
 		});
 	};
-	const operationError = finish.error ?? threadAction.error ?? openDraft.error;
+	const pickerAction = threadAction.variables?.action;
+	const operationError =
+		finish.error ??
+		(pickerAction === "set-labels" || pickerAction === "move-label"
+			? undefined
+			: threadAction.error) ??
+		openDraft.error;
 	return (
 		<section
 			className="mail-workspace"
@@ -576,12 +665,17 @@ export function MailWorkspace() {
 								Переподключить ящик
 							</button>
 						)}
-						<nav aria-label="Папки Gmail" className="mail-folders">
-							{folders.map(({ id, title, icon: Icon }) => (
+						<nav
+							aria-label="Папки Gmail"
+							className="mail-folders"
+							data-show-extra={showMoreFolders || activeExtraFolder}
+						>
+							{folders.map(({ id, title, icon: Icon }, index) => (
 								<button
 									type="button"
 									key={id}
 									className="mail-nav"
+									data-extra={index >= 5}
 									aria-pressed={id === "INBOX" ? isInbox : id === label}
 									onClick={() => changeFolder(id)}
 								>
@@ -589,28 +683,28 @@ export function MailWorkspace() {
 									<span>{title}</span>
 								</button>
 							))}
-							<h3>Ярлыки</h3>
-							{userLabels.map((item) => (
-								<button
-									type="button"
-									key={item.id}
-									className="mail-nav"
-									aria-pressed={item.id === label}
-									onClick={() => changeFolder(item.id)}
-								>
-									<Tag size={14} aria-hidden="true" />
-									<span>{item.name}</span>
-								</button>
-							))}
+							<button
+								type="button"
+								className="mail-nav mail-system-more"
+								aria-expanded={showMoreFolders || activeExtraFolder}
+								onClick={() => setShowMoreFolders((shown) => !shown)}
+								hidden={activeExtraFolder}
+							>
+								<ChevronDown size={14} aria-hidden="true" />
+								<span>{showMoreFolders ? "Свернуть" : "Ещё папки Gmail"}</span>
+							</button>
 						</nav>
-						<div className="mail-sidebar-labels">
-							<MailLabelCreator
-								key={box.id}
-								create={(name) =>
-									createLabel.mutateAsync({ box: box.id, name })
-								}
-							/>
-						</div>
+						<MailFolderNavigation
+							key={box.id}
+							labels={userLabels}
+							active={label}
+							loading={labels.isPending}
+							error={labels.isError}
+							onSelect={changeFolder}
+							onCreate={(name, color) =>
+								createLabel.mutateAsync({ box: box.id, name, color })
+							}
+						/>
 					</aside>
 					<section className="mail-list" aria-label="Список писем">
 						<header className="mail-list-header">
@@ -759,14 +853,8 @@ export function MailWorkspace() {
 													</span>
 													{applied.length > 0 && (
 														<span className="mail-row-tags">
-															{applied.slice(0, 2).map(({ id, name }) => (
-																<span
-																	key={id}
-																	className="mail-tag"
-																	title={name}
-																>
-																	{name}
-																</span>
+															{applied.slice(0, 2).map((label) => (
+																<MailLabelChip key={label.id} label={label} />
 															))}
 															{applied.length > 2 && (
 																<span className="mail-tag">
@@ -834,17 +922,28 @@ export function MailWorkspace() {
 										label !== "TRASH" &&
 										label !== "SPAM"
 									}
-									onToggle={(id) =>
-										onThread(
-											selected.labels.includes(id)
-												? "remove-label"
-												: "add-label",
-											id,
-										)
+									onApply={(labels) =>
+										threadAction.mutateAsync({
+											box: boxId,
+											id: selected.threadId,
+											action: "set-labels",
+											labels,
+										})
 									}
-									onMove={(id) => onThread("move-label", id, moveSource)}
-									onCreate={(name) =>
-										createLabel.mutateAsync({ box: box.id, name })
+									onMove={(label) =>
+										threadAction.mutateAsync({
+											box: boxId,
+											id: selected.threadId,
+											action: "move-label",
+											label,
+											source: moveSource,
+										})
+									}
+									onCreate={(name, color) =>
+										createLabel.mutateAsync({ box: box.id, name, color })
+									}
+									onColor={(id, color) =>
+										updateColor.mutateAsync({ box: boxId, id, color })
 									}
 								/>
 							}
