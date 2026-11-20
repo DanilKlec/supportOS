@@ -197,7 +197,84 @@ test('template actions use mailbox membership and reject overwriting a newer ver
 	expect((await call('GET', 'templates', `${query}&id=${templateId}`)).status).toBe(404);
 });
 
-test('migrations keep mailboxes across reconnects and scope service-only templates per mailbox', async () => {
+test('personal templates follow the signed-in owner across mailboxes and are invisible to coworkers', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	const coworker = '40000000-0000-4000-8000-000000000003';
+	const otherMailbox = '40000000-0000-4000-8000-000000000004';
+	const templateId = '40000000-0000-4000-8000-000000000011';
+	const access = { status: 'active', permissions: ['work'] };
+	identities.actor = { id: userId, access };
+	const draft = { title: 'Личный ответ', subject: '', body: 'Текст.' };
+	let row;
+	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		expect(parsed.hostname).toBe('database.invalid');
+		const params = parsed.searchParams;
+		if (parsed.pathname.endsWith('/supportos_mailbox_members')) return Response.json([{ user_id: identities.actor.id }]);
+		if (parsed.pathname.endsWith('/supportos_mailboxes')) return Response.json([{ id: params.get('id').slice(3) }]);
+		expect(parsed.pathname).toBe('/rest/v1/supportos_mail_templates');
+		if (options.method === 'POST') {
+			expect(JSON.parse(options.body)).toEqual({ ...draft, owner_id: userId });
+			row = { ...draft, id: templateId, revision: 1 };
+			return Response.json([row]);
+		}
+		if (params.has('mailbox_id') || params.get('owner_id') !== `eq.${userId}`) return Response.json([]);
+		return Response.json(row ? [row] : []);
+	}));
+	const personal = `&box=${mailboxId}&scope=personal`;
+	const sibling = `&box=${otherMailbox}&scope=personal`;
+	expect((await call('POST', 'save-template', personal, { ...draft, owner_id: coworker }))).toMatchObject({ status: 200, body: { id: templateId } });
+	expect((await call('GET', 'templates', sibling))).toMatchObject({ status: 200, body: { templates: [{ id: templateId }] } });
+	expect((await call('GET', 'templates', `&box=${mailboxId}&id=${templateId}`)).status).toBe(404);
+	identities.actor = { id: coworker, access };
+	expect((await call('GET', 'templates', `${personal}&id=${templateId}`)).status).toBe(404);
+	expect((await call('POST', 'save-template', personal, { ...draft, id: templateId, revision: 1 })).status).toBe(409);
+	expect((await call('POST', 'delete-template', personal, { id: templateId, revision: 1 })).status).toBe(409);
+});
+
+test('folder badge counts include unread messages and every draft, with all-mail pagination and refresh after reading', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	const box = '40000000-0000-4000-8000-000000000020';
+	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
+	const encrypted_token = seal(googleConfig(testEnv), 'counts-refresh', `gmail:${address}`);
+	let unread = 3;
+	let draftReads = 0;
+	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		if (parsed.hostname === 'database.invalid') {
+			return Response.json(parsed.searchParams.get('select') === 'user_id' ? [{ user_id: userId }] : [{ id: box, address, encrypted_token }]);
+		}
+		if (parsed.hostname === 'oauth2.googleapis.com') return Response.json({ access_token: 'counts-access', expires_in: 3600 });
+		expect(parsed.hostname).toBe('gmail.googleapis.com');
+		if (parsed.pathname.endsWith('/modify')) {
+			expect(JSON.parse(options.body).removeLabelIds).toEqual(['UNREAD']);
+			unread = 0;
+			return Response.json({ messages: [{ labelIds: ['INBOX', 'Label_1'] }] });
+		}
+		if (parsed.pathname.endsWith('/DRAFT')) {
+			draftReads++;
+			expect(parsed.searchParams.get('fields')).toBe('messagesTotal');
+			return Response.json({ messagesTotal: 4, messagesUnread: 0 });
+		}
+		if (parsed.pathname.endsWith('/messages')) {
+			expect(parsed.searchParams.get('labelIds')).toBe('UNREAD');
+			if (unread === 0 || parsed.searchParams.get('q') === 'is:snoozed') return Response.json({ messages: [] });
+			return parsed.searchParams.has('pageToken')
+				? Response.json({ messages: [{ id: 'three' }] })
+				: Response.json({ messages: [{ id: 'one' }, { id: 'two' }], nextPageToken: 'more' });
+		}
+		expect(parsed.searchParams.get('fields')).toBe('messagesUnread');
+		return Response.json({ messagesUnread: unread, threadsUnread: 1 });
+	}));
+	const query = `&box=${box}`;
+	const counts = `${query}&ids=INBOX,DRAFT,Label_1,ALL,SNOOZED`;
+	expect((await call('GET', 'folder-counts', counts)).body).toEqual({ counts: { INBOX: 3, DRAFT: 4, Label_1: 3, ALL: 3, SNOOZED: 0 } });
+	expect((await call('POST', 'change-thread', query, { id: 'thread', operation: 'read' })).status).toBe(200);
+	expect((await call('GET', 'folder-counts', counts)).body).toEqual({ counts: { INBOX: 0, DRAFT: 4, Label_1: 0, ALL: 0, SNOOZED: 0 } });
+	expect(draftReads).toBe(1);
+});
+
+test('migrations preserve shared templates and isolate private templates by owner', async () => {
 	const sql = await readFile(new URL('../../supabase/migrations/20261119222248_shared_mailboxes.sql', import.meta.url), 'utf8');
 	const db = new PGlite();
 	try {
@@ -215,6 +292,12 @@ test('migrations keep mailboxes across reconnects and scope service-only templat
 		const insert = 'insert into public.supportos_mail_templates (mailbox_id,title,body) values ($1,$2,$3) returning revision';
 		const saved = await db.query(insert, [id, 'Проверка', 'Шаблон для ответа.']);
 		expect(saved.rows[0].revision).toBe(1);
+		await db.exec(await readFile(new URL('../../supabase/migrations/20261120055203_personal_mail_templates.sql', import.meta.url), 'utf8'));
+		expect((await db.query('select owner_id, mailbox_id from public.supportos_mail_templates')).rows).toEqual([{ owner_id: null, mailbox_id: id }]);
+		const insertPersonal = 'insert into public.supportos_mail_templates (owner_id,title,body) values ($1,$2,$3)';
+		await db.query(insertPersonal, [userId, 'Проверка', 'Личный текст.']);
+		await expect(db.query(insertPersonal, [userId, 'проверка', 'Дубликат.'])).rejects.toMatchObject({ code: '23505' });
+		await expect(db.query('insert into public.supportos_mail_templates (mailbox_id,owner_id,title,body) values ($1,$2,$3,$4)', [id, userId, 'Оба владельца', 'Текст.'])).rejects.toMatchObject({ code: '23514' });
 		await expect(db.query(insert, [id, 'проверка', 'Другой текст.'])).rejects.toMatchObject({ code: '23505' });
 		const another = await db.query('select public.supportos_connect_gmail_mailbox($1,$2,$3) as id', ['second@example.invalid', 'encoded-token-c', userId]);
 		await expect(db.query(insert, [another.rows[0].id, 'проверка', 'Другой ящик.'])).resolves.toMatchObject({ rows: [{ revision: 1 }] });

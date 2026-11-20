@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	Archive,
 	Bell,
@@ -32,7 +37,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { MailAccountPicker } from "./MailAccountPicker";
 import { MailAdministration, oauthSessionKey } from "./MailAdministration";
 import { emptyMailDraft, MailComposer } from "./MailComposer";
-import { MailLabelChip } from "./MailFolderTree";
+import { MailFolderCount, MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
 import { mailDate, MailThread, plainMailBody } from "./MailThread";
@@ -50,6 +55,11 @@ const folders = [
 	{ id: "SPAM", title: "Спам", icon: ShieldAlert },
 	{ id: "TRASH", title: "Корзина", icon: Trash2 },
 ];
+const virtualCountIds = "ALL,SNOOZED";
+const systemCountIds = folders
+	.map(({ id }) => id)
+	.filter((id) => id !== "ALL" && id !== "SNOOZED")
+	.join(",");
 
 const categories = [
 	["INBOX", "Все входящие"],
@@ -126,6 +136,30 @@ export function MailWorkspace() {
 				.sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true })),
 		[labels.data],
 	);
+	const countGroups = useMemo(() => {
+		const ids = customLabels.map(({ id }) => id).sort();
+		const groups = [systemCountIds, virtualCountIds];
+		for (let start = 0; start < ids.length; start += 24)
+			groups.push(ids.slice(start, start + 24).join(","));
+		return groups;
+	}, [customLabels]);
+	const folderCounts = useQueries({
+		queries: boxId
+			? countGroups.map((ids) => ({
+					queryKey: ["mail", "folder-counts", boxId, ids],
+					queryFn: ({ signal }: { signal: AbortSignal }) =>
+						mailService.folderCounts(boxId, ids, signal),
+					staleTime: 15_000,
+					refetchInterval: 30_000,
+				}))
+			: [],
+		combine: (responses) => {
+			const counts: Record<string, number | null> = {};
+			for (const response of responses)
+				Object.assign(counts, response.data?.counts);
+			return counts;
+		},
+	});
 	const selected =
 		openRow?.boxId === boxId
 			? (resultRows.find((item) => item.threadId === openRow.row.threadId) ??
@@ -189,6 +223,9 @@ export function MailWorkspace() {
 		void client.invalidateQueries({ queryKey: ["mail", "folder", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "thread", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "stats", userId] });
+		void client.invalidateQueries({
+			queryKey: ["mail", "folder-counts", mailbox],
+		});
 	};
 	const updateLabelCache = (box: string, changed: MailLabel) => {
 		const queryKey = ["mail", "labels", box];
@@ -464,6 +501,9 @@ export function MailWorkspace() {
 							onClick={() => {
 								void folder.refetch();
 								void stats.refetch();
+								void client.invalidateQueries({
+									queryKey: ["mail", "folder-counts", boxId],
+								});
 							}}
 						>
 							<RefreshCw size={17} />
@@ -640,6 +680,15 @@ export function MailWorkspace() {
 								>
 									<Icon size={15} aria-hidden="true" />
 									<span>{title}</span>
+									<MailFolderCount
+										count={
+											folderCounts[id] ??
+											(id === "INBOX"
+												? statusByMailbox.get(boxId)?.unread
+												: undefined)
+										}
+										drafts={id === "DRAFT"}
+									/>
 								</button>
 							))}
 							<button
@@ -659,6 +708,7 @@ export function MailWorkspace() {
 							active={label}
 							loading={labels.isPending}
 							error={labels.isError}
+							counts={folderCounts}
 							onSelect={changeFolder}
 							onCreate={(name, color) =>
 								createLabel.mutateAsync({ box: box.id, name, color })

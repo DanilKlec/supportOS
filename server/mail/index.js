@@ -3,6 +3,7 @@ import { config, db } from '../agent-monitor/_server.js';
 import { can } from '../../shared/access.js';
 import { addressOf, completeGoogle, composeRaw, gmail, googleConfig, mailboxToken, mailError, mailMetadata, readMessage, startGoogle, validAddress } from './google.js';
 import { mailTemplates } from './templates.js';
+import { folderCount, invalidateFolderCounts } from './folder-counts.js';
 
 const mailboxFields = 'id,address,provider,updated_at';
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -99,14 +100,14 @@ async function unreadSnapshot(cfg, mailbox) {
 	entry.promise = (async () => {
 		try {
 			const token = await mailboxToken(cfg, mailbox);
-			const [inbox, latest] = await Promise.all([
-				gmail(token, '/labels/INBOX?fields=threadsUnread'),
+			const [unread, latest] = await Promise.all([
+				folderCount((path) => gmail(token, path), mailbox, 'INBOX'),
 				gmail(token, '/messages?labelIds=INBOX&maxResults=1&fields=messages(id)'),
 			]);
 			const recentId = latest.messages?.[0]?.id;
 			let recentDate = null;
 			if (recentId) recentDate = Number((await gmail(token, `/messages/${safeId(recentId)}?format=minimal&fields=internalDate`)).internalDate) || null;
-			return { id: mailbox.id, unread: inbox.threadsUnread ?? 0, recentId, recentDate };
+			return { id: mailbox.id, unread, recentId, recentDate };
 		} catch (error) { return { id: mailbox.id, unread: null, reconnect: error.code === 'reconnect' }; }
 	})();
 	if (statsCache.size >= 200) statsCache.delete(statsCache.keys().next().value);
@@ -164,7 +165,7 @@ export default async function handler(req, res) {
 			return send(200, { stats: await collect(mailboxes, (mailbox) => unreadSnapshot(cfg, mailbox), 8) });
 		}
 		const box = await accessMailbox(env, user.id, admin, url.searchParams.get('box'));
-		if (templateActions.has(action)) return send(200, await mailTemplates(env, box.id, action, url.searchParams, body));
+		if (templateActions.has(action)) return send(200, await mailTemplates(env, box.id, user.id, action, url.searchParams, body));
 		if (action === 'members') {
 			const rows = await db(env, `supportos_mailbox_members?select=user:supportos_users!supportos_mailbox_members_user_id_fkey(id,display_name,email)&mailbox_id=eq.${box.id}&order=created_at`);
 			return send(200, { members: rows.map(({ user: member }) => member).filter(Boolean) });
@@ -187,6 +188,18 @@ export default async function handler(req, res) {
 		const token = await mailboxToken(cfg, box);
 		const g = (path, options) => gmail(token, path, options);
 		if (action === 'labels') return send(200, await g('/labels?fields=labels(id,name,type)'));
+		if (action === 'folder-counts') {
+			const ids = [...new Set((url.searchParams.get('ids') ?? '').split(',').filter(Boolean))].map(safeId);
+			if (!ids.length || ids.length > 32 || ids.some((id) => id.length > 80)) throw mailError('Выберите до 32 папок.');
+			const values = await collect(ids, async (id) => {
+				try {
+					return [id, await folderCount(g, box, id)];
+				} catch {
+					return [id, null];
+				}
+			});
+			return send(200, { counts: Object.fromEntries(values) });
+		}
 		if (action === 'label-colors') {
 			const ids = [...new Set((url.searchParams.get('ids') ?? '').split(',').filter(Boolean))].map(safeId);
 			if (ids.length > 32 || ids.some((id) => id.length > 80)) throw mailError('Выберите до 32 ярлыков.');
@@ -255,6 +268,8 @@ export default async function handler(req, res) {
 		if (action === 'change-thread') {
 			const id = safeId(body.id);
 			const operation = body.operation;
+			let affected;
+			let thread;
 			if (operation === 'trash' || operation === 'untrash') await g(`/threads/${id}/${operation}`, { method: 'POST' });
 			else if (operation === 'move-label') {
 				const destination = safeId(body.label);
@@ -267,6 +282,7 @@ export default async function handler(req, res) {
 					method: 'POST',
 					body: { addLabelIds: [destination], removeLabelIds: source ? [source] : [] },
 				});
+				affected = source ? [source, destination] : [destination];
 			} else if (operation === 'set-labels') {
 				if (!Array.isArray(body.add) || !Array.isArray(body.remove) || body.add.length + body.remove.length > 100)
 					throw mailError('Выберите до 100 изменений ярлыков за раз.');
@@ -279,6 +295,7 @@ export default async function handler(req, res) {
 						addLabelIds.some((id) => removeLabelIds.includes(id)))
 						throw mailError('Обновите список ярлыков и повторите.');
 					await g(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds, removeLabelIds } });
+					affected = [...addLabelIds, ...removeLabelIds];
 				}
 			} else {
 				const changes = {
@@ -288,13 +305,21 @@ export default async function handler(req, res) {
 				const [addLabelIds, removeLabelIds] = operation === 'add-label' ? [[safeId(body.label)], []]
 					: operation === 'remove-label' ? [[], [safeId(body.label)]]
 					: Object.hasOwn(changes, operation) ? changes[operation] : (() => { throw mailError('Неизвестное действие.'); })();
-				await g(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds, removeLabelIds } });
+				thread = await g(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds, removeLabelIds } });
+				if (!['read', 'unread', 'spam', 'unspam'].includes(operation))
+					affected = [...addLabelIds, ...removeLabelIds];
 			}
+			if (!affected && (operation === 'read' || operation === 'unread') && Array.isArray(thread?.messages) && thread.messages.length &&
+				thread.messages.every(({ labelIds }) => Array.isArray(labelIds))) {
+				affected = ['ALL', 'INBOX', 'SNOOZED', 'SPAM', 'TRASH', ...new Set(thread.messages.flatMap(({ labelIds }) => labelIds ?? []))];
+			}
+			invalidateFolderCounts(box.id, affected);
 			statsCache.delete(box.id);
 			return send(200, { ok: true });
 		}
 		if (action === 'delete-draft') {
 			await g(`/drafts/${safeId(body.id)}`, { method: 'DELETE' });
+			invalidateFolderCounts(box.id, ['DRAFT']);
 			return send(200, { ok: true });
 		}
 		if (action === 'save-draft' || action === 'send') {
@@ -313,9 +338,14 @@ export default async function handler(req, res) {
 				input = { ...body, attachments: [...preserved, ...(Array.isArray(body.attachments) ? body.attachments : [])] };
 			}
 			const message = { raw: composeRaw(box.address, input, action === 'save-draft'), ...(body.threadId ? { threadId: safeId(body.threadId) } : {}) };
-			if (action === 'save-draft') return send(200, await g(draftId ? `/drafts/${draftId}` : '/drafts', { method: draftId ? 'PUT' : 'POST', body: { message } }));
+			if (action === 'save-draft') {
+				const saved = await g(draftId ? `/drafts/${draftId}` : '/drafts', { method: draftId ? 'PUT' : 'POST', body: { message } });
+				invalidateFolderCounts(box.id, ['DRAFT']);
+				return send(200, saved);
+			}
 			if (draftId) await g(`/drafts/${draftId}`, { method: 'PUT', body: { message } });
 			const result = await (draftId ? g('/drafts/send', { method: 'POST', body: { id: draftId } }) : g('/messages/send', { method: 'POST', body: message }));
+			if (draftId) invalidateFolderCounts(box.id, ['DRAFT']);
 			return send(200, result);
 		}
 		return send(404, { error: 'Неизвестное действие.' });

@@ -16,6 +16,7 @@ import { useDeferredValue, useState } from "react";
 import {
 	type MailTemplate,
 	type MailTemplateInput,
+	type MailTemplateScope,
 	mailService,
 } from "@/services/mail.service";
 
@@ -23,9 +24,54 @@ const emptyTemplate: MailTemplateInput = { title: "", subject: "", body: "" };
 
 export function MailTemplates({
 	box,
+	userId,
 	onInsert,
 }: {
 	box: string;
+	userId?: string;
+	onInsert: (template: MailTemplate) => string | undefined;
+}) {
+	const [scope, setScope] = useState<MailTemplateScope>("shared");
+	return (
+		<section className="mail-templates" aria-label="Шаблоны писем">
+			<nav className="mail-template-scopes" aria-label="Разделы шаблонов">
+				<button
+					type="button"
+					className="mail-category"
+					aria-pressed={scope === "shared"}
+					onClick={() => setScope("shared")}
+				>
+					Общие
+				</button>
+				<button
+					type="button"
+					className="mail-category"
+					aria-pressed={scope === "personal"}
+					onClick={() => setScope("personal")}
+				>
+					Личные
+				</button>
+			</nav>
+			<TemplateCollection
+				key={scope}
+				box={box}
+				scope={scope}
+				scopeId={scope === "personal" ? userId : box}
+				onInsert={onInsert}
+			/>
+		</section>
+	);
+}
+
+function TemplateCollection({
+	box,
+	scope,
+	scopeId,
+	onInsert,
+}: {
+	box: string;
+	scope: MailTemplateScope;
+	scopeId?: string;
 	onInsert: (template: MailTemplate) => string | undefined;
 }) {
 	const client = useQueryClient();
@@ -35,25 +81,25 @@ export function MailTemplates({
 	const [editor, setEditor] = useState<MailTemplateInput>();
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [insertionError, setInsertionError] = useState("");
-	const listKey = ["mail", "templates", box];
-	const detailKey = ["mail", "template", box];
+	const listKey = ["mail", "templates", scope, scopeId];
+	const detailKey = ["mail", "template", scope, scopeId];
 	const list = useInfiniteQuery({
 		queryKey: [...listKey, query],
 		queryFn: ({ pageParam, signal }) =>
-			mailService.templates(box, query, pageParam, signal),
+			mailService.templates(box, scope, query, pageParam, signal),
 		initialPageParam: 0,
 		getNextPageParam: ({ next }) => next ?? undefined,
 		staleTime: 20_000,
 	});
 	const detail = useQuery({
 		queryKey: [...detailKey, selected],
-		queryFn: ({ signal }) => mailService.template(box, selected, signal),
+		queryFn: ({ signal }) => mailService.template(box, scope, selected, signal),
 		enabled: Boolean(selected),
 		staleTime: 20_000,
 	});
 	const save = useMutation({
 		mutationFn: (draft: MailTemplateInput) =>
-			mailService.saveTemplate(box, draft),
+			mailService.saveTemplate(box, scope, draft),
 		onSuccess: (saved) => {
 			client.setQueryData([...detailKey, saved.id], saved);
 			setSearch("");
@@ -64,7 +110,7 @@ export function MailTemplates({
 	});
 	const remove = useMutation({
 		mutationFn: (template: MailTemplate) =>
-			mailService.deleteTemplate(box, template),
+			mailService.deleteTemplate(box, scope, template),
 		onSuccess: (_, removed) => {
 			setSelected("");
 			setConfirmDelete(false);
@@ -85,7 +131,7 @@ export function MailTemplates({
 	const error = remove.error?.message || insertionError;
 
 	return (
-		<section className="mail-templates" aria-label="Шаблоны писем">
+		<>
 			{editor ? (
 				<form
 					className="mail-template-form"
@@ -193,7 +239,9 @@ export function MailTemplates({
 								<p className="mail-muted">
 									{query
 										? "Шаблоны не найдены"
-										: "У этого ящика пока нет шаблонов"}
+										: scope === "personal"
+											? "У вас пока нет личных шаблонов"
+											: "У этого ящика пока нет шаблонов"}
 								</p>
 							) : (
 								<ul>
@@ -256,7 +304,11 @@ export function MailTemplates({
 										)}
 										{confirmDelete ? (
 											<div className="mail-notice">
-												<p>Удалить шаблон для всех сотрудников этого ящика?</p>
+												<p>
+													{scope === "personal"
+														? "Удалить личный шаблон?"
+														: "Удалить шаблон для всех сотрудников этого ящика?"}
+												</p>
 												<div className="mail-template-actions">
 													<button
 														type="button"
@@ -323,6 +375,6 @@ export function MailTemplates({
 					</div>
 				</>
 			)}
-		</section>
+		</>
 	);
 }

@@ -222,7 +222,11 @@ export function MailComposer({
 					</div>
 				</header>
 				{showTemplates ? (
-					<MailTemplates box={box.id} onInsert={insertTemplate} />
+					<MailTemplates
+						box={box.id}
+						userId={userId}
+						onInsert={insertTemplate}
+					/>
 				) : (
 					<form
 						className="mail-compose-fields"

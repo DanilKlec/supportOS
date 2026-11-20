@@ -11,8 +11,12 @@ function templateId(value) {
 	return value;
 }
 
-export async function mailTemplates(env, box, action, params, body) {
-	const base = { mailbox_id: `eq.${box}`, select: fields };
+export async function mailTemplates(env, box, actor, action, params, body) {
+	const scope = params.get('scope') ?? 'shared';
+	if (scope !== 'shared' && scope !== 'personal') throw mailError('Выберите раздел шаблонов.');
+	const ownerColumn = scope === 'personal' ? 'owner_id' : 'mailbox_id';
+	const ownerId = scope === 'personal' ? actor : box;
+	const base = { [ownerColumn]: `eq.${ownerId}`, select: fields };
 	const path = (options) => `${table}?${new URLSearchParams({ ...base, ...options })}`;
 	if (action === 'templates') {
 		const id = params.get('id');
@@ -56,11 +60,12 @@ export async function mailTemplates(env, box, action, params, body) {
 	try {
 		const [saved] = id
 			? await db(env, rowPath, { title, subject, body: text, revision: body.revision + 1 }, 'PATCH', { returnRows: true })
-			: await db(env, `${table}?select=${fields},body`, { mailbox_id: box, title, subject, body: text }, 'POST', { returnRows: true });
+			: await db(env, `${table}?select=${fields},body`, { [ownerColumn]: ownerId, title, subject, body: text }, 'POST', { returnRows: true });
 		if (!saved) throw mailError('Шаблон уже изменился. Обновите список.', 409);
 		return saved;
 	} catch (error) {
-		if (error.storageCode === '23505') throw mailError('В этом ящике уже есть шаблон с таким названием.', 409);
+		if (error.storageCode === '23505') throw mailError(
+			scope === 'personal' ? 'У вас уже есть личный шаблон с таким названием.' : 'В этом ящике уже есть шаблон с таким названием.', 409);
 		throw error;
 	}
 }

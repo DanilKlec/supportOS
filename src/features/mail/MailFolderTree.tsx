@@ -31,6 +31,29 @@ export function MailLabelChip({ label }: { label: MailLabel }) {
 	);
 }
 
+const countFormat = new Intl.NumberFormat("ru");
+
+export function MailFolderCount({
+	count,
+	drafts = false,
+}: {
+	count?: number | null;
+	drafts?: boolean;
+}) {
+	if (!count || count < 1) return null;
+	const label = drafts ? "Черновиков" : "Непрочитанных";
+	return (
+		<b
+			className="mail-folder-count"
+			title={`${label}: ${countFormat.format(count)}`}
+			data-drafts={drafts}
+		>
+			<span className="sr-only">{label} </span>
+			{countFormat.format(count)}
+		</b>
+	);
+}
+
 type Node = {
 	name: string;
 	path: string;
@@ -65,6 +88,7 @@ export function MailFolderTree({
 	inbox = false,
 	search = "",
 	unavailable,
+	counts,
 }: {
 	labels: MailLabel[];
 	active?: string;
@@ -72,6 +96,7 @@ export function MailFolderTree({
 	inbox?: boolean;
 	search?: string;
 	unavailable?: string;
+	counts?: Record<string, number | null>;
 }) {
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 	const tree = useMemo(() => folderTree(labels), [labels]);
@@ -121,6 +146,7 @@ export function MailFolderTree({
 								<Folder size={16} aria-hidden="true" />
 							)}
 							<span>{name}</span>
+							{label && counts && <MailFolderCount count={counts[label.id]} />}
 						</button>
 					</div>
 					{open && children.size > 0 && (
@@ -142,6 +168,7 @@ export function MailFolderTree({
 					>
 						<Inbox size={16} aria-hidden="true" />
 						<span>Входящие</span>
+						{counts && <MailFolderCount count={counts.INBOX} />}
 					</button>
 				</li>
 			)}
@@ -158,6 +185,7 @@ export function MailFolderTree({
 							>
 								<Folder size={16} aria-hidden="true" />
 								<span>{label.name}</span>
+								{counts && <MailFolderCount count={counts[label.id]} />}
 							</button>
 						</li>
 					))

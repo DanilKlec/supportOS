@@ -184,6 +184,7 @@ export function MailFolderNavigation({
 	active,
 	loading,
 	error,
+	counts,
 	onSelect,
 	onCreate,
 }: {
@@ -191,6 +192,7 @@ export function MailFolderNavigation({
 	active: string;
 	loading: boolean;
 	error: boolean;
+	counts: Record<string, number | null>;
 	onSelect: (id: string) => void;
 	onCreate: CreateLabel;
 }) {
@@ -242,7 +244,12 @@ export function MailFolderNavigation({
 					/>
 				)}
 				{labels.length > 0 ? (
-					<MailFolderTree labels={labels} active={active} onSelect={onSelect} />
+					<MailFolderTree
+						labels={labels}
+						active={active}
+						onSelect={onSelect}
+						counts={counts}
+					/>
 				) : (
 					<p className="mail-picker-empty">
 						{loading
