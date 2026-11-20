@@ -7,6 +7,7 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 	isMobile,
 }, info) => {
 	let sends = 0;
+	let unread = true;
 	let received = false;
 	let recentDate = Date.UTC(2026, 10, 19, 10);
 	let activeMailboxes = 0;
@@ -34,9 +35,14 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 		attachments: [],
 	};
 	const recipients: { id: string; email: string; display_name: string }[] = [];
-	await context.route("**/api/binds?action=workspace", (route) => route.fulfill({
-		json: { ...knowledge, branches: { choices: {}, incoming: [], outgoing: [] } },
-	}));
+	await context.route("**/api/binds?action=workspace", (route) =>
+		route.fulfill({
+			json: {
+				...knowledge,
+				branches: { choices: {}, incoming: [], outgoing: [] },
+			},
+		}),
+	);
 	await context.route("**/api/mail?**", (route) => {
 		const request = route.request();
 		const url = new URL(request.url());
@@ -80,12 +86,23 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 													id: "historic",
 													subject: "Старое обращение",
 												}
-											: message,
+											: {
+													...message,
+													labels: unread ? ["INBOX", "UNREAD"] : ["INBOX"],
+												},
 									]
 								: [],
 						next: url.searchParams.get("page") ? null : "testcursor",
 					},
 				});
+			case "change-thread": {
+				const { id, operation } = request.postDataJSON();
+				expect(box).toBe("test-31");
+				expect(id).toBe(message.threadId);
+				expect(["read", "unread"]).toContain(operation);
+				unread = operation === "unread";
+				return route.fulfill({ json: { ok: true } });
+			}
 			case "thread":
 				return route.fulfill({
 					json: {
@@ -155,8 +172,30 @@ test("search 32 mailboxes, page Gmail history, reply and grant access", async ({
 	).toBeVisible();
 	await mail.getByRole("button", { name: "Следующая страница" }).click();
 	await expect(mail.getByText("Старое обращение")).toBeVisible();
+	await expect(mail.getByText("Непрочитано", { exact: true })).toHaveCount(0);
 	await mail.getByRole("button", { name: "Предыдущая страница" }).click();
-	await mail.getByText("Заявка игрока", { exact: true }).click();
+	const incoming = mail.getByRole("button", { name: /Заявка игрока/ });
+	const unreadBadge = incoming.getByText("Непрочитано", { exact: true });
+	await expect(unreadBadge).toBeVisible();
+	await expect(unreadBadge).toBeInViewport({ ratio: 1 });
+	await page.screenshot({
+		path: info.outputPath("mail-unread.png"),
+		animations: "disabled",
+	});
+	await incoming.click();
+	const actions = mail.getByRole("combobox", { name: "Действия с перепиской" });
+	await expect(
+		actions.getByRole("option", {
+			name: "Отметить непрочитанным",
+			exact: true,
+		}),
+	).toHaveCount(1);
+	await expect(unreadBadge).toHaveCount(0);
+	await actions.selectOption("unread");
+	if (isMobile)
+		await mail.getByRole("button", { name: "К списку писем" }).click();
+	await expect(unreadBadge).toBeVisible();
+	if (isMobile) await incoming.click();
 	await mail.getByRole("button", { name: "Более ранние письма" }).click();
 	await expect(mail.getByText("Раннее письмо")).toBeVisible();
 	await expect(mail.getByText("Последнее письмо")).toBeVisible();

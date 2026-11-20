@@ -162,6 +162,32 @@ export function MailWorkspace() {
 				request.label,
 			),
 		onSuccess: (_, request) => {
+			if (request.action === "read" || request.action === "unread") {
+				const updateUnread = (row: MailRow) => {
+					const unread = request.action === "unread";
+					if (
+						row.threadId !== request.id ||
+						row.labels.includes("UNREAD") === unread
+					)
+						return row;
+					return {
+						...row,
+						labels: unread
+							? [...row.labels, "UNREAD"]
+							: row.labels.filter((label) => label !== "UNREAD"),
+					};
+				};
+				client.setQueriesData<Awaited<ReturnType<typeof mailService.folder>>>(
+					{ queryKey: ["mail", "folder", request.box] },
+					(folder) =>
+						folder && { ...folder, rows: folder.rows.map(updateUnread) },
+				);
+				setOpenRow((current) =>
+					current?.boxId === request.box
+						? { ...current, row: updateUnread(current.row) }
+						: current,
+				);
+			}
 			refreshFolder(request.box);
 			if (
 				["archive", "trash", "untrash", "inbox", "spam", "unspam"].includes(
@@ -650,16 +676,21 @@ export function MailWorkspace() {
 													</span>
 													<time>{mailDate(row.date)}</time>
 												</span>
-												<span className="mail-row-subject">
-													{row.labels.includes("STARRED") && (
-														<Star
-															size={12}
-															fill="currentColor"
-															aria-label="Помечено"
-														/>
+												<span className="mail-row-details">
+													<span className="mail-row-subject">
+														{row.labels.includes("STARRED") && (
+															<Star
+																size={12}
+																fill="currentColor"
+																aria-label="Помечено"
+															/>
+														)}
+														{row.subject || "Без темы"}
+														{row.count > 1 && <small>{row.count}</small>}
+													</span>
+													{row.labels.includes("UNREAD") && (
+														<span className="mail-row-unread">Непрочитано</span>
 													)}
-													{row.subject || "Без темы"}
-													{row.count > 1 && <small>{row.count}</small>}
 												</span>
 												<span className="mail-row-preview">{row.snippet}</span>
 											</button>
