@@ -5,6 +5,7 @@ import sanitizeHtml from './mail-sanitizer.cjs';
 
 const color = /^(?:#[0-9a-f]{3,8}|[a-z]{3,24}|rgba?\([\d\s.,%]+\))$/i;
 const size = /^(?:auto|0|\d+(?:\.\d+)?(?:px|em|rem|%|pt)?)$/i;
+const responsiveFontSize = /^clamp\(\d+px,\s*\d+(?:\.\d+)?vw,\s*\d+px\)$/i;
 const sizes = /^(?:(?:auto|0|-?\d+(?:\.\d+)?(?:px|em|rem|%|pt))(?:\s+|$)){1,4}$/i;
 const words = /^[a-z-]+(?:\s+[a-z-]+){0,3}$/i;
 const border = /^(?:0|none|\d+(?:\.\d+)?px\s+(?:solid|dashed|dotted)\s+(?:#[0-9a-f]{3,8}|[a-z]{3,24}))$/i;
@@ -15,7 +16,7 @@ const styles = {
 	'background-image': [backgroundUrl], 'background-size': [words, sizes],
 	'background-position': [words, sizes], 'background-repeat': [words],
 	width: [size], 'min-width': [size], 'max-width': [size], height: [size],
-	'max-height': [size], 'min-height': [size], 'font-size': [size],
+	'max-height': [size], 'min-height': [size], 'font-size': [size, responsiveFontSize],
 	'line-height': [size], 'letter-spacing': [size],
 	padding: [sizes], 'padding-top': [size], 'padding-bottom': [size],
 	'padding-left': [size], 'padding-right': [size],

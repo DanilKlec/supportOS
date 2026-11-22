@@ -160,7 +160,7 @@ function renderCover(block, { surface, font, align, accent }) {
 	const label = kicker ? `<p style="margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase">${kicker}</p>` : '';
 	const emphasis = accentLine ? `<span style="color:${headlineColor(accent, base, '#ffffff')}">${accentLine}</span>` : '';
 	const headline = [title, emphasis].filter(Boolean).join('<br>');
-	const heading = headline ? `<h1 style="margin:0;font-family:${font};font-size:36px;line-height:1.1;font-weight:700;color:#ffffff">${headline}</h1>` : '';
+	const heading = headline ? `<h1 style="margin:0;font-family:${font};font-size:30px;font-size:clamp(23px,5.8vw,36px);line-height:1.1;font-weight:700;color:#ffffff">${headline}</h1>` : '';
 	const detail = copy ? `<p style="margin:12px 0 0;font-size:16px;line-height:1.5">${copy}</p>` : '';
 	return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px">
 		<tbody><tr><td height="${height}" bgcolor="${base}"${image.attr} style="background-color:${base}${image.css}">
@@ -190,7 +190,7 @@ function renderCampaignBlock(block, style) {
 		const split = artwork && (title || kicker || copy) && block.offerImagePlacement !== 'above';
 		const imageCell = split ? `<td width="27%" align="center" valign="middle" style="padding:12px 0 12px 14px">${artwork}</td>` : '';
 		const imageAbove = artwork && !split ? `<div style="margin:0 0 12px">${artwork}</div>` : '';
-		const heading = title ? `<h2 style="margin:0 0 6px;font-family:${font};font-size:26px;line-height:1.2;color:${headlineColor(accent, fill, ink)}">${title}</h2>` : '';
+		const heading = title ? `<h2 style="margin:0 0 6px;font-family:${font};font-size:24px;font-size:clamp(20px,4.4vw,26px);line-height:1.2;color:${headlineColor(accent, fill, ink)}">${title}</h2>` : '';
 		const detail = copy ? `<p style="margin:0;font-size:14px;line-height:1.55">${copy}</p>` : '';
 		return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;background-color:${fill};border:1px solid ${rule};border-radius:14px"><tbody><tr>${imageCell}<td align="${align}" style="padding:18px;color:${ink}">${imageAbove}${label}${heading}${detail}</td></tr></tbody></table>`;
 	}
@@ -224,7 +224,7 @@ export function renderMailLayout(layout) {
 		const { type, text, url } = block;
 		const value = inline(text);
 		const align = alignments.includes(block.align) ? block.align : 'left';
-		if (type === 'heading') return value ? `<h1 style="font-family:${font};text-align:${align};font-size:28px;line-height:1.25;margin:0 0 14px;color:${ink};font-weight:700">${value}</h1>` : '';
+		if (type === 'heading') return value ? `<h1 style="font-family:${font};text-align:${align};font-size:26px;font-size:clamp(21px,4.8vw,28px);line-height:1.25;margin:0 0 14px;color:${ink};font-weight:700">${value}</h1>` : '';
 		if (type === 'text') return value ? `<p style="text-align:${align};font-size:16px;line-height:1.6;margin:0 0 16px;color:${ink}">${value}</p>` : '';
 		if (type === 'image') {
 			const source = mailAssetUrl(url);

@@ -224,6 +224,7 @@ test('template API validates and reconstructs a saved block layout', async () =>
 	expect(html).toContain('height="420" bgcolor="#152023" background="https://images.example.invalid/cover.gif"');
 	expect(html).toContain('background-position:left center');
 	expect(html).toContain('background-color:rgba(0,0,0,0.65)');
+	expect(html).toContain('font-size:30px;font-size:clamp(23px,5.8vw,36px)');
 	expect(html).toContain('<span style="color:#f4c879">Nocturne Club</span>');
 	expect(html).toContain('display:block;text-align:center;background-color:#f4c879;color:#000000');
 	expect(html).toContain('border-radius:999px');
