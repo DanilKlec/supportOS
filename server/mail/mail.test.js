@@ -235,6 +235,27 @@ test('template API validates and reconstructs a saved block layout', async () =>
 	const imported = await call('POST', 'save-template', query, { title: 'Импорт', html: '<body style="background-color:#eeeeee"><h1>Содержимое</h1></body>' });
 	expect(imported).toMatchObject({ status: 200, body: { body: 'Содержимое', layout: null } });
 	expect(imported.body.html).toContain('background-color:#eeeeee');
+	const input = '<body style="background-color:#112233"><table width="500"><tr><td><a href="https://example.invalid/help">Табличный блок</a><script>Убрать</script></td></tr></table></body>';
+	const prepared = await call('POST', 'import-template-html', query, { html: input });
+	expect(prepared.status).toBe(200);
+	expect(prepared.body.html).toContain('<div style="background-color:#112233"><table width="500">');
+	expect(prepared.body.html).not.toContain('Убрать');
+	expect((await call('POST', 'import-template-html', query, { html: '<script>Убрать</script>' })).status).toBe(400);
+	const sourceLayout = {
+		...defaultMailLayout,
+		frame: 'source',
+		blocks: [
+			{ id: 'heading', type: 'heading', text: 'Импортированный заголовок', url: '' },
+			{ id: 'html', type: 'html', text: '', url: '', html: input.replace('Табличный блок', 'Исправленный текст') },
+		],
+	};
+	const sourceSaved = await call('POST', 'save-template', query, { title: 'Импортированный макет', layout: sourceLayout });
+	expect(sourceSaved).toMatchObject({ status: 200, body: { layout: { frame: 'source' } } });
+	expect(sourceSaved.body.html).toMatch(/^<h1/);
+	expect(sourceSaved.body.html).toContain('<table width="500">');
+	expect(sourceSaved.body.layout.blocks[1].html).not.toContain('Убрать');
+	expect(sourceSaved.body.body).toContain('Исправленный текст');
+	expect(sourceSaved.body.body).toContain('https://example.invalid/help');
 	expect((await call('POST', 'save-template', query, { title: 'Пустой', layout: defaultMailLayout })).status).toBe(400);
 });
 

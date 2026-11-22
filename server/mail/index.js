@@ -2,7 +2,7 @@ import { requireUser } from '../_auth.js';
 import { config, db } from '../agent-monitor/_server.js';
 import { can } from '../../shared/access.js';
 import { addressOf, completeGoogle, composeRaw, gmail, googleConfig, mailboxToken, mailError, mailMetadata, readMessage, startGoogle, validAddress } from './google.js';
-import { mailTemplates } from './templates.js';
+import { importTemplateHtml, mailTemplates } from './templates.js';
 import { folderCount, invalidateFolderCounts } from './folder-counts.js';
 
 const mailboxFields = 'id,address,provider,updated_at';
@@ -128,7 +128,7 @@ async function getAttachment(g, mid, id) {
 
 const adminOnly = new Set(['oauth-start', 'oauth-finish', 'members', 'grant', 'revoke']);
 const templateActions = new Set(['templates', 'save-template', 'delete-template']);
-const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template']);
+const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
 
 export default async function handler(req, res) {
 	res.setHeader('Cache-Control', 'private, no-store');
@@ -165,6 +165,7 @@ export default async function handler(req, res) {
 			return send(200, { stats: await collect(mailboxes, (mailbox) => unreadSnapshot(cfg, mailbox), 8) });
 		}
 		const box = await accessMailbox(env, user.id, admin, url.searchParams.get('box'));
+		if (action === 'import-template-html') return send(200, importTemplateHtml(body.html));
 		if (templateActions.has(action)) return send(200, await mailTemplates(env, box.id, user.id, action, url.searchParams, body));
 		if (action === 'members') {
 			const rows = await db(env, `supportos_mailbox_members?select=user:supportos_users!supportos_mailbox_members_user_id_fkey(id,display_name,email)&mailbox_id=eq.${box.id}&order=created_at`);

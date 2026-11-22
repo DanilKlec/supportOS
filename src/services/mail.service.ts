@@ -153,6 +153,8 @@ export const mailService = {
 		signal?: AbortSignal,
 	) =>
 		request<MailTemplate>("templates", { box, scope, id }, undefined, signal),
+	importTemplateHtml: (box: string, html: string) =>
+		request<{ html: string }>("import-template-html", { box }, { html }),
 	saveTemplate: (
 		box: string,
 		scope: MailTemplateScope,

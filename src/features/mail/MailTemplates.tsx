@@ -26,6 +26,7 @@ import {
 } from "../../../shared/mail-layout.js";
 import { MailHtmlPreview } from "./MailHtmlPreview";
 import { MailLayoutBuilder } from "./MailLayoutBuilder";
+import { importMailLayout } from "./mailLayoutImport";
 
 const emptyTemplate: MailTemplateInput = { title: "", subject: "", body: "" };
 const formats = [
@@ -123,6 +124,26 @@ function TemplateCollection({
 			void client.invalidateQueries({ queryKey: listKey });
 		},
 	});
+	const importHtml = useMutation({
+		mutationFn: async ({ html }: { html: string; append?: boolean }) =>
+			importMailLayout((await mailService.importTemplateHtml(box, html)).html),
+		onSuccess: (imported, { append }) => {
+			setEditor((current) => {
+				if (!current) return current;
+				const layout =
+					append && current.layout
+						? {
+								...current.layout,
+								blocks: [...current.layout.blocks, ...imported.blocks],
+							}
+						: imported;
+				return { ...current, layout, html: null };
+			});
+			setEditedHtmlSource(false);
+			setFormat("builder");
+			save.reset();
+		},
+	});
 	const remove = useMutation({
 		mutationFn: (template: MailTemplate) =>
 			mailService.deleteTemplate(box, scope, template),
@@ -141,6 +162,7 @@ function TemplateCollection({
 	};
 	const openEditor = (template?: MailTemplate) => {
 		save.reset();
+		importHtml.reset();
 		setFormat(template?.layout ? "builder" : template?.html ? "html" : "text");
 		setEditedHtmlSource(Boolean(template?.html && !template.layout));
 		setEditor(template ?? emptyTemplate);
@@ -161,7 +183,7 @@ function TemplateCollection({
 					className="mail-template-form"
 					onSubmit={(event) => {
 						event.preventDefault();
-						if (save.isPending || !hasContent) return;
+						if (save.isPending || importHtml.isPending || !hasContent) return;
 						save.mutate({
 							...editor,
 							body: format === "text" ? editor.body : "",
@@ -199,7 +221,17 @@ function TemplateCollection({
 								type="button"
 								className="mail-category"
 								aria-pressed={format === key}
+								disabled={importHtml.isPending || save.isPending}
 								onClick={() => {
+									if (
+										key === "builder" &&
+										format === "html" &&
+										editor.html?.trim() &&
+										!editor.layout?.blocks.length
+									) {
+										importHtml.mutate({ html: editor.html });
+										return;
+									}
 									if (
 										key === "html" &&
 										format === "builder" &&
@@ -234,6 +266,11 @@ function TemplateCollection({
 						<MailLayoutBuilder
 							layout={editor.layout ?? defaultMailLayout}
 							onChange={(layout) => setEditor({ ...editor, layout })}
+							onImport={(html) =>
+								importHtml.mutateAsync({ html, append: true })
+							}
+							importing={importHtml.isPending}
+							saving={save.isPending}
 						/>
 					)}
 					{format === "html" && (
@@ -246,6 +283,7 @@ function TemplateCollection({
 										required
 										spellCheck={false}
 										maxLength={mailHtmlLimit}
+										disabled={importHtml.isPending}
 										value={editor.html ?? ""}
 										onChange={(event) => {
 											setEditedHtmlSource(true);
@@ -254,6 +292,25 @@ function TemplateCollection({
 										placeholder="<table>…</table>"
 									/>
 								</label>
+								<button
+									type="button"
+									className="mail-button mail-add-link"
+									disabled={
+										importHtml.isPending ||
+										save.isPending ||
+										!editor.html?.trim()
+									}
+									onClick={() => {
+										if (editor.html?.trim())
+											importHtml.mutate({ html: editor.html });
+									}}
+								>
+									{importHtml.isPending
+										? "Импортируем…"
+										: editor.layout?.blocks.length
+											? "Заменить блоки HTML-кодом"
+											: "Импортировать в конструктор"}
+								</button>
 								<p className="mail-muted">
 									Таблицы и стили в атрибутах style сохраняются при отправке.
 								</p>
@@ -271,16 +328,16 @@ function TemplateCollection({
 							</section>
 						</div>
 					)}
-					{save.error && (
+					{(importHtml.error || save.error) && (
 						<p className="mail-error" role="alert">
-							{save.error.message}
+							{(importHtml.error || save.error)?.message}
 						</p>
 					)}
 					<div className="mail-template-actions">
 						<button
 							type="button"
 							className="mail-button"
-							disabled={save.isPending}
+							disabled={save.isPending || importHtml.isPending}
 							onClick={() => {
 								setEditor(undefined);
 								if (selected) void detail.refetch();
@@ -292,7 +349,12 @@ function TemplateCollection({
 							type="submit"
 							className="mail-button"
 							data-primary="true"
-							disabled={save.isPending || !editor.title.trim() || !hasContent}
+							disabled={
+								save.isPending ||
+								importHtml.isPending ||
+								!editor.title.trim() ||
+								!hasContent
+							}
 						>
 							{save.isPending ? "Сохраняем…" : "Сохранить шаблон"}
 						</button>

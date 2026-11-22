@@ -3,6 +3,7 @@ import {
 	ArrowUp,
 	ChevronDown,
 	ChevronRight,
+	FileCode2,
 	Heading,
 	Image,
 	LayoutTemplate,
@@ -21,6 +22,7 @@ import {
 import { useDeferredValue, useRef, useState } from "react";
 import {
 	defaultMailLayout,
+	mailHtmlLimit,
 	type MailBlock,
 	type MailBlockType,
 	type MailLayout,
@@ -28,6 +30,7 @@ import {
 } from "../../../shared/mail-layout.js";
 import { MailBlockFields, MailLayoutSelect } from "./MailBlockFields";
 import { MailHtmlPreview } from "./MailHtmlPreview";
+import { MailImportedBlockFields } from "./MailImportedBlockFields";
 
 const colors = [
 	["background", "Внешний фон"],
@@ -56,17 +59,26 @@ const blockOptions = {
 	button: { title: "Кнопка", Icon: MousePointer2 },
 	divider: { title: "Линия", Icon: Minus },
 	space: { title: "Отступ", Icon: Plus },
+	html: { title: "HTML-блок", Icon: FileCode2 },
 };
 
 export function MailLayoutBuilder({
 	layout = defaultMailLayout,
 	onChange,
+	onImport,
+	importing,
+	saving,
 }: {
 	layout?: MailLayout;
 	onChange: (layout: MailLayout) => void;
+	onImport: (html: string) => Promise<MailLayout>;
+	importing: boolean;
+	saving: boolean;
 }) {
 	const [expanded, setExpanded] = useState(layout.blocks[0]?.id ?? "");
 	const [mobile, setMobile] = useState(false);
+	const [importSource, setImportSource] = useState("");
+	const importPanel = useRef<HTMLDetailsElement>(null);
 	const previewPane = useRef<HTMLElement>(null);
 	const jumpToPreview = useRef<HTMLButtonElement>(null);
 	const preview = renderMailLayout(useDeferredValue(layout));
@@ -103,6 +115,39 @@ export function MailLayoutBuilder({
 				>
 					<Monitor size={15} aria-hidden="true" /> К предпросмотру
 				</button>
+				<details className="mail-layout-appearance" ref={importPanel}>
+					<summary>Вставить HTML</summary>
+					<div className="mail-layout-appearance-content">
+						<label className="mail-field">
+							HTML для импорта
+							<textarea
+								className="mail-html-source"
+								placeholder="<table>…</table>"
+								value={importSource}
+								maxLength={mailHtmlLimit}
+								spellCheck={false}
+								disabled={importing || saving}
+								onChange={(event) => setImportSource(event.target.value)}
+							/>
+						</label>
+						<button
+							type="button"
+							className="mail-button mail-add-link"
+							disabled={importing || saving || !importSource.trim()}
+							onClick={() => {
+								void onImport(importSource)
+									.then(({ blocks }) => {
+										setImportSource("");
+										setExpanded(blocks[0]?.id ?? "");
+										if (importPanel.current) importPanel.current.open = false;
+									})
+									.catch(() => {});
+							}}
+						>
+							{importing ? "Импортируем…" : "Добавить HTML в письмо"}
+						</button>
+					</div>
+				</details>
 				<details className="mail-layout-appearance" open>
 					<summary>Оформление письма</summary>
 					<div className="mail-layout-appearance-content">
@@ -164,6 +209,20 @@ export function MailLayoutBuilder({
 							/>
 						</label>
 						<div className="mail-layout-fields-row">
+							<MailLayoutSelect
+								label="Рамка письма"
+								value={layout.frame ?? "builder"}
+								options={[
+									["builder", "Оформление конструктора"],
+									["source", "Исходная вёрстка"],
+								]}
+								onChange={(frame) =>
+									onChange({
+										...layout,
+										frame: frame === "source" ? frame : undefined,
+									})
+								}
+							/>
 							<MailLayoutSelect
 								label="Расположение фона"
 								value={layout.backgroundPlacement ?? "outer"}
@@ -265,12 +324,18 @@ export function MailLayoutBuilder({
 										<Trash2 size={14} />
 									</button>
 								</div>
-								{open && (
-									<MailBlockFields
-										block={block}
-										onChange={(patch) => replace(block.id, patch)}
-									/>
-								)}
+								{open &&
+									(block.type === "html" ? (
+										<MailImportedBlockFields
+											html={block.html ?? ""}
+											onChange={(patch) => replace(block.id, patch)}
+										/>
+									) : (
+										<MailBlockFields
+											block={block}
+											onChange={(patch) => replace(block.id, patch)}
+										/>
+									))}
 							</li>
 						);
 					})}

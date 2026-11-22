@@ -28,7 +28,8 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	const layoutBackground = "https://media.example.invalid/background.gif";
 	const layoutImage = "https://media.example.invalid/banner.gif";
 	const richHeading = "Оформленный ответ";
-	const importedHtml = '<p style="color:#334488">Вставленный HTML</p>';
+	const importedHtml = '<h1>Вставленный HTML</h1><table width="500"><tbody><tr><td style="color:#334488"><p>До правки</p><a href="https://example.invalid/old">Подробности</a><img src="https://media.example.invalid/old.gif" alt="Обложка"></td></tr></tbody></table>';
+	const appendedHtml = "<p>Дополнение из HTML</p>";
 	const greeting = "Проверяем ваше обращение.";
 	const labels = [
 		{ id: "Label_1", name: "Проекты/Платежи", type: "user" },
@@ -243,12 +244,29 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 					: [];
 				return route.fulfill({ json: { templates: rows, next: null } });
 			}
+			case "import-template-html": {
+				const { html } = request.postDataJSON();
+				expect([importedHtml, appendedHtml]).toContain(html);
+				return route.fulfill({ json: { html } });
+			}
 			case "save-template": {
 				const personal = url.searchParams.get("scope") === "personal";
 				expect(personal ? ["test-0", "test-31"] : ["test-31"]).toContain(box);
 				const previous = personal ? personalTemplate : template;
 				const draft = request.postDataJSON();
-				if (draft.layout) {
+				if (draft.layout?.frame === "source") {
+					expect(draft.layout.blocks).toMatchObject([
+						{ type: "heading", text: "Заголовок после импорта" },
+						{ type: "html", html: expect.stringContaining("Текст после импорта") },
+						{ type: "text", text: "Дополнение из HTML" },
+					]);
+					draft.html = renderMailLayout(draft.layout);
+					expect(draft.html).toContain('width="500"');
+					expect(draft.html).toContain('style="color:#334488"');
+					expect(draft.html).toContain('href="https://example.invalid/new"');
+					expect(draft.html).toContain('src="https://media.example.invalid/new.gif"');
+					draft.body = "Заголовок после импорта\nТекст после импорта";
+				} else if (draft.layout) {
 					expect(draft.layout).toMatchObject({
 						backgroundImage: layoutBackground,
 						backgroundPlacement: "canvas",
@@ -281,7 +299,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 			case "save-draft":
 				expect(box).toBe("test-0");
 				expect(request.postDataJSON()).toMatchObject({
-					html: expect.stringContaining(importedHtml),
+					html: expect.stringContaining("Текст после импорта"),
 					text: expect.stringContaining(richHeading),
 				});
 				return route.fulfill({ json: { id: "layout-draft" } });
@@ -784,6 +802,23 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await templatePanel
 		.getByRole("button", { name: "Сохранить шаблон", exact: true })
 		.click();
+	await templatePanel.getByRole("button", { name: "Редактировать шаблон" }).click();
+	await templatePanel.getByRole("button", { name: "Импортировать в конструктор" }).click();
+	await templatePanel.getByRole("textbox", { name: "Текст заголовка" }).fill("Заголовок после импорта");
+	const blocks = templatePanel.getByRole("list", { name: "Блоки письма" });
+	await blocks.getByRole("button", { name: /^HTML-блок/ }).click();
+	const importedText = blocks.getByRole("textbox", { name: "Текст 1", exact: true });
+	await importedText.fill("");
+	await importedText.fill("Текст после импорта");
+	await blocks.getByRole("textbox", { name: "Адрес ссылки 1" }).fill("https://example.invalid/new");
+	await blocks.getByRole("textbox", { name: "Адрес изображения 1" }).fill("https://media.example.invalid/new.gif");
+	await expect(preview.getByText("Текст после импорта", { exact: true })).toBeVisible();
+	await expect(preview.getByRole("img", { name: "Обложка" })).toHaveAttribute("src", "https://media.example.invalid/new.gif");
+	await templatePanel.getByText("Вставить HTML", { exact: true }).click();
+	await templatePanel.getByRole("textbox", { name: "HTML для импорта" }).fill(appendedHtml);
+	await templatePanel.getByRole("button", { name: "Добавить HTML в письмо" }).click();
+	await expect(preview.getByText("Дополнение из HTML", { exact: true })).toBeVisible();
+	await templatePanel.getByRole("button", { name: "Сохранить шаблон", exact: true }).click();
 	await templatePanel
 		.getByRole("button", { name: "Вставить в письмо" })
 		.click();

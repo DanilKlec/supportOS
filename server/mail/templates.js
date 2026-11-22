@@ -14,6 +14,15 @@ function templateId(value) {
 	return value;
 }
 
+export function importTemplateHtml(source) {
+	if (typeof source !== 'string' || !source.trim()) throw mailError('Вставьте HTML письма.');
+	if (source.length > mailHtmlLimit) throw mailError('HTML шаблона превышает допустимый размер.');
+	const html = sanitizeMailHtml(source);
+	if (!html) throw mailError('В коде нет содержимого письма.');
+	if (html.length > mailHtmlLimit) throw mailError('HTML шаблона превышает допустимый размер.');
+	return { html };
+}
+
 export async function mailTemplates(env, box, actor, action, params, body) {
 	const scope = params.get('scope') ?? 'shared';
 	if (scope !== 'shared' && scope !== 'personal') throw mailError('Выберите раздел шаблонов.');
@@ -65,6 +74,9 @@ export async function mailTemplates(env, box, actor, action, params, body) {
 		if (body.layout != null) {
 			try { layout = normalizeMailLayout(body.layout); }
 			catch (error) { throw mailError(error.message); }
+			for (const block of layout.blocks) {
+				if (block.type === 'html') block.html = sanitizeMailHtml(block.html);
+			}
 		}
 		const rawHtml = layout ? renderMailLayout(layout) : body.html;
 		if (rawHtml != null && (typeof rawHtml !== 'string' || rawHtml.length > mailHtmlLimit))

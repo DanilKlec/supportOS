@@ -1,5 +1,5 @@
 export const mailHtmlLimit = 220_000;
-const blockTypes = new Set(['brand', 'hero', 'offer', 'signature', 'footer', 'heading', 'text', 'image', 'button', 'divider', 'space']);
+const blockTypes = new Set(['brand', 'hero', 'offer', 'signature', 'footer', 'heading', 'text', 'image', 'button', 'divider', 'space', 'html']);
 const alignments = ['left', 'center', 'right'];
 const heroHeights = { compact: 210, regular: 300, tall: 420 };
 const heroShades = { none: 0, medium: 0.4, strong: 0.65 };
@@ -57,6 +57,7 @@ function normalizeMailBlock(block) {
 		throw new Error('Проверьте ссылки в блоках письма. Для изображений нужна HTTPS-ссылка.');
 	if (isButton && !text.trim()) throw new Error('Введите текст кнопки.');
 	const normalized = { id: block.id, type: block.type, text, url };
+	if (block.type === 'html') return { ...normalized, html: readText(block.html).trim() };
 	if (alignments.includes(block.align)) normalized.align = block.align;
 	if (['brand', 'hero', 'offer'].includes(block.type) && typeof block.eyebrow === 'string') normalized.eyebrow = block.eyebrow;
 	if (['hero', 'offer', 'signature'].includes(block.type) && typeof block.description === 'string') normalized.description = block.description;
@@ -97,6 +98,7 @@ export function normalizeMailLayout(input) {
 	}
 	if (input.backgroundPlacement === 'canvas') layout.backgroundPlacement = 'canvas';
 	if (input.headingFont === 'serif') layout.headingFont = 'serif';
+	if (input.frame === 'source') layout.frame = 'source';
 	layout.blocks = input.blocks.map(normalizeMailBlock);
 	if (new Set(layout.blocks.map(({ id }) => id)).size !== layout.blocks.length)
 		throw new Error('В макете повторяются блоки.');
@@ -222,6 +224,7 @@ export function renderMailLayout(layout) {
 	const rule = blend(surface, ink, 0.22);
 	const rows = layout.blocks.map((block) => {
 		const { type, text, url } = block;
+		if (type === 'html') return readText(block.html);
 		const value = inline(text);
 		const align = alignments.includes(block.align) ? block.align : 'left';
 		if (type === 'heading') return value ? `<h1 style="font-family:${font};text-align:${align};font-size:26px;font-size:clamp(21px,4.8vw,28px);line-height:1.25;margin:0 0 14px;color:${ink};font-weight:700">${value}</h1>` : '';
@@ -244,6 +247,7 @@ export function renderMailLayout(layout) {
 		return renderCampaignBlock(block, { ink, accent, surface, font, rule, align });
 	}).join('');
 	if (!rows) return '';
+	if (layout.frame === 'source') return rows;
 	return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${background}"${canvas ? '' : backdrop.attr} style="width:100%;background-color:${background}${canvas ? '' : backdrop.css}">
 		<tbody><tr><td align="center" style="padding:24px 3%">
 			<table role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="${surface}"${canvas ? backdrop.attr : ''} style="width:100%;max-width:600px;background-color:${surface};border-radius:16px${canvas ? backdrop.css : ''}">
