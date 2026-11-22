@@ -10,7 +10,13 @@ import {
 	Send,
 	X,
 } from "lucide-react";
-import { type FormEvent, useId, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useDeferredValue,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import {
 	type Mailbox,
 	type MailDraft,
@@ -18,6 +24,8 @@ import {
 	mailService,
 } from "@/services/mail.service";
 import { MailTemplates } from "./MailTemplates";
+import { mailHtmlLimit, mailTextHtml } from "../../../shared/mail-layout.js";
+import { MailHtmlPreview } from "./MailHtmlPreview";
 
 export const emptyMailDraft: MailDraft = {
 	to: "",
@@ -79,6 +87,10 @@ export function MailComposer({
 	const [error, setError] = useState("");
 	const [confirmClose, setConfirmClose] = useState(false);
 	const [showTemplates, setShowTemplates] = useState(false);
+	const [bodyView, setBodyView] = useState<"preview" | "html" | "text">(
+		"preview",
+	);
+	const richContent = useDeferredValue(fields.html);
 	const messageInput = useRef<HTMLTextAreaElement>(null);
 	const templateCursor = useRef<number | undefined>(undefined);
 	const recentKey =
@@ -138,7 +150,7 @@ export function MailComposer({
 		onError: (issue) => setError(issue.message),
 	});
 	const change = (
-		key: "to" | "cc" | "bcc" | "subject" | "text",
+		key: "to" | "cc" | "bcc" | "subject" | "text" | "html",
 		value: string,
 	) => setFields((current) => ({ ...current, [key]: value }));
 	const close = () => {
@@ -151,20 +163,31 @@ export function MailComposer({
 		if (!mutation.isPending) mutation.mutate("send");
 	};
 	const insertTemplate = (template: MailTemplate) => {
-		const cursor = templateCursor.current ?? fields.text.length;
+		const cursor =
+			fields.html != null
+				? fields.text.length
+				: (templateCursor.current ?? fields.text.length);
 		const before = fields.text.slice(0, cursor);
 		const after = fields.text.slice(cursor);
 		const prefix = before && !before.endsWith("\n") ? `${before}\n\n` : before;
 		const suffix = after && !after.startsWith("\n") ? `\n\n${after}` : after;
 		const text = `${prefix}${template.body}${suffix}`;
-		if (text.length > 200000)
+		const html =
+			fields.html != null
+				? `${fields.html}${template.html ?? mailTextHtml(`\n\n${template.body}`)}`
+				: template.html
+					? `${mailTextHtml(prefix)}${template.html}${mailTextHtml(suffix)}`
+					: undefined;
+		if (text.length > 200000 || (html?.length ?? 0) > mailHtmlLimit)
 			return "Шаблон увеличит письмо сверх допустимого размера.";
 		setFields({
 			...fields,
 			text,
+			html,
 			subject: fields.subject.trim() ? fields.subject : template.subject,
 		});
 		setShowTemplates(false);
+		if (html != null) setBodyView("preview");
 		requestAnimationFrame(() => {
 			messageInput.current?.focus({ preventScroll: true });
 			const end = prefix.length + template.body.length;
@@ -183,6 +206,7 @@ export function MailComposer({
 			<section
 				aria-label={draft.threadId ? "Ответ на письмо" : "Редактор письма"}
 				className="mail-modal mail-composer"
+				data-templates={showTemplates}
 			>
 				<header className="mail-modal-heading">
 					<div>
@@ -330,15 +354,69 @@ export function MailComposer({
 									onChange={(e) => change("subject", e.target.value)}
 								/>
 							</label>
-							<label className="mail-field mail-body-field">
-								Сообщение
-								<textarea
-									ref={messageInput}
-									maxLength={200000}
-									value={fields.text}
-									onChange={(e) => change("text", e.target.value)}
-								/>
-							</label>
+							{fields.html != null && (
+								<nav
+									className="mail-template-scopes"
+									aria-label="Представление письма"
+								>
+									{(
+										[
+											["preview", "Предпросмотр"],
+											["html", "HTML-код"],
+											["text", "Текстовая версия"],
+										] as const
+									).map(([view, label]) => (
+										<button
+											key={view}
+											type="button"
+											className="mail-category"
+											aria-pressed={bodyView === view}
+											onClick={() => setBodyView(view)}
+										>
+											{label}
+										</button>
+									))}
+									<button
+										type="button"
+										className="mail-category"
+										onClick={() =>
+											setFields((current) => ({ ...current, html: undefined }))
+										}
+									>
+										Убрать вёрстку
+									</button>
+								</nav>
+							)}
+							{fields.html == null || bodyView === "text" ? (
+								<label className="mail-field mail-body-field">
+									{fields.html == null
+										? "Сообщение"
+										: "Текст письма без вёрстки"}
+									<textarea
+										ref={messageInput}
+										maxLength={200000}
+										value={fields.text}
+										onChange={(e) => change("text", e.target.value)}
+									/>
+								</label>
+							) : bodyView === "html" ? (
+								<label className="mail-field">
+									HTML письма
+									<textarea
+										className="mail-html-source"
+										spellCheck={false}
+										maxLength={mailHtmlLimit}
+										value={fields.html}
+										onChange={(e) => change("html", e.target.value)}
+									/>
+								</label>
+							) : richContent ? (
+								<MailHtmlPreview html={richContent} />
+							) : (
+								<p className="mail-layout-empty">
+									Добавьте содержимое на вкладке «HTML-код».
+								</p>
+							)}
 							{fields.preservedAttachments && (
 								<p className="mail-muted">
 									Вложения черновика сохранятся при отправке.

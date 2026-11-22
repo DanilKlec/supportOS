@@ -5,6 +5,7 @@ dist-ssr
 *.local
 .env
 .env.collector
+/server/mail/mail-sanitizer.cjs
 .nitro
 .tanstack
 .wrangler

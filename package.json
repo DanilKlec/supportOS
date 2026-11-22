@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
+    "postinstall": "esbuild node_modules/sanitize-html/index.js --bundle --platform=node --target=node22 --outfile=server/mail/mail-sanitizer.cjs",
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
@@ -32,9 +33,11 @@
     "@tanstack/router-plugin": "^1.132.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "esbuild": "0.28.2",
     "express": "^5.2.1",
     "framer-motion": "^11.0.0",
     "fuse.js": "^6.6.2",
+    "html-to-text": "10.0.1",
     "lucide-react": "^0.545.0",
     "openai": "^6.42.0",
     "react": "^19.2.0",
@@ -42,6 +45,7 @@
     "react-markdown": "^9.0.0",
     "read-excel-file": "9.3.10",
     "remark-gfm": "^4.0.0",
+    "sanitize-html": "2.18.2",
     "tailwindcss": "^4.1.18",
     "zustand": "^4.4.0"
   },

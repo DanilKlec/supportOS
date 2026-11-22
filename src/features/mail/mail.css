@@ -962,12 +962,23 @@
 	margin-block: 1.05rem;
 }
 .mail-html {
+	display: block;
 	width: 100%;
 	min-height: 220px;
 	margin-block: 0.7rem;
 	border: 1px solid var(--mail-line);
 	border-radius: 0.5rem;
 	background: white;
+}
+.mail-html-preview {
+	min-width: 0;
+}
+.mail-html-preview .mail-button {
+	margin-top: 0.35rem;
+}
+.mail-html-source {
+	font-family: ui-monospace, Consolas, monospace;
+	tab-size: 2;
 }
 .mail-attachments,
 .mail-message-actions,
@@ -1015,6 +1026,92 @@
 }
 .mail-composer {
 	width: min(100%, 44rem);
+}
+.mail-composer[data-templates="true"] {
+	width: min(100%, 62rem);
+}
+.mail-layout-studio {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	align-items: start;
+	gap: 0.8rem;
+}
+.mail-layout-settings,
+.mail-layout-blocks {
+	display: grid;
+	min-width: 0;
+	gap: 0.6rem;
+}
+.mail-layout-preview {
+	position: sticky;
+	top: 0.35rem;
+	min-width: 0;
+	padding: 0.65rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.7rem;
+	background: var(--mail-panel);
+}
+.mail-layout-preview .mail-html {
+	min-height: min(39dvh, 24rem);
+}
+.mail-layout-preview h4,
+.mail-layout-tools legend {
+	font-size: 0.8rem;
+	font-weight: 650;
+}
+.mail-layout-empty {
+	padding: 0.75rem 0;
+	color: var(--color-muted);
+	font-size: 0.78rem;
+}
+.mail-layout-swatches,
+.mail-layout-tools {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+.mail-layout-tools legend {
+	margin-bottom: 0.4rem;
+}
+.mail-layout-swatch {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.35rem 0.45rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.5rem;
+	font-size: 0.72rem;
+	cursor: pointer;
+}
+.mail-layout-swatch input {
+	width: 1.1rem;
+	height: 1.1rem;
+	cursor: pointer;
+}
+.mail-layout-block {
+	display: grid;
+	gap: 0.46rem;
+	padding: 0.5rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.65rem;
+	background: var(--mail-panel);
+}
+.mail-layout-block-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.8rem;
+}
+.mail-layout-block-heading strong {
+	flex: 1;
+}
+.mail-layout-block-heading .mail-icon {
+	width: 1.65rem;
+	min-height: 1.65rem;
+}
+.mail-layout-block textarea {
+	min-height: 3.6rem;
 }
 .mail-composer-tools {
 	display: flex;
@@ -1412,6 +1509,12 @@
 	}
 }
 @media (max-width: 560px) {
+	.mail-layout-studio {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.mail-layout-preview {
+		position: static;
+	}
 	.mail-template-grid {
 		grid-template-columns: minmax(0, 1fr);
 		min-height: 0;
