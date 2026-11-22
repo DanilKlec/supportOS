@@ -19,21 +19,8 @@ import {
 	type MailTemplateScope,
 	mailService,
 } from "@/services/mail.service";
-import {
-	defaultMailLayout,
-	mailHtmlLimit,
-	renderMailLayout,
-} from "../../../shared/mail-layout.js";
-import { MailHtmlPreview } from "./MailHtmlPreview";
-import { MailLayoutBuilder } from "./MailLayoutBuilder";
 
 const emptyTemplate: MailTemplateInput = { title: "", subject: "", body: "" };
-const formats = [
-	["text", "Текст"],
-	["builder", "Конструктор"],
-	["html", "HTML-код"],
-] as const;
-type TemplateFormat = (typeof formats)[number][0];
 
 export function MailTemplates({
 	box,
@@ -92,7 +79,6 @@ function TemplateCollection({
 	const query = useDeferredValue(search.trim());
 	const [selected, setSelected] = useState("");
 	const [editor, setEditor] = useState<MailTemplateInput>();
-	const [format, setFormat] = useState<TemplateFormat>("text");
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [insertionError, setInsertionError] = useState("");
 	const listKey = ["mail", "templates", scope, scopeId];
@@ -140,17 +126,9 @@ function TemplateCollection({
 	};
 	const openEditor = (template?: MailTemplate) => {
 		save.reset();
-		setFormat(template?.layout ? "builder" : template?.html ? "html" : "text");
 		setEditor(template ?? emptyTemplate);
 	};
 	const error = remove.error?.message || insertionError;
-	const editorHtml = useDeferredValue(editor?.html ?? "");
-	const hasContent =
-		format === "text"
-			? editor?.body.trim()
-			: format === "html"
-				? editor?.html?.trim()
-				: editor?.layout?.blocks.length;
 
 	return (
 		<>
@@ -159,13 +137,7 @@ function TemplateCollection({
 					className="mail-template-form"
 					onSubmit={(event) => {
 						event.preventDefault();
-						if (save.isPending || !hasContent) return;
-						save.mutate({
-							...editor,
-							body: format === "text" ? editor.body : "",
-							html: format === "html" ? editor.html : null,
-							layout: format === "builder" ? editor.layout : null,
-						});
+						if (!save.isPending) save.mutate(editor);
 					}}
 				>
 					<h3>{editor.id ? "Редактировать шаблон" : "Новый шаблон"}</h3>
@@ -190,84 +162,17 @@ function TemplateCollection({
 							}
 						/>
 					</label>
-					<nav className="mail-template-scopes" aria-label="Формат шаблона">
-						{formats.map(([key, label]) => (
-							<button
-								key={key}
-								type="button"
-								className="mail-category"
-								aria-pressed={format === key}
-								onClick={() => {
-									if (
-										key === "html" &&
-										format === "builder" &&
-										editor.html == null &&
-										editor.layout
-									)
-										setEditor({
-											...editor,
-											html: renderMailLayout(editor.layout),
-										});
-									setFormat(key);
-								}}
-							>
-								{label}
-							</button>
-						))}
-					</nav>
-					{format === "text" && (
-						<label className="mail-field">
-							Текст шаблона
-							<textarea
-								required
-								maxLength={200000}
-								value={editor.body}
-								onChange={(event) =>
-									setEditor({ ...editor, body: event.target.value })
-								}
-							/>
-						</label>
-					)}
-					{format === "builder" && (
-						<MailLayoutBuilder
-							layout={editor.layout ?? defaultMailLayout}
-							onChange={(layout) => setEditor({ ...editor, layout })}
+					<label className="mail-field">
+						Текст шаблона
+						<textarea
+							required
+							maxLength={200000}
+							value={editor.body}
+							onChange={(event) =>
+								setEditor({ ...editor, body: event.target.value })
+							}
 						/>
-					)}
-					{format === "html" && (
-						<div className="mail-layout-studio">
-							<div className="mail-layout-settings">
-								<label className="mail-field">
-									HTML шаблона
-									<textarea
-										className="mail-html-source"
-										required
-										spellCheck={false}
-										maxLength={mailHtmlLimit}
-										value={editor.html ?? ""}
-										onChange={(event) =>
-											setEditor({ ...editor, html: event.target.value })
-										}
-										placeholder="<table>…</table>"
-									/>
-								</label>
-								<p className="mail-muted">
-									Таблицы и стили в атрибутах style сохраняются при отправке.
-								</p>
-							</div>
-							<section
-								className="mail-layout-preview"
-								aria-label="Предпросмотр HTML"
-							>
-								<h4>Предпросмотр</h4>
-								{editorHtml.trim() ? (
-									<MailHtmlPreview html={editorHtml} />
-								) : (
-									<p className="mail-layout-empty">Вставьте HTML письма.</p>
-								)}
-							</section>
-						</div>
-					)}
+					</label>
 					{save.error && (
 						<p className="mail-error" role="alert">
 							{save.error.message}
@@ -289,7 +194,9 @@ function TemplateCollection({
 							type="submit"
 							className="mail-button"
 							data-primary="true"
-							disabled={save.isPending || !editor.title.trim() || !hasContent}
+							disabled={
+								save.isPending || !editor.title.trim() || !editor.body.trim()
+							}
 						>
 							{save.isPending ? "Сохраняем…" : "Сохранить шаблон"}
 						</button>
@@ -387,13 +294,9 @@ function TemplateCollection({
 												Тема письма <strong>{detail.data.subject}</strong>
 											</p>
 										)}
-										{detail.data.html ? (
-											<MailHtmlPreview html={detail.data.html} />
-										) : (
-											<p className="mail-template-text supportos-scroll">
-												{detail.data.body}
-											</p>
-										)}
+										<p className="mail-template-text supportos-scroll">
+											{detail.data.body}
+										</p>
 										{error && (
 											<p className="mail-error" role="alert">
 												{error}

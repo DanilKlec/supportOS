@@ -18,17 +18,10 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				title: string;
 				subject: string;
 				body: string;
-				html?: string;
-				layout?: unknown;
 				revision: number;
 		  }
 		| undefined;
 	let personalTemplate: typeof template;
-	const layoutBackground = "https://media.example.invalid/background.gif";
-	const layoutImage = "https://media.example.invalid/banner.gif";
-	const richHeading = "Оформленный ответ";
-	const richHtml = `<table background="${layoutBackground}"><tbody><tr><td><h1>${richHeading}</h1><img src="${layoutImage}" alt="Баннер"></td></tr></tbody></table>`;
-	const importedHtml = '<p style="color:#334488">Вставленный HTML</p>';
 	const greeting = "Проверяем ваше обращение.";
 	const labels = [
 		{ id: "Label_1", name: "Проекты/Платежи", type: "user" },
@@ -244,24 +237,10 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				return route.fulfill({ json: { templates: rows, next: null } });
 			}
 			case "save-template": {
+				expect(box).toBe("test-31");
 				const personal = url.searchParams.get("scope") === "personal";
-				expect(personal ? ["test-0", "test-31"] : ["test-31"]).toContain(box);
 				const previous = personal ? personalTemplate : template;
 				const draft = request.postDataJSON();
-				if (draft.layout) {
-					expect(draft.layout).toMatchObject({
-						backgroundImage: layoutBackground,
-						blocks: [
-							{ type: "heading", text: richHeading },
-							{ type: "image", url: layoutImage, text: "Баннер" },
-						],
-					});
-					draft.html = richHtml;
-					draft.body = richHeading;
-				} else if (draft.html) {
-					expect(draft.html).toBe(importedHtml);
-					draft.body = "Вставленный HTML";
-				}
 				if (draft.id) expect(draft.revision).toBe(previous?.revision);
 				const saved = {
 					...draft,
@@ -272,13 +251,6 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				else template = saved;
 				return route.fulfill({ json: saved });
 			}
-			case "save-draft":
-				expect(box).toBe("test-0");
-				expect(request.postDataJSON()).toMatchObject({
-					html: expect.stringContaining(importedHtml),
-					text: expect.stringContaining(richHeading),
-				});
-				return route.fulfill({ json: { id: "layout-draft" } });
 			case "delete-template":
 				expect(box).toBe("test-31");
 				expect(request.postDataJSON()).toEqual({ id: templateId, revision: 2 });
@@ -667,96 +639,4 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await expect(
 		newComposer.getByRole("textbox", { name: "Сообщение" }),
 	).toHaveValue("Личный тестовый ответ.");
-	await newComposer
-		.getByRole("button", { name: "Шаблоны", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Личные", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Новый шаблон", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "Название", exact: true })
-		.fill("Вёрстка с GIF");
-	await templatePanel
-		.getByRole("button", { name: "Конструктор", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "Фоновое изображение или GIF" })
-		.fill(layoutBackground);
-	await templatePanel
-		.getByRole("button", { name: "Заголовок", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "Текст заголовка" })
-		.fill(richHeading);
-	await templatePanel
-		.getByRole("button", { name: "Картинка / GIF", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "Ссылка на картинку или GIF" })
-		.fill(layoutImage);
-	await templatePanel
-		.getByRole("textbox", { name: "Описание картинки" })
-		.fill("Баннер");
-	const preview = templatePanel.frameLocator(
-		'iframe[title="Предпросмотр HTML-письма"]',
-	);
-	await expect(
-		preview.getByRole("heading", { name: richHeading }),
-	).toBeVisible();
-	await expect(preview.getByRole("img", { name: "Баннер" })).toHaveAttribute(
-		"src",
-		layoutImage,
-	);
-	await page.screenshot({
-		path: info.outputPath("mail-layout-builder.png"),
-		animations: "disabled",
-	});
-	await templatePanel
-		.getByRole("button", { name: "Сохранить шаблон", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Вставить в письмо" })
-		.click();
-	await newComposer
-		.getByRole("button", { name: "HTML-код", exact: true })
-		.click();
-	await expect(
-		newComposer.getByRole("textbox", { name: "HTML письма" }),
-	).toHaveValue(/Личный тестовый ответ[\s\S]*banner\.gif/);
-	await newComposer
-		.getByRole("button", { name: "Шаблоны", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Личные", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Новый шаблон", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "Название", exact: true })
-		.fill("Готовый HTML");
-	await templatePanel
-		.getByRole("button", { name: "HTML-код", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("textbox", { name: "HTML шаблона" })
-		.fill(importedHtml);
-	await expect(
-		preview.getByText("Вставленный HTML", { exact: true }),
-	).toBeVisible();
-	await templatePanel
-		.getByRole("button", { name: "Сохранить шаблон", exact: true })
-		.click();
-	await templatePanel
-		.getByRole("button", { name: "Вставить в письмо" })
-		.click();
-	await newComposer
-		.getByRole("button", { name: "Сохранить черновик", exact: true })
-		.click();
-	await expect(
-		mail.getByText("Черновик сохранён", { exact: true }),
-	).toBeVisible();
 });

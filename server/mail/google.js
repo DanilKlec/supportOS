@@ -1,6 +1,4 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mailHtmlLimit } from '../../shared/mail-layout.js';
-import { plainFromMailHtml, sanitizeMailHtml } from './mail-html.js';
 
 const scope = 'https://www.googleapis.com/auth/gmail.modify';
 const tokens = new Map();
@@ -173,23 +171,12 @@ export function composeRaw(address, input, allowEmpty) {
 	if (!allowEmpty && !to.length && !cc.length && !bcc.length) throw mailError('Добавьте хотя бы одного адресата.');
 	const subject = input.subject ?? '';
 	const text = input.text ?? '';
-	const rawHtml = input.html ?? '';
 	if (typeof subject !== 'string' || subject.length > 500 || /[\r\n\0]/.test(subject) || typeof text !== 'string' || text.length > 200_000)
 		throw mailError('Проверьте тему и размер письма.');
-	if (typeof rawHtml !== 'string' || rawHtml.length > mailHtmlLimit) throw mailError('HTML письма превышает допустимый размер.');
-	const html = rawHtml.trim() ? sanitizeMailHtml(rawHtml) : '';
-	if (html.length > mailHtmlLimit) throw mailError('HTML письма превышает допустимый размер.');
-	if (rawHtml.trim() && !html) throw mailError('В HTML не осталось содержимого для отправки.');
-	const plain = text || (html ? plainFromMailHtml(html).slice(0, 200_000) : '');
 	const reply = typeof input.replyId === 'string' && /^<[^<>\s]{1,250}>$/.test(input.replyId) ? input.replyId : null;
 	const header = [`From: ${address}`, to.length && `To: ${to.join(',\r\n ')}`, cc.length && `Cc: ${cc.join(',\r\n ')}`, bcc.length && `Bcc: ${bcc.join(',\r\n ')}`,
 		`Subject: ${encodedWords(subject)}`, reply && `In-Reply-To: ${reply}`, reply && `References: ${reply}`, 'MIME-Version: 1.0'];
-	const contentPart = (type, value) => [`Content-Type: ${type}; charset=UTF-8`, 'Content-Transfer-Encoding: base64', '', base64Lines(Buffer.from(value).toString('base64'))];
-	const textPart = contentPart('text/plain', plain);
-	const alternative = `supportos-alt-${randomUUID()}`;
-	const body = html
-		? [`Content-Type: multipart/alternative; boundary="${alternative}"`, '', `--${alternative}`, ...textPart, `--${alternative}`, ...contentPart('text/html', html), `--${alternative}--`]
-		: textPart;
+	const textPart = ['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', base64Lines(Buffer.from(text).toString('base64'))];
 	const attachments = input.attachments ?? [];
 	if (!Array.isArray(attachments) || attachments.length > 8) throw mailError('Добавьте до восьми вложений.');
 	const boundary = `supportos-${randomUUID()}`;
@@ -203,6 +190,6 @@ export function composeRaw(address, input, allowEmpty) {
 		const filename = encodeURIComponent(name.replaceAll(/[\x00-\x1f\x7f]/g, '_')).replaceAll(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16)}`);
 		return [`--${boundary}`, 'Content-Type: application/octet-stream', `Content-Disposition: attachment; filename*=UTF-8''${filename}`, 'Content-Transfer-Encoding: base64', '', base64Lines(data)];
 	});
-	const mime = parts.length ? [...header, `Content-Type: multipart/mixed; boundary="${boundary}"`, '', `--${boundary}`, ...body, ...parts.flat(), `--${boundary}--`] : [...header, ...body];
+	const mime = parts.length ? [...header, `Content-Type: multipart/mixed; boundary="${boundary}"`, '', `--${boundary}`, ...textPart, ...parts.flat(), `--${boundary}--`] : [...header, ...textPart];
 	return Buffer.from(mime.filter((line) => line !== false && line !== null).join('\r\n')).toString('base64url');
 }

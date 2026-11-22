@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Download, Forward, Reply, ReplyAll } from "lucide-react";
+import { useMemo } from "react";
 import {
 	type MailAttachment,
 	type MailDraft,
@@ -8,7 +9,6 @@ import {
 	mailService,
 } from "@/services/mail.service";
 import { emptyMailDraft } from "./MailComposer";
-import { MailHtmlPreview, plainFromMailPreview } from "./MailHtmlPreview";
 
 const formatter = new Intl.DateTimeFormat("ru", {
 	dateStyle: "medium",
@@ -19,16 +19,45 @@ export const mailDate = (timestamp: number) =>
 		? formatter.format(timestamp)
 		: "";
 
+function htmlTemplate(value: string) {
+	const template = document.createElement("template");
+	template.innerHTML = value;
+	for (const element of template.content.querySelectorAll(
+		"script,iframe,frame,frameset,link,meta,object,embed,base,form,input,button,svg,video,audio,source",
+	))
+		element.remove();
+	for (const image of template.content.querySelectorAll("img")) image.remove();
+	for (const link of template.content.querySelectorAll("a")) {
+		const target = link.getAttribute("href")?.trim() ?? "";
+		link.removeAttribute("href");
+		if (!/^https?:\/\//i.test(target)) continue;
+		link.append(document.createTextNode(` (${target})`));
+	}
+	return template;
+}
+
 export function plainMailBody(message: MailMessage) {
-	return message.text || plainFromMailPreview(message.html);
+	return message.text || htmlTemplate(message.html).content.textContent || "";
 }
 
 function MailBody({ message }: { message: MailMessage }) {
-	if (message.html)
-		return <MailHtmlPreview html={message.html} title="Содержимое письма" />;
+	const safeHtml = useMemo(
+		() =>
+			message.html && !message.text ? htmlTemplate(message.html).innerHTML : "",
+		[message.html, message.text],
+	);
 	if (message.text)
 		return <div className="mail-message-body">{message.text}</div>;
-	return <p className="mail-muted">Письмо без текста</p>;
+	if (!safeHtml) return <p className="mail-muted">Письмо без текста</p>;
+	return (
+		<iframe
+			className="mail-html"
+			title="Содержимое письма"
+			sandbox=""
+			referrerPolicy="no-referrer"
+			srcDoc={`<!doctype html><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>body { font: 14px/1.55 system-ui; margin:12px; overflow-wrap:anywhere; color:#172231; background:#fff; } pre { white-space:pre-wrap; }</style>${safeHtml}`}
+		/>
+	);
 }
 
 function MessageCard({

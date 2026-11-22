@@ -2,8 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, expect, test, vi } from 'vitest';
 import { completeGoogle, composeRaw, googleConfig, readMessage, seal, startGoogle } from './google.js';
-import { plainFromMailHtml, sanitizeMailHtml } from './mail-html.js';
-import { defaultMailLayout, normalizeMailLayout, renderMailLayout } from '../../shared/mail-layout.js';
 import handler from './index.js';
 
 const identities = vi.hoisted(() => ({ actor: undefined }));
@@ -144,62 +142,6 @@ test('mailbox members create Gmail labels and move a thread without removing its
 		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_1'], removeLabelIds: ['Label_2'] }],
 		['/gmail/v1/users/me/labels/Label_1', { color: colors }],
 	]);
-});
-
-test('HTML composition preserves background and GIF through MIME, and supplies a plain alternative', () => {
-	const layout = normalizeMailLayout({
-		...defaultMailLayout,
-		backgroundImage: 'https://images.example.invalid/background.gif',
-		blocks: [
-			{ id: 'heading', type: 'heading', text: 'Привет', url: '' },
-			{ id: 'image', type: 'image', text: 'Анимация', url: 'https://images.example.invalid/banner.gif' },
-			{ id: 'button', type: 'button', text: 'Подробности', url: 'https://example.invalid/details' },
-		],
-	});
-	const html = renderMailLayout(layout);
-	const clean = sanitizeMailHtml(`${html}<script>Отклонённый блок</script><p>Обычный текст</p>`);
-	expect(clean).toContain('background-image');
-	expect(clean).toContain('https://images.example.invalid/background.gif');
-	expect(clean).toContain('https://images.example.invalid/banner.gif');
-	expect(clean).toContain('https://example.invalid/details');
-	expect(clean).not.toContain('Отклонённый блок');
-	expect(plainFromMailHtml(clean)).toContain('Анимация');
-	const raw = Buffer.from(composeRaw(address, {
-		to: 'recipient@example.invalid',
-		subject: 'HTML письмо',
-		html: clean,
-		attachments: [{ name: 'notice.txt', data: 'YQ==' }],
-	}, false), 'base64url').toString('utf8');
-	expect(raw).toContain('multipart/mixed;');
-	expect(raw).toContain('multipart/alternative;');
-	const plainPart = raw.match(/Content-Type: text\/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)\r\n--supportos-alt-/)?.[1];
-	const htmlPart = raw.match(/Content-Type: text\/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)\r\n--supportos-alt-/)?.[1];
-	expect(Buffer.from(plainPart, 'base64').toString()).toContain('Привет');
-	expect(Buffer.from(htmlPart, 'base64').toString()).toContain('banner.gif');
-	expect(raw).toContain('notice.txt');
-});
-
-test('template API validates and reconstructs a saved block layout', async () => {
-	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
-	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
-	vi.stubGlobal('fetch', vi.fn(async (url, options) => {
-		const parsed = new URL(url);
-		expect(parsed.hostname).toBe('database.invalid');
-		if (parsed.pathname.endsWith('/supportos_mailbox_members')) return Response.json([{ user_id: userId }]);
-		if (parsed.pathname.endsWith('/supportos_mailboxes')) return Response.json([{ id: mailboxId }]);
-		const record = JSON.parse(options.body);
-		expect(record.owner_id).toBe(userId);
-		return Response.json([record]);
-	}));
-	const query = `&box=${mailboxId}&scope=personal`;
-	const layout = { ...defaultMailLayout, blocks: [{ id: 'copy', type: 'text', text: 'Шаблон', url: '' }] };
-	const saved = await call('POST', 'save-template', query, { title: 'Дизайн', layout, html: '<p>Устаревший код</p>' });
-	expect(saved).toMatchObject({ status: 200, body: { body: 'Шаблон', layout } });
-	expect(saved.body.html).not.toContain('Устаревший код');
-	const imported = await call('POST', 'save-template', query, { title: 'Импорт', html: '<body style="background-color:#eeeeee"><h1>Содержимое</h1></body>' });
-	expect(imported).toMatchObject({ status: 200, body: { body: 'Содержимое', layout: null } });
-	expect(imported.body.html).toContain('background-color:#eeeeee');
-	expect((await call('POST', 'save-template', query, { title: 'Пустой', layout: defaultMailLayout })).status).toBe(400);
 });
 
 test('template actions use mailbox membership and reject overwriting a newer version', async () => {
@@ -351,8 +293,6 @@ test('migrations preserve shared templates and isolate private templates by owne
 		const saved = await db.query(insert, [id, 'Проверка', 'Шаблон для ответа.']);
 		expect(saved.rows[0].revision).toBe(1);
 		await db.exec(await readFile(new URL('../../supabase/migrations/20261120055203_personal_mail_templates.sql', import.meta.url), 'utf8'));
-		await db.exec(await readFile(new URL('../../supabase/migrations/20261120225320_html_mail_templates.sql', import.meta.url), 'utf8'));
-		expect((await db.query('select html, layout from public.supportos_mail_templates')).rows).toEqual([{ html: null, layout: null }]);
 		expect((await db.query('select owner_id, mailbox_id from public.supportos_mail_templates')).rows).toEqual([{ owner_id: null, mailbox_id: id }]);
 		const insertPersonal = 'insert into public.supportos_mail_templates (owner_id,title,body) values ($1,$2,$3)';
 		await db.query(insertPersonal, [userId, 'Проверка', 'Личный текст.']);

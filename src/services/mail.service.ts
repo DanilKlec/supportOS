@@ -1,4 +1,3 @@
-import type { MailLayout } from "../../shared/mail-layout.js";
 import { authenticatedFetch } from "./authenticated-fetch";
 
 export type Mailbox = { id: string; address: string; provider: "gmail" };
@@ -24,14 +23,10 @@ export type MailTemplateSummary = {
 	subject: string;
 	revision: number;
 };
-export type MailTemplate = MailTemplateSummary & {
-	body: string;
-	html?: string | null;
-	layout?: MailLayout | null;
-};
+export type MailTemplate = MailTemplateSummary & { body: string };
 export type MailTemplateInput = Pick<
 	MailTemplate,
-	"title" | "subject" | "body" | "html" | "layout"
+	"title" | "subject" | "body"
 > &
 	Partial<Pick<MailTemplate, "id" | "revision">>;
 export type StaffMember = { id: string; email: string; display_name: string };
@@ -70,7 +65,6 @@ export type MailDraft = {
 	bcc: string;
 	subject: string;
 	text: string;
-	html?: string;
 	threadId?: string;
 	replyId?: string;
 	draftId?: string;
