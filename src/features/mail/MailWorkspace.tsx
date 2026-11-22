@@ -376,6 +376,7 @@ export function MailWorkspace() {
 					bcc: message.bcc,
 					subject: message.subject,
 					text: plainMailBody(message),
+					html: message.html || undefined,
 					threadId: message.inReplyTo ? message.threadId : undefined,
 					replyId: message.inReplyTo ?? undefined,
 					preservedAttachments: message.attachments.length > 0,
