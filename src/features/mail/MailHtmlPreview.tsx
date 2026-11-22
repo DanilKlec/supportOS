@@ -33,9 +33,11 @@ export function plainFromMailPreview(value: string) {
 export function MailHtmlPreview({
 	html,
 	title = "Предпросмотр HTML-письма",
+	flush = false,
 }: {
 	html: string;
 	title?: string;
+	flush?: boolean;
 }) {
 	const [showImages, setShowImages] = useState(false);
 	const fragment = useMemo(() => mailFragment(html).innerHTML, [html]);
@@ -60,7 +62,7 @@ export function MailHtmlPreview({
 				title={title}
 				sandbox=""
 				referrerPolicy="no-referrer"
-				srcDoc={`<!doctype html><meta charset="UTF-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${showImages ? "https:" : "'none'"}; base-uri 'none'; form-action 'none'"><style>body { font: 14px/1.55 system-ui; margin:0; padding:12px; overflow-wrap:anywhere; color:#172231; background:#fff; } img { max-width:100%; } pre { white-space:pre-wrap; }</style>${fragment}`}
+				srcDoc={`<!doctype html><meta charset="UTF-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${showImages ? "https:" : "'none'"}; base-uri 'none'; form-action 'none'"><style>body { font: 14px/1.55 system-ui; margin:0; padding:${flush ? "0" : "12px"}; overflow-wrap:anywhere; color:#172231; background:#fff; } img { max-width:100%; } pre { white-space:pre-wrap; }</style>${fragment}`}
 			/>
 		</div>
 	);

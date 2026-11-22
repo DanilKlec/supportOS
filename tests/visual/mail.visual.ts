@@ -1,3 +1,4 @@
+import { renderMailLayout } from "../../shared/mail-layout.js";
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
@@ -27,7 +28,6 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	const layoutBackground = "https://media.example.invalid/background.gif";
 	const layoutImage = "https://media.example.invalid/banner.gif";
 	const richHeading = "Оформленный ответ";
-	const richHtml = `<table background="${layoutBackground}"><tbody><tr><td><h1>${richHeading}</h1><img src="${layoutImage}" alt="Баннер"></td></tr></tbody></table>`;
 	const importedHtml = '<p style="color:#334488">Вставленный HTML</p>';
 	const greeting = "Проверяем ваше обращение.";
 	const labels = [
@@ -251,12 +251,18 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				if (draft.layout) {
 					expect(draft.layout).toMatchObject({
 						backgroundImage: layoutBackground,
+						backgroundPlacement: "canvas",
+						headingFont: "serif",
 						blocks: [
 							{ type: "heading", text: richHeading },
-							{ type: "image", url: layoutImage, text: "Баннер" },
+							{ type: "hero", url: layoutImage, text: "Добро пожаловать", accentLine: "Nocturne", shade: "strong" },
+							{ type: "offer", text: "Приглашение", description: "Подтвердите участие до пятницы." },
+							{ type: "button", text: "Подтвердить", buttonWidth: "full" },
+							{ type: "signature", text: "Анна" },
+							{ type: "footer", links: [{ text: "Условия", url: "https://example.invalid/terms" }] },
 						],
 					});
-					draft.html = richHtml;
+					draft.html = renderMailLayout(draft.layout);
 					draft.body = richHeading;
 				} else if (draft.html) {
 					expect(draft.html).toBe(importedHtml);
@@ -682,9 +688,12 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await templatePanel
 		.getByRole("button", { name: "Конструктор", exact: true })
 		.click();
+	await templatePanel.getByRole("button", { name: "Золото", exact: true }).click();
 	await templatePanel
 		.getByRole("textbox", { name: "Фоновое изображение или GIF" })
 		.fill(layoutBackground);
+	await templatePanel.getByLabel("Расположение фона").selectOption("canvas");
+	await templatePanel.getByLabel("Шрифт заголовков").selectOption("serif");
 	await templatePanel
 		.getByRole("button", { name: "Заголовок", exact: true })
 		.click();
@@ -692,24 +701,49 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		.getByRole("textbox", { name: "Текст заголовка" })
 		.fill(richHeading);
 	await templatePanel
-		.getByRole("button", { name: "Картинка / GIF", exact: true })
+		.getByRole("button", { name: "Обложка", exact: true })
 		.click();
 	await templatePanel
-		.getByRole("textbox", { name: "Ссылка на картинку или GIF" })
+		.getByRole("textbox", { name: "Заголовок обложки" })
+		.fill("Добро пожаловать");
+	await templatePanel.getByRole("textbox", { name: "Акцентная строка" }).fill("Nocturne");
+	await templatePanel
+		.getByRole("textbox", { name: "Изображение или GIF обложки" })
 		.fill(layoutImage);
 	await templatePanel
-		.getByRole("textbox", { name: "Описание картинки" })
-		.fill("Баннер");
+		.getByLabel("Затемнение изображения")
+		.selectOption("strong");
+	await templatePanel.getByRole("button", { name: "Карточка", exact: true }).click();
+	await templatePanel.getByRole("textbox", { name: "Заголовок карточки" }).fill("Приглашение");
+	await templatePanel.getByRole("textbox", { name: "Дополнительный текст" }).fill("Подтвердите участие до пятницы.");
+	await templatePanel.getByRole("button", { name: "Кнопка", exact: true }).click();
+	await templatePanel.getByRole("textbox", { name: "Текст кнопки" }).fill("Подтвердить");
+	await templatePanel.getByRole("textbox", { name: "Ссылка кнопки" }).fill("https://example.invalid/rsvp");
+	await templatePanel.getByLabel("Ширина кнопки").selectOption("full");
+	await templatePanel.getByRole("button", { name: "Подпись", exact: true }).click();
+	await templatePanel.getByRole("textbox", { name: "Имя в подписи" }).fill("Анна");
+	await templatePanel.getByRole("button", { name: "Подвал", exact: true }).click();
+	await templatePanel.getByRole("button", { name: "Добавить ссылку" }).click();
+	await templatePanel.getByRole("textbox", { name: "Текст ссылки 1" }).fill("Условия");
+	await templatePanel.getByRole("textbox", { name: "Адрес ссылки 1" }).fill("https://example.invalid/terms");
+	if (isMobile) {
+		await templatePanel.getByRole("button", { name: "К предпросмотру" }).click();
+		await expect(templatePanel.getByRole("region", { name: "Предпросмотр конструктора" })).toBeFocused();
+	}
 	const preview = templatePanel.frameLocator(
 		'iframe[title="Предпросмотр HTML-письма"]',
 	);
 	await expect(
 		preview.getByRole("heading", { name: richHeading }),
 	).toBeVisible();
-	await expect(preview.getByRole("img", { name: "Баннер" })).toHaveAttribute(
-		"src",
-		layoutImage,
-	);
+	await expect(preview.getByRole("heading", { name: /Добро пожаловать.*Nocturne/ })).toBeVisible();
+	await expect(preview.locator("td[background]")).toHaveAttribute("background", layoutImage);
+	await expect(preview.getByText("Условия", { exact: true })).toBeVisible();
+	await expect(templatePanel.getByRole("button", { name: "Показать изображения" })).toHaveAttribute("aria-pressed", "false");
+	await templatePanel.getByRole("button", { name: "Мобильный экран" }).click();
+	await expect(templatePanel.getByRole("button", { name: "Мобильный экран" })).toHaveAttribute("aria-pressed", "true");
+	await expect.poll(() => preview.locator("html").evaluate((root) => root.scrollWidth - root.clientWidth)).toBeLessThanOrEqual(1);
+	await templatePanel.getByRole("button", { name: "Широкий экран" }).click();
 	await page.screenshot({
 		path: info.outputPath("mail-layout-builder.png"),
 		animations: "disabled",

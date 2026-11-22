@@ -1,5 +1,23 @@
-export type MailBlockType = "heading" | "text" | "image" | "button" | "divider" | "space";
-export type MailBlock = { id: string; type: MailBlockType; text: string; url: string };
+export type MailBlockType = "brand" | "hero" | "offer" | "signature" | "footer" | "heading" | "text" | "image" | "button" | "divider" | "space";
+export type MailAlignment = "left" | "center" | "right";
+export type MailBlock = {
+	id: string;
+	type: MailBlockType;
+	text: string;
+	url: string;
+	eyebrow?: string;
+	accentLine?: string;
+	description?: string;
+	align?: MailAlignment;
+	heroHeight?: "compact" | "regular" | "tall";
+	imagePosition?: MailAlignment;
+	offerImagePlacement?: "above" | "left";
+	shade?: "none" | "medium" | "strong";
+	buttonWidth?: "auto" | "full";
+	buttonShape?: "rounded" | "pill";
+	spaceHeight?: "small" | "medium" | "large" | "extra";
+	links?: { text: string; url: string }[];
+};
 export type MailLayout = {
 	version: 1;
 	background: string;
@@ -7,6 +25,8 @@ export type MailLayout = {
 	foreground: string;
 	accent: string;
 	backgroundImage: string;
+	backgroundPlacement?: "outer" | "canvas";
+	headingFont?: "sans" | "serif";
 	blocks: MailBlock[];
 };
 export const mailHtmlLimit: number;

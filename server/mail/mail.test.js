@@ -196,6 +196,41 @@ test('template API validates and reconstructs a saved block layout', async () =>
 	const saved = await call('POST', 'save-template', query, { title: 'Дизайн', layout, html: '<p>Устаревший код</p>' });
 	expect(saved).toMatchObject({ status: 200, body: { body: 'Шаблон', layout } });
 	expect(saved.body.html).not.toContain('Устаревший код');
+	const campaign = {
+		...defaultMailLayout,
+		paper: '#152023',
+		foreground: '#f4ede3',
+		accent: '#f4c879',
+		backgroundPlacement: 'canvas',
+		backgroundImage: 'https://images.example.invalid/paper.png',
+		headingFont: 'serif',
+		blocks: [
+			{ id: 'brand', type: 'brand', text: 'Nocturne', url: 'https://images.example.invalid/logo.png' },
+			{ id: 'cover', type: 'hero', text: 'Открытие <зала>', url: 'https://images.example.invalid/cover.gif', align: 'center', heroHeight: 'tall', imagePosition: 'left', shade: 'strong', eyebrow: 'Приглашение', accentLine: 'Nocturne Club', description: 'Добро пожаловать' },
+			{ id: 'offer', type: 'offer', text: 'Ваше участие', url: 'https://images.example.invalid/card.png', offerImagePlacement: 'above', description: 'Подтвердите участие до пятницы' },
+			{ id: 'action', type: 'button', text: 'Подтвердить', url: 'https://example.invalid/rsvp', buttonWidth: 'full', buttonShape: 'pill' },
+			{ id: 'team', type: 'signature', text: 'Анна', url: '', description: 'Ваш менеджер' },
+			{ id: 'links', type: 'footer', text: 'Nocturne', url: '', links: [{ text: 'Условия', url: 'https://example.invalid/terms' }] },
+		],
+	};
+	const campaignResult = await call('POST', 'save-template', query, { title: 'Приглашение', layout: campaign });
+	expect(campaignResult).toMatchObject({ status: 200, body: { layout: campaign } });
+	const { body: fallback, html } = campaignResult.body;
+	expect(fallback).toContain('Открытие <зала>');
+	expect(fallback).toContain('Подтвердите участие до пятницы');
+	expect(fallback).toContain('https://example.invalid/terms');
+	expect(html).toContain('Открытие &lt;зала&gt;');
+	expect(html).toContain('font-family:Georgia,Times New Roman,serif');
+	expect(html).toContain('height="420" bgcolor="#152023" background="https://images.example.invalid/cover.gif"');
+	expect(html).toContain('background-position:left center');
+	expect(html).toContain('background-color:rgba(0,0,0,0.65)');
+	expect(html).toContain('<span style="color:#f4c879">Nocturne Club</span>');
+	expect(html).toContain('display:block;text-align:center;background-color:#f4c879;color:#000000');
+	expect(html).toContain('border-radius:999px');
+	expect(html).toContain('width="600" cellpadding="0" cellspacing="0" bgcolor="#152023" background="https://images.example.invalid/paper.png"');
+	const invalid = structuredClone(campaign);
+	invalid.blocks.find(({ type }) => type === 'hero').url = 'http://images.example.invalid/cover.gif';
+	expect((await call('POST', 'save-template', query, { title: 'Фон', layout: invalid })).status).toBe(400);
 	const imported = await call('POST', 'save-template', query, { title: 'Импорт', html: '<body style="background-color:#eeeeee"><h1>Содержимое</h1></body>' });
 	expect(imported).toMatchObject({ status: 200, body: { body: 'Содержимое', layout: null } });
 	expect(imported.body.html).toContain('background-color:#eeeeee');

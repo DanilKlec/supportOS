@@ -1,15 +1,24 @@
 import {
 	ArrowDown,
 	ArrowUp,
+	ChevronDown,
+	ChevronRight,
 	Heading,
 	Image,
+	LayoutTemplate,
 	Minus,
+	Monitor,
 	MousePointer2,
+	PenLine,
 	Plus,
+	RectangleHorizontal,
+	Smartphone,
+	SquareStack,
 	Text,
 	Trash2,
+	Type,
 } from "lucide-react";
-import { useDeferredValue } from "react";
+import { useDeferredValue, useRef, useState } from "react";
 import {
 	defaultMailLayout,
 	type MailBlock,
@@ -17,16 +26,30 @@ import {
 	type MailLayout,
 	renderMailLayout,
 } from "../../../shared/mail-layout.js";
+import { MailBlockFields, MailLayoutSelect } from "./MailBlockFields";
 import { MailHtmlPreview } from "./MailHtmlPreview";
 
 const colors = [
-	["background", "Фон письма"],
-	["paper", "Фон карточки"],
+	["background", "Внешний фон"],
+	["paper", "Фон письма"],
 	["foreground", "Текст"],
-	["accent", "Кнопки"],
+	["accent", "Акцент"],
+] as const;
+
+const palettes = [
+	{ label: "Светлая", colors: ["#eef2f7", "#ffffff", "#172238", "#394cc9"] },
+	{ label: "Графит", colors: ["#101419", "#1a222a", "#f0f4f7", "#a7c5ff"] },
+	{ label: "Изумруд", colors: ["#071211", "#10221d", "#eaf6ef", "#80e5ab"] },
+	{ label: "Слива", colors: ["#120a1b", "#25162f", "#fcf1ff", "#df9cf5"] },
+	{ label: "Золото", colors: ["#13100d", "#24201a", "#fff4df", "#e7c284"] },
 ] as const;
 
 const blockOptions = {
+	brand: { title: "Бренд", Icon: Type },
+	hero: { title: "Обложка", Icon: LayoutTemplate },
+	offer: { title: "Карточка", Icon: RectangleHorizontal },
+	signature: { title: "Подпись", Icon: PenLine },
+	footer: { title: "Подвал", Icon: SquareStack },
 	heading: { title: "Заголовок", Icon: Heading },
 	text: { title: "Текст", Icon: Text },
 	image: { title: "Картинка / GIF", Icon: Image },
@@ -42,6 +65,10 @@ export function MailLayoutBuilder({
 	layout?: MailLayout;
 	onChange: (layout: MailLayout) => void;
 }) {
+	const [expanded, setExpanded] = useState(layout.blocks[0]?.id ?? "");
+	const [mobile, setMobile] = useState(false);
+	const previewPane = useRef<HTMLElement>(null);
+	const jumpToPreview = useRef<HTMLButtonElement>(null);
 	const preview = renderMailLayout(useDeferredValue(layout));
 	const replace = (id: string, patch: Partial<MailBlock>) =>
 		onChange({
@@ -50,14 +77,14 @@ export function MailLayoutBuilder({
 				block.id === id ? { ...block, ...patch } : block,
 			),
 		});
-	const add = (type: MailBlockType) =>
+	const add = (type: MailBlockType) => {
+		const id = crypto.randomUUID();
 		onChange({
 			...layout,
-			blocks: [
-				...layout.blocks,
-				{ id: crypto.randomUUID(), type, text: "", url: "" },
-			],
+			blocks: [...layout.blocks, { id, type, text: "", url: "" }],
 		});
+		setExpanded(id);
+	};
 	const move = (index: number, direction: number) => {
 		const blocks = [...layout.blocks];
 		const next = index + direction;
@@ -68,33 +95,98 @@ export function MailLayoutBuilder({
 	return (
 		<div className="mail-layout-studio">
 			<div className="mail-layout-settings">
-				<div className="mail-layout-swatches">
-					{colors.map(([key, title]) => (
-						<label className="mail-layout-swatch" key={key}>
+				<button
+					type="button"
+					className="mail-button mail-layout-jump"
+					ref={jumpToPreview}
+					onClick={() => previewPane.current?.focus()}
+				>
+					<Monitor size={15} aria-hidden="true" /> К предпросмотру
+				</button>
+				<details className="mail-layout-appearance" open>
+					<summary>Оформление письма</summary>
+					<div className="mail-layout-appearance-content">
+						<fieldset className="mail-layout-palettes" aria-label="Палитры">
+							{palettes.map(({ label, colors: palette }) => {
+								const [background, paper, foreground, accent] = palette;
+								return (
+									<button
+										key={label}
+										type="button"
+										className="mail-layout-palette"
+										aria-pressed={colors.every(
+											([key], index) => layout[key] === palette[index],
+										)}
+										onClick={() =>
+											onChange({
+												...layout,
+												background,
+												paper,
+												foreground,
+												accent,
+											})
+										}
+									>
+										<span
+											aria-hidden="true"
+											style={{ background: accent, borderColor: paper }}
+										/>
+										{label}
+									</button>
+								);
+							})}
+						</fieldset>
+						<div className="mail-layout-swatches">
+							{colors.map(([key, title]) => (
+								<label className="mail-layout-swatch" key={key}>
+									<input
+										type="color"
+										value={layout[key]}
+										onChange={(event) =>
+											onChange({ ...layout, [key]: event.target.value })
+										}
+									/>
+									<span>{title}</span>
+								</label>
+							))}
+						</div>
+						<label className="mail-field">
+							Фоновое изображение или GIF
 							<input
-								type="color"
-								value={layout[key]}
+								type="url"
+								inputMode="url"
+								placeholder="https://…"
+								maxLength={2048}
+								value={layout.backgroundImage}
 								onChange={(event) =>
-									onChange({ ...layout, [key]: event.target.value })
+									onChange({ ...layout, backgroundImage: event.target.value })
 								}
 							/>
-							<span>{title}</span>
 						</label>
-					))}
-				</div>
-				<label className="mail-field">
-					Фоновое изображение или GIF
-					<input
-						type="url"
-						inputMode="url"
-						placeholder="https://…"
-						maxLength={2048}
-						value={layout.backgroundImage}
-						onChange={(event) =>
-							onChange({ ...layout, backgroundImage: event.target.value })
-						}
-					/>
-				</label>
+						<div className="mail-layout-fields-row">
+							<MailLayoutSelect
+								label="Расположение фона"
+								value={layout.backgroundPlacement ?? "outer"}
+								options={[
+									["outer", "Вокруг письма"],
+									["canvas", "За содержимым"],
+								]}
+								onChange={(backgroundPlacement) =>
+									onChange({ ...layout, backgroundPlacement })
+								}
+							/>
+							<MailLayoutSelect
+								label="Шрифт заголовков"
+								value={layout.headingFont ?? "sans"}
+								options={[
+									["sans", "Без засечек"],
+									["serif", "С засечками"],
+								]}
+								onChange={(headingFont) => onChange({ ...layout, headingFont })}
+							/>
+						</div>
+					</div>
+				</details>
 				<fieldset className="mail-layout-tools">
 					<legend>Добавить блок</legend>
 					{Object.entries(blockOptions).map(([type, { title, Icon }]) => (
@@ -108,14 +200,37 @@ export function MailLayoutBuilder({
 						</button>
 					))}
 				</fieldset>
-				<ol className="mail-layout-blocks">
+				<ol className="mail-layout-blocks" aria-label="Блоки письма">
 					{layout.blocks.map((block, index) => {
 						const { title, Icon } = blockOptions[block.type];
+						const editable = block.type !== "divider";
+						const open = editable && expanded === block.id;
+						const Chevron = open ? ChevronDown : ChevronRight;
 						return (
 							<li className="mail-layout-block" key={block.id}>
 								<div className="mail-layout-block-heading">
-									<Icon size={15} aria-hidden="true" />
-									<strong>{title}</strong>
+									{editable ? (
+										<button
+											type="button"
+											className="mail-layout-block-toggle"
+											aria-expanded={open}
+											onClick={() => setExpanded(open ? "" : block.id)}
+										>
+											<Icon size={15} aria-hidden="true" />
+											<span>
+												<strong>{title}</strong>
+												{block.text.trim() && (
+													<small>{block.text.trim()}</small>
+												)}
+											</span>
+											<Chevron size={14} aria-hidden="true" />
+										</button>
+									) : (
+										<div className="mail-layout-block-toggle">
+											<Icon size={15} aria-hidden="true" />{" "}
+											<strong>{title}</strong>
+										</div>
+									)}
 									<button
 										type="button"
 										className="mail-icon"
@@ -150,52 +265,11 @@ export function MailLayoutBuilder({
 										<Trash2 size={14} />
 									</button>
 								</div>
-								{block.type === "image" || block.type === "button" ? (
-									<>
-										<label className="mail-field">
-											{block.type === "image"
-												? "Ссылка на картинку или GIF"
-												: "Ссылка кнопки"}
-											<input
-												required
-												type="url"
-												maxLength={2048}
-												value={block.url}
-												onChange={(event) =>
-													replace(block.id, { url: event.target.value })
-												}
-												placeholder="https://…"
-											/>
-										</label>
-										<label className="mail-field">
-											{block.type === "image"
-												? "Описание картинки"
-												: "Текст кнопки"}
-											<input
-												maxLength={300}
-												required={block.type === "button"}
-												value={block.text}
-												onChange={(event) =>
-													replace(block.id, { text: event.target.value })
-												}
-											/>
-										</label>
-									</>
-								) : (
-									(block.type === "heading" || block.type === "text") && (
-										<label className="mail-field">
-											{block.type === "heading"
-												? "Текст заголовка"
-												: "Текст блока"}
-											<textarea
-												rows={block.type === "heading" ? 2 : 4}
-												value={block.text}
-												onChange={(event) =>
-													replace(block.id, { text: event.target.value })
-												}
-											/>
-										</label>
-									)
+								{open && (
+									<MailBlockFields
+										block={block}
+										onChange={(patch) => replace(block.id, patch)}
+									/>
 								)}
 							</li>
 						);
@@ -205,15 +279,53 @@ export function MailLayoutBuilder({
 			<section
 				className="mail-layout-preview"
 				aria-label="Предпросмотр конструктора"
+				ref={previewPane}
+				tabIndex={-1}
 			>
-				<h4>Предпросмотр</h4>
+				<div className="mail-layout-preview-header">
+					<h4>Предпросмотр</h4>
+					<fieldset
+						className="mail-layout-preview-modes"
+						aria-label="Размер предпросмотра"
+					>
+						<button
+							type="button"
+							className="mail-icon"
+							aria-label="Широкий экран"
+							title="Широкий экран"
+							aria-pressed={!mobile}
+							onClick={() => setMobile(false)}
+						>
+							<Monitor size={15} />
+						</button>
+						<button
+							type="button"
+							className="mail-icon"
+							aria-label="Мобильный экран"
+							title="Мобильный экран"
+							aria-pressed={mobile}
+							onClick={() => setMobile(true)}
+						>
+							<Smartphone size={15} />
+						</button>
+					</fieldset>
+				</div>
 				{preview ? (
-					<MailHtmlPreview html={preview} />
+					<div className="mail-layout-preview-screen" data-mobile={mobile}>
+						<MailHtmlPreview html={preview} flush />
+					</div>
 				) : (
 					<p className="mail-layout-empty">
-						Добавьте блок, чтобы увидеть письмо.
+						Добавьте блок и заполните его, чтобы увидеть письмо.
 					</p>
 				)}
+				<button
+					type="button"
+					className="mail-button mail-layout-jump"
+					onClick={() => jumpToPreview.current?.focus()}
+				>
+					<ArrowUp size={15} aria-hidden="true" /> К редактору
+				</button>
 			</section>
 		</div>
 	);

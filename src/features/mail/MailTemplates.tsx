@@ -93,6 +93,7 @@ function TemplateCollection({
 	const [selected, setSelected] = useState("");
 	const [editor, setEditor] = useState<MailTemplateInput>();
 	const [format, setFormat] = useState<TemplateFormat>("text");
+	const [editedHtmlSource, setEditedHtmlSource] = useState(false);
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [insertionError, setInsertionError] = useState("");
 	const listKey = ["mail", "templates", scope, scopeId];
@@ -141,6 +142,7 @@ function TemplateCollection({
 	const openEditor = (template?: MailTemplate) => {
 		save.reset();
 		setFormat(template?.layout ? "builder" : template?.html ? "html" : "text");
+		setEditedHtmlSource(Boolean(template?.html && !template.layout));
 		setEditor(template ?? emptyTemplate);
 	};
 	const error = remove.error?.message || insertionError;
@@ -201,7 +203,7 @@ function TemplateCollection({
 									if (
 										key === "html" &&
 										format === "builder" &&
-										editor.html == null &&
+										!editedHtmlSource &&
 										editor.layout
 									)
 										setEditor({
@@ -245,9 +247,10 @@ function TemplateCollection({
 										spellCheck={false}
 										maxLength={mailHtmlLimit}
 										value={editor.html ?? ""}
-										onChange={(event) =>
-											setEditor({ ...editor, html: event.target.value })
-										}
+										onChange={(event) => {
+											setEditedHtmlSource(true);
+											setEditor({ ...editor, html: event.target.value });
+										}}
 										placeholder="<table>…</table>"
 									/>
 								</label>
