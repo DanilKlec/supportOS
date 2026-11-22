@@ -28,7 +28,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	const layoutBackground = "https://media.example.invalid/background.gif";
 	const layoutImage = "https://media.example.invalid/banner.gif";
 	const richHeading = "Оформленный ответ";
-	const importedHtml = '<h1>Вставленный HTML</h1><table width="500"><tbody><tr><td style="color:#334488"><p>До правки</p><a href="https://example.invalid/old">Подробности</a><img src="https://media.example.invalid/old.gif" alt="Обложка"></td></tr></tbody></table>';
+	const importedHtml = '<h1>Вставленный HTML</h1><table width="920"><tbody><tr><td style="color:#334488"><p>До правки</p><a href="https://example.invalid/old">Подробности</a><img src="https://media.example.invalid/old.gif" alt="Обложка"></td></tr><tr><td height="1450">Длинный блок письма</td></tr><tr><td>Конец письма</td></tr></tbody></table>';
 	const appendedHtml = "<p>Дополнение из HTML</p>";
 	const greeting = "Проверяем ваше обращение.";
 	const labels = [
@@ -261,7 +261,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 						{ type: "text", text: "Дополнение из HTML" },
 					]);
 					draft.html = renderMailLayout(draft.layout);
-					expect(draft.html).toContain('width="500"');
+					expect(draft.html).toContain('width="920"');
 					expect(draft.html).toContain('style="color:#334488"');
 					expect(draft.html).toContain('href="https://example.invalid/new"');
 					expect(draft.html).toContain('src="https://media.example.invalid/new.gif"');
@@ -760,7 +760,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await expect(templatePanel.getByRole("button", { name: "Показать изображения" })).toHaveAttribute("aria-pressed", "false");
 	await templatePanel.getByRole("button", { name: "Мобильный экран" }).click();
 	await expect(templatePanel.getByRole("button", { name: "Мобильный экран" })).toHaveAttribute("aria-pressed", "true");
-	await expect.poll(() => preview.locator("html").evaluate((root) => root.scrollWidth - root.clientWidth)).toBeLessThanOrEqual(1);
+	await expect(preview.locator("html")).toHaveCSS("overflow", "hidden");
 	await templatePanel.getByRole("button", { name: "Широкий экран" }).click();
 	await page.screenshot({
 		path: info.outputPath("mail-layout-builder.png"),
@@ -814,6 +814,56 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await blocks.getByRole("textbox", { name: "Адрес изображения 1" }).fill("https://media.example.invalid/new.gif");
 	await expect(preview.getByText("Текст после импорта", { exact: true })).toBeVisible();
 	await expect(preview.getByRole("img", { name: "Обложка" })).toHaveAttribute("src", "https://media.example.invalid/new.gif");
+	const fittedPage = templatePanel.locator(".mail-html-fit");
+	const longTable = preview.locator('table[width="920"]');
+	const expectWholePreview = async () => {
+		await expect(preview.getByText("Конец письма", { exact: true })).toBeInViewport();
+		await expect.poll(async () => {
+			const area = await fittedPage.boundingBox();
+			const table = await longTable.boundingBox();
+			return Boolean(area && table &&
+				table.x >= area.x - 1 && table.y >= area.y - 1 &&
+				table.x + table.width <= area.x + area.width + 1 &&
+				table.y + table.height <= area.y + area.height + 1);
+		}).toBe(true);
+	};
+	await fittedPage.scrollIntoViewIfNeeded();
+	await expectWholePreview();
+	if (!isMobile) {
+		const editor = await templatePanel.locator(".mail-layout-block").last().boundingBox();
+		const area = await fittedPage.boundingBox();
+		expect(editor && area && editor.x + editor.width <= area.x).toBe(true);
+	}
+	const imageUrl = "https://media.example.invalid/new.gif";
+	let finishImage = () => {};
+	const imageUnblocked = new Promise<void>((resolve) => { finishImage = resolve; });
+	await page.route(imageUrl, async (route) => {
+		await imageUnblocked;
+		await route.fulfill({
+			contentType: "image/gif",
+			body: Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64"),
+		});
+	});
+	try {
+		const requested = page.waitForRequest(imageUrl);
+		await templatePanel.getByRole("button", { name: "Показать изображения" }).click();
+		await requested;
+		await fittedPage.scrollIntoViewIfNeeded();
+		await expectWholePreview();
+	} finally {
+		finishImage();
+	}
+	await expect(preview.getByRole("img", { name: "Обложка" })).toHaveJSProperty("complete", true);
+	await templatePanel.getByRole("button", { name: "Скрыть изображения" }).click();
+	await templatePanel.getByRole("button", { name: "Мобильный экран" }).click();
+	await fittedPage.scrollIntoViewIfNeeded();
+	await expectWholePreview();
+	const originalViewport = page.viewportSize();
+	if (!originalViewport) throw new Error("Viewport is required for the preview resize check");
+	await page.setViewportSize({ ...originalViewport, height: originalViewport.height - 140 });
+	await fittedPage.scrollIntoViewIfNeeded();
+	await expectWholePreview();
+	await page.setViewportSize(originalViewport);
 	await templatePanel.getByText("Вставить HTML", { exact: true }).click();
 	await templatePanel.getByRole("textbox", { name: "HTML для импорта" }).fill(appendedHtml);
 	await templatePanel.getByRole("button", { name: "Добавить HTML в письмо" }).click();

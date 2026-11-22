@@ -321,7 +321,7 @@ function TemplateCollection({
 							>
 								<h4>Предпросмотр</h4>
 								{editorHtml.trim() ? (
-									<MailHtmlPreview html={editorHtml} />
+									<MailHtmlPreview html={editorHtml} fit="desktop" />
 								) : (
 									<p className="mail-layout-empty">Вставьте HTML письма.</p>
 								)}
@@ -453,7 +453,7 @@ function TemplateCollection({
 											</p>
 										)}
 										{detail.data.html ? (
-											<MailHtmlPreview html={detail.data.html} />
+											<MailHtmlPreview html={detail.data.html} fit="desktop" />
 										) : (
 											<p className="mail-template-text supportos-scroll">
 												{detail.data.body}

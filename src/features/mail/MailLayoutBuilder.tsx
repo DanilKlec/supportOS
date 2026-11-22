@@ -377,7 +377,11 @@ export function MailLayoutBuilder({
 				</div>
 				{preview ? (
 					<div className="mail-layout-preview-screen" data-mobile={mobile}>
-						<MailHtmlPreview html={preview} flush />
+						<MailHtmlPreview
+							html={preview}
+							flush
+							fit={mobile ? "mobile" : "desktop"}
+						/>
 					</div>
 				) : (
 					<p className="mail-layout-empty">

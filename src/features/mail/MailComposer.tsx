@@ -411,7 +411,7 @@ export function MailComposer({
 									/>
 								</label>
 							) : richContent ? (
-								<MailHtmlPreview html={richContent} />
+								<MailHtmlPreview html={richContent} fit="desktop" />
 							) : (
 								<p className="mail-layout-empty">
 									Добавьте содержимое на вкладке «HTML-код».

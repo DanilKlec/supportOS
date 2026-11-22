@@ -976,6 +976,26 @@
 .mail-html-preview .mail-button {
 	margin-top: 0.35rem;
 }
+.mail-html-fit {
+	--mail-fit-height: max(6rem, min(75dvh, calc(100dvh - 11rem)));
+	position: relative;
+	height: var(--mail-fit-height);
+	margin-block: 0.7rem;
+	overflow: hidden;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.5rem;
+	background: var(--mail-control);
+}
+.mail-html-fit .mail-html {
+	position: absolute;
+	inset: 0;
+	height: var(--mail-fit-height);
+	min-height: 0;
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+}
 .mail-html-source {
 	font-family: ui-monospace, Consolas, monospace;
 	tab-size: 2;
@@ -1039,6 +1059,7 @@
 .mail-layout-settings,
 .mail-layout-blocks {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	min-width: 0;
 	gap: 0.6rem;
 }
@@ -1050,9 +1071,6 @@
 	border: 1px solid var(--mail-line);
 	border-radius: 0.7rem;
 	background: var(--mail-panel);
-}
-.mail-layout-preview .mail-html {
-	min-height: min(58dvh, 39rem);
 }
 .mail-layout-preview-header,
 .mail-layout-preview-modes {
@@ -1219,6 +1237,7 @@
 }
 .mail-block-fields {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 0.45rem;
 	min-width: 0;
 }
