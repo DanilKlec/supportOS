@@ -40,9 +40,11 @@ import { emptyMailDraft, MailComposer } from "./MailComposer";
 import { MailFolderCount, MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
+import { MailProjectFolders } from "./MailProjectFolders";
 import { mailDate, MailThread, plainMailBody } from "./MailThread";
 import { MailThreadActions } from "./MailThreadActions";
 import "./mail.css";
+import "./mail-projects.css";
 
 const folders = [
 	{ id: "INBOX", title: "Входящие", icon: Inbox },
@@ -629,6 +631,13 @@ export function MailWorkspace() {
 				</div>
 			) : (
 				<div className="mail-grid">
+					<MailProjectFolders
+						key={userId}
+						active={box}
+						mailboxes={mailboxes}
+						statusByMailbox={statusByMailbox}
+						onChange={chooseBox}
+					/>
 					<aside
 						className="mail-sidebar supportos-scroll"
 						aria-label="Ящики и папки"

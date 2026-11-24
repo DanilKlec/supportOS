@@ -112,7 +112,7 @@
 	display: grid;
 	flex: 1;
 	min-height: 0;
-	grid-template-columns: minmax(12rem, 15.25rem) minmax(15rem, 24rem) minmax(
+	grid-template-columns: 3.35rem minmax(12rem, 15.25rem) minmax(15rem, 24rem) minmax(
 			0,
 			1fr
 		);
@@ -1504,7 +1504,7 @@
 
 @media (max-width: 1050px) {
 	.mail-grid {
-		grid-template-columns: minmax(9.5rem, 12.5rem) minmax(12rem, 18rem) minmax(
+		grid-template-columns: 3.35rem minmax(9.5rem, 12.5rem) minmax(12rem, 18rem) minmax(
 				0,
 				1fr
 			);
@@ -1586,6 +1586,7 @@
 		overflow: visible;
 	}
 	.mail-thread-placeholder,
+	.mail-workspace[data-thread="true"] .mail-project-rail,
 	.mail-workspace[data-thread="true"] .mail-sidebar,
 	.mail-workspace[data-thread="true"] .mail-list {
 		display: none;
