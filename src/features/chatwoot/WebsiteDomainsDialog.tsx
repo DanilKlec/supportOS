@@ -762,9 +762,10 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 											Chatwoot.
 										</p>
 									</div>
-									{(teams.length > 0 || form.operatorTeamIds.length > 0) && <fieldset className="mb-4 rounded-xl border border-border px-3 pb-3">
+									<fieldset className="mb-4 rounded-xl border border-border px-3 pb-3">
 										<legend className="px-1 text-xs font-medium">Команды источника</legend>
 										<p className="mb-2 text-xs text-muted">Участники команды получат доступ к источнику. Изменения состава в SupportOS применяются автоматически.</p>
+										{teams.length === 0 && <p className="text-xs text-muted">Создайте команду в разделе «Команда».</p>}
 										<div className="grid gap-1.5 sm:grid-cols-2">
 											{teams.map((team) => <label key={team.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-xs">
 												<input type="checkbox" className="shrink-0 accent-accent" checked={form.operatorTeamIds.includes(team.id)}
@@ -774,7 +775,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 												<span className="truncate">{team.name}</span>
 											</label>)}
 										</div>
-									</fieldset>}
+									</fieldset>
 									<div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
 										<div className="flex items-center gap-2">
 											<UsersRound size={15} className="text-accent" />

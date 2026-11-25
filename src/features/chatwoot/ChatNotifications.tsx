@@ -105,12 +105,19 @@ export function ChatNotifications({
 			(status) => {
 				if (status === "SUBSCRIBED") refresh();
 			},
+			{
+				userId,
+				onAssignment: () => void client.invalidateQueries({ queryKey: assignedChatsKey }),
+				onStatus: (status) => {
+					if (status === "SUBSCRIBED") refresh();
+				},
+			},
 		);
 		return () => {
 			window.clearTimeout(timer);
 			unsubscribe();
 		};
-	}, [accessToken, chatWorkspaceOpen, client, health.data?.configured]);
+	}, [accessToken, chatWorkspaceOpen, client, health.data?.configured, userId]);
 
 	useEffect(() => {
 		const unlock = () => {

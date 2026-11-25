@@ -21,8 +21,12 @@ test('disconnect disables intake, protects concurrent edits, and releases slots 
 	try {
 		await database.exec(`create role anon; create role authenticated; create role service_role;
 			create schema auth; create table auth.users(id uuid primary key);
+			create schema private; create schema realtime;
+			create table public.realtime_events(event text, topic text, private boolean);
+			create function realtime.send(jsonb, text, text, boolean) returns void language sql
+			as 'insert into public.realtime_events values ($2, $3, $4)';
 			create table public.supportos_users(id uuid primary key, status text);`);
-		for (const name of ['chatwoot_agent_routing', 'chatwoot_widget_settings', 'chatwoot_atomic_router_leases', 'chatwoot_disconnect_handoff'])
+		for (const name of ['chatwoot_agent_routing', 'chatwoot_widget_settings', 'chatwoot_atomic_router_leases', 'chatwoot_disconnect_handoff', 'chatwoot_route_update_broadcast'])
 			await database.exec(await migration(name));
 		await database.query('insert into auth.users values ($1), ($2)', [agent, backup]);
 		await database.query("insert into public.supportos_users values ($1, 'active'), ($2, 'active')", [agent, backup]);
@@ -45,7 +49,12 @@ test('disconnect disables intake, protects concurrent edits, and releases slots 
 		expect(await rpc('reserve_conversation', randomUUID(), conversation, [102], {}, null)).toMatchObject({ reserved: false });
 		expect(await rpc('finish_conversation_operation', conversation, token, null)).toBe(true);
 		expect(await rpc('reserve_conversation', randomUUID(), conversation, [101, 102], { 101: 0, 102: 1 }, lease)).toMatchObject({ reserved: false });
-		expect(await rpc('reserve_conversation', randomUUID(), conversation, [101, 102], { 101: 0, 102: 0 }, lease)).toMatchObject({ reserved: true, agentId: 102 });
+		const assignmentToken = randomUUID();
+		expect(await rpc('reserve_conversation', assignmentToken, conversation, [101, 102], { 101: 0, 102: 0 }, lease)).toMatchObject({ reserved: true, agentId: 102 });
+		expect(await rpc('finish_conversation_operation', conversation, assignmentToken, 102)).toBe(true);
+		expect((await database.query('select * from public.realtime_events')).rows).toEqual([
+			{ event: 'chat_assignment_changed', topic: `chatwoot:coaching:${backup}`, private: true },
+		]);
 		expect(await rpc('complete_handoff', ...handoff)).toBe(true);
 		expect(await rpc('record_presence', agent, null, null)).toMatchObject({ accepting: false, handoff_since: null });
 		expect(await rpc('record_presence', agent, 101, true)).toMatchObject({ accepting: true });

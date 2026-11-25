@@ -41,7 +41,7 @@ import { AgentProfileDialog } from "@/features/chatwoot/AgentProfileDialog";
 import { ChatActivityPage, ChatTeamIndicator } from "@/features/chatwoot/ChatActivityPage";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
-import { CHAT_SOUND_PREFERENCE } from "./chat-alerts";
+import { assignedChatsKey, CHAT_SOUND_PREFERENCE } from "./chat-alerts";
 import { ChatDirectorySettingsDialog } from "@/features/chatwoot/ChatDirectorySettingsDialog";
 import { CustomAttributesDialog } from "@/features/chatwoot/CustomAttributesDialog";
 import { subscribeToChatwootEvents } from "@/services/chatwoot-realtime";
@@ -303,6 +303,10 @@ function AgentInboxWorkspace() {
 			},
 			{
 				userId: user.id,
+				onAssignment: () => {
+					void client.invalidateQueries({ queryKey: assignedChatsKey });
+					scheduleRefresh();
+				},
 				onNote: () => {
 					void client.invalidateQueries({ queryKey: ["chatwoot", "coaching-notes"] });
 				},

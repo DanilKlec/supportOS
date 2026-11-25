@@ -18,13 +18,14 @@ export function subscribeToChatwootEvents(
 	onStatus: (status: ChatwootRealtimeStatus) => void,
 	coaching?: {
 		userId: string;
-		onNote: () => void;
-		onStatus: (status: ChatwootRealtimeStatus) => void;
+		onNote?: () => void;
+		onAssignment?: () => void;
+		onStatus?: (status: ChatwootRealtimeStatus) => void;
 	},
 ) {
 	if (!url || !key) {
 		onStatus("CHANNEL_ERROR");
-		coaching?.onStatus("CHANNEL_ERROR");
+		coaching?.onStatus?.("CHANNEL_ERROR");
 		return () => undefined;
 	}
 	const client = createClient(url, key, {
@@ -44,17 +45,20 @@ export function subscribeToChatwootEvents(
 		client
 			.channel(`chatwoot:coaching:${coaching.userId}`, {
 				config: { private: true },
-			})
-			.on("broadcast", { event: "coaching_note" }, coaching.onNote);
+			});
+	if (coaching?.onNote)
+		coachingChannel?.on("broadcast", { event: "coaching_note" }, coaching.onNote);
+	if (coaching?.onAssignment)
+		coachingChannel?.on("broadcast", { event: "chat_assignment_changed" }, coaching.onAssignment);
 	const report = (
 		status: string,
-		listener: (value: ChatwootRealtimeStatus) => void,
+		listener?: (value: ChatwootRealtimeStatus) => void,
 	) => {
 		if (
 			!disposed &&
 			["SUBSCRIBED", "CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)
 		)
-			listener(status as ChatwootRealtimeStatus);
+			listener?.(status as ChatwootRealtimeStatus);
 	};
 	void client.realtime
 		.setAuth(accessToken)
