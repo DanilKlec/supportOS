@@ -39,6 +39,7 @@ type SourceForm = {
 	greetingEnabled: boolean;
 	greetingMessage: string;
 	operatorIds: number[];
+	operatorTeamIds: number[];
 };
 
 const blankSource: SourceForm = {
@@ -55,6 +56,7 @@ const blankSource: SourceForm = {
 	greetingEnabled: false,
 	greetingMessage: "",
 	operatorIds: [],
+	operatorTeamIds: [],
 };
 
 function splitDomains(value?: string | null) {
@@ -94,6 +96,7 @@ function sourceForm(inbox: ChatwootWebsiteInbox): SourceForm {
 		greetingEnabled: inbox.greeting_enabled === true,
 		greetingMessage: inbox.greeting_message || "",
 		operatorIds: [],
+		operatorTeamIds: [],
 	};
 }
 
@@ -124,21 +127,24 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 	const inboxes = query.data?.inboxes ?? [];
 	const baseUrl = query.data?.baseUrl ?? "";
 	const agents = directory.data?.agents ?? [];
+	const teams = directory.data?.teams ?? [];
 	const editing = form.id !== undefined;
 	const members = useQuery({
 		queryKey: ["chatwoot", "website-inbox-members", form.id],
 		queryFn: () =>
 			form.id === undefined
-				? Promise.resolve({ operatorIds: [] })
+				? Promise.resolve({ operatorIds: [], operatorTeamIds: [] })
 				: chatwootService.websiteInboxMembers(form.id),
 		enabled: mode === "operators" && form.id !== undefined,
+		refetchOnWindowFocus: false,
 	});
 	useEffect(() => {
-		const operatorIds = members.data?.operatorIds;
-		if (operatorIds)
+		const assignment = members.data;
+		if (assignment)
 			setForm((current) => ({
 				...current,
-				operatorIds,
+				operatorIds: assignment.operatorIds,
+				operatorTeamIds: assignment.operatorTeamIds ?? [],
 			}));
 	}, [members.data]);
 	const filteredInboxes = useMemo(
@@ -164,6 +170,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 		onSuccess: async () => {
 			await Promise.all([
 				client.invalidateQueries({ queryKey: ["chatwoot", "website-inboxes"] }),
+				client.invalidateQueries({ queryKey: ["chatwoot", "website-inbox-members"] }),
 				client.invalidateQueries({ queryKey: ["chatwoot", "directory"] }),
 			]);
 			setMode("list");
@@ -755,11 +762,24 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 											Chatwoot.
 										</p>
 									</div>
+									{(teams.length > 0 || form.operatorTeamIds.length > 0) && <fieldset className="mb-4 rounded-xl border border-border px-3 pb-3">
+										<legend className="px-1 text-xs font-medium">Команды источника</legend>
+										<p className="mb-2 text-xs text-muted">Участники команды получат доступ к источнику. Изменения состава в SupportOS применяются автоматически.</p>
+										<div className="grid gap-1.5 sm:grid-cols-2">
+											{teams.map((team) => <label key={team.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-xs">
+												<input type="checkbox" className="shrink-0 accent-accent" checked={form.operatorTeamIds.includes(team.id)}
+													onChange={(event) => setForm((value) => ({ ...value, operatorTeamIds: event.target.checked
+														? [...value.operatorTeamIds, team.id]
+														: value.operatorTeamIds.filter((id) => id !== team.id) }))} />
+												<span className="truncate">{team.name}</span>
+											</label>)}
+										</div>
+									</fieldset>}
 									<div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
 										<div className="flex items-center gap-2">
 											<UsersRound size={15} className="text-accent" />
 											<span className="text-xs font-medium">
-												Выбрано: {form.operatorIds.length}
+												Назначены отдельно: {form.operatorIds.length}
 											</span>
 										</div>
 										<div className="relative w-56">
@@ -832,7 +852,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 											)}
 										</div>
 									)}
-									{form.operatorIds.length === 0 && !members.isLoading && (
+								{form.operatorIds.length === 0 && form.operatorTeamIds.length === 0 && !members.isLoading && (
 										<p className="mt-3 text-[11px] chat-text-warning">
 											Выберите хотя бы одного оператора, чтобы сохранить
 											источник.
@@ -868,7 +888,7 @@ export function WebsiteDomainsDialog({ onClose, canDelete }: { onClose: () => vo
 								<button
 									type="button"
 									disabled={
-										!form.operatorIds.length ||
+									(!editing && !form.operatorIds.length && !form.operatorTeamIds.length) ||
 										save.isPending ||
 										members.isLoading ||
 										!sourceValid

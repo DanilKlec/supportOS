@@ -88,6 +88,7 @@ export function ChatDirectorySettingsDialog({ agents, onClose }: { agents: Chatw
 }
 
 function TeamMembers({ id, agents, onClose }: { id: number; agents: ChatwootAgent[]; onClose: () => void }) {
+	const client = useQueryClient();
 	const query = useQuery({ queryKey: ["chatwoot", "team-members", id], queryFn: () => chatwootService.teamMembers(id) });
 	const [draft, setDraft] = useState<number[] | null>(null);
 	const [search, setSearch] = useState("");
@@ -95,7 +96,14 @@ function TeamMembers({ id, agents, onClose }: { id: number; agents: ChatwootAgen
 	const matches = agents.filter((agent) => `${agent.name} ${agent.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()));
 	const save = useMutation({
 		mutationFn: () => chatwootService.saveTeamMembers(id, selected),
-		onSuccess: async () => { await query.refetch(); onClose(); },
+		onSuccess: async () => {
+			await Promise.all([
+				query.refetch(),
+				client.invalidateQueries({ queryKey: ["chatwoot", "directory"] }),
+				client.invalidateQueries({ queryKey: ["chatwoot", "website-inbox-members"] }),
+			]);
+			onClose();
+		},
 	});
 	return <div className="space-y-3 text-xs">
 		<h3 className="font-semibold">Участники команды</h3>

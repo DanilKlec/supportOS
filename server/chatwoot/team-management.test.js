@@ -11,6 +11,9 @@ beforeEach(() => {
 	vi.stubEnv('CHATWOOT_BASE_URL', 'https://chat.example');
 	vi.stubEnv('CHATWOOT_ACCOUNT_ID', '3');
 	vi.stubEnv('CHATWOOT_ACCESS_TOKEN', 'mock');
+	vi.stubEnv('CHATWOOT_AGENT_TOKENS', '');
+	vi.stubEnv('CHATWOOT_PLATFORM_APP_TOKEN', '');
+	vi.stubEnv('CHATWOOT_PLATFORM_PILOT_EMAIL', '');
 	vi.stubEnv('SUPABASE_URL', 'https://db.example');
 	vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'mock');
 });
@@ -66,4 +69,107 @@ test('does not send a message when a personal token belongs to another operator'
 	vi.stubGlobal('fetch', fetch);
 	expect(await replyToPlayer()).toBe(409);
 	expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test('sends as the pilot operator after obtaining and verifying a token through the Platform App', async () => {
+	vi.stubEnv('CHATWOOT_PLATFORM_APP_TOKEN', 'platform-test-token');
+	vi.stubEnv('CHATWOOT_PLATFORM_PILOT_EMAIL', member.email.toUpperCase());
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ access_token: 'pilot-test-token', user: { id: 32, email: member.email } }))
+		.mockResolvedValueOnce(Response.json({ id: 32, email: member.email }))
+		.mockResolvedValueOnce(Response.json({ id: 11 }));
+	vi.stubGlobal('fetch', fetch);
+	expect(await replyToPlayer()).toBe(200);
+	expect(fetch).toHaveBeenNthCalledWith(3, 'https://chat.example/platform/api/v1/users/32/token', expect.objectContaining({
+		method: 'POST', headers: expect.objectContaining({ Authorization: 'Bearer platform-test-token' }),
+	}));
+	expect(fetch).toHaveBeenNthCalledWith(5, 'https://chat.example/api/v1/accounts/3/conversations/10/messages', expect.objectContaining({
+		headers: expect.objectContaining({ Authorization: 'Bearer pilot-test-token' }),
+	}));
+});
+
+test('blocks pilot replies when the Platform App has no grant', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://grant-test.example');
+	vi.stubEnv('CHATWOOT_PLATFORM_APP_TOKEN', 'platform-test-token');
+	vi.stubEnv('CHATWOOT_PLATFORM_PILOT_EMAIL', member.email);
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ error: 'Non permissible resource' }, { status: 401 }));
+	vi.stubGlobal('fetch', fetch);
+	expect(await replyToPlayer()).toBe(403);
+	expect(fetch).toHaveBeenCalledTimes(3);
+});
+
+test('blocks pilot replies when the returned credential authenticates a different agent', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://identity-test.example');
+	vi.stubEnv('CHATWOOT_PLATFORM_APP_TOKEN', 'platform-test-token');
+	vi.stubEnv('CHATWOOT_PLATFORM_PILOT_EMAIL', member.email);
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ access_token: 'invalid-user-test-token', user: { id: 32, email: member.email } }))
+		.mockResolvedValueOnce(Response.json({ id: 33, email: 'someone-else@example.com' }));
+	vi.stubGlobal('fetch', fetch);
+	expect(await replyToPlayer()).toBe(409);
+	expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('keeps existing chat credentials for an operator outside the pilot', async () => {
+	vi.stubEnv('CHATWOOT_PLATFORM_APP_TOKEN', 'platform-test-token');
+	vi.stubEnv('CHATWOOT_PLATFORM_PILOT_EMAIL', 'someone-else@example.com');
+	vi.stubEnv('CHATWOOT_AGENT_TOKENS', '');
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json({ id: 11 }));
+	vi.stubGlobal('fetch', fetch);
+	expect(await replyToPlayer()).toBe(200);
+	expect(fetch).toHaveBeenNthCalledWith(2, 'https://chat.example/api/v1/accounts/3/conversations/10/messages', expect.objectContaining({
+		headers: expect.objectContaining({ Authorization: 'Bearer mock' }),
+	}));
+});
+
+async function editAppearance(method, body) {
+	const response = { setHeader: vi.fn(), end: vi.fn() };
+	await handler({ url: '/api/chatwoot?action=agent-profile', method, body }, response);
+	return { status: response.statusCode, body: JSON.parse(response.end.mock.calls[0][0]) };
+}
+
+test('returns only the appearance fields for the signed-in agent', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://profile-read.example');
+	vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ id: 32, email: member.email, name: 'Имя', display_name: 'Ник', avatar_url: 'https://chat.example/avatar.png', access_token: 'private', pubsub_token: 'private' })));
+	expect(await editAppearance('GET')).toEqual({ status: 200, body: { name: 'Имя', displayName: 'Ник', avatarUrl: 'https://chat.example/avatar.png' } });
+});
+
+test('never updates a different Chatwoot user with the shared token', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://profile-owner.example');
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ id: 40, email: 'integration@example.com' }));
+	vi.stubGlobal('fetch', fetch);
+	expect((await editAppearance('PUT', { displayName: 'Ник' })).status).toBe(409);
+	expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test('saves the nickname and photo together to the verified profile', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://profile-save.example');
+	const avatar = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0f8AAAAASUVORK5CYII=';
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json([{ id: 32, email: member.email }]))
+		.mockResolvedValueOnce(Response.json({ id: 32, email: member.email }))
+		.mockResolvedValueOnce(Response.json({ id: 32, name: 'Имя', display_name: 'Новый ник', avatar_url: 'https://chat.example/new.png' }));
+	vi.stubGlobal('fetch', fetch);
+	expect(await editAppearance('PUT', { displayName: ' Новый ник ', avatar, email: 'other@example.com' })).toEqual({
+		status: 200, body: { name: 'Имя', displayName: 'Новый ник', avatarUrl: 'https://chat.example/new.png' },
+	});
+	const [url, request] = fetch.mock.calls[2];
+	expect(url).toBe('https://profile-save.example/api/v1/profile');
+	expect(request.method).toBe('PUT');
+	expect(request.body.get('profile[display_name]')).toBe('Новый ник');
+	expect(request.body.get('profile[email]')).toBeNull();
+	expect(request.body.get('profile[avatar]').type).toBe('image/png');
+});
+
+test('rejects files that are not supported images without calling Chatwoot', async () => {
+	const fetch = vi.fn();
+	vi.stubGlobal('fetch', fetch);
+	expect((await editAppearance('PUT', { displayName: 'Ник', avatar: Buffer.from('<svg/>').toString('base64') })).status).toBe(415);
+	expect(fetch).not.toHaveBeenCalled();
 });

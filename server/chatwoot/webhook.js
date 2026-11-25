@@ -96,8 +96,11 @@ export default async function chatwootWebhook(req, res) {
 		});
 		if (!inserted) return respond(res, 200, { received: true, duplicate: true });
 		const needsRouting = eventType === 'conversation_created' || eventType === 'conversation_status_changed'
-			|| eventType === 'conversation_updated' && !conversation.meta?.assignee && !conversation.assignee_id;
-		if (needsRouting) await routeWaitingConversations(storage, cfg).catch(() => undefined);
+			|| eventType === 'conversation_updated' && !conversation.meta?.assignee && !conversation.assignee_id
+			|| eventType === 'message_created' && !payload.private
+				&& ['incoming', 0].includes(payload.message_type)
+				&& !conversation.meta?.assignee && !conversation.assignee_id;
+		if (needsRouting) await routeWaitingConversations(storage, cfg, validInboxId).catch(() => undefined);
 
 		return respond(res, 200, { received: true, duplicate: false });
 	} catch (error) {

@@ -16,7 +16,7 @@ export function subscribeToChatwootEvents(
 	accessToken: string,
 	onEvent: () => void,
 	onStatus: (status: ChatwootRealtimeStatus) => void,
-	coaching: {
+	coaching?: {
 		userId: string;
 		onNote: () => void;
 		onStatus: (status: ChatwootRealtimeStatus) => void;
@@ -24,10 +24,11 @@ export function subscribeToChatwootEvents(
 ) {
 	if (!url || !key) {
 		onStatus("CHANNEL_ERROR");
-		coaching.onStatus("CHANNEL_ERROR");
+		coaching?.onStatus("CHANNEL_ERROR");
 		return () => undefined;
 	}
 	const client = createClient(url, key, {
+		realtime: { worker: typeof Worker !== "undefined" },
 		auth: {
 			persistSession: false,
 			autoRefreshToken: false,
@@ -38,11 +39,13 @@ export function subscribeToChatwootEvents(
 	const channel = client
 		.channel("chatwoot:updates", { config: { private: true } })
 		.on("broadcast", { event: "chatwoot_event" }, onEvent);
-	const coachingChannel = client
-		.channel(`chatwoot:coaching:${coaching.userId}`, {
-			config: { private: true },
-		})
-		.on("broadcast", { event: "coaching_note" }, coaching.onNote);
+	const coachingChannel =
+		coaching &&
+		client
+			.channel(`chatwoot:coaching:${coaching.userId}`, {
+				config: { private: true },
+			})
+			.on("broadcast", { event: "coaching_note" }, coaching.onNote);
 	const report = (
 		status: string,
 		listener: (value: ChatwootRealtimeStatus) => void,
@@ -58,15 +61,18 @@ export function subscribeToChatwootEvents(
 		.then(() => {
 			if (disposed) return;
 			channel.subscribe((status) => report(status, onStatus));
-			coachingChannel.subscribe((status) => report(status, coaching.onStatus));
+			if (coachingChannel && coaching)
+				coachingChannel.subscribe((status) =>
+					report(status, coaching.onStatus),
+				);
 		})
 		.catch(() => {
 			report("CHANNEL_ERROR", onStatus);
-			report("CHANNEL_ERROR", coaching.onStatus);
+			if (coaching) report("CHANNEL_ERROR", coaching.onStatus);
 		});
 	return () => {
 		disposed = true;
 		void client.removeChannel(channel);
-		void client.removeChannel(coachingChannel);
+		if (coachingChannel) void client.removeChannel(coachingChannel);
 	};
 }

@@ -50,6 +50,11 @@ const MainLayout = lazy(() =>
 		default: module.MainLayout,
 	})),
 );
+const ChatNotifications = lazy(() =>
+	import("@/features/chatwoot/ChatNotifications").then((module) => ({
+		default: module.ChatNotifications,
+	})),
+);
 
 useAuthStore.subscribe((state, previous) => {
 	if (state.session?.user.id !== previous.session?.user.id) queryClient.clear();
@@ -147,7 +152,12 @@ function RootComponent() {
 				{accessGranted && <MailNotifications />}
 				{accessGranted && !passwordRecovery && !session?.mfaRequired &&
 					session?.user.access?.permissions.includes("work") && (
-						<ChatPresenceHeartbeat userId={session.user.id} />
+						<>
+							<ChatPresenceHeartbeat userId={session.user.id} />
+							<Suspense fallback={null}>
+								<ChatNotifications key={session.user.id} userId={session.user.id} chatWorkspaceOpen={pathname === "/inbox"} />
+							</Suspense>
+						</>
 					)}
 				{!loading && session?.mfaRequired ? (
 					<AuthenticatorGate key={session.sessionId ?? session.user.id} />

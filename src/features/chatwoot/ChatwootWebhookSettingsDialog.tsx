@@ -14,7 +14,7 @@ export function ChatwootWebhookSettingsDialog({ onClose }: { onClose: () => void
 		refetchInterval: 10000,
 	});
 	const save = useMutation({
-		mutationFn: () => chatwootService.saveWebhookSecret(secret),
+		mutationFn: (automatic: boolean) => automatic ? chatwootService.connectWebhook() : chatwootService.saveWebhookSecret(secret),
 		onSuccess: async () => {
 			setSecret("");
 			await client.invalidateQueries({ queryKey: ["chatwoot", "webhook-settings"] });
@@ -40,6 +40,9 @@ export function ChatwootWebhookSettingsDialog({ onClose }: { onClose: () => void
 					<button type="button" onClick={onClose} aria-label="Закрыть" className="rounded-lg p-1.5 text-muted hover:bg-surface-elevated"><X size={15} /></button>
 				</header>
 				<div className="space-y-4 p-5">
+					<button type="button" disabled={save.isPending} onClick={() => save.mutate(true)} className="h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50">
+						{save.isPending ? "Подключение…" : settings.data?.configured ? "Обновить подключение" : "Подключить вебхук автоматически"}
+					</button>
 					<div className="rounded-xl border border-border bg-background/60 p-3">
 						<div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-medium">1. Добавьте endpoint в Chatwoot</span><button type="button" onClick={() => void copyEndpoint()} className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[10px] hover:bg-surface-elevated">{copied ? <Check size={11} /> : <Copy size={11} />}{copied ? "Скопировано" : "Копировать"}</button></div>
 						<code className="mt-2 block break-all rounded-lg border border-border bg-surface px-2.5 py-2 text-[11px] text-muted">{endpoint}</code>
@@ -50,7 +53,7 @@ export function ChatwootWebhookSettingsDialog({ onClose }: { onClose: () => void
 						<p className="mt-1 text-[10px] leading-relaxed text-muted">Скопируйте secret из формы вебхука Chatwoot и вставьте ниже. SupportOS проверяет HMAC-подпись; значение хранится в базе с доступом только сервера и не показывается повторно.</p>
 						<div className="mt-3 flex flex-wrap gap-2">
 							<input type="password" autoComplete="new-password" value={secret} onChange={(event) => setSecret(event.target.value)} placeholder={settings.data?.configured ? "Введите новый секрет для замены" : "Секрет из Chatwoot"} className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-accent" />
-							<button type="button" disabled={secret.trim().length < 16 || save.isPending} onClick={() => save.mutate()} className="h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50">{save.isPending ? "Сохраняю…" : "Сохранить"}</button>
+							<button type="button" disabled={secret.trim().length < 16 || save.isPending} onClick={() => save.mutate(false)} className="h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50">{save.isPending ? "Сохраняю…" : "Сохранить"}</button>
 						</div>
 					</div>
 					{(settings.isError || save.isError) && <p role="alert" className="text-xs chat-text-danger">{save.error instanceof Error ? save.error.message : settings.error instanceof Error ? settings.error.message : "Не удалось настроить вебхук"}</p>}

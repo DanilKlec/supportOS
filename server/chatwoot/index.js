@@ -6,6 +6,12 @@ import { requireUser } from '../_auth.js';
 import { loadAccess } from '../_rbac.js';
 import { allRows, config as serverConfig, db, equal } from '../agent-monitor/_server.js';
 import { getOperations, onShift, saveOperations, slaSnapshot } from './operations.js';
+import { activityBySite, cachedSnapshot, countConnectedBots } from './activity.js';
+
+const activityCache = new Map();
+const teamStatusCache = new Map();
+const botCountCache = new Map();
+const chatWebhookEvents = ['conversation_created', 'conversation_status_changed', 'conversation_updated', 'message_created', 'message_updated'];
 
 const json = (res, status, body) => {
 	res.statusCode = status;
@@ -27,11 +33,15 @@ export function config(env = process.env) {
 	return { base, accountId, token };
 }
 
-async function api(cfg, path, { method = 'GET', body, timeout = 15000 } = {}) {
+function api(cfg, path, options) {
+	return chatwootRequest(cfg, `/api/v1${path}`, options);
+}
+
+async function chatwootRequest(cfg, path, { method = 'GET', body, timeout = 15000 } = {}) {
 	let response;
 	const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
 	try {
-		response = await fetch(`${cfg.base}/api/v1${path}`, {
+		response = await fetch(`${cfg.base}${path}`, {
 			method,
 			headers: {
 				Authorization: `Bearer ${cfg.token}`,
@@ -94,6 +104,36 @@ function chatwootError(message, status = 502) {
 	return Object.assign(new Error(message), { status });
 }
 
+async function saveChatwootWebhookSecret(env, userId, signingSecret) {
+	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_webhook_config?on_conflict=id`, {
+		method: 'POST',
+		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+		body: JSON.stringify({ id: 'main', signing_secret: signingSecret, updated_by: userId, updated_at: new Date().toISOString() }),
+		signal: AbortSignal.timeout(15000),
+	});
+	if (!response.ok) throw chatwootError('Не удалось сохранить секрет вебхука');
+}
+
+export async function connectChatwootWebhook(cfg, endpoint) {
+	const path = `/accounts/${cfg.accountId}/webhooks`;
+	const existing = await api(cfg, path);
+	const items = existing?.payload?.webhooks ?? existing?.webhooks;
+	if (!Array.isArray(items)) throw chatwootError('Chatwoot вернул неожиданный список вебхуков.');
+	const webhook = items.find((item) => item.url === endpoint && !item.inbox);
+	const subscriptions = [...new Set([...(webhook?.subscriptions ?? []), ...chatWebhookEvents])];
+	let result = webhook;
+	if (!webhook || subscriptions.length !== webhook.subscriptions?.length) {
+		const settings = { url: endpoint, name: webhook?.name || 'SupportOS', subscriptions };
+		result = await api(cfg, webhook ? `${path}/${webhook.id}` : path, {
+			method: webhook ? 'PATCH' : 'POST', body: { webhook: settings },
+		});
+	}
+	const secret = (result?.payload ?? result)?.secret ?? webhook?.secret;
+	if (typeof secret !== 'string' || secret.length < 16 || secret.length > 512)
+		throw chatwootError('Chatwoot не вернул секрет подписи. Сохраните секрет из настроек Chatwoot вручную.');
+	return secret;
+}
+
 function normalizeAllowedDomains(values) {
 	if (!Array.isArray(values) || values.length > 100 || values.some((value) => typeof value !== 'string'))
 		throw chatwootError('Передайте список доменов (не более 100)', 400);
@@ -127,14 +167,19 @@ function websiteSourceInput(body) {
 	if (typeof body.greetingEnabled !== 'boolean') throw chatwootError('Укажите, включено ли приветствие', 400);
 	const operatorIds = [...new Set((Array.isArray(body.operatorIds) ? body.operatorIds : []).map(Number))];
 	if (operatorIds.length > 200 || operatorIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw chatwootError('Выберите корректных операторов', 400);
-	return { name, websiteUrl: url.toString().replace(/\/$/, ''), widgetColor, widgetPosition, widgetType, widgetLocale, launcherTitle, welcomeTitle, welcomeTagline, greetingMessage, greetingEnabled: body.greetingEnabled, allowedDomains: normalizeAllowedDomains(body.allowedDomains ?? []), operatorIds };
+	if (body.operatorTeamIds !== undefined && !Array.isArray(body.operatorTeamIds))
+		throw chatwootError('Передайте список команд источника', 400);
+	const operatorTeamIds = body.operatorTeamIds === undefined ? undefined : [...new Set(body.operatorTeamIds.map(Number))];
+	if (operatorTeamIds?.length > 50 || operatorTeamIds?.some((id) => !validChatId(id)))
+		throw chatwootError('Выберите до 50 команд источника', 400);
+	return { name, websiteUrl: url.toString().replace(/\/$/, ''), widgetColor, widgetPosition, widgetType, widgetLocale, launcherTitle, welcomeTitle, welcomeTagline, greetingMessage, greetingEnabled: body.greetingEnabled, allowedDomains: normalizeAllowedDomains(body.allowedDomains ?? []), operatorIds, operatorTeamIds };
 }
 
-async function saveWidgetSettings(env, inboxId, source) {
+async function saveWidgetSettings(env, inboxId, source, assignment) {
 	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_widget_settings?on_conflict=inbox_id`, {
 		method: 'POST',
 		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-		body: JSON.stringify({ inbox_id: Number(inboxId), widget_position: source.widgetPosition, widget_type: source.widgetType, widget_locale: source.widgetLocale, launcher_title: source.launcherTitle, updated_at: new Date().toISOString() }),
+		body: JSON.stringify({ inbox_id: Number(inboxId), widget_position: source.widgetPosition, widget_type: source.widgetType, widget_locale: source.widgetLocale, launcher_title: source.launcherTitle, updated_at: new Date().toISOString(), ...assignment }),
 		signal: AbortSignal.timeout(15000),
 	});
 	if (!response.ok) throw Object.assign(new Error('Не удалось сохранить настройки виджета. Проверьте, что миграция SupportOS применена.'), { status: 502 });
@@ -215,25 +260,96 @@ async function matchAgent(cfg, email) {
 }
 
 const agentTokenChecks = new Map();
-async function messageCredentials(env, cfg, email) {
-	if (!env.CHATWOOT_AGENT_TOKENS || !email) return cfg;
+async function platformAgentCredentials(env, cfg, email, getAgentId) {
+	const platformToken = env.CHATWOOT_PLATFORM_APP_TOKEN?.trim();
+	if (!platformToken) throw chatwootError('В SupportOS не настроен Platform App Chatwoot для этого агента', 503);
+	const agentId = await getAgentId();
+	if (!validChatId(agentId)) throw chatwootError('В рабочем аккаунте Chatwoot не найден агент с вашей почтой', 409);
+
+	let result;
+	try {
+		result = await chatwootRequest({ ...cfg, token: platformToken }, `/platform/api/v1/users/${agentId}/token`, {
+			method: 'POST', timeout: 5000,
+		});
+	} catch (error) {
+		if ([401, 403].includes(error.chatwootStatus))
+			throw chatwootError('Platform App Chatwoot не авторизован для этого агента. Обратитесь к администратору.', 403);
+		throw chatwootError('Не удалось получить персональный доступ через Platform API Chatwoot', 502);
+	}
+	if (Number(result?.user?.id) !== agentId || String(result?.user?.email ?? '').trim().toLowerCase() !== email)
+		throw chatwootError('Chatwoot вернул данные другого оператора', 409);
+	const token = result?.access_token;
+	if (typeof token !== 'string' || !/^[\x21-\x7e]+$/.test(token))
+		throw chatwootError('Chatwoot не вернул действительный токен оператора', 502);
+	return verifiedAgentCredentials({ ...cfg, token }, email, agentId);
+}
+
+async function messageCredentials(env, cfg, email, getAgentId) {
+	if (!email) return cfg;
+	const normalized = email.trim().toLowerCase();
+	if (normalized && normalized === env.CHATWOOT_PLATFORM_PILOT_EMAIL?.trim().toLowerCase())
+		return platformAgentCredentials(env, cfg, normalized, getAgentId);
+	if (!env.CHATWOOT_AGENT_TOKENS) return cfg;
 	let tokens;
 	try { tokens = JSON.parse(env.CHATWOOT_AGENT_TOKENS); } catch { /* server configuration is invalid */ }
 	if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens))
 		throw chatwootError('Не удалось прочитать настройки персональных профилей Chatwoot', 503);
-	const normalized = email.trim().toLowerCase();
 	if (!Object.hasOwn(tokens, normalized)) return cfg;
 	const token = typeof tokens[normalized] === 'string' ? tokens[normalized].trim() : '';
 	if (!token) throw chatwootError('Персональный профиль Chatwoot настроен без токена', 503);
-	const credentials = { ...cfg, token };
-	const fingerprint = createHash('sha256').update(`${cfg.base}:${cfg.accountId}:${token}`).digest('hex');
-	const cached = agentTokenChecks.get(normalized);
-	if (cached?.fingerprint === fingerprint && cached.expires > Date.now()) return credentials;
-	const profile = await api(credentials, '/profile', { timeout: 4000 });
-	if (profile.email?.trim().toLowerCase() !== normalized)
-		throw chatwootError('Персональный профиль Chatwoot не соответствует рабочей почте агента', 409);
-	agentTokenChecks.set(normalized, { fingerprint, expires: Date.now() + 300_000 });
+	return verifiedAgentCredentials({ ...cfg, token }, normalized);
+}
+
+async function verifiedAgentCredentials(credentials, email, agentId = null) {
+	const { base, accountId, token } = credentials;
+	const fingerprint = createHash('sha256').update(`${base}:${accountId}:${token}`).digest('hex');
+	const cached = agentTokenChecks.get(email);
+	if (cached?.fingerprint === fingerprint && cached.expires > Date.now() && (agentId === null || cached.agentId === agentId)) return credentials;
+	const profile = await ownChatwootProfile(credentials, email, agentId);
+	agentTokenChecks.set(email, { fingerprint, agentId: Number(profile.id) || null, expires: Date.now() + 300_000 });
 	return credentials;
+}
+
+async function ownChatwootProfile(credentials, email, agentId) {
+	const profile = await api(credentials, '/profile', { timeout: 4000 });
+	if (String(profile?.email ?? '').trim().toLowerCase() !== email || (agentId !== null && Number(profile?.id) !== agentId))
+		throw chatwootError('Личный доступ к вашему профилю Chatwoot не подключён', 409);
+	return profile;
+}
+
+function profileAppearance(profile) {
+	return {
+		name: typeof profile.name === 'string' ? profile.name : '',
+		displayName: typeof profile.display_name === 'string' ? profile.display_name : '',
+		avatarUrl: typeof profile.avatar_url === 'string' && /^https:\/\//i.test(profile.avatar_url) ? profile.avatar_url : '',
+	};
+}
+
+const maxAvatarBytes = 2 * 1024 * 1024;
+
+function profileAppearancePayload(body) {
+	const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : null;
+	if (displayName === null || displayName.length > 100 || /[\u0000-\u001f\u007f]/.test(displayName))
+		throw chatwootError('Укажите отображаемое имя до 100 символов', 400);
+	if (body.avatar == null) return { profile: { display_name: displayName } };
+
+	const encoded = body.avatar;
+	if (typeof encoded !== 'string') throw chatwootError('Не удалось прочитать изображение', 400);
+	if (encoded.length > Math.ceil(maxAvatarBytes / 3) * 4) throw chatwootError('Фото должно быть не больше 2 МБ', 413);
+	const bytes = Buffer.from(encoded, 'base64');
+	if (!bytes.length || bytes.toString('base64') !== encoded) throw chatwootError('Не удалось прочитать изображение', 400);
+	if (bytes.length > maxAvatarBytes) throw chatwootError('Фото должно быть не больше 2 МБ', 413);
+	const signature = bytes.subarray(0, 8).toString('hex');
+	const format = signature === '89504e470d0a1a0a' ? 'png'
+		: signature.startsWith('ffd8ff') ? 'jpeg'
+		: /^474946383[79]61/.test(signature) ? 'gif'
+		: bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP' ? 'webp'
+		: null;
+	if (!format) throw chatwootError('Загрузите фото в формате JPG, PNG, GIF или WebP', 415);
+	const form = new FormData();
+	form.append('profile[display_name]', displayName);
+	form.append('profile[avatar]', new Blob([bytes], { type: `image/${format}` }), `avatar.${format}`);
+	return form;
 }
 
 const activeStatuses = ['open', 'pending'];
@@ -274,6 +390,60 @@ async function getTeamMembers(cfg, id, fresh = false) {
 		void entry.ids.catch(() => { if (teamMemberCache.get(key) === entry) teamMemberCache.delete(key); });
 	}
 	return entry.ids;
+}
+
+const sourceGroupColumns = 'inbox_id,operator_team_ids,direct_operator_ids,group_member_ids';
+const sourceAssignmentById = async (env, id) => (await db(env,
+	`supportos_chatwoot_widget_settings?select=${sourceGroupColumns}&inbox_id=eq.${id}&limit=1`,
+))?.[0];
+const sourceAssignmentsByTeam = (env, id) => allRows(env,
+	`supportos_chatwoot_widget_settings?select=${sourceGroupColumns}&operator_team_ids=cs.%7B${id}%7D`,
+);
+
+export function directInboxMembers(current, saved) {
+	const direct = new Set(saved?.direct_operator_ids?.map(Number));
+	const grouped = new Set(saved?.group_member_ids?.map(Number));
+	return current.filter((id) => direct.has(id) || !grouped.has(id));
+}
+
+async function sourceAssignment(cfg, direct, teamIds) {
+	const members = new Set();
+	for (let offset = 0; offset < teamIds.length; offset += 6) {
+		const teams = await Promise.all(teamIds.slice(offset, offset + 6).map((id) => getTeamMembers(cfg, id)));
+		for (const ids of teams) ids.forEach((id) => members.add(id));
+	}
+	return {
+		operator_team_ids: teamIds,
+		direct_operator_ids: direct,
+		group_member_ids: [...members],
+	};
+}
+
+function effectiveInboxMembers(assignment) {
+	return [...new Set([...assignment.direct_operator_ids, ...assignment.group_member_ids])];
+}
+
+async function syncTeamSources(env, cfg, linked) {
+	let failures = 0;
+	for (let offset = 0; offset < linked.length; offset += 4) {
+		const results = await Promise.allSettled(linked.slice(offset, offset + 4).map(async (saved) => {
+			const id = Number(saved.inbox_id);
+			const current = await websiteInboxMembers(cfg, id);
+			const assignment = await sourceAssignment(cfg, [], saved.operator_team_ids);
+			assignment.direct_operator_ids = directInboxMembers(current, {
+				...saved, group_member_ids: [...saved.group_member_ids, ...assignment.group_member_ids],
+			});
+			const desired = effectiveInboxMembers(assignment);
+			if (desired.length !== current.length || desired.some((value) => !current.includes(value)))
+				await setWebsiteInboxMembers(cfg, id, desired);
+			await db(env, `supportos_chatwoot_widget_settings?inbox_id=eq.${id}`, {
+				direct_operator_ids: assignment.direct_operator_ids,
+				group_member_ids: assignment.group_member_ids,
+			}, 'PATCH');
+		}));
+		failures += results.filter((result) => result.status === 'rejected').length;
+	}
+	if (failures) throw chatwootError(`Состав команды сохранён. Источников с ошибкой синхронизации: ${failures}. Повторите сохранение.`);
 }
 async function membersFor(cfg, id, fresh = false) {
 	const key = `${cfg.base}/${cfg.accountId}/${id}`;
@@ -436,7 +606,7 @@ async function changeConversation(env, id, targetAgent, change) {
 	}
 }
 
-export async function routeWaitingConversations(env, cfg) {
+export async function routeWaitingConversations(env, cfg, priorityInboxId) {
 	const leaseToken = randomUUID();
 	const routerLease = await db(env, 'rpc/supportos_chatwoot_acquire_router_lease', {
 		p_lease_token: leaseToken,
@@ -445,7 +615,7 @@ export async function routeWaitingConversations(env, cfg) {
 	});
 	if (routerLease !== true) return { assigned: 0, skipped: true };
 	try {
-		return await routeWaitingConversationsLocked(env, cfg, leaseToken);
+		return await routeWaitingConversationsLocked(env, cfg, leaseToken, priorityInboxId);
 	} finally {
 		await db(env, 'rpc/supportos_chatwoot_release_router_lease', { p_lease_token: leaseToken }).catch(() => undefined);
 	}
@@ -512,13 +682,15 @@ async function requeueDisconnectedConversation(env, cfg, prefix, id, handoff) {
 	}
 }
 
-async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
+async function routeWaitingConversationsLocked(env, cfg, leaseToken, priorityInboxId) {
 	const deadline = Date.now() + 12000;
 	const prefix = `/accounts/${cfg.accountId}/conversations`;
-	const requeued = await requeueDisconnectedConversations(env, cfg, prefix, leaseToken, deadline);
+	const [requeued, presence] = await Promise.all([
+		requeueDisconnectedConversations(env, cfg, prefix, leaseToken, deadline),
+		allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,heartbeat_at&accepting=eq.true'),
+	]);
 	const idle = { assigned: 0, requeued };
 	if (Date.now() >= deadline) return idle;
-	const presence = await allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,heartbeat_at&accepting=eq.true');
 	const eligible = presence
 		.filter((row) => Date.now() - Date.parse(row.heartbeat_at) < 90_000)
 		.map((row) => Number(row.chatwoot_agent_id));
@@ -574,16 +746,18 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 		.filter((id) => Number.isSafeInteger(id) && id > 0).sort((a, b) => a - b);
 	const next = inboxIds.findIndex((id) => id > Number(state?.[0]?.last_inbox_id ?? 0));
 	const start = Math.max(0, next);
-	const batch = [...inboxIds.slice(start), ...inboxIds.slice(0, start)].slice(0, 8);
+	const batch = [...inboxIds.slice(start), ...inboxIds.slice(0, start)];
 	if (!batch.length) return idle;
+	const prioritized = inboxIds.includes(priorityInboxId) ? [priorityInboxId] : [];
+	const selectedInboxes = [...new Set([...prioritized, ...batch])].slice(0, 8);
 
 	// Every pass starts at the oldest chat in each selected project. The persisted
 	// project position lets other sources progress when an earlier source is full.
 	await db(env, `supportos_chatwoot_router_state?id=eq.main&router_lease_token=eq.${leaseToken}`,
-		{ last_inbox_id: batch.at(-1) }, 'PATCH');
+		{ last_inbox_id: selectedInboxes.at(-1) }, 'PATCH');
 	const queues = new Map();
-	for (let index = 0; index < batch.length && Date.now() < deadline; index += 4) {
-		await Promise.all(batch.slice(index, index + 4).map(async (id) => {
+	for (let index = 0; index < selectedInboxes.length && Date.now() < deadline; index += 4) {
+		await Promise.all(selectedInboxes.slice(index, index + 4).map(async (id) => {
 			const required = operations.inboxes[id]?.skills ?? [];
 			const hasSkills = (agent) => required.every((skill) => operations.agents[agent]?.skills.includes(skill));
 			if (![...free.keys()].some(hasSkills)) return;
@@ -598,7 +772,7 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 	}
 	let assigned = 0;
 	while (queues.size && Date.now() < deadline) {
-		for (const inbox of batch) {
+		for (const inbox of selectedInboxes) {
 			if (Date.now() >= deadline) break;
 			const queue = queues.get(inbox);
 			if (!queue) continue;
@@ -836,7 +1010,41 @@ export default async function handler(req, res) {
 		}
 		let agentRequest;
 		const getAgentId = () => agentRequest ??= matchAgent(cfg, user.email).then((agent) => Number(agent?.id) || null);
+		if (action === 'agent-profile') {
+			if (!['GET', 'PUT'].includes(req.method)) return json(res, 405, { error: 'Метод не поддерживается' });
+			const payload = req.method === 'PUT' ? profileAppearancePayload(body) : null;
+			const agentId = await getAgentId();
+			if (!validChatId(agentId)) throw chatwootError('В рабочем аккаунте Chatwoot не найден агент с вашей почтой', 409);
+			const credentials = await messageCredentials(env, cfg, user.email, getAgentId);
+			const profile = await ownChatwootProfile(credentials, user.email.trim().toLowerCase(), agentId);
+			if (!payload) return json(res, 200, profileAppearance(profile));
+			const updated = await api(credentials, '/profile', { method: 'PUT', body: payload });
+			if (Number(updated?.id) !== agentId) throw chatwootError('Chatwoot не подтвердил обновление профиля', 502);
+			agentDirectoryCache.delete(`${cfg.base}/${cfg.accountId}`);
+			return json(res, 200, profileAppearance(updated));
+		}
 		const getDirectory = async () => availableInboxes(cfg, await directoryFor(cfg), capabilities.supervise ? null : await getAgentId(), capabilities);
+		const activityRequest = (path) => api(cfg, `/accounts/${cfg.accountId}${path}`, { timeout: 5000 });
+		const accountKey = `${cfg.base}/${cfg.accountId}`;
+		if (action === 'site-activity' && req.method === 'GET') {
+			const sites = (await getDirectory()).filter(isWebsiteInbox);
+			const cacheKey = `${accountKey}/${sites.map((site) => site.id).sort((a, b) => a - b).join(',')}`;
+			return json(res, 200, await cachedSnapshot(activityCache, cacheKey, 20000, () => activityBySite(activityRequest, sites)));
+		}
+		if (action === 'team-status' && req.method === 'GET') {
+			const [presence, bots] = await Promise.all([
+				cachedSnapshot(teamStatusCache, accountKey, 5000, async () => {
+					const rows = await allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at');
+					const fresh = rows.filter((row) => Date.now() - Date.parse(row.heartbeat_at) < 90000);
+					return {
+						online: new Set(fresh.map((row) => Number(row.chatwoot_agent_id))).size,
+						accepting: new Set(fresh.filter((row) => row.accepting).map((row) => Number(row.chatwoot_agent_id))).size,
+					};
+				}),
+				cachedSnapshot(botCountCache, accountKey, 60000, async () => countConnectedBots(activityRequest, await directoryFor(cfg))).catch(() => null),
+			]);
+			return json(res, 200, { ...presence, bots });
+		}
 		const accessFor = async (id, { fresh = false, needAgent = false } = {}) => {
 			if (!validChatId(id)) throw chatwootError('Некорректный ID диалога', 400);
 			const [row, agentId] = await Promise.all([
@@ -862,15 +1070,20 @@ export default async function handler(req, res) {
 				if (team && id) return json(res, 200, { memberIds: await getTeamMembers(cfg, id, true) });
 				return json(res, 200, { payload: itemList(await api(cfg, path)) });
 			}
-			if (req.method === 'DELETE' && id)
+			if (req.method === 'DELETE' && id) {
+				if (team && (await sourceAssignmentsByTeam(env, Number(id))).length)
+					throw chatwootError('Сначала открепите команду от источников в настройках сайтов.', 409);
 				return json(res, 200, await api(cfg, `${path}/${id}`, { method: 'DELETE' }));
+			}
 			if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
 			if (team && id && Array.isArray(body.memberIds)) {
 				const members = [...new Set(body.memberIds.map(Number))];
 				if (members.length > 250 || members.some((value) => !validChatId(value)))
 					return json(res, 400, { error: 'Проверьте список участников команды' });
+				const linked = await sourceAssignmentsByTeam(env, Number(id));
 				const response = await api(cfg, `${path}/${id}/team_members`, { method: 'PATCH', body: { user_ids: members } });
 				teamMemberCache.delete(`${cfg.base}/${cfg.accountId}/${id}`);
+				if (linked.length) await syncTeamSources(env, cfg, linked);
 				return json(res, 200, response);
 			}
 			const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -918,16 +1131,14 @@ export default async function handler(req, res) {
 				const recent = saved && (await db(env, `supportos_chatwoot_webhook_events?select=received_at&received_at=gte.${encodeURIComponent(saved.updated_at)}&order=received_at.desc&limit=1`))?.[0];
 				return json(res, 200, { configured: Boolean(saved), lastReceivedAt: recent?.received_at ?? null });
 			}
-			const signingSecret = typeof body.signingSecret === 'string' ? body.signingSecret.trim() : '';
+			if (body.connect === true && process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production')
+				throw chatwootError('Подключите вебхук в рабочей версии SupportOS.', 409);
+			const signingSecret = body.connect === true
+				? await connectChatwootWebhook(cfg, 'https://support-os-psi.vercel.app/api/chatwoot/webhook')
+				: typeof body.signingSecret === 'string' ? body.signingSecret.trim() : '';
 			if (signingSecret.length < 16 || signingSecret.length > 512)
 				return json(res, 400, { error: 'Секрет вебхука должен содержать от 16 до 512 символов' });
-			const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_webhook_config?on_conflict=id`, {
-				method: 'POST',
-				headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-				body: JSON.stringify({ id: 'main', signing_secret: signingSecret, updated_by: user.id, updated_at: new Date().toISOString() }),
-				signal: AbortSignal.timeout(15000),
-			});
-			if (!response.ok) throw Object.assign(new Error('Не удалось сохранить секрет вебхука'), { status: 502 });
+			await saveChatwootWebhookSecret(env, user.id, signingSecret);
 			return json(res, 200, { configured: true });
 		}
 		if (action === 'conversation-counts' && req.method === 'GET') {
@@ -1061,7 +1272,9 @@ export default async function handler(req, res) {
 			]);
 			const cutoff = Date.now() - 90_000;
 			const activeTeam = team.filter((row) => Date.parse(row.heartbeat_at) >= cutoff).map((row) => ({ agentId: Number(row.chatwoot_agent_id), accepting: row.accepting, maxActiveChats: Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(row.chatwoot_agent_id))?.max_active_chats) || 4, active: true }));
-			const routing = activeTeam.some((row) => row.accepting) ? await routeWaitingConversations(env, cfg).catch(() => ({ assigned: 0 })) : { assigned: 0 };
+			const routing = accepting === true && current.accepting
+				? await routeWaitingConversations(env, cfg).catch(() => ({ assigned: 0 }))
+				: { assigned: 0 };
 			const maxActiveChats = Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agent.id))?.max_active_chats) || 4;
 			return json(res, 200, {
 				current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at, handoffPending: Boolean(current.handoff_since) },
@@ -1240,7 +1453,8 @@ export default async function handler(req, res) {
 		if (action === 'website-inbox-members' && req.method === 'GET') {
 			const inboxId = url.searchParams.get('inboxId');
 			if (!validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
-			return json(res, 200, { operatorIds: await websiteInboxMembers(cfg, inboxId) });
+			const [current, saved] = await Promise.all([websiteInboxMembers(cfg, inboxId), sourceAssignmentById(env, inboxId)]);
+			return json(res, 200, { operatorIds: directInboxMembers(current, saved), operatorTeamIds: saved?.operator_team_ids ?? [] });
 		}
 		if (action === 'contact' && req.method === 'GET') {
 			const { row, access } = await accessFor(url.searchParams.get('conversationId'));
@@ -1342,20 +1556,23 @@ export default async function handler(req, res) {
 			const source = websiteSourceInput(body);
 			const inboxId = body.id == null ? null : String(body.id);
 			if (inboxId !== null && !validId(inboxId)) return json(res, 400, { error: 'Некорректный ID источника' });
-			if (!inboxId && !source.operatorIds.length) return json(res, 400, { error: 'Назначьте хотя бы одного оператора источнику' });
+			const saved = inboxId && source.operatorTeamIds === undefined ? await sourceAssignmentById(env, inboxId) : null;
+			const assignment = await sourceAssignment(cfg, directInboxMembers(source.operatorIds, saved), source.operatorTeamIds ?? saved?.operator_team_ids ?? []);
+			const operators = effectiveInboxMembers(assignment);
+			if (!inboxId && !operators.length) return json(res, 400, { error: 'Назначьте операторов или непустую команду источнику' });
 			let result;
 			if (inboxId) {
 				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes/${inboxId}`, { method: 'PATCH', body: websiteSourcePayload(source) });
-				await setWebsiteInboxMembers(cfg, inboxId, source.operatorIds);
-				await saveWidgetSettings(env, inboxId, source);
+				await setWebsiteInboxMembers(cfg, inboxId, operators);
+				await saveWidgetSettings(env, inboxId, source, assignment);
 			} else {
 				result = await api(cfg, `/accounts/${cfg.accountId}/inboxes`, { method: 'POST', body: websiteSourcePayload(source) });
 				const created = result?.payload ?? result;
 				const createdId = String(created.id ?? '');
 				if (!validId(createdId)) throw chatwootError('Chatwoot создал источник, но не вернул его ID', 502);
 				try {
-					await setWebsiteInboxMembers(cfg, createdId, source.operatorIds);
-					await saveWidgetSettings(env, createdId, source);
+					await setWebsiteInboxMembers(cfg, createdId, operators);
+					await saveWidgetSettings(env, createdId, source, assignment);
 				} catch (error) {
 					await api(cfg, `/accounts/${cfg.accountId}/inboxes/${createdId}`, { method: 'DELETE' }).catch(() => undefined);
 					throw error;
@@ -1405,7 +1622,7 @@ export default async function handler(req, res) {
 					form.append('attachments[]', new Blob([file.bytes], { type: file.type }), file.name);
 				payload = form;
 			}
-			const credentials = await messageCredentials(env, cfg, user.email);
+			const credentials = await messageCredentials(env, cfg, user.email, getAgentId);
 			const result = await api(credentials, `${prefix}/${id}/messages`, { method: 'POST', body: payload });
 			return json(res, 200, result);
 		}

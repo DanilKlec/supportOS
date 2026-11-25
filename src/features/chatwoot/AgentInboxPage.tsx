@@ -5,6 +5,7 @@ import {
 	Archive,
 	ArrowDownToLine,
 	Ban,
+	Bell,
 	CheckCheck,
 	ChevronDown,
 	ContactRound,
@@ -36,8 +37,11 @@ import {
 } from "lucide-react";
 import { createContext, createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
+import { AgentProfileDialog } from "@/features/chatwoot/AgentProfileDialog";
+import { ChatActivityPage, ChatTeamIndicator } from "@/features/chatwoot/ChatActivityPage";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
+import { CHAT_SOUND_PREFERENCE } from "./chat-alerts";
 import { ChatDirectorySettingsDialog } from "@/features/chatwoot/ChatDirectorySettingsDialog";
 import { CustomAttributesDialog } from "@/features/chatwoot/CustomAttributesDialog";
 import { subscribeToChatwootEvents } from "@/services/chatwoot-realtime";
@@ -52,6 +56,7 @@ import {
 	type ChatwootStatus,
 	type ChatwootTeam,
 	type ConversationSearch,
+	chatwootFileBase64,
 	chatwootService,
 } from "@/services/chatwoot.service";
 import {
@@ -79,7 +84,7 @@ import { searchBinds } from "@/shared/lib/bind-search";
 import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
-type WorkspaceSection = "inbox" | "team" | "archive" | "contacts" | "supervisor" | "settings";
+type WorkspaceSection = "inbox" | "activity" | "team" | "archive" | "contacts" | "supervisor" | "settings";
 type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
@@ -234,11 +239,11 @@ function AgentInboxWorkspace() {
 	const [directorySettingsOpen, setDirectorySettingsOpen] = useState(false);
 	const [attributesOpen, setAttributesOpen] = useState(false);
 	const [profileOpen, setProfileOpen] = useState(false);
+	const [agentProfileOpen, setAgentProfileOpen] = useState(false);
+	const editAgentProfile = () => { setProfileOpen(false); setAgentProfileOpen(true); };
 	const [soundEnabled, setSoundEnabled] = useState(() => {
-		try { return localStorage.getItem("supportos:chatwoot:sound") !== "off"; } catch { return true; }
+		try { return localStorage.getItem(CHAT_SOUND_PREFERENCE) !== "off"; } catch { return true; }
 	});
-	const audioContext = useRef<AudioContext | null>(null);
-	const seenConversationActivity = useRef<Map<number, number | string> | null>(null);
 	const user = useAuthStore((s) => s.session?.user);
 	const accessToken = useAuthStore((s) => s.session?.accessToken);
 	const canWork = useAuthStore(
@@ -282,7 +287,7 @@ function AgentInboxWorkspace() {
 				void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] }, { cancelRefetch: false });
 				void client.invalidateQueries({ queryKey: ["chatwoot", "messages"] }, { cancelRefetch: false });
 				void client.invalidateQueries({ queryKey: ["chatwoot", "conversation"] }, { cancelRefetch: false });
-			}, 650);
+			}, 0);
 		};
 		const unsubscribe = subscribeToChatwootEvents(
 			accessToken,
@@ -321,6 +326,12 @@ function AgentInboxWorkspace() {
 		enabled: connection.data?.configured === true,
 		staleTime: 30000,
 		refetchInterval: 30000,
+	});
+	const teamStatus = useQuery({
+		queryKey: ["chatwoot", "team-status"],
+		queryFn: chatwootService.teamStatus,
+		enabled: connection.data?.configured === true,
+		refetchInterval: 10_000,
 	});
 	const presence = useQuery({
 		queryKey: ["chatwoot", "presence"],
@@ -385,6 +396,7 @@ function AgentInboxWorkspace() {
 		enabled: connection.data?.configured === true && displayedScope !== "active" && (activeSection === "inbox" || activeSection === "archive"),
 		staleTime: displayedScope === "queue" ? 2000 : 0,
 		refetchInterval: displayedScope === "history" ? 20000 : realtimeConnected ? 12000 : 3000,
+		refetchIntervalInBackground: displayedScope !== "history",
 		retry: 1,
 	});
 	const conversationCounts = useQuery({
@@ -467,54 +479,6 @@ function AgentInboxWorkspace() {
 	const updateSelectedChats = (ids: number[]) => setBulkSelection((current) =>
 		current?.key === bulkKey ? { key: bulkKey, ids: new Set(ids) } : current,
 	);
-	const unlockAudio = () => {
-		if (audioContext.current || typeof window === "undefined") return;
-		const Context = window.AudioContext;
-		if (!Context) return;
-		try {
-			audioContext.current = new Context();
-			void audioContext.current.resume().catch(() => undefined);
-		} catch { /* audio is optional */ }
-	};
-	useEffect(() => {
-		if (!conversations.data) return;
-		if (!seenConversationActivity.current) {
-			seenConversationActivity.current = new Map(rows.map((row) => [row.id, row.last_non_activity_message?.id ?? row.updated_at ?? 0]));
-			return;
-		}
-		const fresh = rows.filter((row) => {
-			const previous = seenConversationActivity.current?.get(row.id);
-			const latest = row.last_non_activity_message;
-			const activityId = latest?.id ?? row.updated_at ?? 0;
-			const timestamp = latest?.created_at ?? row.updated_at ?? row.created_at ?? 0;
-			const millis = timestamp > 1e12 ? timestamp : timestamp * 1000;
-			const isIncoming = latest && !latest.private && latest.message_type !== 1 && latest.message_type !== "outgoing";
-			const isRecent = Date.now() - millis < 120_000;
-			const isNewConversation = previous === undefined && isRecent;
-			const isNewMessage = previous !== undefined && previous !== activityId && isIncoming && isRecent;
-			seenConversationActivity.current?.set(row.id, activityId);
-			return isNewConversation || isNewMessage;
-		});
-		if (!fresh.length || !soundEnabled) return;
-		const context = audioContext.current;
-		if (context?.state === "running") {
-			const oscillator = context.createOscillator();
-			const gain = context.createGain();
-			oscillator.type = "sine";
-			oscillator.frequency.setValueAtTime(740, context.currentTime);
-			oscillator.frequency.setValueAtTime(988, context.currentTime + 0.11);
-			gain.gain.setValueAtTime(0.0001, context.currentTime);
-			gain.gain.exponentialRampToValueAtTime(0.14, context.currentTime + 0.02);
-			gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.28);
-			oscillator.connect(gain);
-			gain.connect(context.destination);
-			oscillator.start();
-			oscillator.stop(context.currentTime + 0.29);
-		}
-		if ("Notification" in window && Notification.permission === "granted") {
-			new Notification(fresh.length === 1 ? "Новый диалог" : `${fresh.length} новых диалогов`, { body: "Новое обращение в рабочем пространстве SupportOS" });
-		}
-	}, [conversations.data, rows, soundEnabled]);
 	const placeConversation = (id: number, options: { title?: string; add?: boolean; replaceId?: number } = {}) => {
 		dispatchChatWindow({ type: "open", id, ...options });
 		setAddingChat(false);
@@ -574,15 +538,9 @@ function AgentInboxWorkspace() {
 		setActivePage(1);
 	};
 	const toggleSound = () => {
-		setSoundEnabled((current) => {
-			const next = !current;
-			try { localStorage.setItem("supportos:chatwoot:sound", next ? "on" : "off"); } catch { /* preference remains in session */ }
-			if (next) {
-				unlockAudio();
-				if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
-			}
-			return next;
-		});
+		const next = !soundEnabled;
+		try { localStorage.setItem(CHAT_SOUND_PREFERENCE, next ? "on" : "off"); } catch { /* preference remains in session */ }
+		setSoundEnabled(next);
 	};
 	const resizeList = (width: number) => {
 		const next = Math.min(520, Math.max(260, width));
@@ -631,7 +589,7 @@ function AgentInboxWorkspace() {
 			/>
 		);
 	return (
-		<div className="supportos-inbox flex h-full min-h-0 w-full text-foreground" onPointerDownCapture={unlockAudio}>
+		<div className="supportos-inbox flex h-full min-h-0 w-full text-foreground">
 			<InboxRail
 				activeSection={activeSection}
 				collapsed={railCollapsed}
@@ -642,6 +600,8 @@ function AgentInboxWorkspace() {
 				acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
 				handoffPending={presence.data?.current.handoffPending === true}
 				profileOpen={profileOpen}
+				profileAgent={agents.find((agent) => agent.id === presence.data?.current.agentId)}
+				onEditProfile={editAgentProfile}
 				soundEnabled={soundEnabled}
 				onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
 				onSelect={selectSection}
@@ -677,14 +637,19 @@ function AgentInboxWorkspace() {
 							</button>
 						))}
 					</div>
-					{presence.data && <span className="chat-connection" title="Операторы с активным подключением к SupportOS"><UsersRound size={14} /> <span>В сети</span> <strong className="tabular-nums">{presence.data.onlineCount}</strong></span>}
+					<ChatTeamIndicator team={teamStatus.data} onOpen={() => selectSection("team")} />
 					<span className="chat-connection" data-live={realtimeConnected} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
 						<i aria-hidden="true" />
 						<span>{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
 					</span>
 				</nav>}
+				{(activeSection === "activity" || activeSection === "team") && <div className="chat-scope-bar">
+					<ChatTeamIndicator team={teamStatus.data} onOpen={() => selectSection("team")} />
+				</div>}
 				<div className="flex min-h-0 flex-1">
-				{activeSection === "supervisor" ? (
+				{activeSection === "activity" ? (
+					<ChatActivityPage team={teamStatus.data} />
+				) : activeSection === "supervisor" ? (
 					<ChatOperationsPage agents={agents} inboxes={inboxes} canEdit={canManageChatCapacity}
 						onOpen={(id) => { selectSection("inbox"); setScope("active"); startObservation(id); }} />
 				) : activeSection === "settings" && canOpenChatSettings ? (
@@ -705,7 +670,8 @@ function AgentInboxWorkspace() {
 						currentAgentId={presence.data?.current.agentId}
 						canManageChatCapacity={canManageChatCapacity}
 						canInvite={canManageSites}
-						profileUrl={connection.data?.profileUrl}
+						onManageTeams={canManageSites ? () => setDirectorySettingsOpen(true) : undefined}
+						onEditProfile={editAgentProfile}
 						onSetCapacity={async (agentId, maxActiveChats) => { await chatCapacity.mutateAsync({ agentId, maxActiveChats }); }}
 						loading={directory.isLoading}
 						error={directory.error?.message}
@@ -883,6 +849,7 @@ function AgentInboxWorkspace() {
 				<CustomAttributesDialog onClose={() => setAttributesOpen(false)} />
 			)}
 			{directorySettingsOpen && canManageSites && <ChatDirectorySettingsDialog agents={agents} onClose={() => setDirectorySettingsOpen(false)} />}
+			{agentProfileOpen && <AgentProfileDialog onClose={() => setAgentProfileOpen(false)} profileUrl={connection.data?.profileUrl} />}
 		</div>
 	);
 }
@@ -933,7 +900,7 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, handoffPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings, canBrowseContacts }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, handoffPending, profileOpen, profileAgent, onEditProfile, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings, canBrowseContacts }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
@@ -943,6 +910,8 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	acceptingPending: boolean;
 	handoffPending: boolean;
 	profileOpen: boolean;
+	profileAgent?: ChatwootAgent;
+	onEditProfile: () => void;
 	soundEnabled: boolean;
 	onAccept: () => void;
 	onSelect: (section: WorkspaceSection) => void;
@@ -955,6 +924,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	const profile = useChatPopover<HTMLElement>(profileOpen, onToggleProfile);
 	const items: Array<{ id: WorkspaceSection; label: string; icon: typeof MessagesSquare }> = [
 		{ id: "inbox", label: "Диалоги", icon: MessagesSquare },
+		{ id: "activity", label: "Активность", icon: Activity },
 		{ id: "team", label: "Команда", icon: UsersRound },
 		{ id: "archive", label: "Архив", icon: Archive },
 	];
@@ -977,10 +947,10 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 			</button>
 			<div className={`chat-rail-footer flex w-full items-center gap-2 border-t border-border px-2 pt-2 ${collapsed ? "justify-center" : ""}`}>
 				<button type="button" title="Профиль агента" aria-label="Профиль агента" aria-expanded={profileOpen} onClick={onToggleProfile} className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold hover:border-accent/60">
-					{initials(userEmail)}
+					<ChatAvatar name={profileAgent?.available_name || profileAgent?.name || userEmail} src={profileAgent?.thumbnail} />
 					<span className={`absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-surface ${accepting ? "bg-emerald-400" : "bg-muted"}`} />
 				</button>
-				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{handoffPending ? "Передача чатов…" : acceptingPending ? "Загружаем статус…" : accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
+				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{profileAgent?.available_name || profileAgent?.name || userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{handoffPending ? "Передача чатов…" : acceptingPending ? "Загружаем статус…" : accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
 			</div>
 			</div>
 			{profileOpen && (
@@ -999,6 +969,8 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 						<span className="flex-1">Звук уведомлений</span>
 						<span className="text-[11px] text-muted">{soundEnabled ? "Вкл." : "Выкл."}</span>
 					</button>
+					<BrowserChatNotifications />
+					<button type="button" onClick={onEditProfile} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-xs hover:bg-surface-elevated"><UserRound size={15} /> Имя и фото в чате</button>
 					<Link to="/settings" className="flex items-center gap-2.5 rounded-lg px-3 py-3 text-xs text-muted hover:bg-surface-elevated hover:text-foreground"><Settings2 size={15} /> Личные настройки SupportOS</Link>
 				</div>
 			)}
@@ -1006,7 +978,23 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	);
 }
 
-function TeamWorkspace({ agents, inboxes, teams, presence, currentAgentId, canManageChatCapacity, canInvite, profileUrl, onSetCapacity, loading, error, onRetry }: {
+function BrowserChatNotifications() {
+	const [permission, setPermission] = useState(() =>
+		typeof Notification === "undefined" ? null : Notification.permission,
+	);
+	if (permission === null) return null;
+	if (permission === "default") return (
+		<button type="button" onClick={() => void Notification.requestPermission().then(setPermission).catch(() => undefined)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-xs hover:bg-surface-elevated">
+			<Bell size={15} className="shrink-0" /> Включить уведомления браузера
+		</button>
+	);
+	return <div className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted">
+		<Bell size={15} className="shrink-0" />
+		{permission === "granted" ? "Уведомления браузера включены" : "Разрешите уведомления в настройках сайта"}
+	</div>;
+}
+
+function TeamWorkspace({ agents, inboxes, teams, presence, currentAgentId, canManageChatCapacity, canInvite, onEditProfile, onManageTeams, onSetCapacity, loading, error, onRetry }: {
 	agents: ChatwootAgent[];
 	inboxes: ChatwootInbox[];
 	teams: ChatwootTeam[];
@@ -1014,7 +1002,8 @@ function TeamWorkspace({ agents, inboxes, teams, presence, currentAgentId, canMa
 	currentAgentId?: number;
 	canManageChatCapacity: boolean;
 	canInvite: boolean;
-	profileUrl?: string;
+	onEditProfile: () => void;
+	onManageTeams?: () => void;
 	onSetCapacity: (agentId: number, maxActiveChats: number) => Promise<void>;
 	loading: boolean;
 	error?: string;
@@ -1049,8 +1038,9 @@ function TeamWorkspace({ agents, inboxes, teams, presence, currentAgentId, canMa
 						<div className="order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1">
 							<ChatSearch label={tab === "agents" ? "Найти агента" : "Найти команду"} placeholder={tab === "agents" ? "Имя или почта агента" : "Название команды"} value={search} onChange={setSearch} />
 						</div>
-						{tab === "agents" && profileUrl && <a href={profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-surface-elevated"><ExternalLink size={13} /> Никнейм и фото</a>}
+						{tab === "agents" && <button type="button" onClick={onEditProfile} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-surface-elevated"><UserRound size={13} /> Имя и фото в чате</button>}
 						{tab === "agents" && canInvite && <button type="button" aria-expanded={inviteOpen} onClick={() => setInviteOpen(!inviteOpen)} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-2 text-xs font-semibold text-white"><Plus size={14} /> Добавить агента</button>}
+						{tab === "teams" && onManageTeams && <button type="button" onClick={onManageTeams} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-surface-elevated"><UsersRound size={14} /> Управлять командами</button>}
 					</div>
 					{tab === "agents" && canInvite && inviteOpen && <InviteAgentForm onAdded={onRetry} />}
 					{tab === "agents" && <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs text-muted">
@@ -1544,13 +1534,9 @@ function ConversationPane({
 			const isNote = message.mode === "note";
 			if (supervising || (isNote ? !canNote : !canWrite))
 				throw new Error("Отправка в этом режиме недоступна");
-			const attachments = await Promise.all(message.draft.files.map(async (file) => {
-				const bytes = new Uint8Array(await file.arrayBuffer());
-				let binary = "";
-				for (let offset = 0; offset < bytes.length; offset += 0x8000)
-					binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-				return { name: file.name, type: file.type || "application/octet-stream", contentBase64: btoa(binary) };
-			}));
+			const attachments = await Promise.all(message.draft.files.map(async (file) => ({
+				name: file.name, type: file.type || "application/octet-stream", contentBase64: await chatwootFileBase64(file),
+			})));
 			return chatwootService.sendMessage(message.id, message.draft.text.trim(), isNote, attachments);
 		},
 		onMutate: (message) => {

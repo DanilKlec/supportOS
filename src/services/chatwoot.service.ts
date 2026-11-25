@@ -2,6 +2,12 @@ import { authenticatedFetch } from "@/services/authenticated-fetch";
 
 export type ChatwootStatus = "open" | "pending" | "resolved" | "snoozed";
 export type ChatwootPriority = "low" | "medium" | "high" | "urgent";
+type SiteActivityMetrics = { online: number | null; active: number | null; queue: number | null };
+export type ChatTeamStatus = { online: number; accepting: number; bots: number | null };
+export type ChatSiteActivity = SiteActivityMetrics & {
+	updatedAt: string;
+	sites: Array<SiteActivityMetrics & { id: number; name: string; url?: string | null }>;
+};
 export type ActiveChatMode = "all" | "open" | "pending" | "watching";
 export type ActiveChatSort = "last_activity_at_desc" | "last_activity_at_asc" | "created_at_asc" | "created_at_desc" | "priority_desc" | "waiting_since_asc";
 export type ActiveChatRow = {
@@ -192,6 +198,20 @@ export type ChatwootUpload = {
 	contentBase64: string;
 };
 
+export type ChatwootAgentProfile = {
+	name: string;
+	displayName: string;
+	avatarUrl: string;
+};
+
+export async function chatwootFileBase64(file: File) {
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	let binary = "";
+	for (let offset = 0; offset < bytes.length; offset += 0x8000)
+		binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+	return btoa(binary);
+}
+
 async function request<T>(
 	action: string,
 	init?: RequestInit,
@@ -207,6 +227,13 @@ async function request<T>(
 }
 
 export const chatwootService = {
+	agentProfile: (signal?: AbortSignal) => request<ChatwootAgentProfile>("agent-profile", { signal }),
+	updateAgentProfile: async (displayName: string, file: File | null) =>
+		request<ChatwootAgentProfile>("agent-profile", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ displayName, avatar: file ? await chatwootFileBase64(file) : undefined }),
+		}),
 	health: () =>
 		request<{
 			configured: boolean;
@@ -215,6 +242,8 @@ export const chatwootService = {
 			capabilities?: ChatwootCapabilities;
 			inboxes?: { payload?: Array<{ inbox: ChatwootInbox }> };
 		}>("health"),
+	teamStatus: () => request<ChatTeamStatus>("team-status"),
+	siteActivity: () => request<ChatSiteActivity>("site-activity"),
 	conversations: (options: ConversationSearch) =>
 		request<{
 			data?: { payload?: ChatwootConversation[]; meta?: unknown };
@@ -282,8 +311,14 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ signingSecret }),
 		}),
+	connectWebhook: () =>
+		request<{ configured: boolean }>("webhook-secret", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ connect: true }),
+		}),
 	websiteInboxMembers: (inboxId: number) =>
-		request<{ operatorIds: number[] }>(
+		request<{ operatorIds: number[]; operatorTeamIds: number[] }>(
 			"website-inbox-members",
 			undefined,
 			`&inboxId=${inboxId}`,
@@ -303,6 +338,7 @@ export const chatwootService = {
 		greetingEnabled: boolean;
 		greetingMessage: string;
 		operatorIds: number[];
+		operatorTeamIds: number[];
 	}) =>
 		request<{ inbox: ChatwootWebsiteInbox }>("website-source", {
 			method: "POST",
@@ -334,8 +370,6 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ agentId, maxActiveChats }),
 		}),
-	presenceHeartbeat: (signal: AbortSignal) =>
-		request<{ ok: boolean }>("presence-heartbeat", { method: "POST", signal }),
 	presence: (accepting?: boolean) =>
 		request<{
 			current: { agentId: number; accepting: boolean; maxActiveChats: number; heartbeatAt: string; handoffPending: boolean };

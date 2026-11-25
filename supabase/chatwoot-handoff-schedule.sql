@@ -3,7 +3,7 @@
 create extension if not exists pg_cron;
 create extension if not exists http with schema extensions;
 
-select cron.schedule('supportos-chatwoot-handoff', '30 seconds', $job$
+select cron.schedule('supportos-chatwoot-handoff', '5 seconds', $job$
   do $tick$
   declare
     auth_header text;
@@ -11,10 +11,13 @@ select cron.schedule('supportos-chatwoot-handoff', '30 seconds', $job$
   begin
     select 'Bearer ' || router.schedule_key into auth_header
     from public.supportos_chatwoot_router_state router
-    where router.id = 'main' and exists (
+    where router.id = 'main'
+      and coalesce(router.router_lease_until, '-infinity'::timestamptz) <= now()
+      and exists (
       select 1 from public.supportos_chatwoot_presence presence
       where presence.handoff_since is not null
         or (presence.offline_since is null and presence.heartbeat_at <= now() - interval '90 seconds')
+        or (presence.accepting and presence.heartbeat_at > now() - interval '90 seconds')
     );
     if auth_header is null then return; end if;
 
