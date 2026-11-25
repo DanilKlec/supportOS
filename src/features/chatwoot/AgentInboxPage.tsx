@@ -611,6 +611,7 @@ function AgentInboxWorkspace() {
 				accessRole={capabilities?.role}
 				accepting={presence.data?.current.accepting === true}
 				acceptingPending={accepting.isPending || presence.isLoading || !presence.data}
+				handoffPending={presence.data?.current.handoffPending === true}
 				profileOpen={profileOpen}
 				soundEnabled={soundEnabled}
 				onAccept={() => accepting.mutate(!presence.data?.current.accepting)}
@@ -899,7 +900,7 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	);
 }
 
-function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings, canBrowseContacts }: {
+function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, accessRole, accepting, acceptingPending, handoffPending, profileOpen, soundEnabled, onAccept, onSelect, canSupervise, onToggleProfile, onToggleSound, canOpenChatSettings, canBrowseContacts }: {
 	activeSection: WorkspaceSection;
 	collapsed: boolean;
 	onToggleCollapsed: () => void;
@@ -907,6 +908,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	accessRole?: "support" | "shift" | "qc" | "admin" | "creator";
 	accepting: boolean;
 	acceptingPending: boolean;
+	handoffPending: boolean;
 	profileOpen: boolean;
 	soundEnabled: boolean;
 	onAccept: () => void;
@@ -945,7 +947,7 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 					{initials(userEmail)}
 					<span className={`absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-surface ${accepting ? "bg-emerald-400" : "bg-muted"}`} />
 				</button>
-				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{acceptingPending ? "Загружаем статус…" : accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
+				{!collapsed && <button type="button" onClick={onToggleProfile} className="chat-rail-copy min-w-0 flex-1 text-left"><span className="block truncate text-xs font-medium">{userEmail.split("@")[0] || "Агент"}</span><span className="block truncate text-[11px] text-muted">{handoffPending ? "Передача чатов…" : acceptingPending ? "Загружаем статус…" : accepting ? "Принимаю чаты" : "Приём выключен"}</span></button>}
 			</div>
 			</div>
 			{profileOpen && (
@@ -955,8 +957,8 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 						<div className="mt-1 truncate text-[11px] text-muted">{userEmail || "Аккаунт SupportOS"}</div>
 						{accessRole && <div className="mt-1 text-[10px] font-medium text-accent">Роль SupportOS · {({ support: "Support", shift: "Shift", qc: "QC", admin: "Admin", creator: "Creator" })[accessRole]}</div>}
 					</div>
-					<button type="button" role="switch" aria-label="Приём чатов" aria-checked={accepting} disabled={acceptingPending} onClick={onAccept} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
-						<span><span className="block text-xs font-medium">Приём чатов</span><span className="mt-0.5 block text-[10px] text-muted">{accepting ? "Вы в очереди распределения" : "Новые диалоги не назначаются"}</span></span>
+					<button type="button" role="switch" aria-label="Приём чатов" aria-checked={accepting} disabled={acceptingPending || handoffPending} onClick={onAccept} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-surface-elevated disabled:opacity-50">
+						<span><span className="block text-xs font-medium">Приём чатов</span><span className="mt-0.5 block text-[10px] text-muted">{handoffPending ? "Передаём активные чаты после обрыва связи" : accepting ? "Вы в очереди распределения" : "Новые диалоги не назначаются"}</span></span>
 						<span className={`h-5 w-9 rounded-full p-0.5 transition ${accepting ? "bg-emerald-500" : "bg-surface-elevated"}`}><span className={`block size-4 rounded-full bg-white transition ${accepting ? "translate-x-4" : ""}`} /></span>
 					</button>
 					<button type="button" role="switch" aria-label="Звук уведомлений" aria-checked={soundEnabled} onClick={onToggleSound} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-xs hover:bg-surface-elevated">

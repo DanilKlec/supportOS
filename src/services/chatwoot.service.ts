@@ -317,9 +317,11 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ agentId, maxActiveChats }),
 		}),
+	presenceHeartbeat: (signal: AbortSignal) =>
+		request<{ ok: boolean }>("presence-heartbeat", { method: "POST", signal }),
 	presence: (accepting?: boolean) =>
 		request<{
-			current: { agentId: number; accepting: boolean; maxActiveChats: number; heartbeatAt: string };
+			current: { agentId: number; accepting: boolean; maxActiveChats: number; heartbeatAt: string; handoffPending: boolean };
 			team: Array<{ agentId: number; accepting: boolean; maxActiveChats: number; active: boolean }>;
 			routing: { assigned: number };
 		}>(

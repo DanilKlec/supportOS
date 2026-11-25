@@ -3,7 +3,7 @@ import { isIP } from 'node:net';
 import { chatCapabilities, chatConversationAccess } from '../../shared/chatwoot-access.js';
 import { activeOverview, changeSupervision, coachingNotes, sendCoachingNote, supervisedIds } from './supervision.js';
 import { requireUser } from '../_auth.js';
-import { allRows, config as serverConfig, db } from '../agent-monitor/_server.js';
+import { allRows, config as serverConfig, db, equal } from '../agent-monitor/_server.js';
 import { getOperations, onShift, saveOperations, slaSnapshot } from './operations.js';
 
 const json = (res, status, body) => {
@@ -62,12 +62,14 @@ async function api(cfg, path, { method = 'GET', body, timeout = 15000 } = {}) {
 const idPattern = /^\d{1,18}$/;
 const validId = (value) => typeof value === 'string' && idPattern.test(value);
 
-function itemList(data) {
+function listPayload(data) {
 	if (Array.isArray(data)) return data;
 	if (Array.isArray(data?.payload)) return data.payload;
 	if (Array.isArray(data?.data?.payload)) return data.data.payload;
-	return [];
+	return null;
 }
+
+const itemList = (data) => listPayload(data) ?? [];
 
 function conversationTotal(data) {
 	const meta = data?.data?.meta ?? data?.meta ?? {};
@@ -179,30 +181,12 @@ function isWebsiteInbox(inbox) {
 	return channel.includes('webwidget') || channel.includes('web_widget') || channel === 'website';
 }
 
-async function presenceFor(env, userId) {
-	return (await db(env, `supportos_chatwoot_presence?select=user_id,chatwoot_agent_id,accepting,heartbeat_at&user_id=eq.${encodeURIComponent(userId)}&limit=1`))?.[0] ?? null;
-}
-
-async function writePresence(env, user, agentId, accepting) {
-	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_presence?on_conflict=user_id`, {
-		method: 'POST',
-		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
-		body: JSON.stringify({ user_id: user.id, chatwoot_agent_id: agentId, accepting, heartbeat_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
-		signal: AbortSignal.timeout(10000),
+function recordPresence(env, userId, agentId = null, accepting = null) {
+	return db(env, 'rpc/supportos_chatwoot_record_presence', {
+		p_user_id: userId,
+		p_agent_id: agentId,
+		p_accepting: accepting,
 	});
-	if (!response.ok) throw chatwootError('Не удалось сохранить состояние приёма чатов', 502);
-	return (await response.json())?.[0];
-}
-
-async function refreshPresence(env, userId) {
-	const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/supportos_chatwoot_presence?user_id=eq.${encodeURIComponent(userId)}`, {
-		method: 'PATCH',
-		headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-		body: JSON.stringify({ heartbeat_at: new Date().toISOString() }),
-		signal: AbortSignal.timeout(5000),
-	});
-	if (!response.ok) throw chatwootError('Не удалось обновить статус агента', 502);
-	return (await response.json())?.[0];
 }
 
 async function getAgentLimits(env) {
@@ -444,14 +428,78 @@ export async function routeWaitingConversations(env, cfg) {
 	}
 }
 
+async function requeueDisconnectedConversations(env, cfg, prefix, leaseToken, deadline) {
+	const pending = await db(env, 'rpc/supportos_chatwoot_expire_presence', { p_lease_token: leaseToken });
+	const batches = await Promise.all(pending.map(async (entry) => {
+		const agentId = Number(entry.chatwoot_agent_id);
+		const handoff = {
+			p_lease_token: leaseToken,
+			p_user_id: entry.user_id,
+			p_agent_id: agentId,
+			p_handoff_since: entry.handoff_since,
+		};
+		const result = await api(cfg, `${prefix}/filter?page=1&sort_by=created_at_asc`, {
+			method: 'POST',
+			body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(agentId) }) },
+			timeout: 3000,
+		}).catch(() => null);
+		const rows = listPayload(result);
+		if (!rows) return [];
+		if (!rows.length && (conversationTotal(result) ?? 0) === 0) {
+			await db(env, 'rpc/supportos_chatwoot_complete_handoff', handoff).catch(() => undefined);
+			return [];
+		}
+		return rows.filter((row) => validChatId(row.id) && activeStatuses.includes(row.status) && conversationAssignee(row) === agentId)
+			.map((row) => ({ row, handoff }));
+	}));
+	const candidates = batches.flat().sort((a, b) => oldestFirst(a.row, b.row)).slice(0, 12);
+	let requeued = 0;
+	for (let offset = 0; offset < candidates.length && Date.now() < deadline; offset += 4) {
+		const results = await Promise.allSettled(candidates.slice(offset, offset + 4)
+			.map(({ row, handoff }) => requeueDisconnectedConversation(env, cfg, prefix, Number(row.id), handoff)));
+		requeued += results.filter((result) => result.status === 'fulfilled' && result.value).length;
+	}
+	return requeued;
+}
+
+async function requeueDisconnectedConversation(env, cfg, prefix, id, handoff) {
+	const token = randomUUID();
+	const reservation = await db(env, 'rpc/supportos_chatwoot_reserve_handoff', {
+		...handoff,
+		p_conversation_id: id,
+		p_operation_token: token,
+	});
+	if (!reservation?.reserved) return false;
+	try {
+		const fresh = conversationRecord(await api(cfg, `${prefix}/${id}`, { timeout: 3000 }));
+		const active = activeStatuses.includes(fresh.status);
+		const assignee = conversationAssignee(fresh);
+		if (!active || assignee !== handoff.p_agent_id) {
+			await finishConversation(env, id, token, active ? assignee : null);
+			return false;
+		}
+		await api(cfg, `${prefix}/${id}/assignments`, { method: 'POST', body: { assignee_id: null }, timeout: 5000 });
+		await finishConversation(env, id, token, null);
+		return true;
+	} catch (error) {
+		// An upstream timeout does not say whether Chatwoot applied the change.
+		if (error.chatwootStatus >= 400 && error.chatwootStatus < 500)
+			await finishConversation(env, id, token, error.chatwootStatus === 404 ? null : handoff.p_agent_id).catch(() => undefined);
+		return false;
+	}
+}
+
 async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 	const deadline = Date.now() + 12000;
 	const prefix = `/accounts/${cfg.accountId}/conversations`;
+	const requeued = await requeueDisconnectedConversations(env, cfg, prefix, leaseToken, deadline);
+	const idle = { assigned: 0, requeued };
+	if (Date.now() >= deadline) return idle;
 	const presence = await allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,heartbeat_at&accepting=eq.true');
 	const eligible = presence
 		.filter((row) => Date.now() - Date.parse(row.heartbeat_at) < 90_000)
 		.map((row) => Number(row.chatwoot_agent_id));
-	if (!eligible.length) return { assigned: 0 };
+	if (!eligible.length) return idle;
 
 	const [operations, queueCounts] = await Promise.all([
 		getOperations(env),
@@ -460,9 +508,9 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 			return result?.data?.meta ?? result?.meta;
 		})),
 	]);
-	if (totalFromMeta(queueCounts, 'unassigned_count') === 0) return { assigned: 0 };
+	if (totalFromMeta(queueCounts, 'unassigned_count') === 0) return idle;
 	const working = eligible.filter((id) => onShift(operations.agents[id]));
-	if (!working.length) return { assigned: 0 };
+	if (!working.length) return idle;
 	const [limits, state, directory, active] = await Promise.all([
 		getAgentLimits(env),
 		db(env, 'supportos_chatwoot_router_state?select=last_inbox_id&id=eq.main'),
@@ -497,14 +545,14 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 		const id = Number(agent);
 		return [id, Math.max(0, (capacities.get(id) ?? 4) - used)];
 	}).filter(([, slots]) => slots > 0));
-	if (!free.size) return { assigned: 0 };
+	if (!free.size) return idle;
 
 	const inboxIds = [...new Set(itemList(directory).map((inbox) => Number(inbox.id)))]
 		.filter((id) => Number.isSafeInteger(id) && id > 0).sort((a, b) => a - b);
 	const next = inboxIds.findIndex((id) => id > Number(state?.[0]?.last_inbox_id ?? 0));
 	const start = Math.max(0, next);
 	const batch = [...inboxIds.slice(start), ...inboxIds.slice(0, start)].slice(0, 8);
-	if (!batch.length) return { assigned: 0 };
+	if (!batch.length) return idle;
 
 	// Every pass starts at the oldest chat in each selected project. The persisted
 	// project position lets other sources progress when an earlier source is full.
@@ -538,7 +586,7 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 				continue;
 			}
 			const result = await assignQueuedConversation(env, cfg, prefix, row, inbox, candidates, activeCounts, leaseToken);
-			if (result.stop) return { assigned };
+			if (result.stop) return { assigned, requeued };
 			if (!result.agentId) continue;
 			const remaining = free.get(result.agentId) - 1;
 			if (remaining > 0) free.set(result.agentId, remaining);
@@ -546,7 +594,7 @@ async function routeWaitingConversationsLocked(env, cfg, leaseToken) {
 			assigned++;
 		}
 	}
-	return { assigned };
+	return { assigned, requeued };
 }
 
 async function assignQueuedConversation(env, cfg, prefix, row, inbox, candidates, activeCounts, leaseToken) {
@@ -655,6 +703,17 @@ export default async function handler(req, res) {
 	try {
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		const action = url.searchParams.get('action') ?? 'health';
+		if (action === 'routing-tick') {
+			if (req.method !== 'POST') return json(res, 405, { error: 'Метод не поддерживается' });
+			const authorization = req.headers?.authorization ?? '';
+			if (!/^Bearer [0-9a-f]{64}$/.test(authorization)) return json(res, 401, { error: 'Требуется авторизация' });
+			const env = serverConfig();
+			const state = (await db(env, 'supportos_chatwoot_router_state?select=schedule_key&id=eq.main'))?.[0];
+			if (!equal(authorization.slice(7), state?.schedule_key)) return json(res, 401, { error: 'Требуется авторизация' });
+			const cfg = config();
+			if (!cfg) return json(res, 503, { error: 'Chatwoot не настроен на сервере' });
+			return json(res, 200, await routeWaitingConversations(env, cfg));
+		}
 		if (action === 'widget-config' && req.method === 'GET') {
 			// Website tokens are designed to be public in widget snippets; never return the Chatwoot API token here.
 			const cfg = config();
@@ -696,6 +755,10 @@ export default async function handler(req, res) {
 		}
 		const requestedScope = url.searchParams.get('scope');
 		const user = await requireUser(req, { permission: 'work' });
+		if (action === 'presence-heartbeat' && req.method === 'POST') {
+			await recordPresence(serverConfig(), user.id);
+			return json(res, 200, { ok: true });
+		}
 		const capabilities = chatCapabilities(user.access);
 		const monitorAction = ['agent-capacity', 'chat-operations', 'chat-supervisor', 'active-overview', 'supervision'].includes(action) || action === 'conversations' && requestedScope === 'active';
 		const projectAction = ['website-inboxes', 'website-domains', 'website-source', 'website-inbox-members', 'chat-label', 'chat-team'].includes(action)
@@ -939,10 +1002,8 @@ export default async function handler(req, res) {
 		if (action === 'presence' && ['GET', 'POST'].includes(req.method)) {
 			const agent = await matchAgent(cfg, user.email);
 			if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot, чтобы подключить приём чатов' });
-			const previous = await presenceFor(env, user.id);
-			const accepting = typeof body.accepting === 'boolean' ? body.accepting : previous?.accepting === true;
-			const canRefresh = Number(previous?.chatwoot_agent_id) === Number(agent.id) && typeof body.accepting !== 'boolean';
-			const current = (canRefresh && await refreshPresence(env, user.id)) || await writePresence(env, user, Number(agent.id), accepting);
+			const accepting = req.method === 'POST' && typeof body.accepting === 'boolean' ? body.accepting : null;
+			const current = await recordPresence(env, user.id, Number(agent.id), accepting);
 			const [team, limits] = await Promise.all([
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 				getAgentLimits(env),
@@ -952,7 +1013,7 @@ export default async function handler(req, res) {
 			const routing = activeTeam.some((row) => row.accepting) ? await routeWaitingConversations(env, cfg).catch(() => ({ assigned: 0 })) : { assigned: 0 };
 			const maxActiveChats = Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agent.id))?.max_active_chats) || 4;
 			return json(res, 200, {
-				current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at },
+				current: { agentId: Number(agent.id), accepting: current.accepting, maxActiveChats, heartbeatAt: current.heartbeat_at, handoffPending: Boolean(current.handoff_since) },
 				team: capabilities.supervise ? activeTeam : activeTeam.filter((item) => item.agentId === Number(agent.id)),
 				routing: capabilities.supervise ? routing : { assigned: 0 },
 			});

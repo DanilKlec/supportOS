@@ -4,6 +4,7 @@ import { AuthenticatorGate } from "@/features/auth/AuthenticatorGate";
 import { PasswordForm } from "@/features/auth/PasswordForm";
 import { PendingApproval } from "@/features/auth/PendingApproval";
 import { BonusServerCache } from "@/features/bonuses/BonusServerCache";
+import { ChatPresenceHeartbeat } from "@/features/chatwoot/ChatPresenceHeartbeat";
 import { ProjectEmailServerCache } from "@/features/project-emails/ProjectEmailServerCache";
 import { MailNotifications } from "@/features/mail/MailNotifications";
 import { supabaseService } from "@/services/supabase.service";
@@ -144,6 +145,10 @@ function RootComponent() {
 		<QueryClientProvider client={queryClient}>
 			<ToastProvider>
 				{accessGranted && <MailNotifications />}
+				{accessGranted && !passwordRecovery && !session?.mfaRequired &&
+					session?.user.access?.permissions.includes("work") && (
+						<ChatPresenceHeartbeat userId={session.user.id} />
+					)}
 				{!loading && session?.mfaRequired ? (
 					<AuthenticatorGate key={session.sessionId ?? session.user.id} />
 				) : !loading && session && !session.authVerified ? (
