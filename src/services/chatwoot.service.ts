@@ -63,6 +63,7 @@ export type ChatwootConversation = {
 	crm?: "adwa" | "whitelabels" | "vortexino" | null;
 	created_at?: number;
 	updated_at?: number;
+	waiting_since?: number | null;
 };
 
 export type ChatwootMessage = {
@@ -71,7 +72,7 @@ export type ChatwootMessage = {
 	message_type?: number | string;
 	private?: boolean;
 	created_at?: number;
-	sender?: { name?: string; type?: string; avatar_url?: string };
+	sender?: { name?: string; available_name?: string; type?: string; avatar_url?: string; thumbnail?: string };
 	attachments?: Array<{
 		data_url?: string;
 		file_name?: string;
@@ -92,6 +93,8 @@ export type ChatwootCoachingNote = {
 export type ChatwootAgent = {
 	id: number;
 	name: string;
+	available_name?: string;
+	thumbnail?: string;
 	email?: string;
 	role?: string;
 	availability_status?: string;
@@ -103,6 +106,12 @@ export type ChatwootTeam = {
 	description?: string;
 	allow_auto_assign?: boolean;
 	agents?: ChatwootAgent[];
+};
+export type ChatwootCapacityPolicy = {
+	id: number;
+	name: string;
+	assigned_agent_count: number;
+	inbox_capacity_limits: Array<{ id: number; inbox_id: number; conversation_limit: number }>;
 };
 export type ChatDirectoryKind = "chat-team" | "chat-label";
 export type ChatDirectoryItem = { id: number; name?: string; title?: string; description?: string; color?: string; show_on_sidebar?: boolean };
@@ -201,6 +210,7 @@ export const chatwootService = {
 	health: () =>
 		request<{
 			configured: boolean;
+			profileUrl?: string;
 			lastWebhookAt?: string | null;
 			capabilities?: ChatwootCapabilities;
 			inboxes?: { payload?: Array<{ inbox: ChatwootInbox }> };
@@ -311,6 +321,13 @@ export const chatwootService = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ inboxId, domains }),
 		}),
+	inviteAgent: (email: string, name: string) => request<{ alreadyLinked: boolean }>("invite-agent", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name }),
+	}),
+	capacityPolicies: () => request<{ policies: ChatwootCapacityPolicy[]; unavailable?: boolean }>("chatwoot-capacity"),
+	setInboxCapacity: (policyId: number, inboxId: number, limit: number) => request<{ limit: number }>("chatwoot-capacity", {
+		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyId, inboxId, limit }),
+	}),
 	setAgentCapacity: (agentId: number, maxActiveChats: number) =>
 		request<{ agentId: number; maxActiveChats: number }>("agent-capacity", {
 			method: "POST",
@@ -323,6 +340,7 @@ export const chatwootService = {
 		request<{
 			current: { agentId: number; accepting: boolean; maxActiveChats: number; heartbeatAt: string; handoffPending: boolean };
 			team: Array<{ agentId: number; accepting: boolean; maxActiveChats: number; active: boolean }>;
+			onlineCount: number;
 			routing: { assigned: number };
 		}>(
 			"presence",

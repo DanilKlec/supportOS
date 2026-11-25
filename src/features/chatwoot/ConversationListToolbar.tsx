@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import type { ChatwootAgent, ChatwootInbox } from "@/services/chatwoot.service";
+import { normalizeSearchValue, scoreTextSearch } from "@/shared/lib/bind-search";
 import {
 	ChatFilterPanel,
 	ChatFilterSelect,
@@ -97,6 +98,11 @@ export function ConversationListToolbar({
 }: Props) {
 	const filterPanelId = useId();
 	const [expanded, setExpanded] = useState(false);
+	const [tagSearch, setTagSearch] = useState("");
+	const matchingLabels = normalizeSearchValue(tagSearch)
+		? labels.map((label) => ({ label, score: scoreTextSearch(tagSearch, [label]) }))
+			.filter(({ score, label }) => score || label === filters.label).sort((a, b) => b.score - a.score).map(({ label }) => label)
+		: labels;
 	const projectName = inboxes.find(
 		(inbox) => String(inbox.id) === project,
 	)?.name;
@@ -234,14 +240,17 @@ export function ConversationListToolbar({
 					}))}
 					onChange={(inboxId) => update({ inboxId })}
 				/>
-				<ChatFilterSelect
-					icon={Tag}
-					label="Тег"
-					value={filters.label}
-					empty="Все теги"
-					options={labels.map((label) => ({ value: label, label }))}
-					onChange={(label) => update({ label })}
-				/>
+				<div className="min-w-0 space-y-1.5">
+					<ChatFilterSelect
+						icon={Tag}
+						label="Тег"
+						value={filters.label}
+						empty={matchingLabels.length || !tagSearch ? "Все теги" : "Теги не найдены"}
+						options={matchingLabels.map((label) => ({ value: label, label }))}
+						onChange={(label) => { update({ label }); setTagSearch(""); }}
+					/>
+					{labels.length > 0 && <ChatSearch label="Найти тег для фильтра" placeholder="Найти тег…" value={tagSearch} onChange={setTagSearch} />}
+				</div>
 				{scope === "history" && (
 					<>
 						{canFilterByAgent && (

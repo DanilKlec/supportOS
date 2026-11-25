@@ -27,13 +27,14 @@ import {
 	RefreshCw,
 	Send,
 	Settings2,
+	Tag,
 	UserRound,
 	UsersRound,
 	Volume2,
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createContext, createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { WebsiteDomainsDialog } from "@/features/chatwoot/WebsiteDomainsDialog";
 import { ChatwootWebhookSettingsDialog } from "@/features/chatwoot/ChatwootWebhookSettingsDialog";
@@ -61,6 +62,7 @@ import { useAuthStore } from "@/store/auth.store";
 import type { LanguageCode } from "@/store/knowledge.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 import { ChatOperationsPage } from "./ChatOperationsPage";
+import { ChatwootCapacityPanel } from "./ChatwootCapacityPanel";
 import { ActiveChatsTable } from "./ActiveChatsTable";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
@@ -73,6 +75,7 @@ import { chatWindowsReducer, ConversationWindows, initialChatWindows, MAX_CHAT_W
 import { useChatPopover } from "./useChatPopover";
 import { CoachingComposer, type CoachingRecipient, CoachingThreadTabs, ObservationHeader } from "./ChatCoaching";
 import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
+import { searchBinds } from "@/shared/lib/bind-search";
 import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
@@ -132,6 +135,32 @@ function dateLabel(timestamp?: number) {
 	).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
+function relativeTime(timestamp: number, now: number) {
+	const seconds = Math.max(0, Math.floor((now - (timestamp > 1e12 ? timestamp : timestamp * 1000)) / 1000));
+	if (seconds < 60) return `${seconds} с`;
+	if (seconds < 3600) return `${Math.floor(seconds / 60)} мин`;
+	if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч ${Math.floor(seconds % 3600 / 60)} мин`;
+	return `${Math.floor(seconds / 86400)} д`;
+}
+
+const ChatClock = createContext(0);
+
+function ChatClockProvider({ children }: { children: ReactNode }) {
+	const [now, setNow] = useState(Date.now);
+	useEffect(() => {
+		const timer = window.setInterval(() => setNow(Date.now()), 5000);
+		return () => window.clearInterval(timer);
+	}, []);
+	return <ChatClock.Provider value={now}>{children}</ChatClock.Provider>;
+}
+
+function ReplyTime({ timestamp }: { timestamp?: number }) {
+	const now = useContext(ChatClock);
+	return timestamp ? <time title={new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}>
+		{dateLabel(timestamp)} <span className="opacity-80">· {relativeTime(timestamp, now)} назад</span>
+	</time> : null;
+}
+
 export function AgentInboxPage() {
 	const parentClient = useQueryClient();
 	const identity = useAuthStore((state) => {
@@ -145,7 +174,7 @@ export function AgentInboxPage() {
 function InboxSession({ parentClient }: { parentClient: QueryClient }) {
 	const [client] = useState(() => new QueryClient({ defaultOptions: parentClient.getDefaultOptions() }));
 	useEffect(() => () => client.clear(), [client]);
-	return <QueryClientProvider client={client}><AgentInboxWorkspace /></QueryClientProvider>;
+	return <QueryClientProvider client={client}><ChatClockProvider><AgentInboxWorkspace /></ChatClockProvider></QueryClientProvider>;
 }
 
 type CoachingDraft = { text: string; coachTo?: CoachingRecipient };
@@ -648,6 +677,7 @@ function AgentInboxWorkspace() {
 							</button>
 						))}
 					</div>
+					{presence.data && <span className="chat-connection" title="Операторы с активным подключением к SupportOS"><UsersRound size={14} /> <span>В сети</span> <strong className="tabular-nums">{presence.data.onlineCount}</strong></span>}
 					<span className="chat-connection" data-live={realtimeConnected} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
 						<i aria-hidden="true" />
 						<span>{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
@@ -669,10 +699,13 @@ function AgentInboxWorkspace() {
 				) : activeSection === "team" ? (
 					<TeamWorkspace
 						agents={agents}
+						inboxes={inboxes}
 						teams={directory.data?.teams ?? []}
 						presence={directory.data?.presence ?? []}
 						currentAgentId={presence.data?.current.agentId}
 						canManageChatCapacity={canManageChatCapacity}
+						canInvite={canManageSites}
+						profileUrl={connection.data?.profileUrl}
 						onSetCapacity={async (agentId, maxActiveChats) => { await chatCapacity.mutateAsync({ agentId, maxActiveChats }); }}
 						loading={directory.isLoading}
 						error={directory.error?.message}
@@ -973,12 +1006,15 @@ function InboxRail({ activeSection, collapsed, onToggleCollapsed, userEmail, acc
 	);
 }
 
-function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatCapacity, onSetCapacity, loading, error, onRetry }: {
+function TeamWorkspace({ agents, inboxes, teams, presence, currentAgentId, canManageChatCapacity, canInvite, profileUrl, onSetCapacity, loading, error, onRetry }: {
 	agents: ChatwootAgent[];
+	inboxes: ChatwootInbox[];
 	teams: ChatwootTeam[];
 	presence: Array<{ chatwoot_agent_id: number; accepting: boolean; max_active_chats?: number; heartbeat_at: string }>;
 	currentAgentId?: number;
 	canManageChatCapacity: boolean;
+	canInvite: boolean;
+	profileUrl?: string;
 	onSetCapacity: (agentId: number, maxActiveChats: number) => Promise<void>;
 	loading: boolean;
 	error?: string;
@@ -987,6 +1023,7 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 	const [tab, setTab] = useState<"agents" | "teams">("agents");
 	const [search, setSearch] = useState("");
 	const [acceptingOnly, setAcceptingOnly] = useState(false);
+	const [inviteOpen, setInviteOpen] = useState(false);
 	const online = new Map(presence.filter((item) => Date.now() - Date.parse(item.heartbeat_at) < 90_000).map((item) => [item.chatwoot_agent_id, item]));
 	const query = search.trim().toLowerCase();
 	const filteredAgents = agents.filter((agent) =>
@@ -997,8 +1034,9 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 	return (
 		<section aria-label="Команда чатов" className="chat-secondary-workspace supportos-scroll min-h-0 min-w-0 flex-1 overflow-auto p-2.5 sm:p-6">
 			<div className="mx-auto max-w-5xl">
-				<div className="grid grid-cols-3 gap-1.5 sm:gap-3">
+				<div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-3">
 					<StatCard label="Агенты" value={agents.length} icon={<UsersRound size={16} />} />
+					<StatCard label="В сети в SupportOS" value={online.size} icon={<Activity size={16} />} />
 					<StatCard label="Принимают чаты" value={[...online.values()].filter((agent) => agent.accepting).length} icon={<Headphones size={16} />} />
 					<StatCard label="Команды" value={teams.length} icon={<MessagesSquare size={16} />} />
 				</div>
@@ -1011,7 +1049,10 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 						<div className="order-last min-w-0 basis-full sm:order-0 sm:ml-auto sm:max-w-xs sm:flex-1">
 							<ChatSearch label={tab === "agents" ? "Найти агента" : "Найти команду"} placeholder={tab === "agents" ? "Имя или почта агента" : "Название команды"} value={search} onChange={setSearch} />
 						</div>
+						{tab === "agents" && profileUrl && <a href={profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-surface-elevated"><ExternalLink size={13} /> Никнейм и фото</a>}
+						{tab === "agents" && canInvite && <button type="button" aria-expanded={inviteOpen} onClick={() => setInviteOpen(!inviteOpen)} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-2 text-xs font-semibold text-white"><Plus size={14} /> Добавить агента</button>}
 					</div>
+					{tab === "agents" && canInvite && inviteOpen && <InviteAgentForm onAdded={onRetry} />}
 					{tab === "agents" && <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs text-muted">
 						<label className="chat-team-filter"><input type="checkbox" checked={acceptingOnly} onChange={(event) => setAcceptingOnly(event.target.checked)} /> Только принимающие</label>
 						<span className="shrink-0 tabular-nums" title="Показано агентов">{filteredAgents.length} / {agents.length}</span>
@@ -1021,10 +1062,11 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 						const isOnline = state != null;
 						const status = state?.accepting && isOnline ? "Принимает" : isOnline ? "В SupportOS" : agent.availability_status === "online" ? "В Chatwoot" : "Не в сети";
 						return <div key={agent.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 border-b border-border/70 px-3 py-3 last:border-0 md:flex md:gap-3 md:px-4">
-							<div className="chat-avatar chat-avatar-small" data-tone={agent.id % 4}>{initials(agent.name)}</div>
+							<div className="chat-avatar chat-avatar-small overflow-hidden" data-tone={agent.id % 4}><ChatAvatar name={agent.name} src={agent.thumbnail} /></div>
 							<div className="min-w-0 flex-1">
 								<div className="truncate text-sm font-medium" title={agent.name}>{agent.name}{agent.id === currentAgentId && <span className="ml-2 text-[10px] text-accent">Вы</span>}</div>
 								<div className="truncate text-xs text-muted" title={agent.email}>{agent.email || "Почта не указана"}</div>
+								{agent.available_name && agent.available_name !== agent.name && <div className="truncate text-xs text-muted">В чате · {agent.available_name}</div>}
 							</div>
 							<div className="col-start-2 flex flex-wrap items-center gap-x-3 gap-y-2">
 								<span className="hidden rounded-full bg-background px-2 py-1 text-[11px] text-muted lg:block">{agent.role === "administrator" ? "Администратор" : "Агент"}</span>
@@ -1037,9 +1079,30 @@ function TeamWorkspace({ agents, teams, presence, currentAgentId, canManageChatC
 					{error && <div role="alert" className="space-y-2 p-7 text-center text-sm chat-text-danger"><p>{error}</p><button type="button" onClick={onRetry} className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground">Повторить</button></div>}
 					{!loading && !error && (tab === "agents" ? filteredAgents.length === 0 : filteredTeams.length === 0) && <div className="p-7 text-center text-sm text-muted">{query ? "По запросу ничего не найдено" : tab === "agents" ? (acceptingOnly ? "Сейчас никто не принимает чаты" : "Нет доступных агентов") : "Команд пока нет"}</div>}
 				</div>
+				{canInvite && <ChatwootCapacityPanel inboxes={inboxes} />}
 			</div>
 		</section>
 	);
+}
+
+function InviteAgentForm({ onAdded }: { onAdded: () => void }) {
+	const [email, setEmail] = useState("");
+	const [name, setName] = useState("");
+	const invite = useMutation({ mutationFn: () => chatwootService.inviteAgent(email.trim(), name.trim()), onSuccess: onAdded });
+	const field = "mt-1 block h-9 w-full rounded-lg border border-border bg-background px-2 text-sm";
+	return <form className="grid gap-2 border-b border-border p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); invite.mutate(); }}>
+		<label className="text-xs text-muted">Рабочая почта в SupportOS<input type="email" required maxLength={254} value={email} onChange={(event) => { setEmail(event.target.value); invite.reset(); }} className={field} /></label>
+		<label className="text-xs text-muted">Имя в Chatwoot<input value={name} maxLength={100} onChange={(event) => { setName(event.target.value); invite.reset(); }} className={field} /></label>
+		<button type="submit" disabled={invite.isPending || invite.isSuccess} className="h-9 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-elevated disabled:opacity-50">{invite.isPending ? "Добавляем…" : "Добавить в Chatwoot"}</button>
+		{invite.isError && <p role="alert" className="text-xs chat-text-danger sm:col-span-3">{invite.error.message}</p>}
+		{invite.isSuccess && <output className="text-xs chat-text-success sm:col-span-3">{invite.data.alreadyLinked ? "Пользователь уже связан с агентом Chatwoot по рабочей почте." : "Агент добавлен в Chatwoot. Доступ к проектам можно выдать в настройках источников."}</output>}
+	</form>;
+}
+
+function ChatAvatar({ src, name }: { src?: string; name?: string }) {
+	const [failed, setFailed] = useState<string>();
+	return src && /^https:\/\//i.test(src) && src !== failed
+		? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(src)} className="size-full rounded-full object-cover" /> : initials(name);
 }
 
 function AgentCapacityField({ agent, editable, onSave }: {
@@ -1052,9 +1115,9 @@ function AgentCapacityField({ agent, editable, onSave }: {
 	const [saving, setSaving] = useState(false);
 	const [message, setMessage] = useState<{ text: string; error: boolean }>();
 	if (!editable)
-		return <span className="rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted">Лимит · {limit}</span>;
+		return <span className="rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted">Лимит SupportOS · {limit}</span>;
 	const number = value === null ? limit : Number(value);
-	const valid = value !== "" && Number.isInteger(number) && number >= 1 && number <= 50;
+	const valid = value !== "" && Number.isInteger(number) && number >= 1 && number <= 250;
 	return (
 		<form className="flex flex-wrap items-center gap-1.5" onSubmit={async (event) => {
 			event.preventDefault();
@@ -1071,13 +1134,13 @@ function AgentCapacityField({ agent, editable, onSave }: {
 			}
 		}}>
 			<label className="flex items-center gap-1.5 text-[11px] text-muted">
-				<span>Лимит</span>
-				<input aria-label={`Максимум чатов для ${agent.name}`} value={value ?? limit} type="number" min={1} max={50} required disabled={saving}
+				<span>Лимит SupportOS</span>
+				<input aria-label={`Максимум чатов для ${agent.name}`} value={value ?? limit} type="number" min={1} max={250} required disabled={saving}
 					onChange={(event) => { setValue(event.target.value); setMessage(undefined); }}
 					className="h-8 w-14 rounded-lg border border-border bg-background px-1 text-center text-xs text-foreground disabled:opacity-50" />
 			</label>
 			{(number !== limit || !valid) && <button type="submit" disabled={!valid || saving} className="min-h-8 rounded-md border border-border px-2 text-[11px] font-medium text-accent hover:bg-surface-elevated disabled:opacity-50">{saving ? "Сохраняем…" : "Сохранить"}</button>}
-			{!valid && <span className="text-[11px] chat-text-warning">От 1 до 50</span>}
+			{!valid && <span className="text-[11px] chat-text-warning">От 1 до 250</span>}
 			{message && <span role={message.error ? "alert" : "status"} className={`text-[11px] ${message.error ? "chat-text-danger" : "chat-text-success"}`}>{message.text}</span>}
 		</form>
 	);
@@ -1118,9 +1181,13 @@ function ConversationRow({
 	const sender = conversation.meta?.sender;
 	const last = conversation.last_non_activity_message;
 	const name = sender?.name || sender?.email || "Диалог #" + conversation.id;
+	const loginValue = sender?.custom_attributes?.player_login ?? sender?.custom_attributes?.login ?? conversation.custom_attributes?.player_login ?? conversation.custom_attributes?.login;
+	const login = typeof loginValue === "string" && loginValue.trim() !== name ? loginValue.trim() : "";
 	const source = projectName ?? (conversation.inbox_id ? "Источник #" + conversation.inbox_id : "Входящие");
 	const tags = conversation.labels ?? [];
-	const timestamp = dateLabel(last?.created_at ?? conversation.updated_at);
+	const timestamp = dateLabel(conversation.created_at ?? last?.created_at ?? conversation.updated_at);
+	const waitingSince = ["open", "pending"].includes(conversation.status)
+		? (conversation.waiting_since ?? (["0", "incoming"].includes(String(last?.message_type)) ? last?.created_at : undefined)) : undefined;
 	return (
 		<div data-active={active} data-opened={opened} data-checked={checked} className="chat-list-row">
 			{onCheck && <input type="checkbox" checked={checked} disabled={checkBusy} aria-label={`Выбрать диалог #${conversation.id}`}
@@ -1129,15 +1196,15 @@ function ConversationRow({
 				<span className="chat-avatar" data-tone={conversation.id % 4} aria-hidden="true">{initials(name)}</span>
 				<span className="chat-list-main">
 					<span className="chat-list-line">
-						<span className="chat-list-player truncate" title={name}>{name}</span>
-						<span className="chat-list-time">{timestamp || "#" + conversation.id}</span>
-					</span>
-					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
-					<span className="chat-list-meta">
 						<span className="chat-list-project truncate" title={source}>{source}</span>
-						{conversation.meta?.assignee?.name && <span className="truncate" title={conversation.meta.assignee.name}>{conversation.meta.assignee.name}</span>}
-						{timestamp && <span className="chat-list-number">#{conversation.id}</span>}
+						<span className="chat-list-time" title="Время поступления">{timestamp || "#" + conversation.id}</span>
 					</span>
+					<span className="chat-list-line">
+						<span className="chat-list-player truncate" title={name}>{name}</span>
+						{waitingSince ? <WaitingTime timestamp={waitingSince} /> : <span className="chat-list-number">#{conversation.id}</span>}
+					</span>
+					{login && <span className="chat-list-meta truncate" title={`Логин игрока ${login}`}>Логин · {login}</span>}
+					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
 					{tags.length > 0 && <span className="chat-list-tags">
 						{tags.slice(0, 2).map((tag) => <span className="chat-context-tag truncate" title={tag} key={tag}>{tag}</span>)}
 						{tags.length > 2 && <span className="shrink-0 text-muted" title={tags.slice(2).join(", ")}>+{tags.length - 2}</span>}
@@ -1151,6 +1218,11 @@ function ConversationRow({
 		</div>
 	);
 
+}
+
+function WaitingTime({ timestamp }: { timestamp: number }) {
+	const now = useContext(ChatClock);
+	return <span className="chat-list-time chat-text-warning" title="Время ожидания ответа">Ждёт {relativeTime(timestamp, now)}</span>;
 }
 
 function ConversationPane({
@@ -1226,8 +1298,9 @@ function ConversationPane({
 	const bindPickerOpen = showBinds || slash !== null;
 	const closeBinds = () => { setShowBinds(false); setSlash(null); };
 	const bindMenu = useChatPopover<HTMLDivElement>(visible && bindPickerOpen, closeBinds);
-	const [contextTab, setContextTab] = useState<"player" | "actions" | null>(null);
-	const [contextOverlay, setContextOverlay] = useState(false);
+	const [contextTab, setContextTab] = useState<"player" | "actions" | null>("player");
+	const [tagPickerRequest, setTagPickerRequest] = useState(0);
+	const [contextOverlay, setContextOverlay] = useState(true);
 	const showCustomer = contextTab === "player";
 	const [editorExpanded, setEditorExpanded] = useState(true);
 	const editor = useRef<HTMLTextAreaElement>(null);
@@ -1251,7 +1324,7 @@ function ConversationPane({
 	const [showLatest, setShowLatest] = useState(false);
 	const currentConversationId = useRef(id);
 	useLayoutEffect(() => {
-		if (contextTab) {
+		if (contextTab && contextOpener.current) {
 			customerClose.current?.focus({ preventScroll: true });
 			return;
 		}
@@ -1262,7 +1335,8 @@ function ConversationPane({
 	const toggleContext = (tab: "player" | "actions") => {
 		contextOpener.current = tab;
 		closeBinds();
-		setContextTab(contextTab === tab ? null : tab);
+		setTagPickerRequest(0);
+		setContextTab(contextVisible && contextTab === tab ? null : tab);
 	};
 	const query = useQuery({
 		queryKey: ["chatwoot", "conversation", id],
@@ -1277,6 +1351,9 @@ function ConversationPane({
 	}, [id, conversationTitle, onTitle]);
 	const canWrite = !supervising && conversation?.access?.write === true;
 	const canNote = !supervising && conversation?.access?.note === true;
+	useLayoutEffect(() => {
+		if (visible && !tiled && editorExpanded && (canWrite || canNote)) editor.current?.focus({ preventScroll: true });
+	}, [id, visible, tiled, editorExpanded, canWrite, canNote]);
 	const canTake = !supervising && conversation?.access?.take === true;
 	const mode: ComposerMode = canNote && (!canWrite || operatorDraft.mode === "note") ? "note" : "reply";
 	const sendAsNote = mode === "note";
@@ -1578,15 +1655,8 @@ function ConversationPane({
 		() => binds.filter((bind) => !bind.archived),
 		[binds],
 	);
-	const bindQuery = (slash?.search ?? bindSearch).trim().toLowerCase();
-	const filteredBinds = (bindPickerOpen ? allBinds : [])
-		.filter((bind) =>
-			getBindTranslation(bind, language)?.content &&
-			`${getBindTitle(bind, language)} ${getBindTranslation(bind, language)?.content ?? ""}`
-				.toLowerCase()
-				.includes(bindQuery),
-		)
-		.slice(0, 8);
+	const bindQuery = (slash?.search ?? bindSearch).trim();
+	const filteredBinds = bindPickerOpen ? searchBinds(allBinds.filter((bind) => getBindTranslation(bind, language)?.content), bindQuery, { language }).slice(0, 8) : [];
 	const selectedBindIndex = Math.min(bindIndex, Math.max(0, filteredBinds.length - 1));
 	const selectedBind = filteredBinds[selectedBindIndex];
 	const currentContact = contact.data ?? sender;
@@ -1595,6 +1665,10 @@ function ConversationPane({
 	const visitor = conversation?.visitor;
 	const rawLogin = currentContact?.custom_attributes?.player_login ?? currentContact?.custom_attributes?.login ?? visitor?.login;
 	const playerLogin = typeof rawLogin === "string" ? rawLogin : undefined;
+	const depositKeys = ["total_deposit", "total_deposits", "total_deposit_amount", "total_deposits_amount", "deposit_total", "deposits_total"];
+	const totalDeposit = [currentContact?.custom_attributes, conversation?.custom_attributes]
+		.flatMap((attributes) => depositKeys.map((key) => attributes?.[key]))
+		.find((value) => (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.trim()));
 	const crmUrl = crmWorkspaceUrl(conversation?.crm);
 	const insertBind = (bind: Bind) => {
 		const translation = getBindTranslation(bind, language);
@@ -1673,7 +1747,7 @@ function ConversationPane({
 	const tags = conversation?.labels ?? [];
 	const inactive = ["resolved", "snoozed"].includes(conversation.status);
 	const statusText = conversationStatusLabels[conversation.status];
-	const contextVisible = Boolean(contextTab && (showCustomer || canWrite));
+	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener.current || !contextOverlay && !tiled));
 	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
 		<section
@@ -1742,9 +1816,15 @@ function ConversationPane({
 						</button>}
 					</div>
 				</header>
-				{(conversation.priority || tags.length > 0) && <div className="chat-thread-meta flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
+				{(conversation.priority || tags.length > 0 || canWrite) && <div className="chat-thread-meta flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
 					{conversation.priority && <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted">Приоритет · {conversationPriorityLabels[conversation.priority]}</span>}
 					{tags.map((tag) => <span key={tag} className="chat-context-tag break-all">{tag}</span>)}
+					{canWrite && <button type="button" onClick={() => {
+						contextOpener.current = "actions";
+						closeBinds();
+						setTagPickerRequest((request) => request + 1);
+						setContextTab("actions");
+					}} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-surface-elevated"><Tag size={12} /> Теги диалога</button>}
 				</div>}
 				{editError && contextTab !== "actions" && (
 					<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-4 py-2 text-[11px] chat-text-danger">
@@ -2007,7 +2087,7 @@ function ConversationPane({
 					</div>
 					{!showCustomer && canWrite ? <>
 						{editError && <p role="alert" className="mb-3 rounded-lg bg-red-500/5 px-2 py-1.5 text-xs chat-text-danger">{editError.message}</p>}
-						<ConversationActions conversation={conversation} agents={agents} teams={teams} labels={labels}
+						<ConversationActions key={tagPickerRequest} openTagPicker={tagPickerRequest > 0} conversation={conversation} agents={agents} teams={teams} labels={labels}
 							pending={{ agent: assign.isPending, team: assignTeam.isPending, priority: priority.isPending, status: status.isPending, tags: tagMutation.isPending }}
 							onAgent={assign.mutate} onTeam={assignTeam.mutate} onPriority={priority.mutate} onStatus={status.mutate} onTags={tagMutation.mutate} />
 					</> : <>
@@ -2025,6 +2105,7 @@ function ConversationPane({
 					<div className="space-y-3 text-xs">
 						{canWrite && id != null && contact.data && <ChatContactEditor key={contact.data.id} contact={contact.data} conversationId={id} />}
 						<Info label="Логин игрока" value={playerLogin} />
+						<Info label="Общая сумма депозитов" value={totalDeposit == null ? undefined : String(totalDeposit)} />
 						{currentContact?.identifier !== playerLogin && <Info label="Идентификатор игрока" value={currentContact?.identifier} />}
 						<Info label="Телефон" value={currentContact?.phone_number} />
 						<Info label="ID контакта" value={String(contactId ?? "")} />
@@ -2241,9 +2322,10 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 						Внутренняя заметка
 					</div>
 				)}
-				{!outgoing && (
-					<div className="mb-1 text-[10px] font-semibold text-muted">
-						{message.sender?.name || "Игрок"}
+				{(!outgoing || message.sender?.name || message.sender?.available_name) && (
+					<div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-muted">
+						{outgoing && <span className="grid size-5 shrink-0 place-items-center overflow-hidden rounded-full bg-surface"><ChatAvatar src={message.sender?.avatar_url || message.sender?.thumbnail} name={message.sender?.name} /></span>}
+						{message.sender?.available_name || message.sender?.name || "Игрок"}
 					</div>
 				)}
 				{message.content && (
@@ -2265,7 +2347,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 					</a>
 				))}
 				<div className="mt-1 text-right text-[10px] text-muted">
-					{dateLabel(message.created_at)}
+					<ReplyTime timestamp={message.created_at} />
 				</div>
 			</article>
 		</div>

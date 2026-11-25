@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Bind } from "@/entities/bind";
-import { searchBinds } from "./bind-search";
+import { scoreTextSearch, searchBinds } from "./bind-search";
 
 function makeBind(
 	id: string,
@@ -51,5 +51,11 @@ describe("searchBinds", () => {
 		expect(searchBinds(binds, "промо", { language: "ru" })[0]?.id).toBe(
 			"bonus",
 		);
+	});
+
+	it("finds tags and binds with a mistyped word or the wrong keyboard layout", () => {
+		expect(searchBinds(binds, "ghbdtncndtyysq", { language: "ru" })[0]?.id).toBe("bonus");
+		expect(scoreTextSearch("ghbdtn", ["Привет"])).toBeGreaterThan(0);
+		expect(scoreTextSearch("дипозит", ["Общий депозит"])).toBeGreaterThan(0);
 	});
 });

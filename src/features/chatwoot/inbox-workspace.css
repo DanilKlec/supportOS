@@ -452,11 +452,9 @@
 }
 
 .chat-list-project {
-	max-width: 62%;
-	padding: 0.12rem 0.3rem;
-	border-radius: 0.3rem;
-	background: var(--chat-control);
-	color: var(--color-foreground);
+	color: var(--color-accent);
+	font-size: 0.8125rem;
+	font-weight: 650;
 }
 
 .chat-list-number {

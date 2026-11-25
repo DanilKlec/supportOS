@@ -31,6 +31,19 @@ export function normalizeSearchValue(value: string) {
 		.trim();
 }
 
+const latinKeys = "qwertyuiop[]asdfghjkl;'zxcvbnm,./`";
+const russianKeys = "йцукенгшщзхъфывапролджэячсмитьбю.ё";
+
+function searchTokens(query: string) {
+	return query.toLowerCase().trim().split(/\s+/).flatMap((word) => {
+		const original = normalizeSearchValue(word).split(" ").filter(Boolean);
+		const from = /[а-яё]/.test(word) ? russianKeys : latinKeys;
+		const to = from === russianKeys ? latinKeys : russianKeys;
+		const corrected = normalizeSearchValue([...word].map((char) => to[from.indexOf(char)] ?? char).join(""));
+		return original.map((token) => ({ token, corrected: original.length === 1 && corrected !== token && !corrected.includes(" ") ? corrected : "" }));
+	});
+}
+
 function getFolderPath(
 	folderId: string | undefined,
 	folders: KnowledgeFolder[],
@@ -54,6 +67,11 @@ function getFolderPath(
 
 function isOneEditApart(first: string, second: string) {
 	if (Math.abs(first.length - second.length) > 1) return false;
+	if (first.length === second.length) {
+		const difference = [...first].flatMap((letter, index) => letter === second[index] ? [] : [index]);
+		return difference.length <= 1 || (difference.length === 2 && difference[1] === difference[0] + 1 &&
+			first[difference[0]] === second[difference[1]] && first[difference[1]] === second[difference[0]]);
+	}
 
 	let firstIndex = 0;
 	let secondIndex = 0;
@@ -92,18 +110,17 @@ function getTokenScore(token: string, value: string) {
 	return 0;
 }
 
-export function scoreTextSearch(query: string, parts: string[]) {
-	const normalizedQuery = normalizeSearchValue(query);
-	if (!normalizedQuery) return 0;
+function scoreToken({ token, corrected }: { token: string; corrected: string }, value: string) {
+	return Math.max(getTokenScore(token, value), getTokenScore(corrected, value) * 0.8);
+}
 
+export function scoreTextSearch(query: string, parts: string[]) {
 	const values = parts.map(normalizeSearchValue).filter(Boolean);
-	const tokens = normalizedQuery.split(" ").filter(Boolean);
+	const tokens = searchTokens(query);
 	let score = 0;
 
 	for (const token of tokens) {
-		const tokenScore = Math.max(
-			...values.map((value) => getTokenScore(token, value)),
-		);
+		const tokenScore = Math.max(0, ...values.map((value) => scoreToken(token, value)));
 
 		if (tokenScore === 0) return 0;
 
@@ -145,14 +162,14 @@ export function scoreBindSearch(
 			{ value: translation.content, weight: 1 },
 		]),
 	];
-	const tokens = normalizedQuery.split(" ").filter(Boolean);
+	const tokens = searchTokens(query);
 	let score = 0;
 
 	for (const token of tokens) {
 		const bestFieldScore = Math.max(
 			...fields.map(
 				(field) =>
-					getTokenScore(token, normalizeSearchValue(field.value)) *
+					scoreToken(token, normalizeSearchValue(field.value)) *
 					field.weight,
 			),
 		);
