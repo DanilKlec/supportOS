@@ -4,6 +4,7 @@ import {
 	ArrowUp,
 	ArrowDownUp,
 	Building2,
+	CheckCheck,
 	Columns3,
 	Flag,
 	Inbox,
@@ -171,6 +172,9 @@ export function ActiveChatsTable({
 	changingId,
 	onOpen,
 	onStop,
+	onResolve,
+	resolvingId,
+	resolveError,
 }: {
 	userId?: string;
 	agents: ChatwootAgent[];
@@ -186,6 +190,9 @@ export function ActiveChatsTable({
 	changingId?: number;
 	onOpen: (id: number) => void;
 	onStop: (id: number) => void;
+	onResolve?: (id: number) => void;
+	resolvingId?: number;
+	resolveError?: string;
 }) {
 	const [filters, setFilters] = useState(filtersDefault);
 	const [search, setSearch] = useState("");
@@ -521,12 +528,12 @@ export function ActiveChatsTable({
 					))}
 				</ChatFilterPanel>
 			</div>
-			{watchingError && (
+			{(watchingError || resolveError) && (
 				<p
 					role="alert"
 					className="shrink-0 border-b border-red-500/20 px-3 py-2 text-xs chat-text-danger"
 				>
-					{watchingError}
+					{resolveError || watchingError}
 				</p>
 			)}
 			{query.data?.searchTruncated && (
@@ -728,6 +735,18 @@ export function ActiveChatsTable({
 													onClick={() => onStop(row.id)}
 												>
 													<EyeOff size={13} />
+												</button>
+											)}
+											{onResolve && row.status !== "resolved" && (
+												<button
+													type="button"
+													disabled={resolvingId !== undefined}
+													title="Завершить диалог"
+													aria-label={`Завершить диалог #${row.id}`}
+													className={`${action} ml-1 px-1.5`}
+													onClick={() => onResolve(row.id)}
+												>
+													{resolvingId === row.id ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : <CheckCheck size={13} aria-hidden="true" />}
 												</button>
 											)}
 										</td>

@@ -17,6 +17,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	let assignedAgent = { id: 5, name: "Тестовый агент" };
 	let notesSent = 0;
 	const sentMessages: Array<{ content: string; private: boolean }> = [];
+	const statusWrites: string[] = [];
 	const otherChat = { id: 15, name: "Предыдущий диалог игрока" };
 	let privateNote:
 		| { id: string; author: string; content: string; createdAt: string }
@@ -182,7 +183,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 					json: {
 						payload:
 							scope === "history"
-								? status === "resolved" && !query
+								? !query && (status === "resolved" || status === "snoozed" && conversation.status === "snoozed")
 									? [{ ...conversation, status }]
 									: []
 								: scope === "queue"
@@ -199,6 +200,14 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				expect(request.postDataJSON().conversationId).toBe(row.id);
 				taken = true;
 				return route.fulfill({ json: { id: row.id } });
+			case "status": {
+				const { conversationId, status } = request.postDataJSON();
+				expect(conversationId).toBe(row.id);
+				statusWrites.push(status);
+				row.status = status;
+				conversation.status = status;
+				return route.fulfill({ json: { id: row.id, status } });
+			}
 			case "agent-capacity": {
 				const body = request.postDataJSON();
 				expect(body.agentId).toBe(5);
@@ -262,7 +271,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 			case "active-overview": {
 				activeParameters = url.searchParams;
 				const mode = url.searchParams.get("mode");
-				const rows = mode === "pending" || (mode === "watching" && !watching) ? [] : [row];
+				const rows = mode === "pending" || (mode === "watching" ? !watching : row.status !== "open") ? [] : [row];
 				return route.fulfill({
 					json: { rows, total: rows.length, hasMore: false },
 				});
@@ -492,6 +501,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		name: "Наблюдение за диалогом",
 	});
 	await expect(observation.getByText("Первое обращение")).toBeVisible();
+	await expect(observation.getByRole("button", { name: "Завершить диалог", exact: true })).toBeVisible();
 	if (!isMobile)
 		await expect(table.locator("[data-chat-row]")).toHaveCSS(
 			"display",
@@ -777,6 +787,20 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(fields).toBeInViewport({ ratio: 1 });
 	await page.keyboard.press("Escape");
 	await expect(fields).toHaveCount(0);
+	await page.getByRole("button", { name: "Диалоги", exact: true }).click();
+	await page.getByRole("button", { name: /^Активные/ }).click();
+	await table.getByRole("button", { name: `Завершить диалог #${row.id}` }).click();
+	await expect.poll(() => statusWrites).toEqual(["resolved"]);
+	await expect(table.getByText(row.player, { exact: true })).toHaveCount(0);
+	conversation.status = "snoozed";
+	await page.getByRole("button", { name: "Архив", exact: true }).click();
+	await archive.getByRole("button", { name: "Отложенные" }).click();
+	await archive.getByRole("button", { name: new RegExp(row.player) }).click();
+	await page.getByRole("button", { name: "Завершить диалог", exact: true }).click();
+	await expect.poll(() => statusWrites).toEqual(["resolved", "resolved"]);
+	await expect(page.getByRole("button", { name: "Открыть снова", exact: true })).toBeVisible();
+	conversation.status = "open";
+	row.status = "open";
 	queued = true;
 	await page.reload();
 	await page.getByRole("button", { name: /^Очередь/ }).click();

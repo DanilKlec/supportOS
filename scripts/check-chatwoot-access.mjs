@@ -148,6 +148,7 @@ async function mockFetch(input, init = {}) {
 			if (method === 'POST') {
 				upstreamWrites.push({ path, method, body });
 				if (action === 'assignments' && Object.hasOwn(body, 'assignee_id')) row.assignee_id = body.assignee_id;
+				if (action === 'toggle_status') row.status = body.status;
 				return response({ id: 1, ok: true });
 			}
 		}
@@ -336,6 +337,15 @@ try {
 	await expectStatus('admin', 'website-source', 403, { method: 'DELETE', body: { inboxId: 10 } });
 	assert.equal((await expectStatus('creator', 'health', 200)).capabilities.deleteProjects, true);
 	await expectStatus('creator', 'webhook-secret', 200);
+	const writesBeforeDeniedClose = upstreamWrites.length;
+	await expectStatus('support', 'status', 403, post({ conversationId: 2, status: 'resolved' }));
+	await expectStatus('qc', 'status', 403, post({ conversationId: 1, status: 'resolved' }));
+	assert.equal(upstreamWrites.length, writesBeforeDeniedClose);
+	for (const [role, id, previous] of [['admin', 1, 'snoozed'], ['admin', 2, 'open'], ['creator', 4, 'pending'], ['creator', 3, 'open']]) {
+		assert.equal(chats.get(id).status, previous);
+		await expectStatus(role, 'status', 200, post({ conversationId: id, status: 'resolved' }));
+		assert.equal(chats.get(id).status, 'resolved');
+	}
 
 	assert.ok(upstreamWrites.some(({ path, body }) => path.endsWith('/messages') && body.private === true));
 	assert.ok(upstreamWrites.some(({ path, body }) => path.endsWith('/toggle_status') && body.snoozed_until === snoozedUntil));

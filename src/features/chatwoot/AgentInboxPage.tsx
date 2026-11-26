@@ -56,6 +56,7 @@ import {
 	type ChatwootPriority,
 	type ChatwootStatus,
 	type ChatwootTeam,
+	type ActiveChatFilters,
 	type ConversationSearch,
 	chatwootFileBase64,
 	chatwootService,
@@ -118,6 +119,32 @@ function withoutConversation(result: unknown, id: number) {
 		return { ...value, data: { ...value.data, payload: value.data.payload.filter((item) => item.id !== id) } };
 	if (Array.isArray(value.payload)) return { ...value, payload: value.payload.filter((item) => item.id !== id) };
 	return result;
+}
+
+function updateConversationStatus(client: QueryClient, id: number, status: ChatwootStatus) {
+	const key = ["chatwoot", "conversation", id];
+	client.setQueryData<ChatwootConversation>(key, (chat) => chat && { ...chat, status });
+	const archived = status === "resolved" || status === "snoozed";
+	for (const [key, cached] of client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })) {
+		const request = key[2] as ConversationSearch | undefined;
+		const remove = request?.scope === "history"
+			? request.status !== "all" && request.status !== status
+			: archived;
+		if (remove) client.setQueryData(key, withoutConversation(cached, id));
+	}
+	if (archived) {
+		for (const [key, overview] of client.getQueriesData<Awaited<ReturnType<typeof chatwootService.activeOverview>>>({ queryKey: ["chatwoot", "active-overview"] })) {
+			if (!overview?.rows.some((row) => row.id === id)) continue;
+			const watching = (key[2] as ActiveChatFilters | undefined)?.mode === "watching";
+			const rows = watching
+				? overview.rows.map((row) => row.id === id ? { ...row, status, waitingSince: undefined } : row)
+				: overview.rows.filter((row) => row.id !== id);
+			const total = watching || overview.total === null ? overview.total : Math.max(0, overview.total - 1);
+			client.setQueryData(key, { ...overview, rows, total });
+		}
+	}
+	void client.invalidateQueries({ queryKey: key });
+	void client.invalidateQueries({ queryKey: ["chatwoot", "messages", id] });
 }
 function listFrom<T>(result: unknown): T[] {
 	if (!result || typeof result !== "object") return [];
@@ -290,7 +317,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 	const canManageChatCapacity = capabilities?.manageRouting === true;
 	const canManageWebhookSettings = capabilities?.manageWebhooks === true;
 	const canOpenChatSettings = canManageSites || canManageWebhookSettings;
-	const canBrowseContacts = capabilities?.manageAllChats === true;
+	const canManageAllChats = capabilities?.manageAllChats === true;
 	const canSupervise = capabilities?.supervise === true;
 	const realtimeConnected = realtimeSubscribed && (webhookSeen || Boolean(connection.data?.lastWebhookAt));
 	useEffect(() => {
@@ -538,6 +565,13 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 		void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] });
 		void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
 	};
+	const resolveConversation = useMutation({
+		mutationFn: (id: number) => chatwootService.setStatus(id, "resolved"),
+		onSuccess: (_, id) => {
+			updateConversationStatus(client, id, "resolved");
+			reload();
+		},
+	});
 	const openEmptyPane = () => {
 		setQueueOpen(true);
 	};
@@ -636,7 +670,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 				onToggleProfile={() => setProfileOpen(!profileOpen)}
 				onToggleSound={toggleSound}
 				canOpenChatSettings={canOpenChatSettings}
-				canBrowseContacts={canBrowseContacts}
+				canBrowseContacts={canManageAllChats}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			{(presence.isError || accepting.isError) && (
@@ -686,7 +720,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 						onFields={canManageSites ? () => setAttributesOpen(true) : undefined}
 						onWebhooks={canManageWebhookSettings ? () => setWebhookSettingsOpen(true) : undefined}
 					/>
-				) : activeSection === "contacts" && canBrowseContacts ? (
+				) : activeSection === "contacts" && canManageAllChats ? (
 					<ChatContactsWorkspace inboxes={inboxes} onConversation={(id, title) => { selectSection("inbox"); placeConversation(id, { title }); }} />
 				) : activeSection === "team" ? (
 					<TeamWorkspace
@@ -809,6 +843,9 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
 								onOpen={startObservation}
 								onStop={(id) => changeWatch.mutate({ id, enabled: false })}
+								onResolve={canManageAllChats ? resolveConversation.mutate : undefined}
+								resolvingId={resolveConversation.isPending ? resolveConversation.variables : undefined}
+								resolveError={resolveConversation.variables !== supervisionId ? resolveConversation.error?.message : undefined}
 							/>
 							{supervisionId !== null && (
 								<aside aria-label="Наблюдение за диалогом" className="chat-observation-panel absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[45%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
@@ -820,6 +857,11 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 									)}
 									<ConversationPane key={supervisionId} id={supervisionId}
 										supervising docked
+										resolveObserved={canManageAllChats ? {
+											resolve: () => resolveConversation.mutate(supervisionId),
+											pending: resolveConversation.isPending,
+											error: resolveConversation.variables === supervisionId ? resolveConversation.error : null,
+										} : undefined}
 										coachingDraft={supervisionDrafts.current.get(supervisionId)}
 										onCoachingDraft={rememberCoachingDraft}
 										onOpenRelated={openObservation} realtimeConnected={realtimeConnected}
@@ -854,6 +896,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 							realtimeConnected={realtimeConnected}
 							coachingRealtimeConnected={coachingRealtimeConnected}
 							canTranslate={canTranslate}
+							canManageAllChats={canManageAllChats}
 							nativeAutoTranslate={connection.data?.nativeAutoTranslate === true}
 							agents={agents}
 							teams={directory.data?.teams ?? []}
@@ -1261,6 +1304,7 @@ function ConversationPane({
 	listControl,
 	addControl,
 	supervising = false,
+	resolveObserved,
 	docked = false,
 	visible = true,
 	selected = false,
@@ -1270,6 +1314,7 @@ function ConversationPane({
 	realtimeConnected,
 	coachingRealtimeConnected,
 	canTranslate = false,
+	canManageAllChats = false,
 	nativeAutoTranslate = false,
 	agents,
 	teams,
@@ -1296,6 +1341,7 @@ function ConversationPane({
 	listControl?: ReactNode;
 	addControl?: ReactNode;
 	supervising?: boolean;
+	resolveObserved?: { resolve: () => void; pending: boolean; error: Error | null };
 	docked?: boolean;
 	visible?: boolean;
 	selected?: boolean;
@@ -1305,6 +1351,7 @@ function ConversationPane({
 	realtimeConnected: boolean;
 	coachingRealtimeConnected: boolean;
 	canTranslate?: boolean;
+	canManageAllChats?: boolean;
 	nativeAutoTranslate?: boolean;
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
@@ -1666,16 +1713,7 @@ function ConversationPane({
 		mutationFn: (value: { status: ChatwootStatus; snoozedUntil?: number }) =>
 			chatwootService.setStatus(id as number, value.status, value.snoozedUntil),
 		onSuccess: (_result, value) => {
-			if (["resolved", "snoozed"].includes(value.status) && id != null) {
-				for (const [key, cached] of client.getQueriesData({ queryKey: ["chatwoot", "conversations"] })) {
-					const request = key[2] as ConversationSearch | undefined;
-					if (request?.scope !== "history") client.setQueryData(key, withoutConversation(cached, id));
-				}
-				void client.invalidateQueries({ queryKey: ["chatwoot", "presence"] });
-			}
-			void client.invalidateQueries({
-				queryKey: ["chatwoot", "conversation", id],
-			});
+			if (id != null) updateConversationStatus(client, id, value.status);
 			onChanged();
 		},
 	});
@@ -1823,11 +1861,13 @@ function ConversationPane({
 	const tags = tagsForProject(conversation.labels ?? [], tagScope);
 	const playerDepositTags = depositTags(tagsForProject([...new Set([...tags, ...(contact.data?.label_list ?? [])])], tagScope));
 	const inactive = ["resolved", "snoozed"].includes(conversation.status);
+	const canResolve = conversation.status !== "resolved" && (resolveObserved || (canWrite && (!inactive || canManageAllChats)));
+	const statusAction = "chat-thread-primary inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-2.5 text-xs font-medium hover:border-accent disabled:opacity-60";
 	const statusText = conversationStatusLabels[conversation.status];
 	const lastPublicMessage = messages.findLast((message) => !message.private && ["0", "1", "incoming", "outgoing"].includes(String(message.message_type)));
 	const waitingSince = conversationWaitingSince(conversation, lastPublicMessage);
 	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener || !contextOverlay && !tiled));
-	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
+	const editError = resolveObserved?.error || status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
 		<section
 			ref={thread}
@@ -1874,16 +1914,27 @@ function ConversationPane({
 							onClick={() => toggleContext("actions")} className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated">
 							<Settings2 size={15} />
 						</button>}
-						{canWrite && <button
+						{canResolve && <button
 							type="button"
-							title={inactive ? "Открыть снова" : "Завершить диалог"}
-							aria-label={inactive ? "Открыть снова" : "Завершить диалог"}
-							disabled={status.isPending}
-							onClick={() => status.mutate({ status: inactive ? "open" : "resolved" })}
-							className="chat-thread-primary inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-2.5 text-xs font-medium hover:border-accent disabled:opacity-60"
+							title="Завершить диалог"
+							aria-label="Завершить диалог"
+							disabled={resolveObserved?.pending ?? status.isPending}
+							onClick={resolveObserved?.resolve ?? (() => status.mutate({ status: "resolved" }))}
+							className={statusAction}
 						>
 							<CheckCheck size={14} aria-hidden="true" />
-							<span>{inactive ? "Открыть снова" : "Завершить"}</span>
+							<span>Завершить</span>
+						</button>}
+						{canWrite && inactive && <button
+							type="button"
+							title="Открыть снова"
+							aria-label="Открыть снова"
+							disabled={status.isPending}
+							onClick={() => status.mutate({ status: "open" })}
+							className={statusAction}
+						>
+							<RefreshCw size={14} aria-hidden="true" />
+							<span>Открыть снова</span>
 						</button>}
 						{onExpand && <button type="button" className="chat-window-control"
 							aria-label={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} title={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} onClick={onExpand}>
