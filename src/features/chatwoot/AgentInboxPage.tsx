@@ -35,7 +35,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { createContext, createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createElement, Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Bind } from "@/entities/bind";
 import { AgentProfileDialog } from "@/features/chatwoot/AgentProfileDialog";
 import { ChatActivityPage, ChatTeamIndicator } from "@/features/chatwoot/ChatActivityPage";
@@ -69,6 +69,7 @@ import { useKnowledgeStore } from "@/store/knowledge.store";
 import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ChatwootCapacityPanel } from "./ChatwootCapacityPanel";
 import { ActiveChatsTable } from "./ActiveChatsTable";
+import { ChatClockProvider, useChatClock, WaitingTime } from "./ChatClock";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ChatSearch } from "./ChatFilters";
@@ -148,19 +149,8 @@ function relativeTime(timestamp: number, now: number) {
 	return `${Math.floor(seconds / 86400)} д`;
 }
 
-const ChatClock = createContext(0);
-
-function ChatClockProvider({ children }: { children: ReactNode }) {
-	const [now, setNow] = useState(Date.now);
-	useEffect(() => {
-		const timer = window.setInterval(() => setNow(Date.now()), 5000);
-		return () => window.clearInterval(timer);
-	}, []);
-	return <ChatClock.Provider value={now}>{children}</ChatClock.Provider>;
-}
-
 function ReplyTime({ timestamp }: { timestamp?: number }) {
-	const now = useContext(ChatClock);
+	const now = useChatClock();
 	return timestamp ? <time title={new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}>
 		{dateLabel(timestamp)} <span className="opacity-80">· {relativeTime(timestamp, now)} назад</span>
 	</time> : null;
@@ -1192,7 +1182,7 @@ function ConversationRow({
 					</span>
 					<span className="chat-list-line">
 						<span className="chat-list-player truncate" title={name}>{name}</span>
-						{waitingSince ? <WaitingTime timestamp={waitingSince} /> : <span className="chat-list-number">#{conversation.id}</span>}
+						{waitingSince ? <WaitingTime timestamp={waitingSince} className="chat-list-time chat-text-warning" /> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					{login && <span className="chat-list-meta truncate" title={`Логин игрока ${login}`}>Логин · {login}</span>}
 					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
@@ -1209,11 +1199,6 @@ function ConversationRow({
 		</div>
 	);
 
-}
-
-function WaitingTime({ timestamp }: { timestamp: number }) {
-	const now = useContext(ChatClock);
-	return <span className="chat-list-time chat-text-warning" title="Время ожидания ответа">Ждёт {relativeTime(timestamp, now)}</span>;
 }
 
 function ConversationPane({

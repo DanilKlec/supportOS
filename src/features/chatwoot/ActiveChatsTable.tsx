@@ -26,6 +26,7 @@ import {
 	type ChatwootInbox,
 	type ChatwootTeam,
 } from "@/services/chatwoot.service";
+import { useChatClock, WaitingTime } from "./ChatClock";
 import {
 	ChatFilterPanel,
 	ChatFilterSelect,
@@ -105,9 +106,10 @@ const countries = new Intl.DisplayNames("ru", { type: "region" });
 const action =
 	"inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium hover:border-accent/40 hover:bg-accent/10 disabled:opacity-50";
 
-function duration(value: number | undefined, now: number) {
-	if (!value) return "—";
-	const minutes = Math.floor(Math.max(0, now - value) / 60000);
+function ActiveChatDuration({ timestamp }: { timestamp?: number }) {
+	const now = useChatClock();
+	if (!timestamp) return "—";
+	const minutes = Math.floor(Math.max(0, now - timestamp) / 60000);
 	if (!minutes) return "< 1 мин";
 	if (minutes < 60) return `${minutes} мин`;
 	const hours = Math.floor(minutes / 60);
@@ -190,11 +192,6 @@ export function ActiveChatsTable({
 	const [extra, setExtra] = useState<Set<Extra>>(
 		() => new Set(["location", "device", "tags"]),
 	);
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		const timer = window.setInterval(() => setNow(Date.now()), 15000);
-		return () => window.clearInterval(timer);
-	}, []);
 	useEffect(() => {
 		const timer = window.setTimeout(
 			() =>
@@ -747,7 +744,7 @@ export function ActiveChatsTable({
 											"duration",
 											row.status === "resolved"
 												? "—"
-												: duration(row.startedAt, now),
+												: <ActiveChatDuration timestamp={row.startedAt} />,
 										)}
 										<td
 											data-field="updated"
@@ -755,9 +752,7 @@ export function ActiveChatsTable({
 										>
 											{row.activityAt ? dateFormat.format(row.activityAt) : "—"}
 											{row.waitingSince && row.status !== "resolved" && (
-												<div className="text-[10px] chat-text-warning">
-													Ждёт {duration(row.waitingSince, now)}
-												</div>
+												<WaitingTime timestamp={row.waitingSince} className="block text-[10px] chat-text-warning" />
 											)}
 										</td>
 										{visibleExtras.map(({ key }) => {
