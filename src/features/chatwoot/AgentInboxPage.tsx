@@ -69,7 +69,7 @@ import { useKnowledgeStore } from "@/store/knowledge.store";
 import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ChatwootCapacityPanel } from "./ChatwootCapacityPanel";
 import { ActiveChatsTable } from "./ActiveChatsTable";
-import { ChatClockProvider, useChatClock, WaitingTime } from "./ChatClock";
+import { ChatClockProvider, chatElapsedTime, useChatClock, WaitingTime } from "./ChatClock";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ChatSearch } from "./ChatFilters";
@@ -141,18 +141,15 @@ function dateLabel(timestamp?: number) {
 	).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
-function relativeTime(timestamp: number, now: number) {
-	const seconds = Math.max(0, Math.floor((now - (timestamp > 1e12 ? timestamp : timestamp * 1000)) / 1000));
-	if (seconds < 60) return `${seconds} с`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)} мин`;
-	if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч ${Math.floor(seconds % 3600 / 60)} мин`;
-	return `${Math.floor(seconds / 86400)} д`;
+function conversationWaitingSince(conversation: ChatwootConversation, last = conversation.last_non_activity_message) {
+	if (conversation.status !== "open" && conversation.status !== "pending") return;
+	return conversation.waiting_since ?? (!last?.private && ["0", "incoming"].includes(String(last?.message_type)) ? last?.created_at : undefined);
 }
 
 function ReplyTime({ timestamp }: { timestamp?: number }) {
 	const now = useChatClock();
 	return timestamp ? <time title={new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}>
-		{dateLabel(timestamp)} <span className="opacity-80">· {relativeTime(timestamp, now)} назад</span>
+		{dateLabel(timestamp)} <span className="tabular-nums opacity-80">· {chatElapsedTime(timestamp, now)} назад</span>
 	</time> : null;
 }
 
@@ -1167,8 +1164,7 @@ function ConversationRow({
 	const source = projectName ?? (conversation.inbox_id ? "Источник #" + conversation.inbox_id : "Входящие");
 	const tags = conversation.labels ?? [];
 	const timestamp = dateLabel(conversation.created_at ?? last?.created_at ?? conversation.updated_at);
-	const waitingSince = ["open", "pending"].includes(conversation.status)
-		? (conversation.waiting_since ?? (["0", "incoming"].includes(String(last?.message_type)) ? last?.created_at : undefined)) : undefined;
+	const waitingSince = conversationWaitingSince(conversation);
 	return (
 		<div data-active={active} data-opened={opened} data-checked={checked} className="chat-list-row">
 			{onCheck && <input type="checkbox" checked={checked} disabled={checkBusy} aria-label={`Выбрать диалог #${conversation.id}`}
@@ -1721,6 +1717,10 @@ function ConversationPane({
 	const tags = conversation?.labels ?? [];
 	const inactive = ["resolved", "snoozed"].includes(conversation.status);
 	const statusText = conversationStatusLabels[conversation.status];
+	const lastPublicMessage = conversation.waiting_since == null
+		? messages.filter((message) => !message.private && ["0", "1", "incoming", "outgoing"].includes(String(message.message_type))).at(-1)
+		: undefined;
+	const waitingSince = conversationWaitingSince(conversation, lastPublicMessage);
 	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener || !contextOverlay && !tiled));
 	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
@@ -1739,9 +1739,12 @@ function ConversationPane({
 							<h2 className="truncate text-sm font-semibold" title={sender?.name}>
 								{sender?.name || sender?.email || `Диалог #${id}`}
 							</h2>
-							<p className="truncate text-[11px] text-muted">
-								{project ? `${project} · #${id}` : `#${id}`}
-								{statusText && <span className="chat-thread-status" data-status={conversation.status}>{statusText}</span>}
+							<p className="flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted">
+								<span className="min-w-0 truncate">
+									{project ? `${project} · #${id}` : `#${id}`}
+									{statusText && <span className="chat-thread-status" data-status={conversation.status}>{statusText}</span>}
+								</span>
+								{waitingSince ? <WaitingTime timestamp={waitingSince} className="shrink-0 whitespace-nowrap chat-text-warning" /> : null}
 							</p>
 							{supervising && <p className="truncate text-[11px] text-muted" title={conversation.meta?.assignee?.name}>
 								{conversation.meta?.assignee?.name ? `Агент · ${conversation.meta.assignee.name}` : coachRecipient ? "Назначенный агент" : "Агент не назначен"}

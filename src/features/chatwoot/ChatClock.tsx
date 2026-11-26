@@ -40,7 +40,7 @@ export function useChatClock() {
 	return useContext(ChatClock);
 }
 
-function waitingDuration(timestamp: number, now: number) {
+export function chatElapsedTime(timestamp: number, now: number) {
 	const since =
 		timestamp > 1e12 ? timestamp : timestamp * millisecondsPerSecond;
 	const total = Math.max(0, Math.floor((now - since) / millisecondsPerSecond));
@@ -63,7 +63,7 @@ export function WaitingTime({
 	const now = useChatClock();
 	return (
 		<span className={`${className} tabular-nums`} title="Время ожидания ответа">
-			Ждёт {waitingDuration(timestamp, now)}
+			Ждёт {chatElapsedTime(timestamp, now)}
 		</span>
 	);
 }

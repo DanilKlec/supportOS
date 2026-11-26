@@ -9,10 +9,14 @@ test("work in up to four independent chat windows", async ({
 	let publicMessages = 0;
 	let rejectPriority = true;
 	const priorityWrites: number[] = [];
+	const firstMessageTime = 1791799200;
+	const startTime = (firstMessageTime + 60) * 1000;
+	await page.clock.setFixedTime(startTime);
 	const chats = [21, 22, 23, 24, 25].map((id) => ({
 		id,
 		inbox_id: 2,
 		status: "open",
+		waiting_since: id === 21 ? firstMessageTime : 0,
 		access: { read: true, write: true, note: true, take: false, seeIp: false },
 		meta: { sender: { name: `Игрок ${id}` } },
 	}));
@@ -71,7 +75,7 @@ test("work in up to four independent chat windows", async ({
 							{
 								id,
 								content: `Входящее сообщение ${id}`,
-								created_at: 1791799200,
+								created_at: firstMessageTime,
 								message_type: 0,
 							},
 						],
@@ -125,6 +129,11 @@ test("work in up to four independent chat windows", async ({
 	await openRow(21);
 	await expect(windows).toHaveCount(1);
 	await expect(grid).toHaveAttribute("data-grid-size", "1");
+	await expect(pane(21).getByText("Ждёт 1 мин 00 с")).toBeVisible();
+	await expect(pane(21).getByText(/1 мин 00 с назад/)).toBeVisible();
+	await page.clock.setFixedTime(startTime + 1000);
+	await expect(pane(21).getByText("Ждёт 1 мин 01 с")).toBeVisible();
+	await expect(pane(21).getByText(/1 мин 01 с назад/)).toBeVisible();
 	await reply(21).fill("/Проверка статуса");
 	await expect(
 		pane(21).getByRole("option", { name: /Проверка статуса/ }),
