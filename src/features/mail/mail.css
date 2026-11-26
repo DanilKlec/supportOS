@@ -788,6 +788,27 @@
 .mail-row-top time {
 	max-width: 42%;
 }
+.mail-staff-sender {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: 0.3rem;
+	max-width: 100%;
+	padding: 0.12rem 0.4rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.35rem;
+	background: var(--mail-control);
+	color: var(--color-foreground);
+	font-size: 0.7rem;
+	font-weight: 500;
+}
+.mail-staff-sender svg {
+	flex: none;
+	color: var(--color-muted);
+}
+.mail-message-meta .mail-staff-sender {
+	margin-top: 0.35rem;
+}
 .mail-row-details {
 	display: flex;
 	justify-content: space-between;

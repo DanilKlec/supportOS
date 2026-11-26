@@ -43,6 +43,7 @@ export type MailRow = {
 	count: number;
 	date: number;
 	from: string;
+	staffSender?: string;
 	to: string;
 	cc: string;
 	bcc: string;
@@ -217,7 +218,12 @@ export const mailService = {
 		request("delete-draft", { box }, { id }),
 	save: (box: string, draft: MailDraft) =>
 		request<{ id: string }>("save-draft", { box }, draft),
-	send: (box: string, draft: MailDraft) => request("send", { box }, draft),
+	send: (box: string, draft: MailDraft) =>
+		request<{ id: string; staffSenderMissing?: boolean }>(
+			"send",
+			{ box },
+			draft,
+		),
 	attachment: (box: string, message: string, id: string) =>
 		request<{ data: string }>("attachment", { box, message, id }),
 };

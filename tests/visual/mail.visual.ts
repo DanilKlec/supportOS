@@ -65,6 +65,16 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		html: "",
 		attachments: [],
 	};
+	const sentMessage = {
+		...message,
+		id: "sent-mock",
+		date: message.date + 60_000,
+		labels: ["SENT"],
+		from: message.to,
+		to: message.from,
+		staffSender: "Анна Корнеева",
+		text: "Тестовый ответ",
+	};
 	const recipients: { id: string; email: string; display_name: string }[] = [];
 	await context.route("**/api/binds?action=workspace", (route) =>
 		route.fulfill({
@@ -160,7 +170,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 													subject: "Старое обращение",
 												}
 											: {
-													...message,
+													...(sends ? sentMessage : message),
 													labels: [
 														...threadLabels,
 														...(unread ? ["UNREAD"] : []),
@@ -207,7 +217,7 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 										text: "Раннее письмо",
 									},
 								]
-							: [message],
+							: sends ? [message, sentMessage] : [message],
 						before: url.searchParams.get("before") ? null : message.id,
 					},
 				});
@@ -476,6 +486,13 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		.click();
 	await expect.poll(() => sends).toBe(1);
 	await expect(mail.getByText("Письмо отправлено")).toBeVisible();
+	await expect(
+		mail.getByRole("article").getByText("Отправил: Анна Корнеева"),
+	).toBeVisible();
+	if (isMobile)
+		await mail.getByRole("button", { name: "К списку писем" }).click();
+	await expect(incoming.getByText("Отправил: Анна Корнеева")).toBeVisible();
+	if (isMobile) await incoming.click();
 	const openForward = () =>
 		mail
 			.getByRole("article")

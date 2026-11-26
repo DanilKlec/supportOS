@@ -88,6 +88,79 @@ test('mailbox membership is checked before mail is read or sent and support cann
 	expect(fetch).toHaveBeenCalledTimes(4);
 });
 
+test('attributes new and drafted mail to the employee who sent it without changing the outgoing MIME', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	const alice = { id: userId, access: { status: 'active', permissions: ['work'], display_name: 'Алина' } };
+	const boris = { id: '40000000-0000-4000-8000-000000000003', access: { ...alice.access, display_name: 'Борис' } };
+	identities.actor = alice;
+	const encrypted_token = seal(googleConfig(testEnv), 'example-refresh', `gmail:${address}`);
+	const message = (id, label, participant) => ({
+		id, threadId: 'thread', labelIds: [label], internalDate: '1500000000000',
+		snippet: `Текст ${id}`, payload: { headers: [{ name: label === 'SENT' ? 'To' : 'From', value: participant }] },
+	});
+	const history = [
+		message('sent-1', 'SENT', 'one@example.invalid'),
+		message('sent-2', 'SENT', 'two@example.invalid'),
+		message('incoming', 'INBOX', 'three@example.invalid'),
+	];
+	const senders = [];
+	let lookupCount = 0;
+	const fetch = vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		if (parsed.hostname === 'database.invalid') {
+			if (parsed.pathname.endsWith('/supportos_mail_senders')) {
+				if (options.method === 'POST') {
+					senders.push(JSON.parse(options.body));
+					return new Response(null, { status: 201 });
+				}
+				lookupCount += 1;
+				expect(parsed.searchParams.get('mailbox_id')).toBe(`eq.${mailboxId}`);
+				const ids = parsed.searchParams.get('gmail_message_id').slice(4, -1).split(',');
+				expect(ids).not.toContain('incoming');
+				return Response.json(senders.filter(({ gmail_message_id }) => ids.includes(gmail_message_id)));
+			}
+			return Response.json(parsed.searchParams.get('select') === 'user_id'
+				? [{ user_id: identities.actor.id }]
+				: [{ id: mailboxId, address, encrypted_token }]);
+		}
+		if (parsed.hostname === 'oauth2.googleapis.com') return Response.json({ access_token: 'test', expires_in: 3600 });
+		expect(parsed.hostname).toBe('gmail.googleapis.com');
+		if (parsed.pathname.endsWith('/threads/thread')) return Response.json({ messages: history });
+		if (parsed.pathname.endsWith('/threads')) return Response.json({ threads: [{ id: 'thread', snippet: 'Текст incoming' }] });
+		const payload = JSON.parse(options.body);
+		const raw = payload.raw ?? payload.message?.raw;
+		if (raw) {
+			const mime = Buffer.from(raw, 'base64url').toString('utf8');
+			expect(mime).toContain(`From: ${address}`);
+			for (const privateValue of ['Алина', 'Борис', alice.id, boris.id, 'Подмена']) expect(mime).not.toContain(privateValue);
+		}
+		if (parsed.pathname.endsWith('/messages/send')) return Response.json({ id: 'sent-1' });
+		if (parsed.pathname.endsWith('/drafts/send')) return Response.json({ id: 'sent-2' });
+		if (parsed.pathname.endsWith('/drafts') || parsed.pathname.endsWith('/drafts/draft')) return Response.json({ id: 'draft' });
+		throw new Error(`Unexpected Gmail request: ${parsed.pathname}`);
+	});
+	vi.stubGlobal('fetch', fetch);
+	const query = `&box=${mailboxId}`;
+	const draft = { to: 'one@example.invalid', subject: 'Test', text: 'Message', staffSender: 'Подмена' };
+	expect(await call('POST', 'save-draft', query, draft)).toMatchObject({ status: 200, body: { id: 'draft' } });
+	expect(senders).toEqual([]);
+	expect(await call('POST', 'send', query, draft)).toEqual({ status: 200, body: { id: 'sent-1' } });
+	identities.actor = boris;
+	expect(await call('POST', 'send', query, { ...draft, draftId: 'draft', to: 'two@example.invalid' })).toEqual({ status: 200, body: { id: 'sent-2' } });
+	expect(senders).toEqual([
+		{ mailbox_id: mailboxId, gmail_message_id: 'sent-1', sender_id: alice.id, sender_name: 'Алина' },
+		{ mailbox_id: mailboxId, gmail_message_id: 'sent-2', sender_id: boris.id, sender_name: 'Борис' },
+	]);
+	const thread = await call('GET', 'thread', `${query}&id=thread`);
+	expect(thread.body.messages.map(({ staffSender }) => staffSender)).toEqual(['Алина', 'Борис', undefined]);
+	expect((await call('GET', 'folder', `${query}&label=SENT`)).body.rows).toMatchObject([
+		{ id: 'sent-2', to: 'two@example.invalid', staffSender: 'Борис', snippet: 'Текст sent-2' },
+	]);
+	const inbox = await call('GET', 'folder', `${query}&label=INBOX`);
+	expect(inbox.body.rows[0]).not.toHaveProperty('staffSender');
+	expect(lookupCount).toBe(2);
+});
+
 test('mailbox members create Gmail labels and move a thread without removing its other labels', async () => {
 	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
 	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };

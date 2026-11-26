@@ -9,6 +9,7 @@ const mailboxFields = 'id,address,provider,updated_at';
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const idPattern = /^[a-z0-9_-]{1,1600}$/i;
 const pageSize = 16;
+const senderTable = 'supportos_mail_senders';
 const statsCache = new Map();
 const labelColorCache = new Map();
 
@@ -53,7 +54,25 @@ async function accessMailbox(env, actor, admin, mailboxId) {
 	return mailbox;
 }
 
-async function folder(g, url) {
+async function addStaffSenders(env, boxId, messages) {
+	const ids = messages.filter(({ id, labels }) => labels.includes('SENT') && typeof id === 'string' && idPattern.test(id)).map(({ id }) => id);
+	if (!ids.length) return messages;
+	const query = new URLSearchParams({
+		select: 'gmail_message_id,sender_name', mailbox_id: `eq.${boxId}`, gmail_message_id: `in.(${ids.join(',')})`,
+	});
+	try {
+		const rows = await db(env, `${senderTable}?${query}`);
+		const senders = new Map(rows.map(({ gmail_message_id, sender_name }) => [gmail_message_id, sender_name]));
+		return messages.map((message) => senders.has(message.id)
+			? { ...message, staffSender: senders.get(message.id) }
+			: message);
+	} catch (error) {
+		console.error('Mail sender lookup failed', error.storageCode ?? error.name);
+		return messages;
+	}
+}
+
+async function folder(env, boxId, g, url) {
 	const label = url.searchParams.get('label') ?? 'INBOX';
 	const search = (url.searchParams.get('q') ?? '').trim();
 	const token = url.searchParams.get('page');
@@ -86,11 +105,18 @@ async function folder(g, url) {
 			const filter = encodeURIComponent('id,messages(id,threadId,labelIds,snippet,internalDate,payload(headers))');
 			const thread = await g(`/threads/${safeId(item.id)}?format=metadata&fields=${filter}`);
 			const messages = thread.messages ?? [];
-			const message = messages.at(-1);
-			return message ? { ...mailMetadata(message), labels: [...new Set(messages.flatMap(({labelIds}) => labelIds ?? []))], count: messages.length, snippet: item.snippet ?? message.snippet } : null;
+			const message = label === 'SENT'
+				? messages.findLast(({ labelIds }) => labelIds?.includes('SENT'))
+				: messages.at(-1);
+			return message ? {
+				...mailMetadata(message), count: messages.length,
+				snippet: label === 'SENT' ? message.snippet ?? '' : item.snippet ?? message.snippet ?? '',
+				threadLabels: [...new Set(messages.flatMap(({ labelIds }) => labelIds ?? []))],
+			} : null;
 		} catch (error) { if (error.status === 404) return null; throw error; }
 	});
-	return { rows: rows.filter(Boolean), next: result.nextPageToken ?? null };
+	const messages = await addStaffSenders(env, boxId, rows.filter(Boolean));
+	return { rows: messages.map(({ threadLabels, ...row }) => ({ ...row, labels: threadLabels })), next: result.nextPageToken ?? null };
 }
 
 async function unreadSnapshot(cfg, mailbox) {
@@ -236,7 +262,7 @@ export default async function handler(req, res) {
 			labelColorCache.delete(`${box.id}:${id}`);
 			return send(200, edited);
 		}
-		if (action === 'folder') return send(200, await folder(g, url));
+		if (action === 'folder') return send(200, await folder(env, box.id, g, url));
 		if (action === 'thread') {
 			const id = safeId(url.searchParams.get('id'));
 			const thread = await g(`/threads/${id}?format=full`);
@@ -252,7 +278,7 @@ export default async function handler(req, res) {
 			// Bound the envelope while continuing to page by message id.
 			while (messages.length > 1 && Buffer.byteLength(JSON.stringify(messages)) > 3_000_000) messages.shift();
 			const first = rows.findIndex((message) => message.id === messages[0]?.id);
-			return send(200, { id, messages, before: first > 0 ? messages[0].id : null });
+			return send(200, { id, messages: await addStaffSenders(env, box.id, messages), before: first > 0 ? messages[0].id : null });
 		}
 		if (action === 'draft') {
 			const draft = await g(`/drafts/${safeId(url.searchParams.get('id'))}?format=full`);
@@ -347,6 +373,18 @@ export default async function handler(req, res) {
 			if (draftId) await g(`/drafts/${draftId}`, { method: 'PUT', body: { message } });
 			const result = await (draftId ? g('/drafts/send', { method: 'POST', body: { id: draftId } }) : g('/messages/send', { method: 'POST', body: message }));
 			if (draftId) invalidateFolderCounts(box.id, ['DRAFT']);
+			try {
+				await db(env, senderTable, {
+					mailbox_id: box.id, gmail_message_id: result.id, sender_id: user.id,
+					sender_name: (user.access.display_name?.trim() || user.email?.trim() || 'Сотрудник SupportOS').slice(0, 320),
+				});
+			} catch (error) {
+				// Gmail already accepted the message. Do not turn an attribution error into a failed send.
+				if (error.storageCode !== '23505') {
+					console.error('Mail sender recording failed', error.storageCode ?? error.name);
+					return send(200, { ...result, staffSenderMissing: true });
+				}
+			}
 			return send(200, result);
 		}
 		return send(404, { error: 'Неизвестное действие.' });

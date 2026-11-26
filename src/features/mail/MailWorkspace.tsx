@@ -7,9 +7,9 @@ import {
 import {
 	Archive,
 	Bell,
+	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
-	ChevronDown,
 	FileText,
 	Inbox,
 	Mail,
@@ -21,6 +21,7 @@ import {
 	ShieldAlert,
 	Star,
 	Trash2,
+	UserRound,
 	Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -41,7 +42,7 @@ import { MailFolderCount, MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
 import { MailProjectFolders } from "./MailProjectFolders";
-import { mailDate, MailThread, plainMailBody } from "./MailThread";
+import { MailThread, mailDate, plainMailBody } from "./MailThread";
 import { MailThreadActions } from "./MailThreadActions";
 import "./mail.css";
 import "./mail-projects.css";
@@ -869,6 +870,15 @@ export function MailWorkspace() {
 													<span className="mail-row-preview">
 														{row.snippet}
 													</span>
+													{row.staffSender && (
+														<span
+															className="mail-staff-sender"
+															title={`Отправил: ${row.staffSender}`}
+														>
+															<UserRound size={12} aria-hidden="true" />
+															<span>Отправил: {row.staffSender}</span>
+														</span>
+													)}
 													{applied.length > 0 && (
 														<span className="mail-row-tags">
 															{applied.slice(0, 2).map((label) => (

@@ -23,9 +23,9 @@ import {
 	type MailTemplate,
 	mailService,
 } from "@/services/mail.service";
-import { MailTemplates } from "./MailTemplates";
 import { mailHtmlLimit, mailTextHtml } from "../../../shared/mail-layout.js";
 import { MailHtmlPreview } from "./MailHtmlPreview";
+import { MailTemplates } from "./MailTemplates";
 
 export const emptyMailDraft: MailDraft = {
 	to: "",
@@ -108,19 +108,26 @@ export function MailComposer({
 	const toInput = useRef<HTMLInputElement>(null);
 	const mutation = useMutation({
 		mutationFn: async (action: "send" | "save" | "delete") => {
-			if (action === "delete" && fields.draftId)
-				return mailService.deleteDraft(box.id, fields.draftId);
+			if (action === "delete" && fields.draftId) {
+				await mailService.deleteDraft(box.id, fields.draftId);
+				return "Черновик удалён";
+			}
 			const payload = {
 				...fields,
 				attachments: await Promise.all(
 					files.map(({ file }) => encodeFile(file)),
 				),
 			};
-			return action === "send"
-				? mailService.send(box.id, payload)
-				: mailService.save(box.id, payload);
+			if (action === "send") {
+				const result = await mailService.send(box.id, payload);
+				return result.staffSenderMissing
+					? "Письмо отправлено. Имя сотрудника не сохранилось."
+					: "Письмо отправлено";
+			}
+			await mailService.save(box.id, payload);
+			return "Черновик сохранён";
 		},
-		onSuccess: (_, action) => {
+		onSuccess: (notice, action) => {
 			if (action === "send" && recentKey) {
 				const recipients = new Map<string, string>();
 				for (const email of [
@@ -139,13 +146,7 @@ export function MailComposer({
 					// A browser storage failure must not affect an already sent message.
 				}
 			}
-			onDone(
-				action === "send"
-					? "Письмо отправлено"
-					: action === "delete"
-						? "Черновик удалён"
-						: "Черновик сохранён",
-			);
+			onDone(notice);
 		},
 		onError: (issue) => setError(issue.message),
 	});

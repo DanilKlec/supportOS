@@ -1,5 +1,12 @@
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Download, Forward, Reply, ReplyAll } from "lucide-react";
+import {
+	ArrowLeft,
+	Download,
+	Forward,
+	Reply,
+	ReplyAll,
+	UserRound,
+} from "lucide-react";
 import {
 	type MailAttachment,
 	type MailDraft,
@@ -114,6 +121,12 @@ function MessageCard({
 						{message.cc ? ` · Копия ${message.cc}` : ""}
 						{message.bcc ? ` · Скрытая копия ${message.bcc}` : ""}
 					</p>
+					{message.staffSender && (
+						<span className="mail-staff-sender">
+							<UserRound size={12} aria-hidden="true" />
+							<span>Отправил: {message.staffSender}</span>
+						</span>
+					)}
 				</div>
 				<time>{mailDate(message.date)}</time>
 			</header>
