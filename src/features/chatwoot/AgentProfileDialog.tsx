@@ -8,9 +8,12 @@ const profileKey = ["chatwoot", "agent-profile"] as const;
 
 export function AgentProfileDialog({ onClose, profileUrl }: { onClose: () => void; profileUrl?: string }) {
 	const titleId = useId();
+	const client = useQueryClient();
 	const profile = useQuery({ queryKey: profileKey, queryFn: ({ signal }) => chatwootService.agentProfile(signal), retry: false });
+	const [changingConnection, setChangingConnection] = useState(false);
 	const editing = useRef(false);
 	const close = () => { if (!editing.current) onClose(); };
+	const onSaving = (value: boolean) => { editing.current = value; };
 
 	return <InboxModal labelledBy={titleId} className="w-full max-w-md overflow-auto rounded-2xl border border-border bg-surface shadow-xl" onClose={close}>
 		<header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -26,11 +29,55 @@ export function AgentProfileDialog({ onClose, profileUrl }: { onClose: () => voi
 			<button type="button" onClick={() => void profile.refetch()} className="rounded-lg border border-border px-3 py-2 text-xs hover:bg-surface-elevated">Повторить</button>
 			{profileUrl && <a href={profileUrl} target="_blank" rel="noreferrer" className="ml-3 text-xs text-accent hover:underline">Открыть профиль в Chatwoot</a>}
 		</div>}
-		{profile.data && <AgentAppearanceForm profile={profile.data} onSaving={(value) => { editing.current = value; }} />}
+		{profile.data && (profile.data.connection === "required" || changingConnection
+			? <ProfileConnectionForm profileUrl={profileUrl} onSaving={onSaving}
+				onCancel={profile.data.connection !== "required" ? () => setChangingConnection(false) : undefined}
+				onConnected={(connected) => {
+					client.setQueryData(profileKey, connected);
+					setChangingConnection(false);
+				}} />
+			: <AgentAppearanceForm profile={profile.data} onSaving={onSaving} onReconnect={() => setChangingConnection(true)} />)}
 	</InboxModal>;
 }
 
-function AgentAppearanceForm({ profile, onSaving }: { profile: ChatwootAgentProfile; onSaving: (value: boolean) => void }) {
+function ProfileConnectionForm({ profileUrl, onSaving, onCancel, onConnected }: {
+	profileUrl?: string;
+	onSaving: (value: boolean) => void;
+	onCancel?: () => void;
+	onConnected: (profile: ChatwootAgentProfile) => void;
+}) {
+	const [token, setToken] = useState("");
+	const connect = useMutation({
+		mutationFn: () => chatwootService.connectAgentProfile(token.trim()),
+		onMutate: () => onSaving(true),
+		onSuccess: (profile) => {
+			setToken("");
+			onConnected(profile);
+		},
+		onSettled: () => onSaving(false),
+	});
+	return <form className="space-y-4 p-5" autoComplete="off" onSubmit={(event) => {
+		event.preventDefault();
+		if (token.trim().length >= 16 && !connect.isPending) connect.mutate();
+	}}>
+		<p className="text-sm">Подключите свой профиль один раз. После этого вы сможете менять имя и фото здесь.</p>
+		{profileUrl && <a href={profileUrl} target="_blank" rel="noreferrer" className="inline-block text-xs font-medium text-accent hover:underline">Открыть настройки профиля Chatwoot</a>}
+		<label className="block text-sm font-medium">
+			Личный API-токен Chatwoot
+			<input type="password" autoComplete="new-password" spellCheck={false} maxLength={512} value={token}
+				disabled={connect.isPending} onChange={(event) => { setToken(event.target.value); connect.reset(); }}
+				className="mt-1 block h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent" />
+			<span className="mt-1 block text-xs font-normal text-muted">В настройках профиля Chatwoot найдите «Access Token». SupportOS проверит рабочую почту и сохранит токен в зашифрованном виде.</span>
+		</label>
+		{connect.isError && <p role="alert" className="text-xs chat-text-danger">{connect.error.message}</p>}
+		<div className="flex justify-end gap-2">
+			{onCancel && <button type="button" disabled={connect.isPending} onClick={onCancel} className="rounded-lg border border-border px-3 py-2 text-xs">Отмена</button>}
+			<button type="submit" disabled={token.trim().length < 16 || connect.isPending} className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{connect.isPending ? "Подключаем…" : "Подключить профиль"}</button>
+		</div>
+	</form>;
+}
+
+function AgentAppearanceForm({ profile, onSaving, onReconnect }: { profile: ChatwootAgentProfile; onSaving: (value: boolean) => void; onReconnect: () => void }) {
 	const client = useQueryClient();
 	const [displayName, setDisplayName] = useState<string | null>(null);
 	const [file, setFile] = useState<File | null>(null);
@@ -58,11 +105,18 @@ function AgentAppearanceForm({ profile, onSaving }: { profile: ChatwootAgentProf
 		},
 		onSettled: () => onSaving(false),
 	});
+	const disconnect = useMutation({
+		mutationFn: chatwootService.disconnectAgentProfile,
+		onMutate: () => onSaving(true),
+		onSuccess: () => client.invalidateQueries({ queryKey: profileKey }),
+		onSettled: () => onSaving(false),
+	});
+	const saving = save.isPending || disconnect.isPending;
 	const dirty = name.trim() !== profile.displayName || file !== null;
 
 	return <form className="space-y-4 p-5" onSubmit={(event) => {
 		event.preventDefault();
-		if (dirty && !fileError && !save.isPending) save.mutate();
+		if (dirty && !fileError && !saving) save.mutate();
 	}}>
 		<div className="flex items-center gap-3">
 			<div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-background text-muted">
@@ -88,10 +142,15 @@ function AgentAppearanceForm({ profile, onSaving }: { profile: ChatwootAgentProf
 			<input value={name} maxLength={100} placeholder={profile.name || "Введите имя"} disabled={save.isPending} onChange={(event) => { setDisplayName(event.target.value); save.reset(); }} className="mt-1 block h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent" />
 			<span className="mt-1 block text-xs font-normal text-muted">Если оставить поле пустым, Chatwoot покажет имя из профиля.</span>
 		</label>
-		{(fileError || save.isError) && <p role="alert" className="text-xs chat-text-danger">{fileError || save.error?.message}</p>}
+		{(fileError || save.isError || disconnect.isError) && <p role="alert" className="text-xs chat-text-danger">{fileError || save.error?.message || disconnect.error?.message}</p>}
 		<div className="flex flex-wrap items-center justify-between gap-2">
 			{save.isSuccess && <output className="text-xs chat-text-success">Профиль обновлён в Chatwoot</output>}
-			<button type="submit" disabled={!dirty || Boolean(fileError) || save.isPending} className="ml-auto rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{save.isPending ? "Сохраняем…" : "Сохранить"}</button>
+			<button type="submit" disabled={!dirty || Boolean(fileError) || saving} className="ml-auto rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{save.isPending ? "Сохраняем…" : "Сохранить"}</button>
 		</div>
+		{profile.connection === "personal" && <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3 text-xs text-muted">
+			<span className="mr-auto">Личный профиль подключён</span>
+			<button type="button" disabled={saving} onClick={onReconnect} className="hover:text-foreground">Заменить токен</button>
+			<button type="button" disabled={saving} onClick={() => disconnect.mutate()} className="hover:text-foreground">Отключить</button>
+		</div>}
 	</form>;
 }

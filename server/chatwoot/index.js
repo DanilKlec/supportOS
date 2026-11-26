@@ -7,6 +7,7 @@ import { loadAccess } from '../_rbac.js';
 import { allRows, config as serverConfig, db, equal } from '../agent-monitor/_server.js';
 import { getOperations, onShift, saveOperations, slaSnapshot } from './operations.js';
 import { activityBySite, cachedSnapshot, countConnectedBots } from './activity.js';
+import { readPersonalToken, removePersonalToken, savePersonalToken } from './personal-profiles.js';
 
 const activityCache = new Map();
 const teamStatusCache = new Map();
@@ -284,9 +285,14 @@ async function platformAgentCredentials(env, cfg, email, getAgentId) {
 	return verifiedAgentCredentials({ ...cfg, token }, email, agentId);
 }
 
-async function messageCredentials(env, cfg, email, getAgentId) {
+async function messageCredentials(env, cfg, email, getAgentId, personalToken = null) {
 	if (!email) return cfg;
 	const normalized = email.trim().toLowerCase();
+	if (personalToken) {
+		const agentId = await getAgentId();
+		if (!validChatId(agentId)) throw chatwootError('В рабочем аккаунте Chatwoot не найден агент с вашей почтой', 409);
+		return verifiedAgentCredentials({ ...cfg, token: personalToken }, normalized, agentId);
+	}
 	if (normalized && normalized === env.CHATWOOT_PLATFORM_PILOT_EMAIL?.trim().toLowerCase())
 		return platformAgentCredentials(env, cfg, normalized, getAgentId);
 	if (!env.CHATWOOT_AGENT_TOKENS) return cfg;
@@ -1015,19 +1021,45 @@ export default async function handler(req, res) {
 			return json(res, 200, await sendCoachingNote(env, cfg.accountId, id, user.id, recipientEmail, { id: body.noteId, content }));
 		}
 		let agentRequest;
-		const getAgentId = () => agentRequest ??= matchAgent(cfg, user.email).then((agent) => Number(agent?.id) || null);
+		const getAgent = () => agentRequest ??= matchAgent(cfg, user.email);
+		const getAgentId = async () => Number((await getAgent())?.id) || null;
 		if (action === 'agent-profile') {
-			if (!['GET', 'PUT'].includes(req.method)) return json(res, 405, { error: 'Метод не поддерживается' });
+			if (req.method === 'DELETE') {
+				await removePersonalToken(env, cfg, user.id);
+				return json(res, 200, { ok: true });
+			}
+			if (!['GET', 'POST', 'PUT'].includes(req.method)) return json(res, 405, { error: 'Метод не поддерживается' });
 			const payload = req.method === 'PUT' ? profileAppearancePayload(body) : null;
-			const agentId = await getAgentId();
+			const agent = await getAgent();
+			const agentId = Number(agent?.id);
 			if (!validChatId(agentId)) throw chatwootError('В рабочем аккаунте Chatwoot не найден агент с вашей почтой', 409);
-			const credentials = await messageCredentials(env, cfg, user.email, getAgentId);
-			const profile = await ownChatwootProfile(credentials, user.email.trim().toLowerCase(), agentId);
-			if (!payload) return json(res, 200, profileAppearance(profile));
-			const updated = await api(credentials, '/profile', { method: 'PUT', body: payload });
-			if (Number(updated?.id) !== agentId) throw chatwootError('Chatwoot не подтвердил обновление профиля', 502);
-			agentDirectoryCache.delete(`${cfg.base}/${cfg.accountId}`);
-			return json(res, 200, profileAppearance(updated));
+			const email = user.email.trim().toLowerCase();
+			if (req.method === 'POST') {
+				const token = typeof body.token === 'string' ? body.token.trim() : '';
+				if (!/^[\x21-\x7e]{16,512}$/.test(token)) throw chatwootError('Вставьте личный API-токен из профиля Chatwoot.', 400);
+				const profile = await ownChatwootProfile({ ...cfg, token }, email, agentId).catch((error) => {
+					if ([401, 403].includes(error.chatwootStatus))
+						throw chatwootError('Chatwoot отклонил токен. Проверьте личный токен и требования MFA.', 400);
+					throw error;
+				});
+				await savePersonalToken(env, cfg, user.id, token);
+				return json(res, 200, { ...profileAppearance(profile), connection: 'personal' });
+			}
+			try {
+				const token = await readPersonalToken(env, cfg, user.id);
+				const credentials = await messageCredentials(env, cfg, email, getAgentId, token);
+				const profile = await ownChatwootProfile(credentials, email, agentId);
+				const connection = token ? 'personal' : 'managed';
+				if (!payload) return json(res, 200, { ...profileAppearance(profile), connection });
+				const updated = await api(credentials, '/profile', { method: 'PUT', body: payload });
+				if (Number(updated?.id) !== agentId) throw chatwootError('Chatwoot не подтвердил обновление профиля', 502);
+				agentDirectoryCache.delete(`${cfg.base}/${cfg.accountId}`);
+				return json(res, 200, { ...profileAppearance(updated), connection });
+			} catch (error) {
+				if (req.method === 'GET' && (error.status === 409 || [401, 403].includes(error.chatwootStatus)))
+					return json(res, 200, { ...profileAppearance({ name: agent.name, avatar_url: agent.thumbnail }), connection: 'required' });
+				throw error;
+			}
 		}
 		const getDirectory = async () => availableInboxes(cfg, await directoryFor(cfg), capabilities.supervise ? null : await getAgentId(), capabilities);
 		const activityRequest = (path) => api(cfg, `/accounts/${cfg.accountId}${path}`, { timeout: 5000 });
@@ -1592,7 +1624,10 @@ export default async function handler(req, res) {
 		if (!validChatId(body.conversationId)) return json(res, 400, { error: 'Некорректный ID диалога' });
 		const id = String(body.conversationId);
 		const right = action === 'take' ? 'take' : action === 'message' && body.private === true ? 'note' : 'write';
-		const current = await accessFor(id, { fresh: true, needAgent: action === 'take' });
+		const [current, personalToken] = await Promise.all([
+			accessFor(id, { fresh: true, needAgent: action === 'take' }),
+			action === 'message' ? readPersonalToken(env, cfg, user.id) : null,
+		]);
 		if (action === 'take' && current.access.read && !current.access.take)
 			return json(res, 409, { error: 'Диалог уже взяли или закрыли. Обновите очередь.' });
 		requireChatRight(current.access, right);
@@ -1628,7 +1663,7 @@ export default async function handler(req, res) {
 					form.append('attachments[]', new Blob([file.bytes], { type: file.type }), file.name);
 				payload = form;
 			}
-			const credentials = await messageCredentials(env, cfg, user.email, getAgentId);
+			const credentials = await messageCredentials(env, cfg, user.email, getAgentId, personalToken);
 			const result = await api(credentials, `${prefix}/${id}/messages`, { method: 'POST', body: payload });
 			return json(res, 200, result);
 		}

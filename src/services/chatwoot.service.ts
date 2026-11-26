@@ -199,6 +199,7 @@ export type ChatwootUpload = {
 };
 
 export type ChatwootAgentProfile = {
+	connection: "managed" | "personal" | "required";
 	name: string;
 	displayName: string;
 	avatarUrl: string;
@@ -228,6 +229,14 @@ async function request<T>(
 
 export const chatwootService = {
 	agentProfile: (signal?: AbortSignal) => request<ChatwootAgentProfile>("agent-profile", { signal }),
+	connectAgentProfile: (token: string) =>
+		request<ChatwootAgentProfile>("agent-profile", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ token }),
+		}),
+	disconnectAgentProfile: () =>
+		request<{ ok: boolean }>("agent-profile", { method: "DELETE" }),
 	updateAgentProfile: async (displayName: string, file: File | null) =>
 		request<ChatwootAgentProfile>("agent-profile", {
 			method: "PUT",

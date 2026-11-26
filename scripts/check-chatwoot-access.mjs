@@ -58,6 +58,7 @@ async function mockFetch(input, init = {}) {
 		}
 		if (resource === 'supportos_mfa_session_state') return response({ status: 'approved', mfaEnabled: false });
 		if (resource === 'supportos_chatwoot_operations') return response([{ settings: { inboxes: {}, agents: {} }, updated_at: new Date().toISOString() }]);
+		if (resource === 'supportos_chatwoot_personal_profiles') return response([]);
 		if (resource === 'supportos_chatwoot_webhook_config') return response([]);
 		if (resource === 'supportos_chatwoot_webhook_events') return response([]);
 		if (resource === 'supportos_chatwoot_reserve_conversation') return response({ reserved: true });

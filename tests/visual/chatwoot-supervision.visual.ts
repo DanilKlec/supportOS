@@ -12,6 +12,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	let queued = false;
 	let taken = false;
 	let capacity = 4;
+	let agentProfile = { name: "Тестовый агент", displayName: "Тестовый агент", avatarUrl: "", connection: "required" };
 	let assignedAgent = { id: 5, name: "Тестовый агент" };
 	let notesSent = 0;
 	const sentMessages: Array<{ content: string; private: boolean }> = [];
@@ -106,6 +107,16 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		)
 			return route.fallback();
 		switch (action) {
+			case "agent-profile":
+				if (request.method() === "POST") {
+					expect(request.postDataJSON()).toEqual({ token: "fixture-personal-token" });
+					agentProfile = { ...agentProfile, connection: "personal" };
+				}
+				if (request.method() === "PUT") {
+					expect(agentProfile.connection).toBe("personal");
+					agentProfile = { ...agentProfile, displayName: request.postDataJSON().displayName };
+				}
+				return route.fulfill({ json: agentProfile });
 			case "health":
 				return route.fulfill({
 					json: {
@@ -704,7 +715,15 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(
 		page.getByRole("link", { name: "Личные настройки SupportOS" }),
 	).toBeInViewport({ ratio: 1 });
-	await page.keyboard.press("Escape");
+	await page.getByRole("button", { name: "Имя и фото в чате", exact: true }).click();
+	const editProfile = page.getByRole("dialog", { name: "Имя и фото в чате" });
+	await editProfile.getByLabel("Личный API-токен Chatwoot").fill("fixture-personal-token");
+	await editProfile.getByRole("button", { name: "Подключить профиль" }).click();
+	await expect(editProfile.getByText("Личный профиль подключён")).toBeVisible();
+	await editProfile.getByLabel("Имя для клиентов").fill("Новый ник");
+	await editProfile.getByRole("button", { name: "Сохранить", exact: true }).click();
+	await expect(editProfile.getByText("Профиль обновлён в Chatwoot")).toBeVisible();
+	await editProfile.getByRole("button", { name: "Закрыть профиль" }).click();
 	await page
 		.getByRole("button", { name: "Настройки чатов", exact: true })
 		.click();
