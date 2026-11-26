@@ -7,6 +7,7 @@ test("work in up to four independent chat windows", async ({
 	page,
 }, info) => {
 	let publicMessages = 0;
+	let translationAttempts = 0;
 	let rejectPriority = true;
 	const priorityWrites: number[] = [];
 	const firstMessageTime = 1791799200;
@@ -24,6 +25,19 @@ test("work in up to four independent chat windows", async ({
 		"wss://supportos-visual.invalid/realtime/v1/websocket?**",
 		(socket) => socket.close(),
 	);
+	await context.route("https://lingva.ml/api/v1/**", (route) => {
+		const request = route.request();
+		const [, , , , target, content] = new URL(request.url()).pathname.split("/");
+		expect(request.headers()).not.toHaveProperty("authorization");
+		expect(target).toBe("de");
+		expect(decodeURIComponent(content)).toBe("Ответ во второй чат");
+		translationAttempts += 1;
+		return route.fulfill({
+			status: translationAttempts === 1 ? 503 : 200,
+			json: { translation: "Antwort im zweiten Chat" },
+			headers: { "Access-Control-Allow-Origin": "http://127.0.0.1:4173" },
+		});
+	});
 	await context.route("**/api/binds?action=workspace", (route) =>
 		route.fulfill({
 			json: {
@@ -74,7 +88,7 @@ test("work in up to four independent chat windows", async ({
 						payload: [
 							{
 								id,
-								content: `Входящее сообщение ${id}`,
+								content: id === 22 ? "Guten Morgen, meine Einzahlung ist noch nicht angekommen." : `Входящее сообщение ${id}`,
 								created_at: firstMessageTime,
 								message_type: 0,
 							},
@@ -97,7 +111,7 @@ test("work in up to four independent chat windows", async ({
 			case "message":
 				expect(request.postDataJSON()).toMatchObject({
 					conversationId: 22,
-					content: "Ответ во второй чат",
+					content: "Antwort im zweiten Chat",
 					private: false,
 				});
 				publicMessages += 1;
@@ -123,7 +137,7 @@ test("work in up to four independent chat windows", async ({
 		await add.click();
 		await expect(list.getByText(/Выберите чат для нового окна/)).toBeVisible();
 		await openRow(id);
-		await expect(pane(id).getByText(`Входящее сообщение ${id}`)).toBeVisible();
+		await expect(pane(id).getByRole("log", { name: "Переписка" }).locator("[data-thread-bubble]").first()).toBeVisible();
 	};
 
 	await openRow(21);
@@ -205,7 +219,12 @@ test("work in up to four independent chat windows", async ({
 	}
 	await expect(reply(22)).toHaveValue("Ответ во второй чат");
 	await reply(22).press("Enter");
+	await expect(pane(22).getByRole("alert")).toContainText("Не удалось перевести");
+	await expect(reply(22)).toHaveValue("Ответ во второй чат");
+	expect(publicMessages).toBe(0);
+	await reply(22).press("Enter");
 	await expect.poll(() => publicMessages).toBe(1);
+	expect(translationAttempts).toBe(2);
 	if (!isMobile)
 		await pane(22).getByRole("button", { name: "Вернуть сетку чатов" }).click();
 	else await activate(21);

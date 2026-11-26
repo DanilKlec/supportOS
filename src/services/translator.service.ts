@@ -116,6 +116,8 @@ const PROTECTED_PATTERNS = [
 	{ prefix: "TILDE", pattern: /~~~[\s\S]*?~~~/g },
 	{ prefix: "INLINE", pattern: /`[^`\n]+`/g },
 	{ prefix: "URL", pattern: /https?:\/\/[^\s<)]+/g },
+	{ prefix: "EMAIL", pattern: /[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi },
+	{ prefix: "FIELD", pattern: /\{\{[^{}\n]+\}\}|##[\w.-]+##/g },
 ];
 
 const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
@@ -240,14 +242,17 @@ function protectStaticSegments(input: string) {
 
 	return {
 		text,
-		restore(output: string) {
+		restore(output: string, requireIntact = false) {
 			let restored = output;
 
 			for (const segment of segments) {
-				restored = restored.replace(
-					new RegExp(escapeRegExp(segment.token), "gi"),
-					segment.value,
-				);
+				const token = new RegExp(escapeRegExp(segment.token), "gi");
+				if (requireIntact && restored.match(token)?.length !== 1) {
+					throw new TranslatorServiceError(
+						"Translation modified a protected fragment",
+					);
+				}
+				restored = restored.replace(token, () => segment.value);
 			}
 
 			return restored;
@@ -355,11 +360,14 @@ class TranslatorService {
 		return true;
 	}
 
-	async translate({
-		text,
-		fromLanguage,
-		toLanguage,
-	}: TranslateRequest): Promise<TranslateResult> {
+	async translate(
+		{ text, fromLanguage, toLanguage }: TranslateRequest,
+		options: {
+			signal?: AbortSignal;
+			detectAtProvider?: boolean;
+			requireIntact?: boolean;
+		} = {},
+	): Promise<TranslateResult> {
 		const sourceText = text;
 		const sourceLanguage = this.normalizeLanguage(fromLanguage, true);
 		const targetLanguage = this.normalizeLanguage(toLanguage, false);
@@ -383,7 +391,8 @@ class TranslatorService {
 		const { provider } = useTranslatorStore.getState();
 		const endpoint = provider === "libretranslate" ? this.getEndpoint() : "";
 		const effectiveSourceLanguage =
-			sourceLanguage === "auto"
+			sourceLanguage === "auto" &&
+			(!options.detectAtProvider || provider === "mymemory")
 				? inferSourceLanguage(sourceText)
 				: sourceLanguage;
 		const protectedSource = protectStaticSegments(sourceText);
@@ -393,22 +402,25 @@ class TranslatorService {
 						text: protectedSource.text,
 						sourceLanguage: effectiveSourceLanguage,
 						targetLanguage,
+						signal: options.signal,
 					})
 				: provider === "lingva"
 					? await this.translateWithLingva({
 							text: protectedSource.text,
 							sourceLanguage: effectiveSourceLanguage,
 							targetLanguage,
+							signal: options.signal,
 						})
 					: await this.translateWithLibreTranslate({
 							endpoint,
 							text: protectedSource.text,
 							sourceLanguage: effectiveSourceLanguage,
 							targetLanguage,
+							signal: options.signal,
 						});
 
 		return {
-			text: protectedSource.restore(translatedText),
+			text: protectedSource.restore(translatedText, options.requireIntact),
 			fromLanguage: effectiveSourceLanguage,
 			toLanguage: targetLanguage,
 			model:
@@ -426,10 +438,12 @@ class TranslatorService {
 		text,
 		sourceLanguage,
 		targetLanguage,
+		signal,
 	}: {
 		text: string;
 		sourceLanguage: string;
 		targetLanguage: string;
+		signal?: AbortSignal;
 	}) {
 		const { apiKey, email } = useTranslatorStore.getState();
 		const chunks = splitTextByByteLimit(text, MYMEMORY_MAX_CHUNK_BYTES);
@@ -457,6 +471,7 @@ class TranslatorService {
 
 			const response = await this.request(url.toString(), {
 				method: "GET",
+				signal,
 			});
 			const data = await this.readJson<MyMemoryResponse>(
 				response,
@@ -485,11 +500,13 @@ class TranslatorService {
 		text,
 		sourceLanguage,
 		targetLanguage,
+		signal,
 	}: {
 		endpoint: string;
 		text: string;
 		sourceLanguage: string;
 		targetLanguage: string;
+		signal?: AbortSignal;
 	}) {
 		const { apiKey } = useTranslatorStore.getState();
 
@@ -498,6 +515,7 @@ class TranslatorService {
 				this.createUrl(endpoint, "/translate"),
 				{
 					method: "POST",
+					signal,
 					headers: {
 						"Content-Type": "application/json",
 					},
@@ -530,6 +548,7 @@ class TranslatorService {
 			{
 				method: "POST",
 				body: formData,
+				signal,
 			},
 		);
 
@@ -540,10 +559,12 @@ class TranslatorService {
 		text,
 		sourceLanguage,
 		targetLanguage,
+		signal,
 	}: {
 		text: string;
 		sourceLanguage: string;
 		targetLanguage: string;
+		signal?: AbortSignal;
 	}) {
 		const endpoint = this.getLingvaEndpoint();
 		const chunks = splitTextByByteLimit(text, LINGVA_MAX_CHUNK_BYTES);
@@ -564,6 +585,7 @@ class TranslatorService {
 				),
 				{
 					method: "GET",
+					signal,
 				},
 			);
 			const data = await this.readJson<LingvaTranslateResponse>(

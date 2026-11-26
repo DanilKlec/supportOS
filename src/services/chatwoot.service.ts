@@ -77,6 +77,12 @@ export type ChatwootMessage = {
 	content?: string;
 	message_type?: number | string;
 	private?: boolean;
+	content_attributes?: {
+		deleted?: boolean;
+		source_language?: string;
+		translation_pending?: boolean;
+		translation_failed?: boolean;
+	};
 	created_at?: number;
 	sender?: { name?: string; available_name?: string; type?: string; avatar_url?: string; thumbnail?: string };
 	attachments?: Array<{
@@ -248,6 +254,7 @@ export const chatwootService = {
 			configured: boolean;
 			profileUrl?: string;
 			lastWebhookAt?: string | null;
+			nativeAutoTranslate?: boolean;
 			capabilities?: ChatwootCapabilities;
 			inboxes?: { payload?: Array<{ inbox: ChatwootInbox }> };
 		}>("health"),
@@ -433,11 +440,11 @@ export const chatwootService = {
 		>("labels"),
 	inboxes: () =>
 		request<{ payload?: ChatwootInbox[] } | ChatwootInbox[]>("inboxes"),
-	sendMessage: (conversationId: number, content: string, isPrivate: boolean, attachments: ChatwootUpload[] = []) =>
+	sendMessage: (conversationId: number, content: string, isPrivate: boolean, attachments: ChatwootUpload[] = [], autoTranslate?: boolean) =>
 		request("message", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ conversationId, content, private: isPrivate, attachments }),
+			body: JSON.stringify({ conversationId, content, private: isPrivate, attachments, autoTranslate }),
 		}),
 	setStatus: (
 		conversationId: number,

@@ -50,11 +50,38 @@ test('does not allow SupportOS agents to modify native policies', async () => {
 	expect(fetch).not.toHaveBeenCalled();
 });
 
-async function replyToPlayer() {
+async function replyToPlayer(options = {}) {
 	const response = { setHeader: vi.fn(), end: vi.fn() };
-	await handler({ url: '/api/chatwoot?action=message', method: 'POST', body: { conversationId: 10, content: 'Ответ' } }, response);
+	await handler({ url: '/api/chatwoot?action=message', method: 'POST', body: { conversationId: 10, content: 'Ответ', ...options } }, response);
 	return response.statusCode;
 }
+
+test('queues native translation for public replies with attachments and leaves notes as written', async () => {
+	const base = 'https://native-translation.example';
+	vi.stubEnv('CHATWOOT_BASE_URL', base);
+	const fetch = vi.fn()
+		.mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json({ settings: { auto_translate: true }, features: { auto_translate: true, captain_tasks: true } }))
+		.mockResolvedValueOnce(Response.json({ id: 11 }))
+		.mockResolvedValueOnce(Response.json({ id: 10, status: 'open' }))
+		.mockResolvedValueOnce(Response.json({ id: 12 }));
+	stubFetch(fetch);
+	expect(await replyToPlayer({ autoTranslate: true, attachments: [{ name: 'info.txt', type: 'text/plain', contentBase64: 'SGVsbG8=' }] })).toBe(200);
+	const [url, request] = fetch.mock.calls[2];
+	expect(url).toBe(`${base}/api/v1/accounts/3/conversations/10/messages`);
+	expect(JSON.parse(request.body.get('content_attributes'))).toEqual({ translation_pending: true });
+	expect(request.body.get('attachments[]').name).toBe('info.txt');
+	expect(await replyToPlayer({ autoTranslate: true, private: true })).toBe(200);
+	expect(JSON.parse(fetch.mock.calls[4][1].body)).toMatchObject({ private: true, content: 'Ответ' });
+	expect(JSON.parse(fetch.mock.calls[4][1].body)).not.toHaveProperty('content_attributes');
+});
+
+test('keeps the reply unsent when the dialog has disabled native translation', async () => {
+	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 10, status: 'open', additional_attributes: { auto_translate_disabled: true } }));
+	stubFetch(fetch);
+	expect(await replyToPlayer({ autoTranslate: true })).toBe(409);
+	expect(fetch).toHaveBeenCalledTimes(1);
+});
 
 test('uses the verified personal Chatwoot token as the message author', async () => {
 	vi.stubEnv('CHATWOOT_AGENT_TOKENS', JSON.stringify({ [member.email]: 'personal-test-token' }));

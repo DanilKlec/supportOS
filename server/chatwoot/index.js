@@ -12,6 +12,7 @@ import { readPersonalToken, removePersonalToken, savePersonalToken } from './per
 const activityCache = new Map();
 const teamStatusCache = new Map();
 const botCountCache = new Map();
+const translationSettingsCache = new Map();
 const chatWebhookEvents = ['conversation_created', 'conversation_status_changed', 'conversation_updated', 'message_created', 'message_updated'];
 
 const json = (res, status, body) => {
@@ -36,6 +37,16 @@ export function config(env = process.env) {
 
 function api(cfg, path, options) {
 	return chatwootRequest(cfg, `/api/v1${path}`, options);
+}
+
+function nativeAutoTranslateEnabled(cfg) {
+	return cachedSnapshot(translationSettingsCache, `${cfg.base}:${cfg.accountId}`, 30000, async () => {
+		const account = await api(cfg, `/accounts/${cfg.accountId}`, { timeout: 2000 });
+		if (account.settings?.auto_translate !== true || account.features?.auto_translate !== true) return false;
+		if (account.settings.translation_provider !== 'google_translate') return account.features.captain_tasks === true;
+		const apps = await api(cfg, `/accounts/${cfg.accountId}/integrations/apps`, { timeout: 2000 });
+		return itemList(apps).some((app) => app.id === 'google_translate' && app.enabled === true);
+	});
 }
 
 async function chatwootRequest(cfg, path, { method = 'GET', body, timeout = 15000 } = {}) {
@@ -987,8 +998,10 @@ export default async function handler(req, res) {
 			const lastEvent = Promise.resolve().then(() =>
 				db(serverConfig(), 'supportos_chatwoot_webhook_events?select=received_at&order=received_at.desc&limit=1'),
 			).catch(() => []);
-			const [, events] = await Promise.all([api(cfg, '/profile'), lastEvent]);
-			return json(res, 200, { configured: true, capabilities, lastWebhookAt: events?.[0]?.received_at ?? null,
+			const [, events, nativeAutoTranslate] = await Promise.all([
+				api(cfg, '/profile'), lastEvent, nativeAutoTranslateEnabled(cfg).catch(() => false),
+			]);
+			return json(res, 200, { configured: true, capabilities, nativeAutoTranslate, lastWebhookAt: events?.[0]?.received_at ?? null,
 				profileUrl: `${cfg.base}/app/accounts/${cfg.accountId}/profile/settings` });
 		}
 		const cfg = config();
@@ -1653,12 +1666,17 @@ export default async function handler(req, res) {
 					: 'application/octet-stream';
 				files.push({ name, type, bytes });
 			}
-			let payload = { content, message_type: 'outgoing', private: body.private === true };
+			const needsTranslation = body.autoTranslate === true && body.private !== true && /\p{L}/u.test(content);
+			if (needsTranslation && (current.row.additional_attributes?.auto_translate_disabled === true || !await nativeAutoTranslateEnabled(cfg).catch(() => false)))
+				return json(res, 409, { error: 'Автоперевод Chatwoot недоступен. Выберите язык вручную или отправьте без перевода.' });
+			const contentAttributes = needsTranslation ? { translation_pending: true } : undefined;
+			let payload = { content, message_type: 'outgoing', private: body.private === true, content_attributes: contentAttributes };
 			if (files.length) {
 				const form = new FormData();
 				form.append('content', content);
 				form.append('message_type', 'outgoing');
 				form.append('private', String(body.private === true));
+				if (contentAttributes) form.append('content_attributes', JSON.stringify(contentAttributes));
 				for (const file of files)
 					form.append('attachments[]', new Blob([file.bytes], { type: file.type }), file.name);
 				payload = form;

@@ -13,6 +13,7 @@ import {
 	FileText,
 	Inbox,
 	Headphones,
+	Languages,
 	LoaderCircle,
 	ListChecks,
 	LockKeyhole,
@@ -82,6 +83,7 @@ import { useChatPopover } from "./useChatPopover";
 import { CoachingComposer, type CoachingRecipient, CoachingThreadTabs, ObservationHeader } from "./ChatCoaching";
 import { crmWorkspaceUrl } from "@/widgets/CRM/CRMFrame";
 import { searchBinds } from "@/shared/lib/bind-search";
+import { replyLanguageName, replyLanguages, translateChatReply } from "./reply-translation";
 import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
@@ -172,7 +174,7 @@ function InboxSession({ parentClient }: { parentClient: QueryClient }) {
 type CoachingDraft = { text: string; coachTo?: CoachingRecipient };
 type MessageDraft = { text: string; files: File[] };
 type ComposerMode = "reply" | "note";
-type OperatorDraft = { mode: ComposerMode; reply: MessageDraft; note: MessageDraft };
+type OperatorDraft = { mode: ComposerMode; reply: MessageDraft; note: MessageDraft; replyLanguage?: string };
 type UpdateOperatorDraft = (id: number, change: (current: OperatorDraft) => OperatorDraft) => void;
 const emptyMessageDraft: MessageDraft = { text: "", files: [] };
 const emptyOperatorDraft: OperatorDraft = { mode: "reply", reply: emptyMessageDraft, note: emptyMessageDraft };
@@ -197,7 +199,7 @@ function AgentInboxWorkspace() {
 			const next = change(draft);
 			if (next === draft) return previous;
 			const updated = new Map(previous);
-			if (next.mode === "reply" && !next.reply.text && !next.note.text && !next.reply.files.length && !next.note.files.length)
+			if (next.mode === "reply" && !next.replyLanguage && !next.reply.text && !next.note.text && !next.reply.files.length && !next.note.files.length)
 				updated.delete(id);
 			else updated.set(id, next);
 			return updated;
@@ -236,6 +238,7 @@ function AgentInboxWorkspace() {
 	const canWork = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("work") === true,
 	);
+	const canTranslate = user?.access?.permissions.includes("translator.use") === true;
 	const binds = useKnowledgeStore((s) => s.binds);
 	const remoteBinds = useKnowledgeStore((s) => s.remoteBinds);
 	const composerBinds = useMemo(
@@ -807,6 +810,8 @@ function AgentInboxWorkspace() {
 							onOpenRelated={(relatedId) => placeConversation(relatedId, { replaceId: id ?? undefined })}
 							realtimeConnected={realtimeConnected}
 							coachingRealtimeConnected={coachingRealtimeConnected}
+							canTranslate={canTranslate}
+							nativeAutoTranslate={connection.data?.nativeAutoTranslate === true}
 							agents={agents}
 							teams={directory.data?.teams ?? []}
 							inboxes={inboxes}
@@ -1207,6 +1212,8 @@ function ConversationPane({
 	onExpand,
 	realtimeConnected,
 	coachingRealtimeConnected,
+	canTranslate = false,
+	nativeAutoTranslate = false,
 	agents,
 	teams,
 	operatorDraft = emptyOperatorDraft,
@@ -1235,6 +1242,8 @@ function ConversationPane({
 	onExpand?: () => void;
 	realtimeConnected: boolean;
 	coachingRealtimeConnected: boolean;
+	canTranslate?: boolean;
+	nativeAutoTranslate?: boolean;
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
 	operatorDraft?: OperatorDraft;
@@ -1331,6 +1340,9 @@ function ConversationPane({
 	const canTake = !supervising && conversation?.access?.take === true;
 	const mode: ComposerMode = canNote && (!canWrite || operatorDraft.mode === "note") ? "note" : "reply";
 	const sendAsNote = mode === "note";
+	const autoTranslateDisabled = conversation?.additional_attributes?.auto_translate_disabled === true;
+	const replyLanguage = operatorDraft.replyLanguage ?? (autoTranslateDisabled ? "off" : "auto");
+	const canUseNativeTranslation = nativeAutoTranslate && !autoTranslateDisabled;
 	const draft = operatorDraft[mode];
 	const { text, files: selectedFiles } = draft;
 	const updateDraft = (patch: Partial<MessageDraft>) => {
@@ -1514,17 +1526,24 @@ function ConversationPane({
 		staleTime: 60000,
 	});
 	const send = useMutation({
-		mutationFn: async (message: { id: number; mode: ComposerMode; draft: MessageDraft }) => {
+		mutationFn: async (message: { id: number; mode: ComposerMode; draft: MessageDraft; replyLanguage: string; nativeTranslation: boolean }) => {
 			const isNote = message.mode === "note";
 			if (supervising || (isNote ? !canNote : !canWrite))
 				throw new Error("Отправка в этом режиме недоступна");
-			const attachments = await Promise.all(message.draft.files.map(async (file) => ({
-				name: file.name, type: file.type || "application/octet-stream", contentBase64: await chatwootFileBase64(file),
-			})));
-			return chatwootService.sendMessage(message.id, message.draft.text.trim(), isNote, attachments);
-		},
-		onMutate: (message) => {
-			setOptimisticMessage({ id: -Date.now(), content: message.draft.text.trim(), private: message.mode === "note", message_type: "outgoing", created_at: Math.floor(Date.now() / 1000), attachments: message.draft.files.map((file) => ({ file_name: file.name, file_type: file.type })) });
+			const original = message.draft.text.trim();
+			const [content, attachments] = await Promise.all([
+				message.replyLanguage !== "off" && !message.nativeTranslation && original && conversation
+					? translateChatReply(original, message.replyLanguage, conversation, messages) : original,
+				Promise.all(message.draft.files.map(async (file) => ({
+					name: file.name, type: file.type || "application/octet-stream", contentBase64: await chatwootFileBase64(file),
+				}))),
+			]);
+			if (currentConversationId.current === message.id) {
+				setOptimisticMessage({ id: -Date.now(), content, private: isNote, message_type: "outgoing", created_at: Math.floor(Date.now() / 1000),
+					content_attributes: message.nativeTranslation ? { translation_pending: true } : undefined,
+					attachments: message.draft.files.map((file) => ({ file_name: file.name, file_type: file.type })) });
+			}
+			return chatwootService.sendMessage(message.id, content, isNote, attachments, message.nativeTranslation || undefined);
 		},
 		onSuccess: (_result, message) => {
 			onOperatorDraft?.(message.id, (current) => current[message.mode] === message.draft ? { ...current, [message.mode]: emptyMessageDraft } : current);
@@ -1542,6 +1561,7 @@ function ConversationPane({
 		},
 		onError: (_error, message) => {
 			if (currentConversationId.current === message.id) setOptimisticMessage(null);
+			if (message.nativeTranslation) void client.invalidateQueries({ queryKey: ["chatwoot", "health"] });
 		},
 	});
 	const addFiles = (files: FileList | null) => {
@@ -1662,7 +1682,9 @@ function ConversationPane({
 	};
 	const submitMessage = () => {
 		if (id == null || slash || (!text.trim() && !selectedFiles.length) || send.isPending) return;
-		send.mutate({ id, mode, draft });
+		const nativeTranslation = mode === "reply" && replyLanguage === "auto" && canUseNativeTranslation && /\p{L}/u.test(text);
+		const outgoingLanguage = mode === "reply" && (nativeTranslation || canTranslate) ? replyLanguage : "off";
+		send.mutate({ id, mode, draft, replyLanguage: outgoingLanguage, nativeTranslation });
 	};
 	const handleMessageKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -1947,6 +1969,22 @@ function ConversationPane({
 					<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
 						<div className="flex flex-wrap items-center gap-1.5">
 							<button type="button" title="Прикрепить файл" aria-label="Прикрепить файл" onClick={() => fileInput.current?.click()} disabled={send.isPending || selectedFiles.length >= 5} className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"><Paperclip size={14} /></button>
+							{!sendAsNote && (canTranslate || canUseNativeTranslation) && <label className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-border px-2 text-xs text-muted">
+								<Languages size={14} className="shrink-0" aria-hidden="true" />
+								<select aria-label="Язык ответа" value={replyLanguage} disabled={send.isPending}
+									onChange={(event) => {
+										const selected = event.target.value;
+										if (id != null) onOperatorDraft?.(id, (current) => ({ ...current, replyLanguage: selected }));
+										if (send.isError) send.reset();
+									}}
+									className="min-w-0 max-w-40 bg-surface text-foreground">
+									<option value="auto">Авто · язык игрока</option>
+									<option value="off">Без перевода</option>
+									{canTranslate && <optgroup label="Выбрать язык">
+											{replyLanguages.map((code) => <option key={code} value={code}>{replyLanguageName(code)}</option>)}
+									</optgroup>}
+								</select>
+							</label>}
 							{canWrite && <div ref={bindMenu}>
 								<button
 									type="button"
@@ -2021,7 +2059,7 @@ function ConversationPane({
 								className="inline-flex h-8 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-semibold text-white disabled:opacity-50"
 							>
 								<Send size={13} />
-								<span className="chat-send-caption">{send.isPending ? "Отправляем…" : sendAsNote ? "Отправить команде" : "Отправить игроку"}</span>
+								<span className="chat-send-caption">{send.isPending ? (send.variables.replyLanguage !== "off" && send.variables.draft.text.trim() ? "Переводим и отправляем…" : "Отправляем…") : sendAsNote ? "Отправить команде" : "Отправить игроку"}</span>
 							</button>
 						</div>
 					</div>
@@ -2271,6 +2309,7 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 	const type = String(message.message_type ?? "").toLowerCase();
 	const activity = type === "2" || type === "activity";
 	const outgoing = type === "1" || type === "outgoing";
+	const translation = message.content_attributes;
 	if (activity) {
 		return (
 			<div className="flex justify-center px-3 py-1">
@@ -2323,6 +2362,12 @@ function MessageBubble({ message }: { message: ChatwootMessage }) {
 						{file.file_name || "Открыть вложение"}
 					</a>
 				))}
+				{outgoing && !message.private && translation?.translation_pending && (
+					<p className="mt-1 text-xs text-muted">Переводим на язык игрока…</p>
+				)}
+				{outgoing && !message.private && translation?.translation_failed && (
+					<p className="mt-1 text-xs chat-text-warning">Перевод не удался. Игроку отправлен исходный текст.</p>
+				)}
 				<div className="mt-1 text-right text-[10px] text-muted">
 					<ReplyTime timestamp={message.created_at} />
 				</div>
