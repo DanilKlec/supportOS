@@ -6,7 +6,7 @@ import { routeWaitingConversations } from './index.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
-test('disconnect disables intake, protects concurrent edits, and releases slots only to a fresh agent under the cap', async () => {
+test('disconnect recovery and least-loaded routing respect the same reservations and capacity limits', async () => {
 	const database = new PGlite();
 	const migrations = new URL('../../supabase/migrations/', import.meta.url);
 	const names = await readdir(migrations);
@@ -26,7 +26,7 @@ test('disconnect disables intake, protects concurrent edits, and releases slots 
 			create function realtime.send(jsonb, text, text, boolean) returns void language sql
 			as 'insert into public.realtime_events values ($2, $3, $4)';
 			create table public.supportos_users(id uuid primary key, status text);`);
-		for (const name of ['chatwoot_agent_routing', 'chatwoot_widget_settings', 'chatwoot_atomic_router_leases', 'chatwoot_disconnect_handoff', 'chatwoot_route_update_broadcast'])
+		for (const name of ['chatwoot_agent_routing', 'chatwoot_widget_settings', 'chatwoot_atomic_router_leases', 'chatwoot_disconnect_handoff', 'chatwoot_route_update_broadcast', 'chatwoot_balance_active_load'])
 			await database.exec(await migration(name));
 		await database.query('insert into auth.users values ($1), ($2)', [agent, backup]);
 		await database.query("insert into public.supportos_users values ($1, 'active'), ($2, 'active')", [agent, backup]);
@@ -63,6 +63,32 @@ test('disconnect disables intake, protects concurrent edits, and releases slots 
 		expect(expired.rows).toEqual([expect.objectContaining({ user_id: backup, chatwoot_agent_id: 102 })]);
 		const state = await database.query('select accepting, offline_since from public.supportos_chatwoot_presence where user_id = $1', [backup]);
 		expect(state.rows[0]).toMatchObject({ accepting: false, offline_since: expect.any(Date) });
+
+		const agents = [201, 202, 203, 204, 205];
+		for (const id of agents) {
+			const user = randomUUID();
+			await database.query('insert into auth.users values ($1)', [user]);
+			await database.query("insert into public.supportos_users values ($1, 'active')", [user]);
+			await rpc('record_presence', user, id, true);
+		}
+		await rpc('release_router_lease', lease);
+		await database.exec("update public.supportos_chatwoot_router_state set last_run_at = now() - interval '2 seconds', last_agent_id = 205 where id = 'main'");
+		const loadLease = randomUUID();
+		expect(await rpc('acquire_router_lease', loadLease, 1, 60)).toBe(true);
+		const snapshot = { 201: 3, 202: 1, 203: 0, 204: 0, 205: 0 };
+		const expected = [203, 204, 205, 202, 203, 204, 205, 202, 203, 204, 205, 201, 202, 203, 204, 205];
+		const firstToken = randomUUID();
+		for (const [index, expectedAgent] of expected.entries()) {
+			const chat = 600 + index;
+			const token = index === 0 ? firstToken : randomUUID();
+			expect(await rpc('reserve_conversation', token, chat, agents, snapshot, loadLease)).toMatchObject({ reserved: true, agentId: expectedAgent });
+			// Keep the first assignment in flight so it also affects the load calculation.
+			if (index > 0) expect(await rpc('finish_conversation_operation', chat, token, expectedAgent)).toBe(true);
+		}
+		expect(await rpc('reserve_conversation', randomUUID(), 616, agents, snapshot, loadLease)).toMatchObject({ reserved: false });
+		expect(await rpc('finish_conversation_operation', 600, firstToken, expected[0])).toBe(true);
+		const load = await database.query("select chatwoot_agent_id as agent, count(*)::int as assigned from public.supportos_chatwoot_routing where conversation_id >= 600 and status = 'assigned' group by agent order by agent");
+		expect(load.rows.map(({ agent, assigned }) => assigned + snapshot[agent])).toEqual([4, 4, 4, 4, 4]);
 	} finally {
 		await database.close();
 	}
