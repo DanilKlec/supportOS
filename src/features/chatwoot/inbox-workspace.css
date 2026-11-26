@@ -924,11 +924,6 @@
 	padding: 0.5rem;
 }
 
-.chat-thread[data-tiled="true"] .chat-thread-composer textarea {
-	min-height: 2.5rem;
-	max-height: 4.25rem;
-}
-
 .chat-thread[data-tiled="true"] :is(.chat-send-caption, .chat-send-hint) {
 	display: none;
 }
@@ -1004,6 +999,36 @@
 	background-color: var(--color-surface);
 }
 
+.chat-editor-resize {
+	position: absolute;
+	z-index: 1;
+	inset-block-start: -9px;
+	inset-inline: 0;
+	inline-size: clamp(4rem, 30%, 10rem);
+	block-size: 18px;
+	margin: 0 auto;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	cursor: row-resize;
+	touch-action: none;
+}
+
+.chat-editor-resize::after {
+	position: absolute;
+	inset: 0;
+	inline-size: 2.25rem;
+	block-size: 3px;
+	margin: auto;
+	border-radius: 999px;
+	background: var(--color-muted);
+	content: "";
+}
+
+.chat-editor-resize:is(:hover, :active, :focus-visible)::after {
+	background: var(--chat-focus);
+}
+
 .chat-thread-composer[data-note="true"] {
 	border-color: color-mix(
 		in srgb,
@@ -1021,6 +1046,10 @@
 	border-color: var(--chat-line);
 	background: var(--chat-control);
 	field-sizing: content;
+}
+
+.chat-message-editor[data-manual-height="true"] {
+	field-sizing: fixed;
 }
 
 .supportos-inbox .chat-thread textarea:focus-visible {

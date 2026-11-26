@@ -159,6 +159,31 @@ test("work in up to four independent chat windows", async ({
 
 	await openRow(21);
 	await expect(reply(21)).toBeFocused();
+	const resizeEditor = (id: number) => pane(id).getByRole("separator", { name: "Изменить высоту поля сообщения" });
+	const editorHeight = async (id: number) => Math.round((await reply(id).boundingBox())?.height ?? 0);
+	const compactHeight = await editorHeight(21);
+	await resizeEditor(21).press("ArrowUp");
+	await expect.poll(() => editorHeight(21)).toBe(compactHeight + 16);
+	const grip = await resizeEditor(21).boundingBox();
+	if (!grip) throw new Error("Ручка изменения высоты не отображается");
+	const x = Math.round(grip.x + grip.width / 2);
+	const y = Math.round(grip.y + grip.height / 2);
+	if (isMobile) {
+		const touch = await context.newCDPSession(page);
+		await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+		await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - 48 }] });
+		await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+		await touch.detach();
+	} else {
+		await page.mouse.move(x, y);
+		await page.mouse.down();
+		await page.mouse.move(x, y - 48, { steps: 5 });
+		await page.mouse.up();
+	}
+	await expect.poll(() => editorHeight(21)).toBe(compactHeight + 64);
+	await resizeEditor(21).press("ArrowDown");
+	const chosenHeight = compactHeight + 48;
+	await expect.poll(() => editorHeight(21)).toBe(chosenHeight);
 	await expect(page.getByRole("button", { name: /Операторы онлайн 7.*активные чаты 12/ })).toBeVisible();
 	await expect(windows).toHaveCount(1);
 	await expect(grid).toHaveAttribute("data-grid-size", "1");
@@ -242,6 +267,7 @@ test("work in up to four independent chat windows", async ({
 	await openRow(22);
 	await expect(windows).toHaveCount(1);
 	await expect(reply(22)).toBeFocused();
+	await expect.poll(() => editorHeight(22)).toBe(chosenHeight);
 	if (isMobile)
 		await page.getByRole("button", { name: "Показать список" }).click();
 	await openRow(21);
@@ -253,6 +279,10 @@ test("work in up to four independent chat windows", async ({
 	await addChat(22);
 	await expect(windows).toHaveCount(2);
 	await expect(tabs).toBeVisible();
+	await resizeEditor(22).press("ArrowUp");
+	await expect.poll(() => editorHeight(22)).toBe(chosenHeight + 16);
+	await resizeEditor(22).press("Enter");
+	await expect.poll(() => editorHeight(22)).toBe(compactHeight);
 	await reply(22).fill("Ответ во второй чат");
 	await expect(grid).toHaveAttribute("data-grid-size", isMobile ? "1" : "2");
 	await addChat(23);

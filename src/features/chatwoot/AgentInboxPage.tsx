@@ -193,9 +193,28 @@ type OperatorDraft = { mode: ComposerMode; reply: MessageDraft; note: MessageDra
 type UpdateOperatorDraft = (id: number, change: (current: OperatorDraft) => OperatorDraft) => void;
 const emptyMessageDraft: MessageDraft = { text: "", files: [] };
 const emptyOperatorDraft: OperatorDraft = { mode: "reply", reply: emptyMessageDraft, note: emptyMessageDraft };
+const minEditorHeight = 40;
+const maxEditorHeight = 420;
 
 function AgentInboxWorkspace({ notificationClient }: { notificationClient: QueryClient }) {
 	const client = useQueryClient();
+	const user = useAuthStore((s) => s.session?.user);
+	const editorHeightKey = `supportos:chatwoot:editor-height:${user?.id ?? ""}`;
+	const [editorHeight, setEditorHeight] = useState<number | null>(() => {
+		try {
+			const saved = Number(localStorage.getItem(editorHeightKey));
+			return saved >= minEditorHeight && saved <= maxEditorHeight ? saved : null;
+		} catch { return null; }
+	});
+	const resizeEditor = (height: number | null) => {
+		const next = height === null ? null : Math.round(height);
+		if (next === editorHeight) return;
+		setEditorHeight(next);
+		try {
+			if (next === null) localStorage.removeItem(editorHeightKey);
+			else localStorage.setItem(editorHeightKey, String(next));
+		} catch { /* use the height for this session */ }
+	};
 	const [scope, setScope] = useState<Scope>("mine");
 	const [activeSection, setActiveSection] = useState<WorkspaceSection>("inbox");
 	const [railCollapsed, setRailCollapsed] = useState(false);
@@ -248,7 +267,6 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 	const [soundEnabled, setSoundEnabled] = useState(() => {
 		try { return localStorage.getItem(CHAT_SOUND_PREFERENCE) !== "off"; } catch { return true; }
 	});
-	const user = useAuthStore((s) => s.session?.user);
 	const accessToken = useAuthStore((s) => s.session?.accessToken);
 	const canWork = useAuthStore(
 		(s) => s.session?.user.access?.permissions.includes("work") === true,
@@ -829,6 +847,8 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 							onExpand={canExpand && id !== null ? () => dispatchChatWindow({ type: "expand", id }) : undefined}
 							operatorDraft={id == null ? undefined : drafts.get(id)}
 							onOperatorDraft={updateOperatorDraft}
+							editorHeight={editorHeight}
+							onEditorResize={resizeEditor}
 							onTitle={rememberTitle}
 							onOpenRelated={(relatedId) => placeConversation(relatedId, { replaceId: id ?? undefined })}
 							realtimeConnected={realtimeConnected}
@@ -870,45 +890,59 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 	);
 }
 
-function ResizeHandle({ label, value, min, max, onResize, fromEnd = false }: {
+function ResizeHandle({ label, value, min, max, onResize, fromEnd = false, horizontal = false, controls, onReset }: {
 	label: string;
 	value: number;
 	min: number;
 	max: number;
 	onResize: (coordinate: number) => void;
 	fromEnd?: boolean;
+	horizontal?: boolean;
+	controls?: string;
+	onReset?: () => void;
 }) {
 	const drag = useRef<{ origin: number; value: number } | null>(null);
 	const resizeTo = (next: number) => onResize(Math.min(max, Math.max(min, next)));
+	const decreaseKey = horizontal ? "ArrowUp" : "ArrowLeft";
+	const increaseKey = horizontal ? "ArrowDown" : "ArrowRight";
 	return (
 		<hr
 			aria-label={label}
-			aria-orientation="vertical"
+			aria-controls={controls}
+			aria-orientation={horizontal ? "horizontal" : "vertical"}
 			aria-valuemin={min}
 			aria-valuemax={max}
 			aria-valuenow={Math.round(value)}
 			tabIndex={0}
+			title={horizontal ? "Перетащите вверх или вниз. Двойной щелчок возвращает автоматическую высоту." : undefined}
 			onKeyDown={(event) => {
-				if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+				if (event.key === "Enter" && onReset) {
+					event.preventDefault();
+					onReset();
+					return;
+				}
+				if (![decreaseKey, increaseKey, "Home", "End"].includes(event.key)) return;
 				event.preventDefault();
 				if (event.key === "Home" || event.key === "End") {
 					resizeTo(event.key === "Home" ? min : max);
 					return;
 				}
-				resizeTo(value + (event.key === "ArrowLeft" ? -16 : 16) * (fromEnd ? -1 : 1));
+				resizeTo(value + (event.key === decreaseKey ? -16 : 16) * (fromEnd ? -1 : 1));
 			}}
 			onPointerDown={(event) => {
 				if (event.button !== 0) return;
-				drag.current = { origin: event.clientX, value };
+				if (horizontal) event.preventDefault();
+				drag.current = { origin: horizontal ? event.clientY : event.clientX, value };
 				event.currentTarget.setPointerCapture(event.pointerId);
 			}}
 			onPointerMove={(event) => {
 				if (!drag.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-				const offset = event.clientX - drag.current.origin;
+				const offset = (horizontal ? event.clientY : event.clientX) - drag.current.origin;
 				resizeTo(drag.current.value + offset * (fromEnd ? -1 : 1));
 			}}
 			onLostPointerCapture={() => { drag.current = null; }}
-			className="chat-pane-resize"
+			onDoubleClick={onReset}
+			className={horizontal ? "chat-editor-resize" : "chat-pane-resize"}
 		/>
 	);
 }
@@ -1241,6 +1275,8 @@ function ConversationPane({
 	teams,
 	operatorDraft = emptyOperatorDraft,
 	onOperatorDraft,
+	editorHeight = null,
+	onEditorResize,
 	coachingDraft,
 	onCoachingDraft,
 	onTitle,
@@ -1274,6 +1310,8 @@ function ConversationPane({
 	teams: ChatwootTeam[];
 	operatorDraft?: OperatorDraft;
 	onOperatorDraft?: UpdateOperatorDraft;
+	editorHeight?: number | null;
+	onEditorResize?: (height: number | null) => void;
 	coachingDraft?: CoachingDraft;
 	onCoachingDraft?: (id: number, value: CoachingDraft) => void;
 	onTitle?: (id: number, title: string) => void;
@@ -1311,6 +1349,9 @@ function ConversationPane({
 	const showCustomer = contextTab === "player";
 	const [editorExpanded, setEditorExpanded] = useState(true);
 	const editor = useRef<HTMLTextAreaElement>(null);
+	const editorId = useId();
+	const [autoEditorHeight, setAutoEditorHeight] = useState(minEditorHeight);
+	const [threadHeight, setThreadHeight] = useState(0);
 	const thread = useRef<HTMLElement>(null);
 	const customerClose = useRef<HTMLButtonElement>(null);
 	const playerToggle = useRef<HTMLButtonElement>(null);
@@ -1360,6 +1401,18 @@ function ConversationPane({
 	}, [id, conversationTitle, onTitle]);
 	const canWrite = !supervising && conversation?.access?.write === true;
 	const canNote = !supervising && conversation?.access?.note === true;
+	const editorVisible = visible && editorExpanded && !privateOnly && (canWrite || canNote);
+	const editorLimit = Math.max(minEditorHeight, Math.min(maxEditorHeight, Math.floor(threadHeight * (tiled ? 0.36 : 0.46))));
+	const displayedEditorHeight = Math.min(editorHeight ?? autoEditorHeight, editorLimit);
+	useLayoutEffect(() => {
+		const field = editor.current;
+		if (!editorVisible || !field || editorHeight !== null) return;
+		const measure = () => setAutoEditorHeight(Math.round(field.getBoundingClientRect().height));
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(field);
+		return () => observer.disconnect();
+	}, [editorVisible, editorHeight]);
 	useLayoutEffect(() => {
 		if (visible && selected && editorExpanded && (canWrite || canNote) && !thread.current?.contains(document.activeElement)) {
 			editor.current?.focus({ preventScroll: true });
@@ -1498,7 +1551,9 @@ function ConversationPane({
 	useEffect(() => {
 		if (!conversationVisible || !thread.current) return;
 		const observer = new ResizeObserver(([entry]) => {
-			if (entry) setContextOverlay(entry.contentRect.width < 640);
+			if (!entry) return;
+			setContextOverlay(entry.contentRect.width < 640);
+			setThreadHeight(entry.contentRect.height);
 		});
 		observer.observe(thread.current);
 		return () => observer.disconnect();
@@ -1951,6 +2006,9 @@ function ConversationPane({
 						</button>
 					</footer>
 				) : (canWrite || canNote) ? <footer data-note={sendAsNote} data-collapsed={!editorExpanded} className="chat-thread-composer relative shrink-0 border-t border-border px-2.5 py-2">
+					{editorExpanded && onEditorResize && <ResizeHandle label="Изменить высоту поля сообщения" controls={editorId}
+						value={displayedEditorHeight} min={minEditorHeight} max={editorLimit} horizontal fromEnd
+						onResize={onEditorResize} onReset={() => onEditorResize(null)} />}
 					<div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5">
 							<fieldset className="chat-operator-composer flex w-fit max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-border p-0.5">
 								<legend className="sr-only">Кому отправить сообщение</legend>
@@ -1981,6 +2039,7 @@ function ConversationPane({
 					)}
 					<textarea
 						ref={editor}
+						id={editorId}
 						aria-label={sendAsNote ? "Заметка команде" : "Ответ игроку"}
 						aria-controls={slash ? bindOptionsId : undefined}
 						aria-activedescendant={slash && selectedBind ? `${bindOptionsId}-${selectedBindIndex}` : undefined}
@@ -1994,7 +2053,9 @@ function ConversationPane({
 								: "Напишите ответ игроку или введите /"
 						}
 						rows={1}
-						className="supportos-scroll block max-h-36 min-h-10 w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent/60"
+						style={{ minHeight: minEditorHeight, height: editorHeight === null ? undefined : displayedEditorHeight, maxHeight: editorHeight === null ? Math.min(editorLimit, tiled ? 68 : 144) : editorLimit }}
+						data-manual-height={editorHeight !== null}
+						className="supportos-scroll chat-message-editor block w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent/60"
 					/>
 					<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
 						<div className="flex flex-wrap items-center gap-1.5">
