@@ -766,6 +766,8 @@ function AgentInboxWorkspace() {
 						<div className="chat-observation-layout relative flex min-h-0 min-w-0 flex-1" data-observation-open={supervisionId !== null}>
 							<ActiveChatsTable userId={user?.id} agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
 								labels={labels} realtime={realtimeConnected} selectedId={supervisionId} watched={watched}
+								counts={conversationCounts.data}
+								onRefreshCounts={() => { void conversationCounts.refetch(); void watching.refetch(); }}
 								watchingError={(changeWatch.error ?? watching.error)?.message}
 								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
 								onOpen={startObservation}

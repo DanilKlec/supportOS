@@ -7,6 +7,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	page,
 }, info) => {
 	let watching = false;
+	let openCount = 1;
 	let activeParameters = new URLSearchParams();
 	let agentView = false;
 	let queued = false;
@@ -166,7 +167,9 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 			case "conversation-counts":
 				return route.fulfill({
 					json: {
-						activeCount: 1,
+						activeCount: openCount,
+						openCount,
+						pendingCount: 0,
 						mineCount: taken ? 1 : 0,
 						queueCount: queued && !taken ? 1 : 0,
 					},
@@ -258,8 +261,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 			}
 			case "active-overview": {
 				activeParameters = url.searchParams;
-				const rows =
-					url.searchParams.get("mode") === "watching" && !watching ? [] : [row];
+				const mode = url.searchParams.get("mode");
+				const rows = mode === "pending" || (mode === "watching" && !watching) ? [] : [row];
 				return route.fulfill({
 					json: { rows, total: rows.length, hasMore: false },
 				});
@@ -389,6 +392,26 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await page.getByRole("button", { name: /^Активные/ }).click();
 	const table = page.getByRole("table");
 	await expect(table.getByText(row.email)).toBeVisible();
+	const active = page.getByRole("region", { name: "Активные чаты команды" });
+	const allTab = active.getByRole("button", { name: /^Все(?: активные)? \d/ });
+	const openTab = active.getByRole("button", { name: /^Открытые/ });
+	const pendingTab = active.getByRole("button", { name: /^Ожидают/ });
+	const watchingTab = active.getByRole("button", { name: /^Наблюдаемые/ });
+	await expect(allTab.locator(".chat-scope-count")).toHaveText("1");
+	await expect(openTab.locator(".chat-scope-count")).toHaveText("1");
+	await expect(pendingTab.locator(".chat-scope-count")).toHaveText("0");
+	await expect(watchingTab.locator(".chat-scope-count")).toHaveText("0");
+	await pendingTab.click();
+	await expect.poll(() => activeParameters.get("mode")).toBe("pending");
+	await expect(openTab.locator(".chat-scope-count")).toHaveText("1");
+	openCount = 12;
+	const refresh = active.getByRole("button", { name: "Обновить активные чаты" });
+	await refresh.click();
+	await expect(allTab.locator(".chat-scope-count")).toHaveText("12");
+	await expect(openTab.locator(".chat-scope-count")).toHaveText("12");
+	await expect(pendingTab.locator(".chat-scope-count")).toHaveText("0");
+	await allTab.click();
+	await expect(table.getByText(row.email)).toBeVisible();
 	await assertLayout("active");
 	if (!isMobile) {
 		const columns = page.getByRole("button", { name: "Колонки" });
@@ -397,7 +420,6 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		await columns.press("Escape");
 		await expect(columns).toHaveAttribute("aria-expanded", "false");
 	}
-	const active = page.getByRole("region", { name: "Активные чаты команды" });
 	const filterToggle = active.getByRole("button", { name: /^Фильтры/ });
 	await filterToggle.click();
 	const project = active.getByRole("combobox", { name: "Проект", exact: true });

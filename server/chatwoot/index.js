@@ -1213,10 +1213,13 @@ export default async function handler(req, res) {
 					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(actorId), inboxId: allowed }) },
 				}).then(conversationTotal) : null,
 			]);
+			const [openMeta, pendingMeta] = allStatuses ?? [];
 			return json(res, 200, {
 				queueCount: totalFromMeta(statuses, 'unassigned_count'),
 				mineCount,
 				activeCount: allStatuses ? totalFromMeta(allStatuses, 'all_count') : null,
+				openCount: countFromMeta(openMeta, 'all_count'),
+				pendingCount: countFromMeta(pendingMeta, 'all_count'),
 			});
 		}
 		if (action === 'custom-attributes') {

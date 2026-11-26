@@ -50,6 +50,26 @@ test('does not allow SupportOS agents to modify native policies', async () => {
 	expect(fetch).not.toHaveBeenCalled();
 });
 
+test('returns account totals for each active status while the queue is filtered by project', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://conversation-counts.example');
+	const fetch = vi.fn(async (url) => {
+		const { pathname, searchParams } = new URL(url);
+		if (pathname.endsWith('/agents')) return Response.json([]);
+		expect(pathname).toBe('/api/v1/accounts/3/conversations/meta');
+		const isOpen = searchParams.get('status') === 'open';
+		const hasProject = searchParams.get('inbox_id') === '9';
+		return Response.json({ meta: { all_count: isOpen ? (hasProject ? 2 : 11) : 0, unassigned_count: isOpen ? 1 : 0 } });
+	});
+	stubFetch(fetch);
+	const response = { setHeader: vi.fn(), end: vi.fn() };
+	await handler({ url: '/api/chatwoot?action=conversation-counts&inbox_id=9', method: 'GET' }, response);
+	expect(response.statusCode).toBe(200);
+	expect(JSON.parse(response.end.mock.calls[0][0])).toEqual({
+		queueCount: 1, mineCount: null, activeCount: 11, openCount: 11, pendingCount: 0,
+	});
+	expect(fetch).toHaveBeenCalledTimes(5);
+});
+
 async function replyToPlayer(options = {}) {
 	const response = { setHeader: vi.fn(), end: vi.fn() };
 	await handler({ url: '/api/chatwoot?action=message', method: 'POST', body: { conversationId: 10, content: 'Ответ', ...options } }, response);

@@ -9,6 +9,13 @@ export type ChatSiteActivity = SiteActivityMetrics & {
 	sites: Array<SiteActivityMetrics & { id: number; name: string; url?: string | null }>;
 };
 export type ActiveChatMode = "all" | "open" | "pending" | "watching";
+export type ChatwootConversationCounts = {
+	queueCount: number | null;
+	mineCount: number | null;
+	activeCount: number | null;
+	openCount: number | null;
+	pendingCount: number | null;
+};
 export type ActiveChatSort = "last_activity_at_desc" | "last_activity_at_asc" | "created_at_asc" | "created_at_desc" | "priority_desc" | "waiting_since_asc";
 export type ActiveChatRow = {
 	id: number; inboxId?: number; player?: string; email?: string; agent?: string; team?: string; project?: string;
@@ -271,7 +278,7 @@ export const chatwootService = {
 			`&scope=${options.scope}&status=${encodeURIComponent(options.status ?? "open")}&page=${options.page ?? 1}${options.inboxId ? `&inbox_id=${options.inboxId}` : ""}${options.agentId ? `&agent_id=${options.agentId}` : ""}${options.label ? `&label=${encodeURIComponent(options.label)}` : ""}${options.from ? `&from=${encodeURIComponent(options.from)}` : ""}${options.to ? `&to=${encodeURIComponent(options.to)}` : ""}${options.query ? `&q=${encodeURIComponent(options.query)}` : ""}`,
 		),
 	conversationCounts: (inboxId?: number) =>
-		request<{ queueCount: number | null; mineCount: number | null; activeCount: number | null }>("conversation-counts", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
+		request<ChatwootConversationCounts>("conversation-counts", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
 	conversation: (id: number) =>
 		request<ChatwootConversation>("conversation", undefined, `&id=${id}`),
 	activeOverview: (filters: ActiveChatFilters, signal?: AbortSignal) => {

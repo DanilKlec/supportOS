@@ -23,6 +23,7 @@ import {
 	type ActiveChatRow,
 	type ActiveChatSort,
 	type ChatwootAgent,
+	type ChatwootConversationCounts,
 	type ChatwootInbox,
 	type ChatwootTeam,
 } from "@/services/chatwoot.service";
@@ -163,6 +164,8 @@ export function ActiveChatsTable({
 	realtime,
 	selectedId,
 	watched,
+	counts,
+	onRefreshCounts,
 	watchingError,
 	changingId,
 	onOpen,
@@ -176,6 +179,8 @@ export function ActiveChatsTable({
 	realtime: boolean;
 	selectedId: number | null;
 	watched: ReadonlySet<number>;
+	counts?: ChatwootConversationCounts;
+	onRefreshCounts: () => void;
 	watchingError?: string;
 	changingId?: number;
 	onOpen: (id: number) => void;
@@ -227,6 +232,12 @@ export function ActiveChatsTable({
 		});
 	const projects = new Map(inboxes.map((item) => [item.id, item.name]));
 	const rows = query.data?.rows ?? [];
+	const tabCounts = {
+		all: counts?.activeCount,
+		open: counts?.openCount,
+		pending: counts?.pendingCount,
+		watching: watched.size,
+	};
 	const showPagination = filters.page > 1 || query.data?.hasMore === true;
 	useEffect(() => {
 		if (query.data && query.data.rows.length === 0 && filters.page > 1)
@@ -374,11 +385,12 @@ export function ActiveChatsTable({
 						) : (
 							tab.title
 						)}
-						{tab.id === "watching" ? (
-							<span className="chat-scope-count">{watched.size}</span>
-						) : filters.mode === tab.id && query.data?.total != null ? (
-							<span className="chat-scope-count">{query.data.total}</span>
-						) : null}
+						<span
+							className="chat-scope-count"
+							title={tab.id === "watching" ? "Под вашим наблюдением" : "По всем проектам"}
+						>
+							{tabCounts[tab.id] ?? "—"}
+						</span>
 					</button>
 				))}
 			</div>
@@ -450,7 +462,10 @@ export function ActiveChatsTable({
 						type="button"
 						aria-label="Обновить активные чаты"
 						disabled={query.isFetching}
-						onClick={() => void query.refetch()}
+						onClick={() => {
+							void query.refetch();
+							onRefreshCounts();
+						}}
 						className={action}
 					>
 						<RefreshCw size={13} />
