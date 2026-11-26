@@ -80,6 +80,7 @@ test("work in up to four independent chat windows", async ({
 			case "coaching-notes":
 				return route.fulfill({ json: { notes: [] } });
 			case "labels":
+			case "custom-attributes":
 				return route.fulfill({ json: { payload: [] } });
 			case "priority": {
 				const { conversationId, priority } = request.postDataJSON();

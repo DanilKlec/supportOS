@@ -512,11 +512,10 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		observation.getByRole("textbox", { name: "Подсказка агенту" }),
 	).toBeVisible();
 	const card = observation.getByRole("button", { name: "Карточка игрока" });
-	await card.click();
-	await expect(
-		observation.getByRole("complementary", { name: "Карточка игрока" }),
-	).toBeInViewport();
-	await page.keyboard.press("Escape");
+	const playerPanel = observation.getByRole("complementary", { name: "Карточка игрока" });
+	if (!(await playerPanel.isVisible())) await card.click();
+	await expect(playerPanel).toBeInViewport();
+	await playerPanel.getByRole("button", { name: "Закрыть карточку игрока" }).press("Escape");
 	await expect(card).toBeFocused();
 	await card.click();
 	await observation
@@ -812,7 +811,7 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await tagSearch.fill("несуществующий");
 	await expect(actions.getByText("Теги не найдены")).toBeVisible();
 	await tagSearch.fill("priority");
-	await actions.getByRole("button", { name: "priority-review" }).click();
+	await actions.getByRole("button", { name: "priority-review", exact: true }).click();
 	await expect(
 		actions.getByRole("button", { name: "Убрать тег priority-review" }),
 	).toBeVisible();

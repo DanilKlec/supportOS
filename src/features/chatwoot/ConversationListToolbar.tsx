@@ -2,7 +2,6 @@ import {
 	Archive,
 	Building2,
 	Clock3,
-	Globe2,
 	Tag,
 	UserRound,
 } from "lucide-react";
@@ -35,7 +34,6 @@ type Props = {
 	filters: ConversationFilters;
 	update: (patch: Partial<ConversationFilters>) => void;
 	project: string;
-	requireProject: boolean;
 	inboxes: ChatwootInbox[];
 	agents: ChatwootAgent[];
 	labels: string[];
@@ -88,7 +86,6 @@ export function ConversationListToolbar({
 	filters,
 	update,
 	project,
-	requireProject,
 	inboxes,
 	agents,
 	labels,
@@ -202,16 +199,6 @@ export function ConversationListToolbar({
 					}}
 				/>
 			)}
-			{requireProject && !filters.inboxId && (
-				<p className="chat-filter-source" title={projectName}>
-					<Globe2 size={13} aria-hidden="true" />
-					<span className="truncate">
-						{projectName
-							? `Очередь проекта · ${projectName}`
-							: "Нет доступных проектов"}
-					</span>
-				</p>
-			)}
 			<ChatFilterSummary
 				chips={chips}
 				onReset={() =>
@@ -227,13 +214,7 @@ export function ConversationListToolbar({
 					icon={Building2}
 					label="Проект"
 					value={project}
-					empty={
-						requireProject
-							? inboxes.length
-								? undefined
-								: "Нет проектов"
-							: "Все проекты"
-					}
+					empty={inboxes.length ? "Все проекты" : "Нет доступных проектов"}
 					options={inboxes.map((inbox) => ({
 						value: String(inbox.id),
 						label: inbox.name,

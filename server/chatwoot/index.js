@@ -896,6 +896,12 @@ function conversationFilters({ status, assigneeId, agentId, inboxId, label, from
 	return filters;
 }
 
+function scopeConversationQuery(query, inboxIds) {
+	if (inboxIds?.length === 1) query.set('inbox_id', inboxIds[0]);
+	else for (const id of inboxIds ?? []) query.append('inbox_id[]', id);
+	return query;
+}
+
 export default async function handler(req, res) {
 	try {
 		const url = new URL(req.url ?? '/', 'http://localhost');
@@ -1142,31 +1148,30 @@ export default async function handler(req, res) {
 			return json(res, 200, { configured: true });
 		}
 		if (action === 'conversation-counts' && req.method === 'GET') {
-			let inboxId = url.searchParams.get('inbox_id');
+			const inboxId = url.searchParams.get('inbox_id');
 			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
 			const actorId = await getAgentId();
 			const allowed = capabilities.supervise ? null : (await getDirectory()).map((item) => String(item.id));
 			if (allowed && inboxId && !allowed.includes(inboxId)) throw chatwootError('Источник недоступен.', 403);
-			const mineInbox = inboxId || allowed || undefined;
-			if (allowed) inboxId ||= allowed[0];
-			const statuses = allowed && !inboxId ? [] : await Promise.all(activeStatuses.map(async (status) => {
-				const query = new URLSearchParams({ status });
-				if (inboxId) query.set('inbox_id', inboxId);
+			const queueInboxes = inboxId ? [inboxId] : allowed;
+			const readStatuses = (scope) => scope?.length === 0 ? [] : Promise.all(activeStatuses.map(async (status) => {
+				const query = scopeConversationQuery(new URLSearchParams({ status }), scope);
 				const result = await api(cfg, `${prefix}/meta?${query}`);
 				return result?.data?.meta ?? result?.meta ?? {};
 			}));
-			let mineCount = null;
-			if (actorId && (!allowed || allowed.length)) {
-				const filtered = await api(cfg, `${prefix}/filter?page=1`, {
+			const queueStatus = readStatuses(queueInboxes);
+			const [statuses, allStatuses, mineCount] = await Promise.all([
+				queueStatus,
+				capabilities.supervise ? (inboxId ? readStatuses(null) : queueStatus) : null,
+				actorId && allowed?.length !== 0 ? api(cfg, `${prefix}/filter?page=1`, {
 					method: 'POST',
-					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(actorId), inboxId: mineInbox }) },
-				});
-				mineCount = conversationTotal(filtered);
-			}
+					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(actorId), inboxId: allowed }) },
+				}).then(conversationTotal) : null,
+			]);
 			return json(res, 200, {
 				queueCount: totalFromMeta(statuses, 'unassigned_count'),
 				mineCount,
-				activeCount: capabilities.supervise ? totalFromMeta(statuses, 'all_count') : null,
+				activeCount: allStatuses ? totalFromMeta(allStatuses, 'all_count') : null,
 			});
 		}
 		if (action === 'custom-attributes') {
@@ -1289,7 +1294,7 @@ export default async function handler(req, res) {
 			const page = Math.min(10000, Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1));
 			const status = url.searchParams.get('status') ?? (scope === 'history' ? 'resolved' : scope === 'mine' ? 'open' : 'open');
 			if (!['open', 'resolved', 'pending', 'snoozed', 'all'].includes(status)) return json(res, 400, { error: 'Некорректный статус' });
-			let inboxId = url.searchParams.get('inbox_id');
+			const inboxId = url.searchParams.get('inbox_id');
 			if (inboxId && !validId(inboxId)) return json(res, 400, { error: 'Некорректный проект' });
 			const agentId = url.searchParams.get('agent_id');
 			if (agentId && !validId(agentId)) return json(res, 400, { error: 'Некорректный агент' });
@@ -1302,10 +1307,11 @@ export default async function handler(req, res) {
 			if (allowed && inboxId && !allowed.includes(inboxId)) throw chatwootError('Источник недоступен.', 403);
 			if (allowed && !allowed.length) return json(res, 200, { payload: [], hasMore: false });
 			if (scope === 'queue') {
-				if (allowed) inboxId ||= allowed[0];
+				const inboxIds = inboxId ? [inboxId] : allowed;
 				const paramsFor = (nextStatus) => {
-					const query = new URLSearchParams({ status: nextStatus, assignee_type: 'unassigned', page: String(page), sort_by: 'created_at_asc' });
-					if (inboxId) query.set('inbox_id', inboxId);
+					const query = scopeConversationQuery(new URLSearchParams({
+						status: nextStatus, assignee_type: 'unassigned', page: String(page), sort_by: 'created_at_asc',
+					}), inboxIds);
 					if (label) query.set('labels', label);
 					const q = url.searchParams.get('q');
 					if (q) query.set('q', q.slice(0, 150));
@@ -1315,7 +1321,7 @@ export default async function handler(req, res) {
 				const results = await Promise.all(statuses.map((kind) => api(cfg, `${prefix}?${paramsFor(kind)}`)));
 				const pages = results.map((result) => itemList(result).filter((row) =>
 					activeStatuses.includes(row.status) && !conversationAssignee(row) && !hasBotAssignee(row)
-					&& (!inboxId || Number(inboxId) === conversationInbox(row))));
+					&& (!inboxIds || inboxIds.includes(String(conversationInbox(row))))));
 				const unique = new Map(pages.flat().map((conversation) => [conversation.id, conversation]));
 				const nextPages = results.map(async (result, index) => {
 					const rows = pages[index];

@@ -35,6 +35,7 @@ chats.get(1).meta.assignee = { id: 1, name: 'support', access_token: 'not-for-br
 chats.get(1).meta.sender.email = 'player@example.invalid';
 chats.get(1).additional_attributes = { referer: 'https://project.example.invalid/play?token=private' };
 chats.get(4).status = 'pending';
+chats.set(7, makeChat(7, 30, null, 'pending'));
 const watches = new Map();
 const coaching = new Map();
 const upstreamWrites = [];
@@ -99,9 +100,12 @@ async function mockFetch(input, init = {}) {
 		const path = url.pathname.replace('/api/v1/accounts/3/', '');
 		if (path === '/api/v1/profile') return response({ email: 'private-service-profile@example.invalid' });
 		if (path === 'agents') return response(users.map(({ agentId, email, role }) => ({ id: agentId, email, name: role })));
-		if (path === 'inboxes') return response({ payload: [{ id: 10, name: 'Project A', token: 'internal' }, { id: 20, name: 'Project B' }] });
+		if (path === 'inboxes') return response({ payload: [
+			{ id: 10, name: 'Project A', token: 'internal' }, { id: 20, name: 'Project B' }, { id: 30, name: 'Project C' },
+		] });
 		if (path === 'inbox_members/10') return response({ payload: [{ id: 1 }, { id: 3 }] });
 		if (path === 'inbox_members/20') return response({ payload: [{ id: 2 }, { id: 4 }] });
+		if (path === 'inbox_members/30') return response({ payload: [{ id: 1 }] });
 		if (path === 'conversations/filter') {
 			const sort = url.searchParams.get('sort_by');
 			if (!sort) return response({ data: { payload: [...chats.values()] } });
@@ -115,7 +119,19 @@ async function mockFetch(input, init = {}) {
 		}
 		if (path === 'contacts') return response({ payload: [playerContact], meta: { count: 30 } });
 		if (path === 'contacts/search') return response({ payload: url.searchParams.get('q') === 'player@example.invalid' ? [playerContact] : [], meta: { count: 1, has_more: true } });
-		if (path === 'conversations') return response({ data: { payload: [...chats.values()], meta: { unassigned_count: 2 } } });
+		if (path === 'conversations' || path === 'conversations/meta') {
+			const query = url.searchParams;
+			const inboxIds = query.has('inbox_id') ? [query.get('inbox_id')] : query.getAll('inbox_id[]');
+			const status = query.get('status');
+			const rows = [...chats.values()].filter((chat) =>
+				(!inboxIds.length || inboxIds.includes(String(chat.inbox_id))) && (!status || status === chat.status));
+			const waiting = rows.filter((chat) => chat.assignee_id === null);
+			const payload = query.get('assignee_type') === 'unassigned' ? waiting : rows;
+			return response({ data: {
+				payload: Number(query.get('page')) > 1 ? [] : payload,
+				meta: { unassigned_count: waiting.length, all_count: rows.length },
+			} });
+		}
 		if (path === 'labels') {
 			if (method === 'GET') return response({ payload: [{ id: 1, title: 'billing' }] });
 			upstreamWrites.push({ path, method, body });
@@ -234,7 +250,14 @@ try {
 	await expectStatus('support', 'labels', 400, post({ conversationId: 1, labels: ['new-undefined-tag'] }));
 	await expectStatus('support', 'conversations', 403, { query: '&scope=queue&inbox_id=20' });
 	const queue = await expectStatus('support', 'conversations', 200, { query: '&scope=queue' });
-	assert.deepEqual(queue.payload.map((item) => item.id), [3]);
+	assert.deepEqual(queue.payload.map((item) => item.id), [3, 7]);
+	const filteredQueue = await expectStatus('support', 'conversations', 200, { query: '&scope=queue&inbox_id=30' });
+	assert.deepEqual(filteredQueue.payload.map((item) => item.id), [7]);
+	const counts = await expectStatus('support', 'conversation-counts', 200);
+	assert.equal(counts.queueCount, 2);
+	const countsAtProject = await expectStatus('support', 'conversation-counts', 200, { query: '&inbox_id=30' });
+	assert.equal(countsAtProject.queueCount, 1);
+	assert.equal(countsAtProject.mineCount, counts.mineCount);
 	const archives = await expectStatus('support', 'conversations', 200, { query: '&scope=history&agent_id=2' });
 	assert.ok(archives.payload.some((item) => item.id === 5));
 	assert.ok(archives.payload.every((item) => item.assignee_id === 1 && item.inbox_id === 10));
@@ -287,7 +310,7 @@ try {
 	assert.deepEqual(active.rows.map((row) => row.id), [3, 1]);
 	assert.equal(active.rows[1].lastPage, 'project.example.invalid/play');
 	assert.equal(JSON.stringify(active).includes('not-for-browser'), false);
-	assert.deepEqual((await expectStatus('qc', 'active-overview', 200, { query: '&mode=pending' })).rows.map((row) => row.id), [4]);
+	assert.deepEqual((await expectStatus('qc', 'active-overview', 200, { query: '&mode=pending' })).rows.map((row) => row.id), [4, 7]);
 	const writesBeforeWatch = upstreamWrites.length;
 	await expectStatus('qc', 'supervision', 409, post({ conversationId: 5, enabled: true }));
 	assert.deepEqual(await expectStatus('qc', 'supervision', 200, post({ conversationId: 1, enabled: true })), { id: 1, watching: true });

@@ -380,14 +380,11 @@ function AgentInboxWorkspace() {
 		},
 	});
 	const watched = new Set(watching.data?.ids ?? []);
-	const queueInbox = displayedScope === "queue" && !canSupervise
-		? inboxId || String(directory.data?.inboxes[0]?.id ?? "")
-		: inboxId;
 	const request: ConversationSearch = {
 		scope: displayedScope,
 		status: displayedScope === "history" ? historyStatus : "open",
 		page: activePage,
-		...(queueInbox ? { inboxId: Number(queueInbox) } : {}),
+		...(inboxId ? { inboxId: Number(inboxId) } : {}),
 		...(displayedScope === "history" && canSupervise && agentId ? { agentId: Number(agentId) } : {}),
 		...(label ? { label } : {}),
 		...(displayedScope === "history" && from ? { from } : {}),
@@ -559,7 +556,7 @@ function AgentInboxWorkspace() {
 	const prefetchQueue = () => {
 		if (scope === "queue" || activeSection !== "inbox") return;
 		const queueFilters = listFilters.queue;
-		const project = queueFilters.inboxId || (!canSupervise ? directory.data?.inboxes[0]?.id : undefined);
+		const project = queueFilters.inboxId;
 		const queueRequest: ConversationSearch = {
 			scope: "queue",
 			status: "open",
@@ -695,7 +692,7 @@ function AgentInboxWorkspace() {
 							{conversations.isSuccess && <span title="На этой странице" className="chat-scope-count">{rows.length}</span>}
 						</div>
 						<ConversationListToolbar key={listScope} userId={user?.id} scope={listScope} filters={filters} update={updateListFilters}
-							project={queueInbox} requireProject={listScope === "queue" && !canSupervise}
+							project={inboxId}
 							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
 							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
 						/>
@@ -1302,7 +1299,7 @@ function ConversationPane({
 	const customerClose = useRef<HTMLButtonElement>(null);
 	const playerToggle = useRef<HTMLButtonElement>(null);
 	const actionsToggle = useRef<HTMLButtonElement>(null);
-	const contextOpener = useRef<"player" | "actions" | null>(null);
+	const [contextOpener, setContextOpener] = useState<"player" | "actions" | null>(null);
 	const [customerWidth, setCustomerWidth] = useState(275);
 	const [confirmBlock, setConfirmBlock] = useState(false);
 	const [olderMessages, setOlderMessages] = useState<ChatwootMessage[]>([]);
@@ -1318,16 +1315,18 @@ function ConversationPane({
 	const [showLatest, setShowLatest] = useState(false);
 	const currentConversationId = useRef(id);
 	useLayoutEffect(() => {
-		if (contextTab && contextOpener.current) {
+		if (contextTab && contextOpener) {
 			customerClose.current?.focus({ preventScroll: true });
 			return;
 		}
-		const trigger = contextOpener.current;
-		if (trigger) (trigger === "player" ? playerToggle : actionsToggle).current?.focus({ preventScroll: true });
-	}, [contextTab]);
-	const closeCustomer = () => setContextTab(null);
+		if (contextOpener) (contextOpener === "player" ? playerToggle : actionsToggle).current?.focus({ preventScroll: true });
+	}, [contextTab, contextOpener]);
+	const closeCustomer = () => {
+		setContextOpener(contextOpener ?? contextTab);
+		setContextTab(null);
+	};
 	const toggleContext = (tab: "player" | "actions") => {
-		contextOpener.current = tab;
+		setContextOpener(tab);
 		closeBinds();
 		setTagPickerRequest(0);
 		setContextTab(contextVisible && contextTab === tab ? null : tab);
@@ -1737,7 +1736,7 @@ function ConversationPane({
 	const tags = conversation?.labels ?? [];
 	const inactive = ["resolved", "snoozed"].includes(conversation.status);
 	const statusText = conversationStatusLabels[conversation.status];
-	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener.current || !contextOverlay && !tiled));
+	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener || !contextOverlay && !tiled));
 	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
 	return (
 		<section
@@ -1771,12 +1770,12 @@ function ConversationPane({
 							onClick={() => toggleContext("player")}
 							title="Карточка игрока"
 							aria-label="Карточка игрока"
-							aria-expanded={showCustomer}
+							aria-expanded={showCustomer && contextVisible}
 							className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated"
 						>
 							<UserRound size={14} />
 						</button>
-						{canWrite && <button ref={actionsToggle} type="button" aria-label="Действия с диалогом" title="Действия с диалогом" aria-expanded={contextTab === "actions"}
+						{canWrite && <button ref={actionsToggle} type="button" aria-label="Действия с диалогом" title="Действия с диалогом" aria-expanded={contextTab === "actions" && contextVisible}
 							onClick={() => toggleContext("actions")} className="grid size-8 place-items-center rounded-lg border border-border text-muted hover:bg-surface-elevated">
 							<Settings2 size={15} />
 						</button>}
@@ -1810,7 +1809,7 @@ function ConversationPane({
 					{conversation.priority && <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted">Приоритет · {conversationPriorityLabels[conversation.priority]}</span>}
 					{tags.map((tag) => <span key={tag} className="chat-context-tag break-all">{tag}</span>)}
 					{canWrite && <button type="button" onClick={() => {
-						contextOpener.current = "actions";
+						setContextOpener("actions");
 						closeBinds();
 						setTagPickerRequest((request) => request + 1);
 						setContextTab("actions");

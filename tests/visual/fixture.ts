@@ -81,6 +81,15 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 					? json({ code: "bad_jwt", message: "Invalid test session" }, 401)
 					: json(authUser);
 			}
+			if (
+				url.origin === origin && path === "/api/chatwoot" &&
+				action === "presence-heartbeat" && request.method() === "POST"
+			) {
+				return request.headers().authorization === `Bearer ${accessToken}` &&
+					visualAuth !== "anonymous" && visualAuth !== "invalid"
+					? json({ ok: true })
+					: block();
+			}
 			if (url.origin !== origin || request.method() !== "GET") return block();
 			if (!path.startsWith("/api/")) return route.continue();
 			if (
@@ -89,6 +98,10 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 			)
 				return block();
 			network.reads.add(`${path}${action ? `?action=${action}` : ""}`);
+			if (path === "/api/chatwoot" && action === "health")
+				return json({ configured: false });
+			if (path === "/api/chatwoot" && action === "team-status")
+				return json({ online: 0, accepting: 0, bots: 0 });
 			if (path === "/api/accounts") {
 				switch (action) {
 					case "me":

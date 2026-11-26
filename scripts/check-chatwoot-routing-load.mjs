@@ -59,6 +59,10 @@ async function fakeFetch(input, init) {
 	if (url.hostname === 'storage.invalid') {
 		const name = url.pathname.split('/').at(-1);
 		if (name in rpcSignatures) return reply(await rpc(name, JSON.parse(init.body)));
+		if (name === 'supportos_chatwoot_expire_presence') {
+			const { p_lease_token: lease } = JSON.parse(init.body);
+			return reply((await pg.query('select * from public.supportos_chatwoot_expire_presence($1)', [lease])).rows);
+		}
 		if (name === 'supportos_chatwoot_presence') return reply(acceptingChats ? presence() : []);
 		if (name === 'supportos_chatwoot_agent_limits') return reply(agents.map((id) => ({ chatwoot_agent_id: id, max_active_chats: limit })));
 		if (name === 'supportos_chatwoot_router_state') {
@@ -175,6 +179,8 @@ try {
 		'20261119045359_chatwoot_atomic_router_leases',
 		'20261119045403_chatwoot_supervision',
 		'20261119045408_chatwoot_coaching_notes',
+		'20261124100123_chatwoot_disconnect_handoff',
+		'20261125211944_chatwoot_route_update_broadcast',
 	]) await pg.exec(await migrate(migration));
 	await pg.exec(`
 		insert into auth.users select ('00000000-0000-0000-0000-' || lpad(id::text, 12, '0'))::uuid from generate_series(1, ${agentCount}) as id;
@@ -292,7 +298,7 @@ try {
 	assert.equal((await deliverWebhook(`sha256=${'0'.repeat(64)}`, now, bytes)).statusCode, 401);
 	assert.equal((await deliverWebhook(signature, now, bytes)).statusCode, 200);
 	assert.equal((await deliverWebhook(signature, now, bytes)).body.duplicate, true);
-	const broadcasts = (await pg.query('select payload from realtime.fixture_events')).rows;
+	const broadcasts = (await pg.query("select payload from realtime.fixture_events where event = 'chatwoot_event'")).rows;
 	assert.equal(broadcasts.length, 1);
 	assert.deepEqual(broadcasts[0].payload, { changed: true });
 	assert.equal((await pg.query('select conversation_id from public.supportos_chatwoot_webhook_events')).rows[0].conversation_id, 9);
