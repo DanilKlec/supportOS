@@ -191,16 +191,18 @@ export function AccountsPanel({
 						: body,
 			);
 			setNotice(
-				result.warning ??
-					(change.action === "user.delete"
-						? "Аккаунт удалён"
-						: change.action === "user.password"
-							? "Пароль изменён. Сессии сотрудника завершены."
-							: change.action === "user.mfa.reset"
-								? "2FA отключена. Сессии сотрудника завершены."
-								: change.action === "user.sessions.revoke"
-									? "Все сессии сотрудника завершены."
-									: "Изменения сохранены"),
+				result.invited
+					? `Приглашение отправлено на почту.${result.warning ? ` ${result.warning}` : ""}`
+					: (result.warning ??
+							(change.action === "user.delete"
+								? "Аккаунт удалён"
+								: change.action === "user.password"
+									? "Пароль изменён. Сессии сотрудника завершены."
+									: change.action === "user.mfa.reset"
+										? "2FA отключена. Сессии сотрудника завершены."
+										: change.action === "user.sessions.revoke"
+											? "Все сессии сотрудника завершены."
+											: "Изменения сохранены")),
 			);
 			setCreate(false);
 			setUserEdit(null);
@@ -423,6 +425,16 @@ export function AccountsPanel({
 								key="create"
 								roles={assignable}
 								busy={busy}
+								canConfigureChatwoot={
+									can(access, "work") &&
+									Boolean(
+										access?.roles.some(
+											(role) =>
+												role.id === "admin" ||
+												(role.id === "creator" && can(access, "technical")),
+										),
+									)
+								}
 								onSave={mutate}
 								onCancel={() => setCreate(false)}
 							/>

@@ -4,6 +4,11 @@ import { withTimeout } from "@/shared/lib/with-timeout";
 import { type AuthSession, useAuthStore } from "@/store/auth.store";
 import { normalizeRole } from "../../shared/access.js";
 import { loginEmail } from "../../shared/login-identity.js";
+import {
+	rememberedInviteSession,
+	rememberInviteSession,
+	takeInviteToken,
+} from "./auth-invitation";
 import { supabase } from "./supabase-client";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -83,6 +88,7 @@ class SupabaseService {
 		return this.initialized;
 	}
 	private async initializeOnce() {
+		const inviteToken = takeInviteToken();
 		if (
 			typeof window !== "undefined" &&
 			new URLSearchParams(window.location.search).get("recovery") === "1"
@@ -95,12 +101,28 @@ class SupabaseService {
 		}
 		// SDK owns refresh, persistence and cross-tab session events. Never trust the old local access store.
 		supabase.auth.onAuthStateChange((event, session) => {
+			const priorSessionId = this.getSession()?.sessionId;
 			if (event === "PASSWORD_RECOVERY")
 				useAuthStore.setState({ passwordRecovery: true });
-			if (event === "SIGNED_OUT")
-				useAuthStore.setState({ passwordRecovery: false });
+			if (event === "SIGNED_OUT") {
+				rememberInviteSession(null);
+				useAuthStore.setState({
+					passwordRecovery: false,
+					passwordInvitation: false,
+				});
+			}
 			this.revision++;
-			this.accept(session);
+			const next = this.accept(session);
+			if (
+				useAuthStore.getState().passwordInvitation &&
+				priorSessionId !== next?.sessionId
+			) {
+				rememberInviteSession(null);
+				useAuthStore.setState({
+					passwordRecovery: false,
+					passwordInvitation: false,
+				});
+			}
 			if (session)
 				queueMicrotask(() => void this.refreshIdentity({ deduplicate: true }));
 		});
@@ -110,13 +132,34 @@ class SupabaseService {
 			if (!data.session) return this.accept(null);
 			const revision = this.revision;
 			const verified = await withTimeout(supabase.auth.getUser());
-			if (revision !== this.revision) {
+			const storedInvite = rememberedInviteSession();
+			if (
+				revision !== this.revision &&
+				(!(inviteToken || storedInvite) ||
+					this.getSession()?.accessToken !== data.session.access_token)
+			) {
 				await this.refreshIdentity({ deduplicate: true });
 				return this.getSession();
 			}
 			if (verified.error || !verified.data.user)
 				throw verified.error ?? new Error("Session expired");
-			this.accept({ ...data.session, user: verified.data.user });
+			const accepted = this.accept({
+				...data.session,
+				user: verified.data.user,
+			});
+			if (
+				accepted?.sessionId &&
+				verified.data.user.email_confirmed_at &&
+				verified.data.user.app_metadata?.supportos_invitation === true &&
+				(inviteToken === data.session.access_token ||
+					storedInvite === accepted.sessionId)
+			) {
+				rememberInviteSession(accepted.sessionId);
+				useAuthStore.setState({
+					passwordRecovery: true,
+					passwordInvitation: true,
+				});
+			}
 			await this.refreshIdentity({ deduplicate: true });
 			return this.getSession();
 		} catch (error) {
@@ -194,7 +237,11 @@ class SupabaseService {
 		const { error } = await supabase.auth.updateUser({ password });
 		if (error) throw error;
 		await this.signOut(true);
-		useAuthStore.setState({ passwordRecovery: false });
+		rememberInviteSession(null);
+		useAuthStore.setState({
+			passwordRecovery: false,
+			passwordInvitation: false,
+		});
 	}
 	async refreshSessionIdentity() {
 		if (!supabase) throw new Error("Вход ещё не настроен");

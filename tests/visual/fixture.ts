@@ -122,6 +122,8 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 						});
 					case "catalog":
 						return json({ roles, permissions });
+					case "invitation":
+						return json({ pending: false, canResend: false, sentAt: null });
 					case "users":
 						return json({ users, total: users.length, hasMore: false });
 					case "telegram-links":

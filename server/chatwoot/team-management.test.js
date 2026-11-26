@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import handler from './index.js';
+import handler, { normalizeStaffChatwoot, provisionStaffChatwoot } from './index.js';
 
 const { member } = vi.hoisted(() => ({
 	member: { id: '00000000-0000-4000-8000-000000000001', email: 'agent@example.com', access: { status: 'active', permissions: ['work'], roles: [{ id: 'admin' }] } },
@@ -18,6 +18,36 @@ beforeEach(() => {
 	vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'mock');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+test('provisions memberships and a verified personal connection without exposing the agent token', async () => {
+	const env = { SUPABASE_URL: 'https://db.example', SUPABASE_SERVICE_ROLE_KEY: 'storage-key', CHATWOOT_PLATFORM_APP_TOKEN: 'platform-key' };
+	const cfg = { base: 'https://staff-provisioning.example', accountId: '3', token: 'account-key' };
+	const calls = [];
+	const fetch = vi.fn(async (url, init) => {
+		const path = new URL(url).pathname;
+		const body = init.body ? JSON.parse(init.body) : undefined;
+		calls.push({ path, method: init.method, body });
+		if (path.endsWith('/agents') && init.method === 'GET') return Response.json([]);
+		if (path.endsWith('/agents')) return Response.json({ id: 32, name: 'Alex', email: member.email });
+		if (path.endsWith('/users/32/token')) return Response.json({ user: { id: 32, email: member.email }, access_token: 'agent-test-token' });
+		if (path.endsWith('/profile')) {
+			expect(init.headers.Authorization).toBe('Bearer agent-test-token');
+			return Response.json({ id: 32, email: member.email });
+		}
+		if (path.endsWith('supportos_chatwoot_widget_settings')) return Response.json([]);
+		return new Response(null, { status: 204 });
+	});
+	vi.stubGlobal('fetch', fetch);
+	const setup = normalizeStaffChatwoot({ name: 'Alex', maxActiveChats: 6, inboxIds: [9, 9], teamIds: [5] });
+	expect(await provisionStaffChatwoot(env, cfg, { actorId: member.id, userId: member.id, email: member.email, name: 'Employee', setup })).toEqual({ personalConnected: true });
+	expect(calls).toEqual(expect.arrayContaining([
+		expect.objectContaining({ path: '/api/v1/accounts/3/inbox_members', method: 'POST', body: { inbox_id: 9, user_ids: [32] } }),
+		expect.objectContaining({ path: '/api/v1/accounts/3/teams/5/team_members', method: 'POST', body: { user_ids: [32] } }),
+		expect.objectContaining({ path: '/rest/v1/supportos_chatwoot_agent_limits', body: expect.objectContaining({ max_active_chats: 6 }) }),
+		expect.objectContaining({ path: '/rest/v1/supportos_chatwoot_personal_profiles', body: expect.objectContaining({ sealed_token: expect.any(String) }) }),
+	]));
+	expect(JSON.stringify(calls)).not.toContain('agent-test-token');
+});
 
 function stubFetch(upstream, storage = () => Response.json([])) {
 	vi.stubGlobal('fetch', (url, init) => String(url).includes('/rest/v1/supportos_chatwoot_personal_profiles?')

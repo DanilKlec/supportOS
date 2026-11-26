@@ -24,24 +24,37 @@ import { useAuthStore } from "@/store/auth.store";
 export const Route = createFileRoute("/login")({
 	validateSearch: (search: Record<string, unknown>) => ({
 		redirect: safeAuthRedirect(search.redirect),
+		invite:
+			search.invite === "1" || search.invite === 1
+				? "1"
+				: search.invite === "done"
+					? "done"
+					: undefined,
 	}),
 	component: LoginPage,
 });
 export function LoginPage() {
 	const navigate = useNavigate();
-	const { redirect } = Route.useSearch();
+	const { redirect, invite } = Route.useSearch();
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
 	const authError = useAuthStore((state) => state.error);
 	const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
 	useEffect(() => {
-		if (session?.authVerified && !loading && !passwordRecovery)
+		if (
+			session?.authVerified &&
+			!loading &&
+			!passwordRecovery &&
+			invite !== "1"
+		)
 			void navigate({ href: safeAuthRedirect(redirect), replace: true });
-	}, [session, loading, redirect, navigate, passwordRecovery]);
+	}, [session, loading, redirect, navigate, passwordRecovery, invite]);
 	const [register, setRegister] = useState(false);
 	const [recovery, setRecovery] = useState(false);
 	const [confirmation, setConfirmation] = useState("");
-	const [message, setMessage] = useState("");
+	const [message, setMessage] = useState(
+		invite === "done" ? "Пароль установлен. Войдите в SupportOS." : "",
+	);
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
@@ -81,6 +94,24 @@ export function LoginPage() {
 			setBusy(false);
 		}
 	}
+	if (invite === "1" && !loading && !passwordRecovery)
+		return (
+			<div className="min-h-screen bg-background px-6 py-16 text-foreground">
+				<section className="mx-auto max-w-lg space-y-4 rounded-xl border border-border bg-surface p-6">
+					<h2 className="text-xl font-semibold">
+						Ссылка приглашения недоступна
+					</h2>
+					<p className="text-sm text-muted">
+						Если почта уже подтверждена, войдите в SupportOS или воспользуйтесь
+						восстановлением пароля. Для нового приглашения обратитесь к
+						администратору.
+					</p>
+					<a className="ui-button inline-flex" href="/login">
+						Перейти ко входу
+					</a>
+				</section>
+			</div>
+		);
 	if (recovery)
 		return (
 			<div className="min-h-screen bg-background p-6 text-foreground">

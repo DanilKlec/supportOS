@@ -1,7 +1,9 @@
 import {createClient} from '@supabase/supabase-js';
 import {requireUser} from '../_auth.js';
 import {can} from '../../shared/access.js';
-import {changeAccess} from '../_rbac.js';
+import {changeAccess,loadAccess} from '../_rbac.js';
+import {chatCapabilities} from '../../shared/chatwoot-access.js';
+import {config as chatwootConfig,normalizeStaffChatwoot,provisionStaffChatwoot} from '../chatwoot/index.js';
 import {config,db,allRows} from '../agent-monitor/_server.js';
 import {displayIdentity} from '../../shared/login-identity.js';
 import {criticalAction,criticalSpec,executeCritical} from '../critical-confirmation.js';
@@ -15,6 +17,51 @@ export function adminClient(env=process.env) {
 async function catalog(env){
  const [roles,permissions,links]=await Promise.all([allRows(env,'supportos_roles?select=*&order=name'),allRows(env,'supportos_permissions?select=*&order=id'),allRows(env,'supportos_role_permissions?select=*&order=role_id,permission_id')]);
  return {roles:roles.map(role=>({...role,permissions:links.filter(link=>link.role_id===role.id).map(link=>link.permission_id)})),permissions};
+}
+
+function inviteRedirect(env) {
+ const base = new URL(env.SUPPORTOS_APP_URL || 'https://support-os-psi.vercel.app');
+ if (base.protocol !== 'https:' && !(env.NODE_ENV !== 'production' && base.hostname === 'localhost'))
+  throw fail('Укажите HTTPS-адрес SupportOS для приглашений', 503);
+ return new URL('/login?invite=1', base).href;
+}
+
+async function pendingInvitation(env, actor, id) {
+ if (!can(actor.access, 'users.manage') || id === actor.id) throw fail('Недостаточно прав', 403);
+ if (!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id ?? '')) throw fail('Некорректный пользователь');
+ const [access, result] = await Promise.all([loadAccess(id, env), adminClient(env).getUserById(id)]);
+ if (access.roles.some(role => role.id === 'creator') ||
+   (!actor.access.roles.some(role => role.id === 'creator') && access.permissions.some(permission => !actor.access.permissions.includes(permission))))
+  throw fail('Недостаточно прав', 403);
+ if (result.error || !result.data.user) throw fail('Не удалось проверить статус приглашения', 502);
+ return { access, user: result.data.user, pending: result.data.user.app_metadata?.supportos_invitation === true && !result.data.user.email_confirmed_at };
+}
+
+async function sendStaffInvitation(env, actor, user, name, redirectTo) {
+ const admin = adminClient(env);
+ const setup = user.app_metadata?.supportos_chatwoot_pending;
+ let warning;
+ if (setup) {
+  const cfg = chatwootConfig(env);
+  if (!cfg || !chatCapabilities(actor.access).manageProjects)
+   return { invited: false, warning: 'Сотрудник создан. Для настройки Chatwoot и повторной отправки приглашения нужен администратор чатов.' };
+  try {
+   const result = await provisionStaffChatwoot(env, cfg, { actorId: actor.id, userId: user.id, email: user.email, name, setup });
+   if (!result.personalConnected) warning = 'Агент Chatwoot настроен. Для подписи своими данными сотрудник может подключить личный профиль в разделе «Чаты».';
+   const { error } = await admin.updateUserById(user.id, { app_metadata: { supportos_chatwoot_pending: null } });
+   if (error) throw error;
+  } catch {
+   return { invited: false, warning: 'Сотрудник создан. Настройка Chatwoot не завершилась. Повторите отправку из карточки сотрудника.' };
+  }
+ }
+ const { data, error } = await admin.inviteUserByEmail(user.email, { redirectTo });
+ if (error || data?.user?.id !== user.id) {
+  const limited = ['over_email_send_rate_limit', 'over_request_rate_limit'].includes(error?.code);
+  return { invited: false, warning: limited
+   ? 'Достигнут лимит отправки писем. Повторите приглашение позже из карточки сотрудника.'
+   : 'Сотрудник создан. Supabase не подтвердил отправку письма. Проверьте SMTP и повторите приглашение из карточки сотрудника.' };
+ }
+ return { invited: true, warning };
 }
 export default async function handler(req,res) {
  res.setHeader('Cache-Control','private, no-store');res.setHeader('Content-Type','application/json; charset=utf-8');
@@ -84,6 +131,10 @@ export default async function handler(req,res) {
    }))});
   }
   if(req.method==='GET') {
+   if(action==='invitation') {
+    const invitation=await pendingInvitation(env,actor,url.searchParams.get('target'));
+    return send(200,{pending:invitation.pending,canResend:invitation.pending&&invitation.access.status==='active',sentAt:invitation.pending?invitation.user.invited_at??null:null});
+   }
    if(action==='users'&&url.searchParams.get('purpose')==='share') {
     if(!can(actor.access,'binds.read'))throw fail('Нет доступа к биндам',403);
     const page=Number(url.searchParams.get('page')??1);if(!Number.isInteger(page)||page<1||page>10000)throw fail('Некорректная страница');
@@ -109,24 +160,44 @@ export default async function handler(req,res) {
     return send(200,result);
   }
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body??{};
+  if(body.action==='user.invite.resend') {
+   if(body.confirmed!==true)throw fail('Подтвердите отправку приглашения',400);
+   const redirectTo=inviteRedirect(env);
+   const invitation=await pendingInvitation(env,actor,body.id);
+   if(!invitation.pending||invitation.access.status!=='active')throw fail('Повторная отправка доступна для активных сотрудников, которые ещё не подтвердили почту',409);
+   if(invitation.user.app_metadata?.supportos_chatwoot_pending&&!invitation.access.permissions.includes('work')) throw fail('Для подключения Chatwoot сотруднику нужен доступ к чатам',409);
+   return send(200,await sendStaffInvitation(env,actor,invitation.user,invitation.access.display_name??'',redirectTo));
+  }
   if(body.action==='create'){
    if(!can(actor.access,'users.manage'))throw fail('Нет права создавать пользователей',403);
-   if(typeof body.email!=='string'||body.email.length>320||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim())||typeof body.password!=='string'||body.password.length<12||body.password.length>128)throw fail('Укажите почту и пароль длиной от 12 до 128 символов');
+   if(typeof body.email!=='string'||body.email.length>254||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()))throw fail('Укажите рабочую почту');
+   const invited=body.delivery==='invite';
+   if(!invited&&(typeof body.password!=='string'||body.password.length<12||body.password.length>128))throw fail('Укажите пароль длиной от 12 до 128 символов');
+   const email=invited?body.email.trim().toLowerCase():body.email.trim();
+   const name=typeof body.display_name==='string'?body.display_name.trim().slice(0,120):'';
+   const redirectTo=invited?inviteRedirect(env):null;
+   const setup=invited?normalizeStaffChatwoot(body.chatwoot):null;
    if(!Array.isArray(body.roles)||!body.roles.length||body.roles.length>30||body.roles.some(r=>typeof r!=='string'))throw fail('Выберите роли');
    const data=await catalog(env);const owner=actor.access.roles.some(r=>r.id==='creator');
    if(body.roles.some(id=>{const role=data.roles.find(r=>r.id===id);return !role||(!owner&&(id==='creator'||role.permissions.some(p=>!actor.access.permissions.includes(p))));}))throw fail('Нельзя назначить эти роли',403);
+   if(setup) {
+    if(!chatCapabilities(actor.access).manageProjects)throw fail('Настройка Chatwoot доступна администраторам чатов',403);
+    if(!data.roles.some(role=>body.roles.includes(role.id)&&role.permissions.includes('work')))throw fail('Выберите роль с доступом к чатам');
+    if(!chatwootConfig(env))throw fail('Подключите Chatwoot перед созданием агента',503);
+   }
    if(body.confirmed!==true)throw fail('Подтвердите создание аккаунта во всплывающем окне',400);
    const requestId=randomUUID(),metadata=securityMetadata(req,env);
-   const prepared=await db(env,'rpc/supportos_prepare_account_action',{actor:actor.id,sid:actor.sessionId,operation:'user.create',payload:criticalSpec(actor,'user.create',body).payload,request_id:requestId,ip_digest:metadata.ipHash,agent:metadata.agent});
+   const prepared=await db(env,'rpc/supportos_prepare_account_action',{actor:actor.id,sid:actor.sessionId,operation:'user.create',payload:criticalSpec(actor,'user.create',{...body,email,display_name:name}).payload,request_id:requestId,ip_digest:metadata.ipHash,agent:metadata.agent});
    if(!prepared?.ok)throw fail('Нет права создавать аккаунт с этими ролями',403);
    // Non-secret, server-controlled reference: the identity-sync transaction
    // writes user.create audit before Auth commits (also when role setup fails).
-   const result=await adminClient().createUser({email:body.email.trim(),password:body.password,email_confirm:true,app_metadata:{supportos_creation_request:requestId}});
-   if(result.error)throw fail('Не удалось создать аккаунт. Проверьте почту и требования к паролю');
+   const appMetadata={supportos_creation_request:requestId,...(invited?{supportos_invitation:true,...(setup?{supportos_chatwoot_pending:setup}:{})}:{})};
+   const result=await adminClient(env).createUser({email,...(invited?{}:{password:body.password}),email_confirm:!invited,app_metadata:appMetadata});
+   if(result.error||!result.data?.user?.id)throw fail(result.error?.code==='email_exists'?'Аккаунт с этой почтой уже существует. Откройте его карточку.':'Не удалось создать аккаунт. Проверьте данные сотрудника');
    const id=result.data.user.id;
-   try{await changeAccess(actor.id,'user.update',{id,roles:body.roles,status:'active',display_name:typeof body.display_name==='string'?body.display_name.slice(0,120):'',version:1});}
+   try{await changeAccess(actor.id,'user.update',{id,roles:body.roles,status:'active',display_name:name,version:1});}
    catch{ return send(201,{id,warning:'Аккаунт создан без доступа. Найдите его в списке и назначьте роли.'});}
-   return send(201,{id});
+   return send(201,{id,...(invited?await sendStaffInvitation(env,actor,{id,email,app_metadata:appMetadata},name,redirectTo):{})});
   }
   if(['user.password','user.delete','user.mfa.reset','user.sessions.revoke'].includes(body.action)) {
    if(!can(actor.access,'users.manage'))throw fail('Нет права управления пользователями',403);

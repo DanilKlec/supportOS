@@ -95,10 +95,12 @@ function RootComponent() {
 	const session = useAuthStore((state) => state.session);
 	const loading = useAuthStore((state) => state.loading);
 	const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
+	const passwordInvitation = useAuthStore((state) => state.passwordInvitation);
 	const authError = useAuthStore((state) => state.error);
 	const isLoginRoute = pathname.replace(/\/+$/, "") === "/login";
 	const accessGranted =
 		!loading &&
+		!passwordRecovery &&
 		Boolean(session) &&
 		Boolean(session?.authVerified) &&
 		canAccessPage(session?.user.access, pathname, hash);
@@ -169,7 +171,7 @@ function RootComponent() {
 					/>
 				) : passwordRecovery && session ? (
 					<div className="min-h-screen bg-background px-6 py-16">
-						<PasswordForm />
+						<PasswordForm invitation={passwordInvitation} />
 					</div>
 				) : isLoginRoute ? (
 					<Outlet />

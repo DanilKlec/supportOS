@@ -1,4 +1,5 @@
 import { AuthClient } from "@supabase/auth-js";
+import { isInviteCallback } from "./auth-invitation";
 
 const url = import.meta.env.VITE_SUPABASE_URL?.trim();
 const key = (
@@ -14,7 +15,7 @@ export const supabase =
 					headers: { apikey: key, Authorization: `Bearer ${key}` },
 					// Preserve the full client's session, PKCE verifier and cross-tab channel.
 					storageKey: `sb-${new URL(url).hostname.split(".")[0]}-auth-token`,
-					flowType: "pkce",
+					flowType: isInviteCallback ? "implicit" : "pkce",
 					persistSession: true,
 					autoRefreshToken: true,
 					detectSessionInUrl: true,

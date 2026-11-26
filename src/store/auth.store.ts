@@ -25,6 +25,7 @@ export interface AuthSession {
 
 interface AuthState {
 	passwordRecovery: boolean;
+	passwordInvitation: boolean;
 	configured: boolean;
 	loading: boolean;
 	session?: AuthSession;
@@ -37,6 +38,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
 	passwordRecovery: false,
+	passwordInvitation: false,
 	configured: false,
 	loading: true,
 	session: undefined,

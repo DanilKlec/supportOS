@@ -63,6 +63,22 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
+it("opens password setup only for the verified session returned by the invitation", async () => {
+	const sessionId = "11111111-1111-4111-8111-111111111111";
+	const token = `header.${btoa(JSON.stringify({ session_id: sessionId }))}.signature`;
+	const user = { ...session.user, email_confirmed_at: "2026-11-26T00:00:00Z", app_metadata: { supportos_invitation: true } };
+	vi.stubGlobal("window", { location: { hash: `#access_token=${token}&refresh_token=refresh&type=invite`, search: "?invite=1" } });
+	const storage = { setItem: vi.fn(), getItem: vi.fn().mockReturnValue(null) };
+	vi.stubGlobal("sessionStorage", storage);
+	vi.resetModules();
+	service = (await import("./supabase.service")).supabaseService;
+	store = (await import("@/store/auth.store")).useAuthStore;
+	fixture.auth.getSession.mockResolvedValue({ data: { session: { ...session, access_token: token, user } } });
+	fixture.auth.getUser.mockResolvedValue({ data: { user }, error: null });
+	await service.initialize();
+	expect(store.getState()).toMatchObject({ passwordInvitation: true, passwordRecovery: true });
+	expect(storage.setItem).toHaveBeenCalledWith("supportos:invite-session", sessionId);
+});
 it("preserves legacy login identities and existing email login", async () => {
 	fixture.auth.signInWithPassword.mockResolvedValue({
 		data: { session },

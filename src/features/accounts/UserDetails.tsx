@@ -3,6 +3,7 @@ import { Button, Input, Select, Tabs } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
 import type { MonitorData } from "@/features/agent-monitor/live-model";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
+import { chatwootService } from "@/services/chatwoot.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { useAuthStore } from "@/store/auth.store";
@@ -59,6 +60,7 @@ export function UserDetails({
 				security={
 					<>
 						{protection && <p className="employee-info mb-4">{protection}</p>}
+						{!editDisabled && <InvitationStatus user={user} onSave={onSave} />}
 						<UserAccountActions
 							user={user}
 							disabled={editDisabled}
@@ -78,6 +80,75 @@ export function UserDetails({
 				/>
 			</UserDetailsContent>
 		</BaseModal>
+	);
+}
+
+function InvitationStatus({
+	user,
+	onSave,
+}: {
+	user: User;
+	onSave: (body: unknown) => Promise<void>;
+}) {
+	const [status, setStatus] = useState<{
+		pending: boolean;
+		canResend: boolean;
+		sentAt: string | null;
+	}>();
+	const [confirm, setConfirm] = useState(false);
+	useEffect(() => {
+		const abort = new AbortController();
+		void accessApi("invitation", undefined, { target: user.id }, abort.signal)
+			.then((result) => {
+				if (!abort.signal.aborted) setStatus(result);
+			})
+			.catch(() => undefined);
+		return () => abort.abort();
+	}, [user.id]);
+	if (!status?.pending) return null;
+	return (
+		<section className="employee-card mb-4">
+			<h3>Приглашение в SupportOS</h3>
+			<p className="employee-hint">
+				{status.sentAt
+					? "Сотрудник ещё не подтвердил почту."
+					: "Отправка приглашения ожидает завершения."}
+			</p>
+			{status.canResend && (
+				<Button type="button" onClick={() => setConfirm(true)}>
+					Повторить приглашение
+				</Button>
+			)}
+			{confirm && (
+				<BaseModal
+					title="Отправить приглашение повторно?"
+					size="sm"
+					onClose={() => setConfirm(false)}
+				>
+					<p className="break-all text-sm">
+						Новая ссылка будет отправлена на {user.email}.
+					</p>
+					<div className="ui-actions mt-5 justify-end gap-2">
+						<Button variant="secondary" onClick={() => setConfirm(false)}>
+							Отмена
+						</Button>
+						<Button
+							variant="primary"
+							onClick={() => {
+								setConfirm(false);
+								void onSave({
+									action: "user.invite.resend",
+									id: user.id,
+									confirmed: true,
+								});
+							}}
+						>
+							Отправить письмо
+						</Button>
+					</div>
+				</BaseModal>
+			)}
+		</section>
 	);
 }
 
@@ -286,20 +357,96 @@ function RolesChoice({
 export function CreateUser({
 	roles,
 	busy,
+	canConfigureChatwoot = false,
 	onSave,
 	onCancel,
 }: {
 	roles: ManagedRole[];
 	busy: boolean;
+	canConfigureChatwoot?: boolean;
 	onSave: (body: unknown) => Promise<void>;
 	onCancel: () => void;
 }) {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [name, setName] = useState("");
+	const [invite, setInvite] = useState(true);
+	const [configureChatwoot, setConfigureChatwoot] = useState(false);
+	const [agentName, setAgentName] = useState("");
+	const [chatLimit, setChatLimit] = useState("4");
+	const [inboxIds, setInboxIds] = useState<number[]>([]);
+	const [teamIds, setTeamIds] = useState<number[]>([]);
+	const [directory, setDirectory] =
+		useState<Awaited<ReturnType<typeof chatwootService.inboxDirectory>>>();
+	const [directoryError, setDirectoryError] = useState("");
+	const [directoryAttempt, setDirectoryAttempt] = useState(0);
 	const [confirmCreate, setConfirmCreate] = useState(false);
 	const [selected, setSelected] = useState<string[]>(
 		roles.some((r) => r.id === "support") ? ["support"] : [],
+	);
+	const canLink =
+		invite &&
+		canConfigureChatwoot &&
+		roles.some(
+			(role) => selected.includes(role.id) && role.permissions.includes("work"),
+		);
+	const linkChatwoot = canLink && configureChatwoot;
+	useEffect(() => {
+		if (!linkChatwoot) return;
+		let current = true;
+		setDirectoryError("");
+		void chatwootService
+			.inboxDirectory()
+			.then((result) => {
+				if (current) setDirectory(result);
+			})
+			.catch((error) => {
+				if (current)
+					setDirectoryError(
+						error instanceof Error
+							? error.message
+							: "Не удалось загрузить проекты и группы",
+					);
+			});
+		return () => {
+			current = false;
+		};
+	}, [linkChatwoot, directoryAttempt]);
+	const selectMembership = (
+		items: { id: number; name: string }[],
+		values: number[],
+		update: (ids: number[]) => void,
+		title: string,
+	) => (
+		<fieldset className="min-w-0">
+			<legend className="mb-1 text-xs font-medium">{title}</legend>
+			<div className="supportos-scroll max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+				{items.length ? (
+					items.map((item) => (
+						<label
+							key={item.id}
+							className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-surface-elevated"
+						>
+							<input
+								type="checkbox"
+								disabled={busy}
+								checked={values.includes(item.id)}
+								onChange={(event) =>
+									update(
+										event.target.checked
+											? [...values, item.id]
+											: values.filter((id) => id !== item.id),
+									)
+								}
+							/>
+							<span className="min-w-0 break-words">{item.name}</span>
+						</label>
+					))
+				) : (
+					<p className="text-xs text-muted">Список пуст</p>
+				)}
+			</div>
+		</fieldset>
 	);
 	return (
 		<form
@@ -328,18 +475,31 @@ export function CreateUser({
 					onChange={(e) => setEmail(e.target.value)}
 					disabled={busy}
 				/>
-				<Input
-					type="password"
-					autoComplete="new-password"
-					aria-label="Пароль нового аккаунта"
-					placeholder="Пароль от 12 символов"
-					required
-					minLength={12}
-					maxLength={128}
-					value={password}
-					onChange={(e) => setPassword(e.target.value)}
-					disabled={busy}
-				/>
+				<label className="employee-field">
+					<span>Способ входа</span>
+					<Select
+						disabled={busy}
+						value={invite ? "invite" : "password"}
+						onChange={(e) => setInvite(e.target.value === "invite")}
+					>
+						<option value="invite">Приглашение на почту</option>
+						<option value="password">Пароль вручную</option>
+					</Select>
+				</label>
+				{!invite && (
+					<Input
+						type="password"
+						autoComplete="new-password"
+						aria-label="Пароль нового аккаунта"
+						placeholder="Пароль от 12 символов"
+						required
+						minLength={12}
+						maxLength={128}
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						disabled={busy}
+					/>
+				)}
 			</div>
 			<RolesChoice
 				roles={roles}
@@ -347,19 +507,102 @@ export function CreateUser({
 				onChange={setSelected}
 				disabled={busy}
 			/>
+			{canLink && (
+				<section className="employee-card space-y-3">
+					<label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+						<input
+							type="checkbox"
+							disabled={busy}
+							checked={configureChatwoot}
+							onChange={(e) => setConfigureChatwoot(e.target.checked)}
+						/>
+						Настроить агента Chatwoot
+					</label>
+					{linkChatwoot && (
+						<>
+							<div className="grid gap-3 sm:grid-cols-2">
+								<label className="employee-field">
+									<span>Имя агента в чате</span>
+									<Input
+										value={agentName}
+										onChange={(e) => setAgentName(e.target.value)}
+										placeholder={name || "Имя сотрудника"}
+										disabled={busy}
+										maxLength={100}
+									/>
+								</label>
+								<label className="employee-field">
+									<span>Лимит активных чатов</span>
+									<Input
+										type="number"
+										required
+										min={1}
+										max={250}
+										value={chatLimit}
+										onChange={(e) => setChatLimit(e.target.value)}
+										disabled={busy}
+									/>
+								</label>
+							</div>
+							{directoryError ? (
+								<div className="flex flex-wrap items-center gap-2 text-sm">
+									<span role="alert">{directoryError}</span>
+									<Button
+										type="button"
+										onClick={() => setDirectoryAttempt((value) => value + 1)}
+									>
+										Повторить
+									</Button>
+								</div>
+							) : directory ? (
+								<div className="grid gap-3 sm:grid-cols-2">
+									{selectMembership(
+										directory.inboxes,
+										inboxIds,
+										setInboxIds,
+										"Проекты",
+									)}
+									{selectMembership(
+										directory.teams,
+										teamIds,
+										setTeamIds,
+										"Группы",
+									)}
+								</div>
+							) : (
+								<p role="status" className="text-xs text-muted">
+									Загружаем проекты и группы…
+								</p>
+							)}
+						</>
+					)}
+				</section>
+			)}
 			<p className="text-sm text-muted">
-				Передайте пароль сотруднику лично. Письмо не отправляется. Сотрудник
-				сможет изменить пароль в настройках.
+				{invite
+					? "Сотрудник получит ссылку для подтверждения почты и установки пароля."
+					: "Передайте пароль сотруднику лично."}
 			</p>
-			<Button type="submit" disabled={busy || !selected.length}>
-				Создать аккаунт
+			<Button
+				type="submit"
+				disabled={
+					busy ||
+					!selected.length ||
+					(linkChatwoot && (!directory || Boolean(directoryError)))
+				}
+			>
+				{invite ? "Создать и пригласить" : "Создать аккаунт"}
 			</Button>{" "}
 			<Button type="button" disabled={busy} onClick={onCancel}>
 				Отмена
 			</Button>
 			{confirmCreate && (
 				<BaseModal
-					title="Создать аккаунт?"
+					title={
+						invite
+							? "Создать аккаунт и отправить приглашение?"
+							: "Создать аккаунт?"
+					}
 					size="sm"
 					onClose={() => setConfirmCreate(false)}
 					closeDisabled={busy}
@@ -374,7 +617,7 @@ export function CreateUser({
 							.filter((role) => selected.includes(role.id))
 							.map((role) => role.name)
 							.join(", ")}
-						. Пароль передайте сотруднику лично.
+						{linkChatwoot && `. Агент Chatwoot · лимит ${chatLimit}`}
 					</p>
 					<div className="ui-actions justify-end gap-2 mt-5">
 						<Button
@@ -393,13 +636,27 @@ export function CreateUser({
 									action: "create",
 									confirmed: true,
 									email,
-									password,
+									...(invite
+										? {
+												delivery: "invite",
+												...(linkChatwoot
+													? {
+															chatwoot: {
+																name: agentName,
+																maxActiveChats: Number(chatLimit),
+																inboxIds,
+																teamIds,
+															},
+														}
+													: {}),
+											}
+										: { password }),
 									display_name: name,
 									roles: selected,
 								});
 							}}
 						>
-							Да, создать аккаунт
+							{invite ? "Отправить приглашение" : "Да, создать аккаунт"}
 						</Button>
 					</div>
 				</BaseModal>

@@ -3,9 +3,11 @@ import { supabaseService } from "@/services/supabase.service";
 
 export function PasswordForm({
 	recovery = false,
+	invitation = false,
 	onBack,
 }: {
 	recovery?: boolean;
+	invitation?: boolean;
 	onBack?: () => void;
 }) {
 	const [email, setEmail] = useState("");
@@ -28,6 +30,10 @@ export function PasswordForm({
 			} else {
 				if (password !== confirmation) throw new Error("Пароли не совпадают");
 				await supabaseService.updatePassword(password);
+				if (invitation) {
+					window.location.replace("/login?invite=done");
+					return;
+				}
 				setPassword("");
 				setConfirmation("");
 				setMessage("Пароль обновлён. Войдите снова с новым паролем.");
@@ -41,8 +47,17 @@ export function PasswordForm({
 	return (
 		<section className="mx-auto w-full max-w-lg space-y-4 rounded-xl border border-border bg-surface p-6">
 			<h2 className="text-xl font-semibold">
-				{recovery ? "Восстановление пароля" : "Новый пароль"}
+				{recovery
+					? "Восстановление пароля"
+					: invitation
+						? "Активируйте аккаунт SupportOS"
+						: "Новый пароль"}
 			</h2>
+			{invitation && (
+				<p className="text-sm text-muted">
+					Почта подтверждена. Установите пароль для первого входа.
+				</p>
+			)}
 			<form onSubmit={submit} className="space-y-4">
 				{recovery ? (
 					<label className="ui-field">

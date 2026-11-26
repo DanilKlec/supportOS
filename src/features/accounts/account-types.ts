@@ -49,5 +49,10 @@ export type AccessResponses = {
 	catalog: { roles: ManagedRole[]; permissions: Permission[] };
 	users: { users: User[]; total: number; hasMore?: boolean };
 	audit: { rows: Audit[]; hasMore: boolean };
+	invitation: { pending: boolean; canResend: boolean; sentAt: string | null };
 };
-export type AccessMutationResponse = { ok?: boolean; warning?: string };
+export type AccessMutationResponse = {
+	ok?: boolean;
+	warning?: string;
+	invited?: boolean;
+};

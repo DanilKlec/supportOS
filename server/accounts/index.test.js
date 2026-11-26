@@ -1,9 +1,9 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({requireUser:vi.fn(),changeAccess:vi.fn(),db:vi.fn(),allRows:vi.fn(),createUser:vi.fn(),signOut:vi.fn()}));
+const mock=vi.hoisted(()=>({requireUser:vi.fn(),changeAccess:vi.fn(),loadAccess:vi.fn(),db:vi.fn(),allRows:vi.fn(),createUser:vi.fn(),signOut:vi.fn(),inviteUserByEmail:vi.fn(),getUserById:vi.fn()}));
 vi.mock('../_auth.js',()=>({requireUser:mock.requireUser}));
-vi.mock('../_rbac.js',()=>({changeAccess:mock.changeAccess}));
+vi.mock('../_rbac.js',()=>({changeAccess:mock.changeAccess,loadAccess:mock.loadAccess}));
 vi.mock('../agent-monitor/_server.js',()=>({config:()=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test'}),db:mock.db,allRows:mock.allRows}));
-vi.mock('@supabase/supabase-js',()=>({createClient:()=>({auth:{admin:{createUser:mock.createUser,signOut:mock.signOut}}})}));
+vi.mock('@supabase/supabase-js',()=>({createClient:()=>({auth:{admin:{createUser:mock.createUser,signOut:mock.signOut,inviteUserByEmail:mock.inviteUserByEmail,getUserById:mock.getUserById}}})}));
 import handler from './index.js';
 const response=()=>({setHeader(){},end(text){this.body=JSON.parse(text);}});
 const req=(body)=>({method:'POST',url:'/api/accounts',headers:{origin:'https://app.test',host:'app.test'},body});
@@ -43,6 +43,37 @@ it('attaches only the verified creation reference to Auth metadata, preserving p
  expect(mock.createUser.mock.calls[0][0].app_metadata.supportos_creation_request).not.toBe(confirmation.id);
  expect(mock.db).toHaveBeenCalledWith(expect.anything(),'rpc/supportos_prepare_account_action',expect.objectContaining({actor:historyUser,sid:'verified-session',operation:'user.create',payload:{email:'created@example.test',roles:['support'],display_name:''}}));
  expect(mock.changeAccess).toHaveBeenCalledWith(historyUser,'user.update',expect.objectContaining({id:historyOther}));
+});
+it('creates an unconfirmed account without a temporary password and invites only after granting roles',async()=>{
+ mock.requireUser.mockResolvedValue({id:historyUser,sessionId:'verified-session',access:{status:'active',roles:[{id:'admin'}],permissions:['work','users.manage']}});
+ mock.allRows.mockImplementation(async(_env,path)=>path.startsWith('supportos_roles?')?[{id:'support',name:'Support'}]:[]);
+ mock.db.mockResolvedValue({ok:true});
+ mock.createUser.mockResolvedValue({data:{user:{id:historyOther}},error:null});
+ mock.inviteUserByEmail.mockResolvedValue({data:{user:{id:historyOther}},error:null});
+ const res=response();
+ await handler(req({action:'create',confirmed:true,delivery:'invite',email:'New@Example.test',display_name:'Новый сотрудник',roles:['support']}),res);
+ expect(res.statusCode).toBe(201);
+ expect(res.body).toEqual({id:historyOther,invited:true});
+ expect(mock.createUser).toHaveBeenCalledExactlyOnceWith({email:'new@example.test',email_confirm:false,app_metadata:{supportos_invitation:true,supportos_creation_request:expect.any(String)}});
+ expect(mock.changeAccess.mock.invocationCallOrder[0]).toBeLessThan(mock.inviteUserByEmail.mock.invocationCallOrder[0]);
+ expect(mock.inviteUserByEmail).toHaveBeenCalledExactlyOnceWith('new@example.test',{redirectTo:'https://support-os-psi.vercel.app/login?invite=1'});
+});
+it('retries delivery for the same unconfirmed employee without creating another account',async()=>{
+ mock.loadAccess.mockResolvedValue({status:'active',roles:[{id:'support'}],permissions:['work']});
+ mock.getUserById.mockResolvedValue({data:{user:{id:historyOther,email:'agent@example.test',app_metadata:{supportos_invitation:true}}}});
+ mock.inviteUserByEmail.mockResolvedValue({error:{code:'over_email_send_rate_limit'}});
+ const res=response();
+ await handler(req({action:'user.invite.resend',id:historyOther,confirmed:true,email:'wrong@example.test'}),res);
+ expect(res.statusCode).toBe(200);
+ expect(res.body).toMatchObject({invited:false,warning:expect.stringMatching(/лимит отправки/)});
+ expect(mock.inviteUserByEmail).toHaveBeenCalledWith('agent@example.test',expect.anything());
+ expect(mock.createUser).not.toHaveBeenCalled();
+ const confirmed={id:historyOther,email:'agent@example.test',email_confirmed_at:'2026-11-26T10:00:00Z',app_metadata:{supportos_invitation:true}};
+ mock.getUserById.mockResolvedValue({data:{user:confirmed}});
+ const blocked=response();
+ await handler(req({action:'user.invite.resend',id:historyOther,confirmed:true}),blocked);
+ expect(blocked.statusCode).toBe(409);
+ expect(mock.inviteUserByEmail).toHaveBeenCalledTimes(1);
 });
 it('rejects cross-origin writes before authentication or database access',async()=>{
  const res=response();await handler({...req({}),headers:{origin:'https://evil.test',host:'app.test'}},res);expect(res.statusCode).toBe(403);expect(mock.requireUser).not.toHaveBeenCalled();

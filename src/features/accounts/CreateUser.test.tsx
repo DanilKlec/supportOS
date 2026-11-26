@@ -22,6 +22,9 @@ it("creates only after ordinary confirmation and keeps the selected roles when c
 			onCancel={vi.fn()}
 		/>,
 	);
+	fireEvent.change(screen.getByLabelText("Способ входа"), {
+		target: { value: "password" },
+	});
 	fireEvent.change(screen.getByLabelText("Почта нового аккаунта"), {
 		target: { value: "employee@example.test" },
 	});
@@ -50,6 +53,42 @@ it("creates only after ordinary confirmation and keeps the selected roles when c
 		email: "employee@example.test",
 		password: "synthetic-password",
 		display_name: "Employee",
+		roles: ["support"],
+	});
+});
+
+it("defaults to employee email confirmation and password setup by invitation", () => {
+	const onSave = vi.fn().mockResolvedValue(undefined);
+	render(
+		<CreateUser
+			roles={[
+				{
+					id: "support",
+					name: "Support",
+					description: "",
+					is_system: true,
+					version: 1,
+					permissions: ["work"],
+				},
+			]}
+			busy={false}
+			onSave={onSave}
+			onCancel={vi.fn()}
+		/>,
+	);
+	const email = screen.getByLabelText("Почта нового аккаунта");
+	fireEvent.change(email, { target: { value: "employee@example.test" } });
+	expect(screen.queryByLabelText("Пароль нового аккаунта")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "Создать и пригласить" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: "Отправить приглашение" }),
+	);
+	expect(onSave).toHaveBeenCalledExactlyOnceWith({
+		action: "create",
+		confirmed: true,
+		delivery: "invite",
+		email: "employee@example.test",
+		display_name: "",
 		roles: ["support"],
 	});
 });
