@@ -120,6 +120,8 @@ export function ConversationWindows({
 			tiled: boolean;
 			canExpand: boolean;
 			expanded: boolean;
+			listControl?: ReactNode;
+			addControl?: ReactNode;
 		},
 	) => ReactNode;
 }) {
@@ -152,23 +154,36 @@ export function ConversationWindows({
 		bounds.height >= (count <= 2 ? 300 : 470);
 	const tiled = canTile && state.expandedId === null;
 	const atLimit = count >= MAX_CHAT_WINDOWS;
+	const listControl = (
+		<button
+			type="button"
+			className="chat-window-control"
+			onClick={onToggleList}
+			aria-label={listOpen ? "Скрыть список" : "Показать список"}
+			title={listOpen ? "Скрыть список" : "Показать список"}
+		>
+			{listOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+		</button>
+	);
+	const addControl = (
+		<button
+			type="button"
+			className="chat-window-control chat-window-add"
+			aria-label="Добавить чат"
+			aria-pressed={choosing}
+			disabled={atLimit}
+			onClick={onAdd}
+			title={atLimit ? "Открыто 4 из 4 чатов" : "Открыть ещё один чат"}
+		>
+			<Plus size={16} aria-hidden="true" />
+			<span>{atLimit ? "4 из 4" : "Добавить чат"}</span>
+		</button>
+	);
 	return (
 		<div className="chat-windows flex min-h-0 min-w-0 flex-1 flex-col">
-			<div className="chat-windows-toolbar">
-				<button
-					type="button"
-					className="chat-window-control"
-					onClick={onToggleList}
-					aria-label={listOpen ? "Скрыть список" : "Показать список"}
-					title={listOpen ? "Скрыть список" : "Показать список"}
-				>
-					{listOpen ? (
-						<PanelLeftClose size={16} />
-					) : (
-						<PanelLeftOpen size={16} />
-					)}
-				</button>
-				{count > 1 && (
+			{count > 1 && (
+				<div className="chat-windows-toolbar">
+					{listControl}
 					<nav
 						ref={tabs}
 						aria-label="Открытые чаты"
@@ -194,22 +209,9 @@ export function ConversationWindows({
 							</button>
 						))}
 					</nav>
-				)}
-				{count > 0 && (
-					<button
-						type="button"
-						className="chat-window-control chat-window-add ml-auto"
-						aria-label="Добавить чат"
-						aria-pressed={choosing}
-						disabled={atLimit}
-						onClick={onAdd}
-						title={atLimit ? "Открыто 4 из 4 чатов" : "Открыть ещё один чат"}
-					>
-						<Plus size={16} aria-hidden="true" />
-						<span>{atLimit ? "4 из 4" : "Добавить чат"}</span>
-					</button>
-				)}
-			</div>
+					{addControl}
+				</div>
+			)}
 			<div
 				ref={grid}
 				className="chat-window-grid"
@@ -221,6 +223,7 @@ export function ConversationWindows({
 							tiled: false,
 							canExpand: false,
 							expanded: false,
+							listControl,
 						})
 					: state.panes.map(({ id }) => {
 							const shown = tiled || state.activeId === id;
@@ -243,6 +246,8 @@ export function ConversationWindows({
 										tiled,
 										canExpand: canTile,
 										expanded: state.expandedId === id,
+										listControl: count === 1 ? listControl : undefined,
+										addControl: count === 1 ? addControl : undefined,
 									})}
 								</section>
 							);

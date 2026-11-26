@@ -27,7 +27,9 @@ test("work in up to four independent chat windows", async ({
 	);
 	await context.route("https://lingva.ml/api/v1/**", (route) => {
 		const request = route.request();
-		const [, , , , target, content] = new URL(request.url()).pathname.split("/");
+		const [, , , , target, content] = new URL(request.url()).pathname.split(
+			"/",
+		);
 		expect(request.headers()).not.toHaveProperty("authorization");
 		expect(target).toBe("de");
 		expect(decodeURIComponent(content)).toBe("Ответ во второй чат");
@@ -88,7 +90,10 @@ test("work in up to four independent chat windows", async ({
 						payload: [
 							{
 								id,
-								content: id === 22 ? "Guten Morgen, meine Einzahlung ist noch nicht angekommen." : `Входящее сообщение ${id}`,
+								content:
+									id === 22
+										? "Guten Morgen, meine Einzahlung ist noch nicht angekommen."
+										: `Входящее сообщение ${id}`,
 								created_at: firstMessageTime,
 								message_type: 0,
 							},
@@ -137,12 +142,53 @@ test("work in up to four independent chat windows", async ({
 		await add.click();
 		await expect(list.getByText(/Выберите чат для нового окна/)).toBeVisible();
 		await openRow(id);
-		await expect(pane(id).getByRole("log", { name: "Переписка" }).locator("[data-thread-bubble]").first()).toBeVisible();
+		await expect(
+			pane(id)
+				.getByRole("log", { name: "Переписка" })
+				.locator("[data-thread-bubble]")
+				.first(),
+		).toBeVisible();
 	};
 
 	await openRow(21);
 	await expect(windows).toHaveCount(1);
 	await expect(grid).toHaveAttribute("data-grid-size", "1");
+	await expect(page.locator(".chat-windows-toolbar")).toHaveCount(0);
+	const header = pane(21).locator(".chat-thread-header");
+	await expect(
+		header.getByRole("button", { name: "Добавить чат" }),
+	).toBeVisible();
+	if (!isMobile) {
+		const card = pane(21).getByRole("complementary", {
+			name: "Карточка игрока",
+		});
+		await expect(card).toBeVisible();
+		const [listBox, paneBox, headerBox, cardBox] = await Promise.all([
+			list.boundingBox(),
+			pane(21).boundingBox(),
+			header.boundingBox(),
+			card.boundingBox(),
+		]);
+		if (!listBox || !paneBox || !headerBox || !cardBox)
+			throw new Error("Одна из панелей чата не отображается");
+		expect(paneBox.x).toBeCloseTo(listBox.x + listBox.width, 0);
+		expect(headerBox.y).toBeCloseTo(listBox.y, 0);
+		expect(cardBox.x).toBeCloseTo(headerBox.x + headerBox.width, 0);
+		const divider = pane(21).getByRole("separator", {
+			name: "Изменить ширину карточки клиента",
+		});
+		await divider.press("ArrowLeft");
+		await expect(divider).toHaveAttribute(
+			"aria-valuenow",
+			String(cardBox.width + 16),
+		);
+		expect((await card.boundingBox())?.width).toBe(cardBox.width + 16);
+		await divider.press("ArrowRight");
+	}
+	await page.screenshot({
+		path: info.outputPath("single-chat.png"),
+		animations: "disabled",
+	});
 	await expect(pane(21).getByText("Ждёт 1 мин 00 с")).toBeVisible();
 	await expect(pane(21).getByText(/1 мин 00 с назад/)).toBeVisible();
 	await page.clock.setFixedTime(startTime + 1000);
@@ -185,6 +231,7 @@ test("work in up to four independent chat windows", async ({
 
 	await addChat(22);
 	await expect(windows).toHaveCount(2);
+	await expect(tabs).toBeVisible();
 	await reply(22).fill("Ответ во второй чат");
 	await expect(grid).toHaveAttribute("data-grid-size", isMobile ? "1" : "2");
 	await addChat(23);
@@ -219,7 +266,9 @@ test("work in up to four independent chat windows", async ({
 	}
 	await expect(reply(22)).toHaveValue("Ответ во второй чат");
 	await reply(22).press("Enter");
-	await expect(pane(22).getByRole("alert")).toContainText("Не удалось перевести");
+	await expect(pane(22).getByRole("alert")).toContainText(
+		"Не удалось перевести",
+	);
 	await expect(reply(22)).toHaveValue("Ответ во второй чат");
 	expect(publicMessages).toBe(0);
 	await reply(22).press("Enter");
@@ -258,9 +307,7 @@ test("work in up to four independent chat windows", async ({
 	expect(priorityWrites).toEqual([]);
 	await bulk.getByRole("button", { name: "Подтвердить" }).click();
 	await expect(bulk.getByRole("status")).toContainText("Обновлено 1 из 2");
-	await expect(bulk.getByRole("list")).toContainText(
-		"#22 · Чат уже изменился",
-	);
+	await expect(bulk.getByRole("list")).toContainText("#22 · Чат уже изменился");
 	await expect(picked(21)).not.toBeChecked();
 	await expect(picked(22)).toBeChecked();
 	rejectPriority = false;

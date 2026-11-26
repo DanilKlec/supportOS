@@ -88,7 +88,6 @@ import "./inbox-workspace.css";
 
 type Scope = "mine" | "queue" | "history" | "active";
 type WorkspaceSection = "inbox" | "activity" | "team" | "archive" | "contacts" | "supervisor" | "settings";
-type ResizeAxis = "x" | "y";
 const languages: Array<{ id: LanguageCode; label: string }> = [
 	{ id: "ru", label: "RU" },
 	{ id: "en", label: "EN" },
@@ -761,7 +760,7 @@ function AgentInboxWorkspace() {
 						)}
 					</aside>
 				)}
-				{queueOpen && scope !== "active" && <div className="hidden md:flex"><ResizeHandle axis="x" label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} /></div>}
+				{queueOpen && scope !== "active" && <div className="chat-pane-divider hidden md:block"><ResizeHandle label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} /></div>}
 				<main className={`relative min-h-0 min-w-0 flex-1 flex-col ${queueOpen && scope !== "active" ? "hidden md:flex" : "flex"}`}>
 					{scope === "active" && canSupervise ? (
 						<div className="chat-observation-layout relative flex min-h-0 min-w-0 flex-1" data-observation-open={supervisionId !== null}>
@@ -798,8 +797,10 @@ function AgentInboxWorkspace() {
 						onToggleList={() => { if (queueOpen) setAddingChat(false); setQueueOpen(!queueOpen); }}
 						onAdd={() => { if (!bulkBusy) setBulkSelection(null); setAddingChat(!addingChat); setQueueOpen(true); }}
 						onFocus={(id) => dispatchChatWindow({ type: "focus", id })}
-						renderPane={(id, { visible, tiled, canExpand, expanded }) => <ConversationPane
+						renderPane={(id, { visible, tiled, canExpand, expanded, listControl, addControl }) => <ConversationPane
 							id={id}
+							listControl={listControl}
+							addControl={addControl}
 							visible={visible}
 							tiled={tiled}
 							expanded={expanded}
@@ -847,12 +848,11 @@ function AgentInboxWorkspace() {
 	);
 }
 
-function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEnd = false }: {
-	axis: ResizeAxis;
+function ResizeHandle({ label, value, min, max, onResize, fromEnd = false }: {
 	label: string;
 	value: number;
-	min?: number;
-	max?: number;
+	min: number;
+	max: number;
 	onResize: (coordinate: number) => void;
 	fromEnd?: boolean;
 }) {
@@ -861,34 +861,32 @@ function ResizeHandle({ axis, label, value, min = 0, max = 100, onResize, fromEn
 	return (
 		<hr
 			aria-label={label}
-			aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+			aria-orientation="vertical"
 			aria-valuemin={min}
 			aria-valuemax={max}
 			aria-valuenow={Math.round(value)}
 			tabIndex={0}
 			onKeyDown={(event) => {
-				const backward = axis === "x" ? "ArrowLeft" : "ArrowUp";
-				const forward = axis === "x" ? "ArrowRight" : "ArrowDown";
-				if (![backward, forward, "Home", "End"].includes(event.key)) return;
+				if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 				event.preventDefault();
 				if (event.key === "Home" || event.key === "End") {
 					resizeTo(event.key === "Home" ? min : max);
 					return;
 				}
-				resizeTo(value + (event.key === backward ? -16 : 16) * (fromEnd ? -1 : 1));
+				resizeTo(value + (event.key === "ArrowLeft" ? -16 : 16) * (fromEnd ? -1 : 1));
 			}}
 			onPointerDown={(event) => {
 				if (event.button !== 0) return;
-				drag.current = { origin: axis === "x" ? event.clientX : event.clientY, value };
+				drag.current = { origin: event.clientX, value };
 				event.currentTarget.setPointerCapture(event.pointerId);
 			}}
 			onPointerMove={(event) => {
 				if (!drag.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-				const offset = (axis === "x" ? event.clientX : event.clientY) - drag.current.origin;
+				const offset = event.clientX - drag.current.origin;
 				resizeTo(drag.current.value + offset * (fromEnd ? -1 : 1));
 			}}
 			onLostPointerCapture={() => { drag.current = null; }}
-			className={`m-0 shrink-0 touch-none self-stretch border-0 bg-transparent p-0 outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 ${axis === "x" ? "h-auto w-2 cursor-col-resize" : "h-2 w-auto cursor-row-resize"}`}
+			className="chat-pane-resize"
 		/>
 	);
 }
@@ -1204,6 +1202,8 @@ function ConversationRow({
 
 function ConversationPane({
 	id,
+	listControl,
+	addControl,
 	supervising = false,
 	docked = false,
 	visible = true,
@@ -1234,6 +1234,8 @@ function ConversationPane({
 	onChoose,
 }: {
 	id: number | null;
+	listControl?: ReactNode;
+	addControl?: ReactNode;
 	supervising?: boolean;
 	docked?: boolean;
 	visible?: boolean;
@@ -1714,7 +1716,8 @@ function ConversationPane({
 	};
 	if (!id)
 		return (
-			<div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center p-8 text-center">
+			<div className="relative flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center p-8 text-center">
+				{listControl && <div className="absolute top-2 left-2">{listControl}</div>}
 				<div className="chat-empty-icon">
 					<MessageSquareText size={23} />
 				</div>
@@ -1730,6 +1733,8 @@ function ConversationPane({
 		);
 	if (!conversation?.access?.read || query.isError) return (
 		<div className="relative grid flex-1 place-items-center p-6 text-center text-sm text-muted">
+			{listControl && <div className="absolute top-2 left-2">{listControl}</div>}
+			{addControl && <div className="absolute top-2 right-12">{addControl}</div>}
 			{!docked && <button type="button" className="chat-window-control absolute top-2 right-2" aria-label="Закрыть диалог" onClick={onClose}><X size={15} /></button>}
 			<div><p role={query.isError ? "alert" : "status"}>{query.error?.message ?? (query.isLoading ? "Загружаем диалог…" : "Диалог недоступен")}</p>
 				{query.isError && <button type="button" onClick={() => void query.refetch()} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs">Повторить</button>}
@@ -1751,9 +1756,10 @@ function ConversationPane({
 			className="chat-thread relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
 			data-tiled={tiled}
 		>
-			<div inert={contextVisible && contextOverlay} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+			<div inert={contextVisible && contextOverlay} className="chat-thread-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 				<header className={`chat-thread-header flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5 ${docked ? "chat-docked-thread-header" : ""}`}>
 					<div className="flex min-w-0 items-center gap-2.5">
+						{listControl}
 						<div className="chat-avatar chat-avatar-small" data-tone={id % 4}>
 							{initials(sender?.name)}
 						</div>
@@ -1774,6 +1780,7 @@ function ConversationPane({
 						</div>
 					</div>
 					<div className="chat-thread-actions flex shrink-0 flex-wrap items-center gap-1.5">
+						{addControl}
 						<button
 							ref={playerToggle}
 							type="button"
@@ -2079,7 +2086,7 @@ function ConversationPane({
 			</div>
 			{visible && contextVisible && (
 				<>
-				<div className="chat-thread-customer-resize"><ResizeHandle axis="x" label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={setCustomerWidth} /></div>
+				<div className="chat-pane-divider chat-thread-customer-resize"><ResizeHandle label="Изменить ширину карточки клиента" value={customerWidth} min={200} max={420} fromEnd onResize={setCustomerWidth} /></div>
 				<aside aria-label={showCustomer ? "Карточка игрока" : "Действия с диалогом"} onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) closeCustomer(); }} style={{ "--chat-context-width": `${customerWidth}px` } as CSSProperties} className="chat-thread-customer supportos-scroll absolute inset-y-0 right-0 z-30 max-w-full shrink-0 overflow-y-auto border-l border-border bg-surface p-3 shadow-xl">
 					<div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 space-y-1.5 border-b border-border bg-surface px-3 py-2">
 					<div className="flex items-center justify-between gap-2">
