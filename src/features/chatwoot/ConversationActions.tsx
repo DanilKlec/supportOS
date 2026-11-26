@@ -30,6 +30,7 @@ type Props = {
 	agents: ChatwootAgent[];
 	teams: ChatwootTeam[];
 	labels: string[];
+	visibleTags: string[];
 	openTagPicker?: boolean;
 	pending: {
 		agent: boolean;
@@ -53,6 +54,7 @@ export function ConversationActions({
 	agents,
 	teams,
 	labels,
+	visibleTags,
 	openTagPicker = false,
 	pending,
 	onAgent,
@@ -278,18 +280,18 @@ export function ConversationActions({
 				className="space-y-2 border-t border-border pt-3"
 			>
 				<h4 className="text-xs font-semibold">Теги</h4>
-				{tags.length > 0 && (
-					<div className="flex flex-wrap gap-1.5">
-						{tags.map((tag) => (
+				{visibleTags.length > 0 && (
+					<div className="grid gap-1">
+						{visibleTags.map((tag) => (
 							<button
 								key={tag}
 								type="button"
 								disabled={pending.tags}
 								aria-label={`Убрать тег ${tag}`}
 								onClick={() => onTags(tags.filter((item) => item !== tag))}
-								className="chat-context-tag hover:bg-accent/20 disabled:opacity-60"
+								className="chat-context-tag chat-applied-tag hover:bg-accent/20 disabled:opacity-60"
 							>
-								<span className="min-w-0 break-all">{tag}</span>
+								<span className="min-w-0">{tag}</span>
 								<X size={11} className="shrink-0" />
 							</button>
 						))}
@@ -309,7 +311,7 @@ export function ConversationActions({
 					<Tag size={13} /> Добавить тег
 				</button>
 				{picker === "tag" && (
-					<div id={tagsId} className="chat-context-picker">
+					<div id={tagsId} className="chat-context-picker chat-tag-picker">
 						<input
 							ref={searchInput}
 							value={search}
@@ -318,7 +320,7 @@ export function ConversationActions({
 							placeholder="Название тега"
 							className={field}
 						/>
-						<div className="supportos-scroll max-h-36 overflow-y-auto py-1">
+						<div className="supportos-scroll chat-tag-options overflow-y-auto py-1">
 							{matchingTags.length === 0 ? (
 								<p className="px-2 py-2 text-xs text-muted">
 									{query
@@ -330,8 +332,8 @@ export function ConversationActions({
 							) : (
 								matchingTags.map(({ tag, pinned }) => (
 									<div key={tag} className="flex items-center gap-1">
-										<button type="button" onClick={() => chooseTag(tag)} disabled={pending.tags} className="chat-context-option min-w-0 flex-1 break-all text-left">{tag}</button>
-										<button type="button" aria-label={`Закрепление тега ${tag}`} aria-pressed={pinned} title={pinned ? "Открепить тег" : "Закрепить тег"} onClick={() => togglePin(tag)} className={`grid size-8 shrink-0 place-items-center rounded-md hover:bg-surface-elevated ${pinned ? "text-accent" : "text-muted"}`}><Pin size={14} fill={pinned ? "currentColor" : "none"} /></button>
+										<button type="button" onClick={() => chooseTag(tag)} disabled={pending.tags} className="chat-context-option min-w-0 flex-1 text-left">{tag}</button>
+										<button type="button" aria-label={`Закрепление тега ${tag}`} aria-pressed={pinned} title={pinned ? "Открепить тег" : "Закрепить тег"} onClick={() => togglePin(tag)} className={`grid size-9 shrink-0 place-items-center rounded-md hover:bg-surface-elevated ${pinned ? "text-accent" : "text-muted"}`}><Pin size={15} fill={pinned ? "currentColor" : "none"} /></button>
 									</div>
 								))
 							)}

@@ -8,6 +8,7 @@ import {
 
 const ChatClock = createContext(0);
 const millisecondsPerSecond = 1000;
+export const firstReplyTargetSeconds = 20;
 
 export function ChatClockProvider({ children }: { children: ReactNode }) {
 	const [now, setNow] = useState(Date.now);
@@ -56,14 +57,33 @@ export function chatElapsedTime(timestamp: number, now: number) {
 export function WaitingTime({
 	timestamp,
 	className,
+	firstReply = false,
 }: {
 	timestamp: number;
 	className: string;
+	firstReply?: boolean;
 }) {
 	const now = useChatClock();
+	const since =
+		timestamp > 1e12 ? timestamp : timestamp * millisecondsPerSecond;
+	const seconds = Math.floor(Math.max(0, now - since) / millisecondsPerSecond);
+	const overdue = firstReply && seconds >= firstReplyTargetSeconds;
 	return (
-		<span className={`${className} tabular-nums`} title="Время ожидания ответа">
+		<span
+			className={`${className} tabular-nums${overdue ? " chat-reply-overdue" : ""}`}
+			title={
+				firstReply
+					? `Первый ответ за ${firstReplyTargetSeconds} с`
+					: "Время ожидания ответа"
+			}
+		>
 			Ждёт {chatElapsedTime(timestamp, now)}
+			{firstReply && (
+				<span className="chat-reply-target">
+					{" "}
+					/ {firstReplyTargetSeconds} с
+				</span>
+			)}
 		</span>
 	);
 }

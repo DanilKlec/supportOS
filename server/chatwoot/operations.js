@@ -36,11 +36,12 @@ export function normalizeOperations(body) {
 		return [id, { zone, skills: skillsOf(rule.skills), shifts: shifts.map(({ day, start, end }) => ({ day, start, end })) }];
 	}));
 	const inboxes = Object.fromEntries(entriesOf(body.inboxes).map(([id, rule]) => {
-		const { responseMinutes, crm } = rule;
+		const { responseMinutes, crm, tagScope = '' } = rule;
 		if (!Number.isInteger(responseMinutes) || responseMinutes < 0 || responseMinutes > 1440 ||
 			!['', 'adwa', 'whitelabels', 'vortexino'].includes(crm))
 			throw badRequest('Некорректная цель SLA или CRM');
-		return [id, { skills: skillsOf(rule.skills), responseMinutes, crm }];
+		if (!['', 'b2b', 'b2c', 'all'].includes(tagScope)) throw badRequest('Некорректная группа тегов');
+		return [id, { skills: skillsOf(rule.skills), responseMinutes, crm, ...(tagScope ? { tagScope } : {}) }];
 	}));
 	return { agents, inboxes };
 }

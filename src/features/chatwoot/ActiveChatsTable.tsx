@@ -28,6 +28,7 @@ import {
 	type ChatwootTeam,
 } from "@/services/chatwoot.service";
 import { useChatClock, WaitingTime } from "./ChatClock";
+import { projectTagScope, searchProjectTags, tagsForProject } from "./chat-tags";
 import {
 	ChatFilterPanel,
 	ChatFilterSelect,
@@ -189,6 +190,7 @@ export function ActiveChatsTable({
 	const [filters, setFilters] = useState(filtersDefault);
 	const [search, setSearch] = useState("");
 	const [filterOpen, setFilterOpen] = useState(false);
+	const [tagSearch, setTagSearch] = useState("");
 	const filterPanelId = useId();
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const columns = useChatPopover<HTMLDivElement>(columnsOpen, () =>
@@ -221,6 +223,7 @@ export function ActiveChatsTable({
 		setFilters((current) => ({
 			...current,
 			[key]: value,
+			...(key === "inbox" ? { label: tagsForProject([current.label], projectTagScope(inboxes.find(({ id }) => String(id) === value)))[0] ?? "" } : {}),
 			page: key === "page" ? Number(value) : 1,
 		}));
 	const toggleColumn = (key: Extra) =>
@@ -230,7 +233,8 @@ export function ActiveChatsTable({
 			else next.add(key);
 			return next;
 		});
-	const projects = new Map(inboxes.map((item) => [item.id, item.name]));
+	const projects = new Map(inboxes.map((item) => [item.id, item]));
+	const matchingTags = searchProjectTags(labels, projectTagScope(projects.get(Number(filters.inbox))), tagSearch, filters.label);
 	const rows = query.data?.rows ?? [];
 	const tabCounts = {
 		all: counts?.activeCount,
@@ -285,7 +289,7 @@ export function ActiveChatsTable({
 			label: "Тег",
 			icon: Tag,
 			empty: "Все теги",
-			options: labels.map((label) => ({ value: label, label })),
+			options: matchingTags.map((label) => ({ value: label, label })),
 		},
 		{
 			key: "priority",
@@ -502,6 +506,7 @@ export function ActiveChatsTable({
 					onClose={() => setFilterOpen(false)}
 				>
 					{filterFields.map((item) => (
+						<div key={item.key} className="min-w-0 space-y-1.5">
 						<ChatFilterSelect
 							key={item.key}
 							icon={item.icon}
@@ -511,6 +516,8 @@ export function ActiveChatsTable({
 							empty={item.empty}
 							onChange={(value) => update(item.key, value)}
 						/>
+						{item.key === "label" && labels.length > 0 && <ChatSearch label="Найти тег для фильтра" placeholder="Найти тег…" value={tagSearch} onChange={setTagSearch} />}
+						</div>
 					))}
 				</ChatFilterPanel>
 			</div>
@@ -658,8 +665,9 @@ export function ActiveChatsTable({
 							rows.map((row) => {
 								const state = activity(row);
 								const player = row.player || `Диалог #${row.id}`;
-								const project =
-									row.project ?? projects.get(row.inboxId ?? 0) ?? "—";
+								const source = projects.get(row.inboxId ?? 0);
+								const project = row.project ?? source?.name ?? "—";
+								const tags = tagsForProject(row.tags, projectTagScope(source, project));
 								const alreadyWatched = watched.has(row.id);
 								return (
 									<tr
@@ -775,7 +783,7 @@ export function ActiveChatsTable({
 												key === "location"
 													? location(row)
 													: key === "tags"
-														? row.tags.join(", ")
+																? tags.join(", ")
 														: row[key];
 											return (
 												<td

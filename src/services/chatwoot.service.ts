@@ -77,6 +77,7 @@ export type ChatwootConversation = {
 	created_at?: number;
 	updated_at?: number;
 	waiting_since?: number | null;
+	first_reply_created_at?: number | string | null;
 };
 
 export type ChatwootMessage = {
@@ -134,12 +135,13 @@ export type ChatwootCapacityPolicy = {
 };
 export type ChatDirectoryKind = "chat-team" | "chat-label";
 export type ChatDirectoryItem = { id: number; name?: string; title?: string; description?: string; color?: string; show_on_sidebar?: boolean };
-export type ChatwootInbox = { id: number; name: string; channel_type?: string; website_url?: string | null };
+export type ChatTagScope = "b2b" | "b2c" | "all";
+export type ChatwootInbox = { id: number; name: string; channel_type?: string; website_url?: string | null; tagScope?: ChatTagScope };
 
 export type ChatwootOperations = {
 	revision: string;
 	agents: Record<number, { skills: string[]; zone: string; shifts: { day: number; start: string; end: string }[] }>;
-	inboxes: Record<number, { skills: string[]; responseMinutes: number; crm: NonNullable<ChatwootConversation["crm"]> | "" }>;
+	inboxes: Record<number, { skills: string[]; responseMinutes: number; crm: NonNullable<ChatwootConversation["crm"]> | ""; tagScope?: ChatTagScope | "" }>;
 };
 
 export type ChatwootSupervisor = {

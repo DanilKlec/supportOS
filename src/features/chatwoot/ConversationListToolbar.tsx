@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import type { ChatwootAgent, ChatwootInbox } from "@/services/chatwoot.service";
-import { normalizeSearchValue, scoreTextSearch } from "@/shared/lib/bind-search";
+import { projectTagScope, searchProjectTags, tagsForProject } from "./chat-tags";
 import {
 	ChatFilterPanel,
 	ChatFilterSelect,
@@ -96,13 +96,9 @@ export function ConversationListToolbar({
 	const filterPanelId = useId();
 	const [expanded, setExpanded] = useState(false);
 	const [tagSearch, setTagSearch] = useState("");
-	const matchingLabels = normalizeSearchValue(tagSearch)
-		? labels.map((label) => ({ label, score: scoreTextSearch(tagSearch, [label]) }))
-			.filter(({ score, label }) => score || label === filters.label).sort((a, b) => b.score - a.score).map(({ label }) => label)
-		: labels;
-	const projectName = inboxes.find(
-		(inbox) => String(inbox.id) === project,
-	)?.name;
+	const source = inboxes.find((inbox) => String(inbox.id) === project);
+	const projectName = source?.name;
+	const matchingLabels = searchProjectTags(labels, projectTagScope(source), tagSearch, filters.label);
 	const chips: FilterChip[] = [];
 	if (filters.inboxId)
 		chips.push({
@@ -219,7 +215,10 @@ export function ConversationListToolbar({
 						value: String(inbox.id),
 						label: inbox.name,
 					}))}
-					onChange={(inboxId) => update({ inboxId })}
+					onChange={(inboxId) => {
+						const tagScope = projectTagScope(inboxes.find((inbox) => String(inbox.id) === inboxId));
+						update({ inboxId, label: tagsForProject([filters.label], tagScope)[0] ?? "" });
+					}}
 				/>
 				<div className="min-w-0 space-y-1.5">
 					<ChatFilterSelect

@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { chatwootService } from "@/services/chatwoot.service";
 import { useAuthStore } from "@/store/auth.store";
+import { useToast } from "@/shared/hooks/useToast";
 import { subscribeToChatwootEvents } from "@/services/chatwoot-realtime";
 import { assignedChats, assignedChatsKey, CHAT_SOUND_PREFERENCE, getChatAlerts } from "./chat-alerts";
 
@@ -69,6 +70,7 @@ export function ChatNotifications({
 	const email = useAuthStore((state) => state.session?.user.email);
 	const accessToken = useAuthStore((state) => state.session?.accessToken);
 	const client = useQueryClient();
+	const { showToast } = useToast();
 	const audio = useRef<AudioContext | null>(null);
 	const baseline = useRef<Map<number, number | undefined> | null>(null);
 	const health = useQuery({
@@ -81,6 +83,7 @@ export function ChatNotifications({
 		queryFn: () => chatwootService.conversations(assignedChats),
 		enabled: health.data?.configured === true,
 		refetchInterval: 8_000,
+		refetchIntervalInBackground: true,
 		refetchOnWindowFocus: "always",
 		refetchOnReconnect: "always",
 		retry: false,
@@ -167,13 +170,17 @@ export function ChatNotifications({
 			}
 			if (fresh.length === 0) return;
 			playSound(audio.current);
-			showNotification(fresh.length, fresh[0].assignment);
+			if (document.hidden || !document.hasFocus()) {
+				showNotification(fresh.length, fresh[0].assignment);
+			} else {
+				showToast(fresh.length > 1 ? `Новые события в чатах · ${fresh.length}` : fresh[0].assignment ? "Вам назначен диалог" : "Новое сообщение в чате");
+			}
 		};
 		if (navigator.locks)
 			void navigator.locks
 				.request("supportos:chat-alerts", notify)
 				.catch(() => undefined);
 		else notify();
-	}, [snapshots.data, userId]);
+	}, [showToast, snapshots.data, userId]);
 	return null;
 }

@@ -71,6 +71,7 @@ import { ChatOperationsPage } from "./ChatOperationsPage";
 import { ChatwootCapacityPanel } from "./ChatwootCapacityPanel";
 import { ActiveChatsTable } from "./ActiveChatsTable";
 import { ChatClockProvider, chatElapsedTime, useChatClock, WaitingTime } from "./ChatClock";
+import { depositTags, projectTagScope, tagsForProject, totalDepositFrom } from "./chat-tags";
 import { ConversationActions, conversationPriorityLabels, conversationStatusLabels } from "./ConversationActions";
 import { ChatSettingsWorkspace } from "./ChatSettingsWorkspace";
 import { ChatSearch } from "./ChatFilters";
@@ -144,7 +145,22 @@ function dateLabel(timestamp?: number) {
 
 function conversationWaitingSince(conversation: ChatwootConversation, last = conversation.last_non_activity_message) {
 	if (conversation.status !== "open" && conversation.status !== "pending") return;
-	return conversation.waiting_since ?? (!last?.private && ["0", "incoming"].includes(String(last?.message_type)) ? last?.created_at : undefined);
+	const since = conversation.waiting_since;
+	if (last && !last.private) {
+		const type = String(last.message_type);
+		if (["1", "outgoing"].includes(type) && last.sender?.type?.toLowerCase() !== "agentbot" &&
+			since && last.created_at && timestampMs(last.created_at) >= timestampMs(since)) return;
+		if (!since && ["0", "incoming"].includes(type)) return last.created_at;
+	}
+	return since || undefined;
+}
+
+const timestampMs = (timestamp: number) => timestamp > 1e12 ? timestamp : timestamp * 1000;
+
+function firstReplyPending(conversation: ChatwootConversation, since?: number) {
+	const firstReply = conversation.first_reply_created_at;
+	if (firstReply !== undefined) return firstReply === null || firstReply === 0 || firstReply === "0";
+	return Boolean(since && since === conversation.created_at);
 }
 
 function ReplyTime({ timestamp }: { timestamp?: number }) {
@@ -167,7 +183,7 @@ export function AgentInboxPage() {
 function InboxSession({ parentClient }: { parentClient: QueryClient }) {
 	const [client] = useState(() => new QueryClient({ defaultOptions: parentClient.getDefaultOptions() }));
 	useEffect(() => () => client.clear(), [client]);
-	return <QueryClientProvider client={client}><ChatClockProvider><AgentInboxWorkspace /></ChatClockProvider></QueryClientProvider>;
+	return <QueryClientProvider client={client}><ChatClockProvider><AgentInboxWorkspace notificationClient={parentClient} /></ChatClockProvider></QueryClientProvider>;
 }
 
 type CoachingDraft = { text: string; coachTo?: CoachingRecipient };
@@ -178,7 +194,7 @@ type UpdateOperatorDraft = (id: number, change: (current: OperatorDraft) => Oper
 const emptyMessageDraft: MessageDraft = { text: "", files: [] };
 const emptyOperatorDraft: OperatorDraft = { mode: "reply", reply: emptyMessageDraft, note: emptyMessageDraft };
 
-function AgentInboxWorkspace() {
+function AgentInboxWorkspace({ notificationClient }: { notificationClient: QueryClient }) {
 	const client = useQueryClient();
 	const [scope, setScope] = useState<Scope>("mine");
 	const [activeSection, setActiveSection] = useState<WorkspaceSection>("inbox");
@@ -271,6 +287,7 @@ function AgentInboxWorkspace() {
 			if (refreshTimer !== undefined) return;
 			refreshTimer = window.setTimeout(() => {
 				refreshTimer = undefined;
+				void notificationClient.invalidateQueries({ queryKey: assignedChatsKey }, { cancelRefetch: false });
 				void client.invalidateQueries({ queryKey: ["chatwoot", "conversations"] }, { cancelRefetch: false });
 				void client.invalidateQueries({ queryKey: ["chatwoot", "active-overview"] }, { cancelRefetch: false });
 				void client.invalidateQueries({ queryKey: ["chatwoot", "conversation-counts"] }, { cancelRefetch: false });
@@ -294,6 +311,7 @@ function AgentInboxWorkspace() {
 				userId: user.id,
 				onAssignment: () => {
 					void client.invalidateQueries({ queryKey: assignedChatsKey });
+					void notificationClient.invalidateQueries({ queryKey: assignedChatsKey }, { cancelRefetch: false });
 					scheduleRefresh();
 				},
 				onNote: () => {
@@ -312,7 +330,7 @@ function AgentInboxWorkspace() {
 			if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
 			unsubscribe();
 		};
-	}, [connection.data?.configured, accessToken, user?.id, canWork, canSupervise, client]);
+	}, [connection.data?.configured, accessToken, user?.id, canWork, canSupervise, client, notificationClient]);
 	const directory = useQuery({
 		queryKey: ["chatwoot", "directory"],
 		queryFn: chatwootService.inboxDirectory,
@@ -392,7 +410,7 @@ function AgentInboxWorkspace() {
 	const conversationCounts = useQuery({
 		queryKey: ["chatwoot", "conversation-counts", listScope === "queue" ? inboxId : "", user?.email],
 		queryFn: () => chatwootService.conversationCounts(listScope === "queue" && inboxId ? Number(inboxId) : undefined),
-		enabled: connection.data?.configured === true && activeSection === "inbox",
+		enabled: connection.data?.configured === true && ["inbox", "team", "activity"].includes(activeSection),
 		staleTime: 5000,
 		refetchInterval: realtimeConnected ? 12000 : 5000,
 		retry: 1,
@@ -411,6 +429,7 @@ function AgentInboxWorkspace() {
 				queryKey: ["chatwoot", "conversations"],
 			});
 			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "team-status"] });
 		},
 	});
 	const chatCapacity = useMutation({
@@ -627,14 +646,14 @@ function AgentInboxWorkspace() {
 							</button>
 						))}
 					</div>
-					<ChatTeamIndicator team={teamStatus.data} onOpen={() => selectSection("team")} />
+					<ChatTeamIndicator team={teamStatus.data} active={conversationCounts.data?.activeCount} onOpen={() => selectSection("team")} />
 					<span className="chat-connection" data-live={realtimeConnected} role="status" title={realtimeConnected ? "Обновляется онлайн" : "Автообновление"}>
 						<i aria-hidden="true" />
 						<span>{realtimeConnected ? "Обновляется онлайн" : "Автообновление"}</span>
 					</span>
 				</nav>}
 				{(activeSection === "activity" || activeSection === "team") && <div className="chat-scope-bar">
-					<ChatTeamIndicator team={teamStatus.data} onOpen={() => selectSection("team")} />
+					<ChatTeamIndicator team={teamStatus.data} active={conversationCounts.data?.activeCount} onOpen={() => selectSection("team")} />
 				</div>}
 				<div className="flex min-h-0 flex-1">
 				{activeSection === "activity" ? (
@@ -731,7 +750,7 @@ function AgentInboxWorkspace() {
 									<ConversationRow
 										key={item.id}
 										conversation={item}
-										projectName={item.meta?.inbox?.name ?? inboxes.find((project) => project.id === item.inbox_id)?.name}
+										project={inboxes.find((project) => project.id === item.inbox_id)}
 										active={chatWindows.activeId === item.id}
 										opened={chatWindows.panes.some((pane) => pane.id === item.id)}
 										checked={selectedChats?.has(item.id)}
@@ -804,6 +823,7 @@ function AgentInboxWorkspace() {
 							listControl={listControl}
 							addControl={addControl}
 							visible={visible}
+							selected={id !== null && id === chatWindows.activeId}
 							tiled={tiled}
 							expanded={expanded}
 							onExpand={canExpand && id !== null ? () => dispatchChatWindow({ type: "expand", id }) : undefined}
@@ -1138,7 +1158,7 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
 
 function ConversationRow({
 	conversation,
-	projectName,
+	project,
 	active,
 	opened,
 	checked,
@@ -1150,7 +1170,7 @@ function ConversationRow({
 	takeDisabled = false,
 }: {
 	conversation: ChatwootConversation;
-	projectName?: string;
+	project?: ChatwootInbox;
 	active: boolean;
 	opened: boolean;
 	checked?: boolean;
@@ -1163,12 +1183,12 @@ function ConversationRow({
 }) {
 	const sender = conversation.meta?.sender;
 	const last = conversation.last_non_activity_message;
-	const name = sender?.name || sender?.email || "Диалог #" + conversation.id;
-	const loginValue = sender?.custom_attributes?.player_login ?? sender?.custom_attributes?.login ?? conversation.custom_attributes?.player_login ?? conversation.custom_attributes?.login;
-	const login = typeof loginValue === "string" && loginValue.trim() !== name ? loginValue.trim() : "";
-	const source = projectName ?? (conversation.inbox_id ? "Источник #" + conversation.inbox_id : "Входящие");
-	const tags = conversation.labels ?? [];
-	const timestamp = dateLabel(conversation.created_at ?? last?.created_at ?? conversation.updated_at);
+	const name = sender?.name || sender?.email || `Диалог #${conversation.id}`;
+	const loginValue = sender?.custom_attributes?.player_login ?? sender?.custom_attributes?.login ?? conversation.custom_attributes?.player_login ?? conversation.custom_attributes?.login ?? sender?.identifier;
+	const login = (typeof loginValue === "string" || typeof loginValue === "number") && String(loginValue).trim() !== name ? String(loginValue).trim() : "";
+	const source = conversation.meta?.inbox?.name ?? project?.name ?? (conversation.inbox_id ? `Источник #${conversation.inbox_id}` : "Входящие");
+	const tags = tagsForProject(conversation.labels ?? [], projectTagScope(project, source));
+	const timestamp = conversation.created_at ?? last?.created_at ?? conversation.updated_at;
 	const waitingSince = conversationWaitingSince(conversation);
 	return (
 		<div data-active={active} data-opened={opened} data-checked={checked} className="chat-list-row">
@@ -1179,11 +1199,11 @@ function ConversationRow({
 				<span className="chat-list-main">
 					<span className="chat-list-line">
 						<span className="chat-list-project truncate" title={source}>{source}</span>
-						<span className="chat-list-time" title="Время поступления">{timestamp || "#" + conversation.id}</span>
+						{timestamp ? <time className="chat-list-time" title={`Поступил ${new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}`}>{dateLabel(timestamp)}</time> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					<span className="chat-list-line">
 						<span className="chat-list-player truncate" title={name}>{name}</span>
-						{waitingSince ? <WaitingTime timestamp={waitingSince} className="chat-list-time chat-text-warning" /> : <span className="chat-list-number">#{conversation.id}</span>}
+						{waitingSince ? <WaitingTime timestamp={waitingSince} firstReply={firstReplyPending(conversation, waitingSince)} className="chat-list-time chat-text-warning" /> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					{login && <span className="chat-list-meta truncate" title={`Логин игрока ${login}`}>Логин · {login}</span>}
 					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
@@ -1194,7 +1214,7 @@ function ConversationRow({
 				</span>
 			</button>
 			{onTake && <button type="button" onClick={onTake} disabled={takeDisabled} title="Взять в работу"
-				aria-label={"Взять в работу диалог #" + conversation.id} className="chat-list-take">
+				aria-label={`Взять в работу диалог #${conversation.id}`} className="chat-list-take">
 				<ArrowDownToLine size={13} aria-hidden="true" /> {taking ? "Берём…" : "Взять"}
 			</button>}
 		</div>
@@ -1209,6 +1229,7 @@ function ConversationPane({
 	supervising = false,
 	docked = false,
 	visible = true,
+	selected = false,
 	tiled = false,
 	expanded = false,
 	onExpand,
@@ -1241,6 +1262,7 @@ function ConversationPane({
 	supervising?: boolean;
 	docked?: boolean;
 	visible?: boolean;
+	selected?: boolean;
 	tiled?: boolean;
 	expanded?: boolean;
 	onExpand?: () => void;
@@ -1294,7 +1316,7 @@ function ConversationPane({
 	const playerToggle = useRef<HTMLButtonElement>(null);
 	const actionsToggle = useRef<HTMLButtonElement>(null);
 	const [contextOpener, setContextOpener] = useState<"player" | "actions" | null>(null);
-	const [customerWidth, setCustomerWidth] = useState(275);
+	const [customerWidth, setCustomerWidth] = useState(234);
 	const [confirmBlock, setConfirmBlock] = useState(false);
 	const [olderMessages, setOlderMessages] = useState<ChatwootMessage[]>([]);
 	const [hasOlderMessages, setHasOlderMessages] = useState(true);
@@ -1339,8 +1361,10 @@ function ConversationPane({
 	const canWrite = !supervising && conversation?.access?.write === true;
 	const canNote = !supervising && conversation?.access?.note === true;
 	useLayoutEffect(() => {
-		if (visible && !tiled && editorExpanded && (canWrite || canNote)) editor.current?.focus({ preventScroll: true });
-	}, [id, visible, tiled, editorExpanded, canWrite, canNote]);
+		if (visible && selected && editorExpanded && (canWrite || canNote) && !thread.current?.contains(document.activeElement)) {
+			editor.current?.focus({ preventScroll: true });
+		}
+	}, [visible, selected, editorExpanded, canWrite, canNote]);
 	const canTake = !supervising && conversation?.access?.take === true;
 	const mode: ComposerMode = canNote && (!canWrite || operatorDraft.mode === "note") ? "note" : "reply";
 	const sendAsNote = mode === "note";
@@ -1474,7 +1498,7 @@ function ConversationPane({
 	useEffect(() => {
 		if (!conversationVisible || !thread.current) return;
 		const observer = new ResizeObserver(([entry]) => {
-			if (entry) setContextOverlay(entry.contentRect.width < 760);
+			if (entry) setContextOverlay(entry.contentRect.width < 640);
 		});
 		observer.observe(thread.current);
 		return () => observer.disconnect();
@@ -1657,12 +1681,9 @@ function ConversationPane({
 	const source = inboxes.find((inbox) => inbox.id === conversation?.inbox_id);
 	const project = conversation?.meta?.inbox?.name ?? source?.name;
 	const visitor = conversation?.visitor;
-	const rawLogin = currentContact?.custom_attributes?.player_login ?? currentContact?.custom_attributes?.login ?? visitor?.login;
-	const playerLogin = typeof rawLogin === "string" ? rawLogin : undefined;
-	const depositKeys = ["total_deposit", "total_deposits", "total_deposit_amount", "total_deposits_amount", "deposit_total", "deposits_total"];
-	const totalDeposit = [currentContact?.custom_attributes, conversation?.custom_attributes]
-		.flatMap((attributes) => depositKeys.map((key) => attributes?.[key]))
-		.find((value) => (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.trim()));
+	const rawLogin = currentContact?.custom_attributes?.player_login ?? currentContact?.custom_attributes?.login ?? visitor?.login ?? currentContact?.identifier;
+	const playerLogin = typeof rawLogin === "string" || typeof rawLogin === "number" ? String(rawLogin) : undefined;
+	const totalDeposit = totalDepositFrom(currentContact?.custom_attributes, sender?.custom_attributes, conversation?.custom_attributes, currentContact?.additional_attributes, conversation?.additional_attributes);
 	const crmUrl = crmWorkspaceUrl(conversation?.crm);
 	const insertBind = (bind: Bind) => {
 		const translation = getBindTranslation(bind, language);
@@ -1743,12 +1764,12 @@ function ConversationPane({
 			</div>
 		</div>
 	);
-	const tags = conversation?.labels ?? [];
+	const tagScope = projectTagScope(source, project);
+	const tags = tagsForProject(conversation.labels ?? [], tagScope);
+	const playerDepositTags = depositTags(tagsForProject([...new Set([...tags, ...(contact.data?.label_list ?? [])])], tagScope));
 	const inactive = ["resolved", "snoozed"].includes(conversation.status);
 	const statusText = conversationStatusLabels[conversation.status];
-	const lastPublicMessage = conversation.waiting_since == null
-		? messages.filter((message) => !message.private && ["0", "1", "incoming", "outgoing"].includes(String(message.message_type))).at(-1)
-		: undefined;
+	const lastPublicMessage = messages.findLast((message) => !message.private && ["0", "1", "incoming", "outgoing"].includes(String(message.message_type)));
 	const waitingSince = conversationWaitingSince(conversation, lastPublicMessage);
 	const contextVisible = Boolean(contextTab && (showCustomer || canWrite) && (contextOpener || !contextOverlay && !tiled));
 	const editError = status.error || assign.error || assignTeam.error || priority.error || take.error || tagMutation.error || block.error;
@@ -1774,7 +1795,7 @@ function ConversationPane({
 									{project ? `${project} · #${id}` : `#${id}`}
 									{statusText && <span className="chat-thread-status" data-status={conversation.status}>{statusText}</span>}
 								</span>
-								{waitingSince ? <WaitingTime timestamp={waitingSince} className="shrink-0 whitespace-nowrap chat-text-warning" /> : null}
+								{waitingSince ? <WaitingTime timestamp={waitingSince} firstReply={firstReplyPending(conversation, waitingSince)} className="shrink-0 whitespace-nowrap chat-text-warning" /> : null}
 							</p>
 							{supervising && <p className="truncate text-[11px] text-muted" title={conversation.meta?.assignee?.name}>
 								{conversation.meta?.assignee?.name ? `Агент · ${conversation.meta.assignee.name}` : coachRecipient ? "Назначенный агент" : "Агент не назначен"}
@@ -1824,7 +1845,7 @@ function ConversationPane({
 						</button>}
 					</div>
 				</header>
-				{(conversation.priority || tags.length > 0 || canWrite) && <div className="chat-thread-meta flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
+				{(conversation.priority || tags.length > 0 || canWrite) && <section className="chat-thread-meta flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5" aria-label="Метки диалога">
 					{conversation.priority && <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted">Приоритет · {conversationPriorityLabels[conversation.priority]}</span>}
 					{tags.map((tag) => <span key={tag} className="chat-context-tag break-all">{tag}</span>)}
 					{canWrite && <button type="button" onClick={() => {
@@ -1833,7 +1854,7 @@ function ConversationPane({
 						setTagPickerRequest((request) => request + 1);
 						setContextTab("actions");
 					}} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-surface-elevated"><Tag size={12} /> Теги диалога</button>}
-				</div>}
+				</section>}
 				{editError && contextTab !== "actions" && (
 					<div role="alert" className="border-b border-red-500/20 bg-red-500/5 px-4 py-2 text-[11px] chat-text-danger">
 						{editError.message}
@@ -1929,7 +1950,7 @@ function ConversationPane({
 							<MessageSquareText size={14} /> Вернуться к переписке
 						</button>
 					</footer>
-				) : (canWrite || canNote) ? <footer data-note={sendAsNote} data-collapsed={!editorExpanded} className="chat-thread-composer relative shrink-0 border-t border-border p-2.5 sm:p-3">
+				) : (canWrite || canNote) ? <footer data-note={sendAsNote} data-collapsed={!editorExpanded} className="chat-thread-composer relative shrink-0 border-t border-border px-2.5 py-2">
 					<div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5">
 							<fieldset className="chat-operator-composer flex w-fit max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-border p-0.5">
 								<legend className="sr-only">Кому отправить сообщение</legend>
@@ -1972,8 +1993,8 @@ function ConversationPane({
 								? "Заметка видна только команде…"
 								: "Напишите ответ игроку или введите /"
 						}
-						rows={3}
-						className="supportos-scroll block max-h-36 min-h-14 w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none placeholder:text-muted focus:border-accent/60"
+						rows={1}
+						className="supportos-scroll block max-h-36 min-h-10 w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent/60"
 					/>
 					<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
 						<div className="flex flex-wrap items-center gap-1.5">
@@ -2111,7 +2132,7 @@ function ConversationPane({
 					</div>
 					{!showCustomer && canWrite ? <>
 						{editError && <p role="alert" className="mb-3 rounded-lg bg-red-500/5 px-2 py-1.5 text-xs chat-text-danger">{editError.message}</p>}
-						<ConversationActions key={tagPickerRequest} openTagPicker={tagPickerRequest > 0} conversation={conversation} agents={agents} teams={teams} labels={labels}
+						<ConversationActions key={tagPickerRequest} openTagPicker={tagPickerRequest > 0} conversation={conversation} agents={agents} teams={teams} labels={tagsForProject(labels, tagScope)} visibleTags={tags}
 							pending={{ agent: assign.isPending, team: assignTeam.isPending, priority: priority.isPending, status: status.isPending, tags: tagMutation.isPending }}
 							onAgent={assign.mutate} onTeam={assignTeam.mutate} onPriority={priority.mutate} onStatus={status.mutate} onTags={tagMutation.mutate} />
 					</> : <>
@@ -2129,7 +2150,8 @@ function ConversationPane({
 					<div className="space-y-3 text-xs">
 						{canWrite && id != null && contact.data && <ChatContactEditor key={contact.data.id} contact={contact.data} conversationId={id} />}
 						<Info label="Логин игрока" value={playerLogin} />
-						<Info label="Общая сумма депозитов" value={totalDeposit == null ? undefined : String(totalDeposit)} />
+						<Info label="Общая сумма депозитов" value={totalDeposit} />
+						<Info label="Теги депозитов" value={playerDepositTags.join(" · ")} />
 						{currentContact?.identifier !== playerLogin && <Info label="Идентификатор игрока" value={currentContact?.identifier} />}
 						<Info label="Телефон" value={currentContact?.phone_number} />
 						<Info label="ID контакта" value={String(contactId ?? "")} />

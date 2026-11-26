@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
 	Activity,
 	ArrowDown,
-	Bot,
 	Headphones,
 	Inbox,
 	UsersRound,
@@ -151,9 +150,11 @@ export function ChatActivityPage({ team }: { team?: ChatTeamStatus }) {
 
 export function ChatTeamIndicator({
 	team,
+	active,
 	onOpen,
 }: {
 	team?: ChatTeamStatus;
+	active?: number | null;
 	onOpen: () => void;
 }) {
 	const [open, setOpen] = useState(false);
@@ -162,19 +163,24 @@ export function ChatTeamIndicator({
 			<button
 				type="button"
 				aria-expanded={open}
-				aria-label={`Принимают чаты: агенты ${team?.accepting ?? "—"}, подключённые боты ${team?.bots ?? "—"}`}
+				aria-label={`Операторы онлайн ${team?.online ?? "—"}, принимают чаты ${team?.accepting ?? "—"}, активные чаты ${active ?? "—"}, подключённые боты ${team?.bots ?? "—"}`}
 				onClick={() => setOpen((value) => !value)}
 				onKeyDown={(event) => {
 					if (event.key === "Escape") setOpen(false);
 				}}
 				className="flex h-8 items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-xs hover:bg-surface-elevated"
 			>
-				<Headphones size={14} className="text-accent" />
-				<span className="hidden sm:inline">Принимают</span>
-				<strong className="tabular-nums">{team?.accepting ?? "—"}</strong>
+				<UsersRound size={14} className="text-accent" aria-hidden="true" />
+				<span className="hidden sm:inline">Онлайн</span>
+				<strong className="tabular-nums">{team?.online ?? "—"}</strong>
 				<span className="mx-0.5 h-3 w-px bg-border" aria-hidden="true" />
-				<Bot size={14} className="text-muted" />
-				<strong className="tabular-nums">{team?.bots ?? "—"}</strong>
+				<Activity size={14} className="text-muted" aria-hidden="true" />
+				<strong className="tabular-nums">{active ?? "—"}</strong>
+				<span className="hidden xl:inline">активных</span>
+				<span className="hidden items-center gap-1.5 border-l border-border pl-2 lg:inline-flex" title="Принимают чаты">
+					<Headphones size={14} className="text-muted" aria-hidden="true" />
+					<strong className="tabular-nums">{team?.accepting ?? "—"}</strong>
+				</span>
 			</button>
 			{open && (
 				<div className="absolute right-0 top-full mt-2 w-56 space-y-2 rounded-xl border border-border bg-surface p-3 text-xs shadow-xl">
@@ -185,6 +191,9 @@ export function ChatTeamIndicator({
 					<div className="flex justify-between gap-2">
 						<span>Принимают чаты</span>
 						<strong>{team?.accepting ?? "—"}</strong>
+					</div>
+					<div className="flex justify-between gap-2">
+						<span>Активные чаты</span><strong>{active ?? "—"}</strong>
 					</div>
 					<div className="flex justify-between gap-2">
 						<span>Подключённые боты</span>

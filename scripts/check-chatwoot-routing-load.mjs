@@ -181,6 +181,7 @@ try {
 		'20261119045408_chatwoot_coaching_notes',
 		'20261124100123_chatwoot_disconnect_handoff',
 		'20261125211944_chatwoot_route_update_broadcast',
+		'20261126080134_chatwoot_balance_active_load',
 	]) await pg.exec(await migrate(migration));
 	await pg.exec(`
 		insert into auth.users select ('00000000-0000-0000-0000-' || lpad(id::text, 12, '0'))::uuid from generate_series(1, ${agentCount}) as id;
@@ -192,6 +193,23 @@ try {
 		insert into public.supportos_chatwoot_agent_limits(chatwoot_agent_id, max_active_chats)
 			select id, ${limit} from generate_series(1, ${agentCount}) as id;
 	`);
+	await pg.exec('begin');
+	try {
+		const lease = randomUUID();
+		assert.equal(await rpc('supportos_chatwoot_acquire_router_lease', {
+			p_lease_token: lease, p_min_interval_seconds: 1, p_lease_seconds: 60,
+		}), true);
+		await pg.exec("update public.supportos_chatwoot_router_state set last_agent_id = 50 where id = 'main'");
+		const reserve = (id) => rpc('supportos_chatwoot_reserve_conversation', {
+			p_operation_token: randomUUID(), p_conversation_id: id, p_agent_ids: [1, 2, 3],
+			p_active_counts: { 1: 1, 2: 0, 3: 0 }, p_lease_token: lease,
+		});
+		assert.equal((await reserve(10_001)).agentId, 2, 'An idle agent wins even when round-robin would start at the busy agent');
+		assert.equal((await reserve(10_002)).agentId, 3, 'A reservation counts as load and other idle agents still win');
+		assert.equal((await reserve(10_003)).agentId, 1, 'Once the loads tie, round-robin resumes');
+	} finally {
+		await pg.exec('rollback');
+	}
 	globalThis.fetch = fakeFetch;
 	addChats(1, 20);
 	const normal = await wave();
@@ -234,9 +252,10 @@ try {
 	assert.equal(onShift({ zone: 'UTC', shifts: [shift] }, new Date('2026-11-17T03:00:00Z')), false);
 	const settings = normalizeOperations({
 		agents: { 1: { zone: 'UTC', shifts: [shift], skills: ['EN', ' en '] } },
-		inboxes: { 1: { skills: ['EN'], responseMinutes: 2, crm: '' } },
+		inboxes: { 1: { skills: ['EN'], responseMinutes: 2, crm: '', tagScope: 'b2b' } },
 	});
 	assert.deepEqual(settings.agents[1].skills, ['en']);
+	assert.equal(settings.inboxes[1].tagScope, 'b2b');
 	assert.equal(slaSnapshot([{ id: 1, inbox_id: 1, waiting_since: 100 }], settings, 221000)[0].overdue, true);
 	const outOfShiftDay = (new Date().getUTCDay() + 2) % 7;
 	const projectRules = normalizeOperations({

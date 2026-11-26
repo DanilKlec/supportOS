@@ -9,6 +9,7 @@ test("work in up to four independent chat windows", async ({
 	let publicMessages = 0;
 	let translationAttempts = 0;
 	let rejectPriority = true;
+	let incomingNew = false;
 	const priorityWrites: number[] = [];
 	const firstMessageTime = 1791799200;
 	const startTime = (firstMessageTime + 60) * 1000;
@@ -18,6 +19,7 @@ test("work in up to four independent chat windows", async ({
 		inbox_id: 2,
 		status: "open",
 		waiting_since: id === 21 ? firstMessageTime : 0,
+		labels: id === 21 ? ["b2b-deposit-100-eur", "b2c-vip"] : [],
 		access: { read: true, write: true, note: true, take: false, seeIp: false },
 		meta: { sender: { name: `Игрок ${id}` } },
 	}));
@@ -65,20 +67,24 @@ test("work in up to four independent chat windows", async ({
 					json: {
 						agents: [],
 						teams: [],
-						inboxes: [{ id: 2, name: "Тестовый проект" }],
+						inboxes: [{ id: 2, name: "Тестовый проект", tagScope: "b2b" }],
 						presence: [],
 					},
 				});
 			case "presence":
 				return route.fulfill({ json: { current: { accepting: true } } });
+			case "team-status":
+				return route.fulfill({ json: { online: 7, accepting: 5, bots: 2 } });
 			case "conversation-counts":
 				return route.fulfill({
-					json: { mineCount: chats.length, queueCount: 0 },
+					json: { mineCount: chats.length, queueCount: 0, activeCount: 12 },
 				});
 			case "conversations":
 				return route.fulfill({
 					json: {
-						payload: url.searchParams.get("scope") === "mine" ? chats : [],
+						payload: url.searchParams.get("scope") === "mine" ? chats.map((chat) => incomingNew && chat.id === 22 ? {
+							...chat, last_non_activity_message: { id: 99, message_type: 0, created_at: startTime / 1000, content: "Новое сообщение" },
+						} : chat) : [],
 						hasMore: false,
 					},
 				});
@@ -103,6 +109,7 @@ test("work in up to four independent chat windows", async ({
 			case "coaching-notes":
 				return route.fulfill({ json: { notes: [] } });
 			case "labels":
+				return route.fulfill({ json: { payload: [{ title: "привет" }, { title: "депозит" }, { title: "b2c-привет" }] } });
 			case "custom-attributes":
 				return route.fulfill({ json: { payload: [] } });
 			case "priority": {
@@ -151,6 +158,8 @@ test("work in up to four independent chat windows", async ({
 	};
 
 	await openRow(21);
+	await expect(reply(21)).toBeFocused();
+	await expect(page.getByRole("button", { name: /Операторы онлайн 7.*активные чаты 12/ })).toBeVisible();
 	await expect(windows).toHaveCount(1);
 	await expect(grid).toHaveAttribute("data-grid-size", "1");
 	await expect(page.locator(".chat-windows-toolbar")).toHaveCount(0);
@@ -163,6 +172,7 @@ test("work in up to four independent chat windows", async ({
 			name: "Карточка игрока",
 		});
 		await expect(card).toBeVisible();
+		await expect(card.getByText("b2b-deposit-100-eur")).toBeVisible();
 		const [listBox, paneBox, headerBox, cardBox] = await Promise.all([
 			list.boundingBox(),
 			pane(21).boundingBox(),
@@ -194,6 +204,17 @@ test("work in up to four independent chat windows", async ({
 	await page.clock.setFixedTime(startTime + 1000);
 	await expect(pane(21).getByText("Ждёт 1 мин 01 с")).toBeVisible();
 	await expect(pane(21).getByText(/1 мин 01 с назад/)).toBeVisible();
+	await pane(21).getByRole("button", { name: "Теги диалога" }).click();
+	const tagSearch = pane(21).getByRole("textbox", { name: "Найти тег", exact: true });
+	await tagSearch.fill("ghbdtn");
+	await expect(pane(21).getByRole("button", { name: "привет", exact: true })).toBeVisible();
+	await expect(pane(21).getByRole("button", { name: "b2c-привет", exact: true })).toHaveCount(0);
+	await tagSearch.fill("дипозит");
+	await expect(pane(21).getByRole("button", { name: "депозит", exact: true })).toBeVisible();
+	await pane(21).getByRole("button", { name: "Закрепление тега депозит" }).click();
+	await tagSearch.fill("");
+	await expect(pane(21).locator(".chat-tag-options .chat-context-option").first()).toHaveText("депозит");
+	await pane(21).getByRole("button", { name: "Закрыть действия с диалогом" }).click();
 	await reply(21).fill("/Проверка статуса");
 	await expect(
 		pane(21).getByRole("option", { name: /Проверка статуса/ }),
@@ -220,7 +241,7 @@ test("work in up to four independent chat windows", async ({
 		await page.getByRole("button", { name: "Показать список" }).click();
 	await openRow(22);
 	await expect(windows).toHaveCount(1);
-	await expect(reply(22)).toBeVisible();
+	await expect(reply(22)).toBeFocused();
 	if (isMobile)
 		await page.getByRole("button", { name: "Показать список" }).click();
 	await openRow(21);
@@ -274,6 +295,13 @@ test("work in up to four independent chat windows", async ({
 	await reply(22).press("Enter");
 	await expect.poll(() => publicMessages).toBe(1);
 	expect(translationAttempts).toBe(2);
+	await page.bringToFront();
+	incomingNew = true;
+	const notification = page.getByText("Новое сообщение в чате", { exact: true });
+	await expect(notification).toBeVisible({ timeout: 12000 });
+	const sendButton = pane(22).getByRole("button", { name: "Отправить игроку" });
+	const [notificationBox, sendBox] = await Promise.all([notification.boundingBox(), sendButton.boundingBox()]);
+	expect(notificationBox?.y ?? Infinity).toBeLessThan(sendBox?.y ?? 0);
 	if (!isMobile)
 		await pane(22).getByRole("button", { name: "Вернуть сетку чатов" }).click();
 	else await activate(21);

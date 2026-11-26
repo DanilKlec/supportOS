@@ -480,8 +480,16 @@
 
 .chat-list-project {
 	color: var(--color-accent);
-	font-size: 0.8125rem;
+	font-size: 0.875rem;
 	font-weight: 650;
+}
+
+.chat-reply-target {
+	color: var(--color-muted);
+}
+
+.chat-reply-overdue {
+	color: var(--chat-danger);
 }
 
 .chat-list-number {
@@ -1076,6 +1084,28 @@
 	background: var(--color-surface-elevated);
 }
 
+.chat-tag-options {
+	max-height: min(18rem, 40dvh);
+	overscroll-behavior: contain;
+}
+
+.chat-tag-picker input {
+	min-height: 2.4rem;
+	font-size: 0.8125rem;
+}
+
+.chat-tag-picker .chat-context-option,
+.chat-context-tag.chat-applied-tag {
+	min-height: 2.4rem;
+	font-size: 0.8125rem;
+	overflow-wrap: anywhere;
+}
+
+.chat-applied-tag {
+	justify-content: space-between;
+	text-align: start;
+}
+
 .chat-context-tag {
 	display: inline-flex;
 	max-width: 100%;
@@ -1092,7 +1122,7 @@
 	display: none;
 }
 
-@container chat-thread (min-width: 760px) {
+@container chat-thread (min-width: 640px) {
 	.chat-thread-customer {
 		position: static;
 		width: var(--chat-context-width);

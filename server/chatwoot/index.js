@@ -1288,7 +1288,7 @@ export default async function handler(req, res) {
 			const queueStatus = readStatuses(queueInboxes);
 			const [statuses, allStatuses, mineCount] = await Promise.all([
 				queueStatus,
-				capabilities.supervise ? (inboxId ? readStatuses(null) : queueStatus) : null,
+				inboxId ? readStatuses(allowed) : queueStatus,
 				actorId && allowed?.length !== 0 ? api(cfg, `${prefix}/filter?page=1`, {
 					method: 'POST',
 					body: { payload: conversationFilters({ status: activeStatuses, assigneeId: String(actorId), inboxId: allowed }) },
@@ -1394,6 +1394,7 @@ export default async function handler(req, res) {
 			if (!agent) return json(res, 409, { error: 'Почта SupportOS должна совпадать с почтой агента Chatwoot, чтобы подключить приём чатов' });
 			const accepting = req.method === 'POST' && typeof body.accepting === 'boolean' ? body.accepting : null;
 			const current = await recordPresence(env, user.id, Number(agent.id), accepting);
+			if (accepting !== null) teamStatusCache.delete(accountKey);
 			const [team, limits] = await Promise.all([
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 				getAgentLimits(env),
@@ -1489,13 +1490,16 @@ export default async function handler(req, res) {
 			if (assigneeId && !validId(assigneeId)) return json(res, 400, { error: 'Некорректный агент' });
 			const filters = conversationFilters({ status: scope === 'mine' && status === 'open' ? activeStatuses : status, assigneeId, inboxId: inboxId || allowed, label, from, to });
 			const search = url.searchParams.get('q')?.trim().slice(0, 150);
-			const searchQuery = search ? `&q=${encodeURIComponent(search)}` : '';
-			const result = await api(cfg, `${prefix}/filter?page=${page}${searchQuery}`, { method: 'POST', body: { payload: filters } });
+			const filterQuery = new URLSearchParams({ page: String(page) });
+			if (search) filterQuery.set('q', search);
+			if (scope === 'mine') filterQuery.set('sort_by', 'created_at_asc');
+			const result = await api(cfg, `${prefix}/filter?${filterQuery}`, { method: 'POST', body: { payload: filters } });
 			const received = itemList(result);
 			const payload = received.filter((row) => {
 				if (scope === 'history' && status !== 'all' && status !== row.status) return false;
 				return !allowed || (String(conversationAssignee(row)) === assigneeId && allowed.includes(String(conversationInbox(row))));
 			});
+			if (scope === 'mine') payload.sort(oldestFirst);
 			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: received.length >= 25 });
 		}
 		if (action === 'conversation' && req.method === 'GET') {
@@ -1543,12 +1547,13 @@ export default async function handler(req, res) {
 			return json(res, 200, { alreadyLinked });
 		}
 		if (action === 'agents' && req.method === 'GET') {
-			const [agents, inboxes, teams, presence, limits] = await Promise.all([
+			const [agents, inboxes, teams, presence, limits, operations] = await Promise.all([
 				api(cfg, `/accounts/${cfg.accountId}/agents`),
 				getDirectory(),
 				api(cfg, `/accounts/${cfg.accountId}/teams`).catch(() => []),
 				allRows(env, 'supportos_chatwoot_presence?select=chatwoot_agent_id,accepting,heartbeat_at'),
 				getAgentLimits(env),
+				getOperations(env).catch(() => null),
 			]);
 			const maxFor = (agentId) => Number(limits.find((item) => Number(item.chatwoot_agent_id) === Number(agentId))?.max_active_chats) || 4;
 			const actor = await getAgentId();
@@ -1557,7 +1562,7 @@ export default async function handler(req, res) {
 			)).flat());
 			const safeAgents = itemList(agents).filter((agent) => !visibleMembers || visibleMembers.has(Number(agent.id)) || Number(agent.id) === actor)
 				.map(({ id, name, available_name, thumbnail, avatar_url, email, role, availability_status }) => ({ id, name, available_name, thumbnail: thumbnail || avatar_url, email: capabilities.supervise || Number(id) === actor ? email : undefined, role, availability_status, max_active_chats: maxFor(id) }));
-			return json(res, 200, { agents: safeAgents, inboxes: inboxes.map(publicInbox), teams: itemList(teams).map(({ id, name, description, allow_auto_assign }) => ({ id, name, description, allow_auto_assign })), presence: presence.filter((item) => !visibleMembers || visibleMembers.has(Number(item.chatwoot_agent_id))).map((row) => ({ ...row, max_active_chats: maxFor(row.chatwoot_agent_id) })) });
+			return json(res, 200, { agents: safeAgents, inboxes: inboxes.map((inbox) => ({ ...publicInbox(inbox), tagScope: operations?.inboxes?.[inbox.id]?.tagScope })), teams: itemList(teams).map(({ id, name, description, allow_auto_assign }) => ({ id, name, description, allow_auto_assign })), presence: presence.filter((item) => !visibleMembers || visibleMembers.has(Number(item.chatwoot_agent_id))).map((row) => ({ ...row, max_active_chats: maxFor(row.chatwoot_agent_id) })) });
 		}
 		if (action === 'labels' && req.method === 'GET')
 			return json(res, 200, await api(cfg, `/accounts/${cfg.accountId}/labels`));
@@ -1584,8 +1589,16 @@ export default async function handler(req, res) {
 			const { row, access } = await accessFor(url.searchParams.get('conversationId'));
 			requireChatRight(access, 'read');
 			const contactId = trustedContact(row, url.searchParams.get('id'));
-			const contact = await api(cfg, `/accounts/${cfg.accountId}/contacts/${contactId}`);
-			return json(res, 200, access.seeIp ? contact : stripIp(contact));
+			const contactPath = `/accounts/${cfg.accountId}/contacts/${contactId}`;
+			const [response, labels] = await Promise.all([
+				api(cfg, contactPath),
+				api(cfg, `${contactPath}/labels`, { timeout: 3500 }).then(itemList).catch(() => []),
+			]);
+			const contact = response.payload ?? response;
+			const label_list = [...new Set([...(Array.isArray(contact.label_list) ? contact.label_list : []), ...labels])]
+				.filter((label) => typeof label === 'string');
+			const result = { ...contact, label_list };
+			return json(res, 200, access.seeIp ? result : stripIp(result));
 		}
 		if (action === 'contact-directory' && req.method === 'GET') {
 			const page = Number(url.searchParams.get('page') ?? 1);

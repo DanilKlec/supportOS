@@ -1,12 +1,13 @@
 import { useToast } from "#/shared/hooks/useToast";
 
-export function ToastContainer() {
+export function ToastContainer({ aboveChat = false }: { aboveChat?: boolean }) {
 	const { toasts } = useToast();
 
-	if (toasts.length === 0) return null;
-
 	return (
-		<div className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96">
+		<div
+			aria-live="polite"
+			className={`pointer-events-none fixed inset-x-3 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96 ${aboveChat ? "top-[calc(3.75rem+env(safe-area-inset-top))]" : "bottom-[calc(1rem+env(safe-area-inset-bottom))]"}`}
+		>
 			{toasts.map((toast) => (
 				<div
 					key={toast.id}
@@ -17,7 +18,7 @@ export function ToastContainer() {
 						<button
 							type="button"
 							onClick={toast.action.onClick}
-							className="ui-button ui-button--primary font-medium text-accent hover:bg-accent/10"
+							className="ui-button ui-button--primary pointer-events-auto font-medium text-accent hover:bg-accent/10"
 						>
 							{toast.action.label}
 						</button>

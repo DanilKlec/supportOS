@@ -100,6 +100,26 @@ test('returns account totals for each active status while the queue is filtered 
 	expect(fetch).toHaveBeenCalledTimes(5);
 });
 
+test('keeps My Chats in arrival order after newer message activity', async () => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://arrival-order.example');
+	const fetch = vi.fn(async (url) => {
+		const { pathname, searchParams } = new URL(url);
+		if (pathname.endsWith('/agents')) return Response.json([{ id: 12, email: member.email }]);
+		expect(pathname).toBe('/api/v1/accounts/3/conversations/filter');
+		expect(searchParams.get('sort_by')).toBe('created_at_asc');
+		return Response.json({ data: { payload: [
+			{ id: 3, created_at: 20, last_activity_at: 200 },
+			{ id: 1, created_at: 10, last_activity_at: 300 },
+			{ id: 2, created_at: 20, last_activity_at: 100 },
+		] } });
+	});
+	stubFetch(fetch);
+	const response = { setHeader: vi.fn(), end: vi.fn() };
+	await handler({ url: '/api/chatwoot?action=conversations&scope=mine', method: 'GET' }, response);
+	expect(response.statusCode).toBe(200);
+	expect(JSON.parse(response.end.mock.calls[0][0]).payload.map(({ id }) => id)).toEqual([1, 2, 3]);
+});
+
 async function replyToPlayer(options = {}) {
 	const response = { setHeader: vi.fn(), end: vi.fn() };
 	await handler({ url: '/api/chatwoot?action=message', method: 'POST', body: { conversationId: 10, content: 'Ответ', ...options } }, response);

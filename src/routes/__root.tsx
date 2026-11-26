@@ -216,7 +216,7 @@ function RootComponent() {
 				{accessGranted && <BonusServerCache />}
 				{accessGranted && <LazyModalRoot />}
 
-				<ToastContainer />
+				<ToastContainer aboveChat={pathname === "/inbox"} />
 			</ToastProvider>
 		</QueryClientProvider>
 	);

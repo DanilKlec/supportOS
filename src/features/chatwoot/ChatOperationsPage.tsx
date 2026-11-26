@@ -37,6 +37,7 @@ export function ChatOperationsPage({ agents, inboxes, canEdit, onOpen }: {
 			client.setQueryData(["chatwoot", "operations"], next);
 			void client.invalidateQueries({ queryKey: ["chatwoot", "supervisor"] });
 			void client.invalidateQueries({ queryKey: ["chatwoot", "conversation"] });
+			void client.invalidateQueries({ queryKey: ["chatwoot", "directory"] });
 		},
 	});
 	const [selected, setSelected] = useState(0);
@@ -155,6 +156,9 @@ function InboxEditor({ value, pending, onSave }: { value: InboxRule; pending: bo
 	return <form onSubmit={(event) => { event.preventDefault(); onSave({ ...inbox, skills: skills(skillText) }); }} className="mt-4 space-y-3 text-xs">
 		<label className="flex flex-col gap-1.5">Обязательные навыки через запятую<input className={field} placeholder="Например: en, payments" value={skillText} onChange={(event) => setSkillText(event.target.value)} /></label>
 		<label className="flex flex-col gap-1.5">Цель ответа, минут. 0 отключает SLA<input required min={0} max={1440} type="number" className={field} value={inbox.responseMinutes} onChange={(event) => setInbox({ ...inbox, responseMinutes: Number(event.target.value) })} /></label>
+		<label className="flex flex-col gap-1.5">Теги проекта<select className={field} value={inbox.tagScope ?? ""} onChange={(event) => setInbox({ ...inbox, tagScope: event.target.value as InboxRule["tagScope"] })}>
+			<option value="">Определять по названию проекта</option><option value="b2b">B2B и общие</option><option value="b2c">B2C и общие</option><option value="all">Все теги</option>
+		</select></label>
 		<label className="flex flex-col gap-1.5">CRM проекта<select className={field} value={inbox.crm} onChange={(event) => setInbox({ ...inbox, crm: event.target.value as InboxRule["crm"] })}>
 			<option value="">Не выбрана</option><option value="adwa">ADWA</option><option value="whitelabels">Whitelabels</option><option value="vortexino">Vortexino</option>
 		</select></label>
