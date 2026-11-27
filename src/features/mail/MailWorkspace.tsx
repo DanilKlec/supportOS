@@ -4,7 +4,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
 	Archive,
 	Bell,
@@ -23,7 +23,7 @@ import {
 	Trash2,
 	UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type Mailbox,
 	type MailDraft,
@@ -76,7 +76,15 @@ type OpenComposer = { box: Mailbox; draft: MailDraft };
 export function MailWorkspace() {
 	const client = useQueryClient();
 	const userId = useAuthStore((state) => state.session?.user.id);
-	const [selectedBox, setSelectedBox] = useState("");
+	const navigate = useNavigate();
+	const destination = useRouterState({
+		select: (state) => state.location.state.workspaceSearch,
+	});
+	const [selectedBox, setSelectedBox] = useState(() => {
+		return destination && "mailboxId" in destination
+			? destination.mailboxId
+			: "";
+	});
 	const [showMoreFolders, setShowMoreFolders] = useState(false);
 	const [label, setLabel] = useState("INBOX");
 	const [search, setSearch] = useState("");
@@ -203,21 +211,33 @@ export function MailWorkspace() {
 		"Письма";
 	const isInbox = label === "INBOX" || label.startsWith("CATEGORY_");
 	const activeExtraFolder = folders.slice(5).some(({ id }) => id === label);
-	const reset = () => {
+	const reset = useCallback(() => {
 		setPages([""]);
 		setOpenRow(undefined);
-	};
+	}, []);
 	const changeFolder = (value: string) => {
 		setLabel(value);
 		reset();
 	};
-	const chooseBox = (value: string) => {
-		setSelectedBox(value);
-		setLabel("INBOX");
-		setQuery("");
-		setSearch("");
-		reset();
-	};
+	const chooseBox = useCallback(
+		(value: string) => {
+			setSelectedBox(value);
+			setLabel("INBOX");
+			setQuery("");
+			setSearch("");
+			reset();
+		},
+		[reset],
+	);
+	useEffect(() => {
+		if (!destination || !("mailboxId" in destination)) return;
+		chooseBox(destination.mailboxId);
+		void navigate({
+			to: "/mail",
+			replace: true,
+			state: (previous) => ({ ...previous, workspaceSearch: undefined }),
+		});
+	}, [destination, chooseBox, navigate]);
 	const refreshFolder = (mailbox: string) => {
 		void client.invalidateQueries({ queryKey: ["mail", "folder", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "thread", mailbox] });
@@ -577,80 +597,84 @@ export function MailWorkspace() {
 						statusByMailbox={statusByMailbox}
 						onChange={chooseBox}
 					/>
-					<aside
-						className="mail-sidebar supportos-scroll"
-						aria-label="Ящики и папки"
-					>
-						<button
-							type="button"
-							className="mail-button mail-compose-trigger"
-							data-primary="true"
-							onClick={() => setComposer({ box, draft: emptyMailDraft })}
-						>
-							<Pencil size={15} /> Написать
-						</button>
+					<div className="mail-navigation">
 						<MailAccountPicker
 							active={box}
 							mailboxes={mailboxes}
 							statusByMailbox={statusByMailbox}
 							onChange={chooseBox}
 						/>
-						{admin && statusByMailbox.get(boxId)?.reconnect && (
-							<Link to="/admin" hash="mailboxes" className="mail-button">
-								Переподключение ящика
-							</Link>
-						)}
-						<nav
-							aria-label="Папки Gmail"
-							className="mail-folders"
-							data-show-extra={showMoreFolders || activeExtraFolder}
+						<aside
+							className="mail-sidebar supportos-scroll"
+							aria-label="Папки и действия ящика"
 						>
-							{folders.map(({ id, title, icon: Icon }, index) => (
-								<button
-									type="button"
-									key={id}
-									className="mail-nav"
-									data-extra={index >= 5}
-									aria-pressed={id === "INBOX" ? isInbox : id === label}
-									onClick={() => changeFolder(id)}
-								>
-									<Icon size={15} aria-hidden="true" />
-									<span>{title}</span>
-									<MailFolderCount
-										count={
-											folderCounts[id] ??
-											(id === "INBOX"
-												? statusByMailbox.get(boxId)?.unread
-												: undefined)
-										}
-										drafts={id === "DRAFT"}
-									/>
-								</button>
-							))}
 							<button
 								type="button"
-								className="mail-nav mail-system-more"
-								aria-expanded={showMoreFolders || activeExtraFolder}
-								onClick={() => setShowMoreFolders((shown) => !shown)}
-								hidden={activeExtraFolder}
+								className="mail-button mail-compose-trigger"
+								data-primary="true"
+								onClick={() => setComposer({ box, draft: emptyMailDraft })}
 							>
-								<ChevronDown size={14} aria-hidden="true" />
-								<span>{showMoreFolders ? "Свернуть" : "Ещё папки Gmail"}</span>
+								<Pencil size={15} /> Написать
 							</button>
-						</nav>
-						<MailFolderNavigation
-							key={box.id}
-							labels={userLabels}
-							active={label}
-							loading={labels.isPending}
-							error={labels.isError}
-							counts={folderCounts}
-							onSelect={changeFolder}
-							onCreate={(name, color) =>
-								createLabel.mutateAsync({ box: box.id, name, color })
-							}
-						/>
-					</aside>
+							{admin && statusByMailbox.get(boxId)?.reconnect && (
+								<Link to="/admin" hash="mailboxes" className="mail-button">
+									Переподключение ящика
+								</Link>
+							)}
+							<nav
+								aria-label="Папки Gmail"
+								className="mail-folders"
+								data-show-extra={showMoreFolders || activeExtraFolder}
+							>
+								{folders.map(({ id, title, icon: Icon }, index) => (
+									<button
+										type="button"
+										key={id}
+										className="mail-nav"
+										data-extra={index >= 5}
+										aria-pressed={id === "INBOX" ? isInbox : id === label}
+										onClick={() => changeFolder(id)}
+									>
+										<Icon size={15} aria-hidden="true" />
+										<span>{title}</span>
+										<MailFolderCount
+											count={
+												folderCounts[id] ??
+												(id === "INBOX"
+													? statusByMailbox.get(boxId)?.unread
+													: undefined)
+											}
+											drafts={id === "DRAFT"}
+										/>
+									</button>
+								))}
+								<button
+									type="button"
+									className="mail-nav mail-system-more"
+									aria-expanded={showMoreFolders || activeExtraFolder}
+									onClick={() => setShowMoreFolders((shown) => !shown)}
+									hidden={activeExtraFolder}
+								>
+									<ChevronDown size={14} aria-hidden="true" />
+									<span>
+										{showMoreFolders ? "Свернуть" : "Ещё папки Gmail"}
+									</span>
+								</button>
+							</nav>
+							<MailFolderNavigation
+								key={box.id}
+								labels={userLabels}
+								active={label}
+								loading={labels.isPending}
+								error={labels.isError}
+								counts={folderCounts}
+								onSelect={changeFolder}
+								onCreate={(name, color) =>
+									createLabel.mutateAsync({ box: box.id, name, color })
+								}
+							/>
+						</aside>
+					</div>
 					<section className="mail-list" aria-label="Список писем">
 						<header className="mail-list-header">
 							<div>

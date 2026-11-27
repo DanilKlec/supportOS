@@ -204,6 +204,7 @@ export type ConversationSearch = {
 	label?: string;
 	from?: string;
 	to?: string;
+	email?: string;
 	query?: string;
 };
 
@@ -269,17 +270,30 @@ export const chatwootService = {
 		}>("health"),
 	teamStatus: () => request<ChatTeamStatus>("team-status"),
 	siteActivity: () => request<ChatSiteActivity>("site-activity"),
-	conversations: (options: ConversationSearch) =>
-		request<{
+	conversations: (options: ConversationSearch, signal?: AbortSignal) => {
+		const params = new URLSearchParams({
+			scope: options.scope,
+			status: options.status ?? "open",
+			page: String(options.page ?? 1),
+		});
+		if (options.inboxId) params.set("inbox_id", String(options.inboxId));
+		if (options.agentId) params.set("agent_id", String(options.agentId));
+		if (options.label) params.set("label", options.label);
+		if (options.from) params.set("from", options.from);
+		if (options.to) params.set("to", options.to);
+		if (options.email) params.set("email", options.email);
+		if (options.query) params.set("q", options.query);
+		return request<{
 			data?: { payload?: ChatwootConversation[]; meta?: unknown };
 			payload?: ChatwootConversation[];
 			hasMore?: boolean;
 			searchTruncated?: boolean;
 		}>(
 			"conversations",
-			undefined,
-			`&scope=${options.scope}&status=${encodeURIComponent(options.status ?? "open")}&page=${options.page ?? 1}${options.inboxId ? `&inbox_id=${options.inboxId}` : ""}${options.agentId ? `&agent_id=${options.agentId}` : ""}${options.label ? `&label=${encodeURIComponent(options.label)}` : ""}${options.from ? `&from=${encodeURIComponent(options.from)}` : ""}${options.to ? `&to=${encodeURIComponent(options.to)}` : ""}${options.query ? `&q=${encodeURIComponent(options.query)}` : ""}`,
-		),
+			{ signal },
+			`&${params}`,
+		);
+	},
 	conversationCounts: (inboxId?: number) =>
 		request<ChatwootConversationCounts>("conversation-counts", undefined, inboxId ? `&inbox_id=${inboxId}` : ""),
 	conversation: (id: number) =>

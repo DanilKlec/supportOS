@@ -986,7 +986,7 @@ function shiftFilterDate(date, days) {
 	return shifted.toISOString().slice(0, 10);
 }
 
-function conversationFilters({ status, assigneeId, agentId, inboxId, label, from, to, displayIds }) {
+function conversationFilters({ status, assigneeId, agentId, inboxId, label, from, to, displayIds, contactIds }) {
 	const filters = [];
 	const add = (attribute_key, filter_operator, values) => filters.push({ attribute_key, filter_operator, values: Array.isArray(values) ? values : [values], query_operator: 'AND' });
 	if (status) add('status', 'equal_to', status);
@@ -995,11 +995,29 @@ function conversationFilters({ status, assigneeId, agentId, inboxId, label, from
 	if (inboxId) add('inbox_id', 'equal_to', inboxId);
 	if (label) add('labels', 'equal_to', label);
 	if (displayIds) add('display_id', 'equal_to', displayIds);
+	if (contactIds) add('contact_id', 'equal_to', contactIds);
 	// Chatwoot compares calendar dates with strict operators. Include both days selected in the archive.
 	if (from && from > '0001-01-01') add('created_at', 'is_greater_than', shiftFilterDate(from, -1));
 	if (to && to < '9999-12-31') add('created_at', 'is_less_than', shiftFilterDate(to, 1));
 	if (filters.length) filters[filters.length - 1].query_operator = null;
 	return filters;
+}
+
+async function archiveEmailSearch(cfg, search) {
+	const ids = new Set();
+	const pageLimit = 10;
+	for (let page = 1; page <= pageLimit; page++) {
+		const params = new URLSearchParams({ q: search, page: String(page), include_contact_inboxes: 'false' });
+		const result = await api(cfg, `/accounts/${cfg.accountId}/contacts/search?${params}`);
+		const contacts = itemList(result);
+		for (const contact of contacts) {
+			if (validChatId(contact?.id) && typeof contact.email === 'string' && contact.email.toLowerCase().includes(search))
+				ids.add(Number(contact.id));
+		}
+		const hasMore = result.meta?.has_more ?? result.data?.meta?.has_more ?? contacts.length >= 15;
+		if (!contacts.length || !hasMore) return { ids, truncated: false };
+	}
+	return { ids, truncated: true };
 }
 
 async function archiveSearch(cfg, search) {
@@ -1529,14 +1547,25 @@ export default async function handler(req, res) {
 				assigneeId = String(agentId);
 			}
 			if (assigneeId && !validId(assigneeId)) return json(res, 400, { error: 'Некорректный агент' });
-			const search = url.searchParams.get('q')?.trim().slice(0, 150);
-			const archiveMatches = scope === 'history' && search ? await archiveSearch(cfg, search) : null;
-			if (archiveMatches?.ids.size === 0)
-				return json(res, 200, { payload: [], hasMore: false, searchTruncated: archiveMatches.truncated });
+			const queryText = url.searchParams.get('q')?.trim() ?? '';
+			const explicitEmail = scope === 'history' ? url.searchParams.get('email')?.trim() : '';
+			const emailQuery = scope === 'history' && !explicitEmail && /^[^\s@]*@[^\s@]*$/.test(queryText) ? queryText : '';
+			const email = scope === 'history'
+				? (explicitEmail || emailQuery).toLowerCase().slice(0, 254)
+				: '';
+			const search = emailQuery ? '' : queryText.slice(0, 150);
+			const [archiveMatches, contactMatches] = await Promise.all([
+				scope === 'history' && search ? archiveSearch(cfg, search) : null,
+				email ? archiveEmailSearch(cfg, email) : null,
+			]);
+			const searchTruncated = archiveMatches?.truncated || contactMatches?.truncated;
+			if (archiveMatches?.ids.size === 0 || contactMatches?.ids.size === 0)
+				return json(res, 200, { payload: [], hasMore: false, searchTruncated });
 			const filters = conversationFilters({
 				status: scope === 'mine' && status === 'open' ? activeStatuses : status,
 				assigneeId, inboxId: inboxId || allowed, label, from, to,
 				displayIds: archiveMatches ? [...archiveMatches.ids] : undefined,
+				contactIds: contactMatches ? [...contactMatches.ids] : undefined,
 			});
 			const filterQuery = new URLSearchParams({ page: String(page) });
 			if (search && !archiveMatches) filterQuery.set('q', search);
@@ -1545,12 +1574,19 @@ export default async function handler(req, res) {
 			const result = await api(cfg, `${prefix}/filter?${filterQuery}`, { method: 'POST', body: { payload: filters } });
 			const received = itemList(result);
 			const payload = received.filter((row) => {
-				if (scope === 'history' && status !== 'all' && status !== row.status) return false;
+				if (scope === 'history') {
+					if (status !== 'all' && status !== row.status) return false;
+					if (assigneeId && String(conversationAssignee(row)) !== assigneeId) return false;
+					if (inboxId && String(conversationInbox(row)) !== inboxId) return false;
+				}
 				if (archiveMatches && !archiveMatches.ids.has(Number(row.id))) return false;
+				if (contactMatches && !contactMatches.ids.has(conversationContact(row))) return false;
 				return !allowed || (String(conversationAssignee(row)) === assigneeId && allowed.includes(String(conversationInbox(row))));
 			});
 			if (scope === 'mine') payload.sort(oldestFirst);
-			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: received.length >= 25, searchTruncated: archiveMatches?.truncated });
+			const total = scope === 'history' ? conversationTotal(result) : null;
+			const hasMore = page < 10000 && (total === null ? received.length >= 25 : page * 25 < total);
+			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore, searchTruncated });
 		}
 		if (action === 'conversation' && req.method === 'GET') {
 			const id = url.searchParams.get('id');

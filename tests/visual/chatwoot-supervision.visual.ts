@@ -185,6 +185,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				const scope = url.searchParams.get("scope");
 				const status = url.searchParams.get("status");
 				const query = url.searchParams.get("q");
+				const email = url.searchParams.get("email") || query;
+				const agent = url.searchParams.get("agent_id");
 				if (scope === "history" && status === "resolved" && query === `#${otherChat.id}`) {
 					return route.fulfill({ json: { payload: [{
 						...conversation,
@@ -197,7 +199,8 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 					json: {
 						payload:
 							scope === "history"
-								? !query && (status === "resolved" || status === "snoozed" && conversation.status === "snoozed")
+								? (!email || row.email.includes(email)) && (!agent || agent === "5") &&
+									(status === "resolved" || status === "snoozed" && conversation.status === "snoozed")
 									? [{ ...conversation, status }]
 									: []
 								: scope === "queue"
@@ -634,6 +637,17 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	await expect(archive.getByRole("button", { name: /Фильтры/ })).toContainText(
 		"1",
 	);
+	const projectFilterBounds = await archive.getByRole("combobox", { name: "Проект", exact: true }).boundingBox();
+	const tagFilterBounds = await archive.getByRole("combobox", { name: "Тег", exact: true }).boundingBox();
+	expect(projectFilterBounds?.y).toBe(tagFilterBounds?.y);
+	const iconOffset = await archive.getByRole("combobox", { name: "Проект", exact: true }).evaluate((select) => {
+		const icon = select.parentElement?.querySelector("svg");
+		if (!icon) return Number.POSITIVE_INFINITY;
+		const field = select.getBoundingClientRect();
+		const glyph = icon.getBoundingClientRect();
+		return Math.abs(field.top + field.height / 2 - glyph.top - glyph.height / 2);
+	});
+	expect(iconOffset).toBeLessThanOrEqual(1);
 	await assertLayout("archive-filters");
 	await archive.getByLabel("С даты").fill("2026-10-01");
 	await expect(
@@ -641,6 +655,26 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 	).toContainText("01.10.2026");
 	await archive.getByRole("button", { name: "Убрать фильтр «Период»" }).click();
 	await expect(archive.getByLabel("С даты")).toHaveValue("");
+	const archiveAgentSearch = archive.getByRole("textbox", { name: "Найти агента в списке" });
+	const archiveAgentFilter = archive.getByRole("combobox", { name: "Агент", exact: true });
+	await archive.getByRole("button", { name: "Поиск по агентам" }).click();
+	await expect(archiveAgentSearch).toBeFocused();
+	await archiveAgentSearch.fill("нет совпадений");
+	await expect(archiveAgentFilter).toHaveText("Агенты не найдены");
+	await archiveAgentSearch.fill("agent@example");
+	await archiveAgentFilter.selectOption("5");
+	await expect(archive.getByRole("button", { name: "Убрать фильтр «Агент»" })).toContainText(row.agent);
+	await archive.getByRole("textbox", { name: "Почта игрока", exact: true }).fill("missing@example.invalid");
+	await expect(archive.getByText("Диалогов не найдено")).toBeVisible();
+	const filteredArchive = page.waitForRequest((request) => {
+		const params = new URL(request.url()).searchParams;
+		return params.get("scope") === "history" && params.get("email") === "player@example" &&
+			params.get("agent_id") === "5" && params.get("label") === "billing";
+	});
+	await archive.getByRole("textbox", { name: "Почта игрока", exact: true }).fill("player@example");
+	await filteredArchive;
+	await expect(archive.getByText(row.email, { exact: true })).toBeVisible();
+	await archive.getByRole("button", { name: "Убрать фильтр «Почта игрока»" }).click();
 	await archive
 		.getByRole("textbox", { name: "Поиск диалогов" })
 		.fill("несуществующий");
@@ -657,6 +691,12 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		.getByRole("button", { name: "Очистить поиск и фильтры" })
 		.click();
 	await expect(archive.getByText(row.player)).toBeVisible();
+	if (isMobile) await page.getByRole("button", { name: "Поиск", exact: true }).click();
+	await page.getByRole("textbox", { name: "Глобальный поиск", exact: true }).fill(row.email);
+	await page.getByRole("option", { name: /Найти диалоги по email/ }).click();
+	await expect(archive.getByRole("textbox", { name: "Поиск диалогов" })).toHaveValue(row.email);
+	await expect(archive.getByText(row.email, { exact: true })).toBeVisible();
+	await archive.getByRole("textbox", { name: "Поиск диалогов" }).clear();
 	await page.getByRole("button", { name: "Команда", exact: true }).click();
 	await expect(
 		page.getByRole("textbox", { name: "Найти агента" }),

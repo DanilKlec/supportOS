@@ -112,14 +112,7 @@ export function LoginPage() {
 				</section>
 			</div>
 		);
-	if (recovery)
-		return (
-			<div className="min-h-screen bg-background p-6 text-foreground">
-				<div className="mx-auto max-w-lg pt-16">
-					<PasswordForm recovery onBack={() => setRecovery(false)} />
-				</div>
-			</div>
-		);
+	if (recovery) return <PasswordForm recovery onBack={() => setRecovery(false)} />;
 	return (
 		<div className="login-scene auth-surface">
 			<AmbientBackground />

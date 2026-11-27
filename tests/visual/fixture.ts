@@ -102,6 +102,8 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 				return json({ configured: false });
 			if (path === "/api/chatwoot" && action === "team-status")
 				return json({ online: 0, accepting: 0, bots: 0 });
+			if (path === "/api/mail" && action === "list")
+				return json({ configured: false, admin: false, mailboxes: [] });
 			if (path === "/api/accounts") {
 				switch (action) {
 					case "me":

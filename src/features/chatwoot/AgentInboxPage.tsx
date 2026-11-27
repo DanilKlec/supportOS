@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
 	Activity,
 	Archive,
@@ -405,16 +405,35 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 	const displayedScope: Scope = archiving ? "history" : scope;
 	const listScope = displayedScope === "active" ? "mine" : displayedScope;
 	const filters = listFilters[listScope];
-	const { search, inboxId, agentId, label, from, to } = filters;
-	const [searchRequest, setSearchRequest] = useState({ scope: listScope, text: search });
+	const { search, email, inboxId, agentId, label, from, to } = filters;
+	const [searchRequest, setSearchRequest] = useState({ scope: listScope, text: search, email });
+	const navigate = useNavigate();
+	const destination = useRouterState({ select: (state) => state.location.state.workspaceSearch });
 	useEffect(() => {
-		const timer = window.setTimeout(() => setSearchRequest({ scope: listScope, text: search }), 220);
+		if (!destination || !("archiveEmail" in destination)) return;
+		const archiveQuery = destination.archiveEmail;
+		setActiveSection("archive");
+		setScope("history");
+		setHistoryStatus("resolved");
+		setListFilters((current) => ({ ...current, history: { ...emptyConversationFilters, search: archiveQuery } }));
+		setSearchRequest({ scope: "history", text: archiveQuery, email: "" });
+		setQueueOpen(true);
+		setActivePage(1);
+		setAddingChat(false);
+		setArchiveId(null);
+		void navigate({ to: "/inbox", replace: true, state: (previous) => ({ ...previous, workspaceSearch: undefined }) });
+	}, [destination, navigate]);
+	useEffect(() => {
+		const timer = window.setTimeout(() => setSearchRequest({ scope: listScope, text: search, email }), 220);
 		return () => window.clearTimeout(timer);
-	}, [listScope, search]);
+	}, [listScope, search, email]);
 	const queryText = (searchRequest.scope === listScope ? searchRequest.text : search).trim();
+	const queryEmail = (searchRequest.scope === listScope ? searchRequest.email : email).trim();
 	const updateListFilters = (patch: Partial<ConversationFilters>) => {
 		setListFilters((current) => ({ ...current, [listScope]: { ...current[listScope], ...patch } }));
-		if (patch.search === "") setSearchRequest({ scope: listScope, text: "" });
+		if (patch.search === "" || patch.email === "") {
+			setSearchRequest({ scope: listScope, text: patch.search ?? search, email: patch.email ?? email });
+		}
 		setActivePage(1);
 	};
 	const watching = useQuery({
@@ -448,11 +467,12 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 		...(label ? { label } : {}),
 		...(displayedScope === "history" && from ? { from } : {}),
 		...(displayedScope === "history" && to ? { to } : {}),
+		...(displayedScope === "history" && queryEmail ? { email: queryEmail } : {}),
 		...(queryText ? { query: queryText } : {}),
 	};
 	const conversations = useQuery({
 		queryKey: ["chatwoot", "conversations", request],
-		queryFn: () => chatwootService.conversations(request),
+		queryFn: ({ signal }) => chatwootService.conversations(request, signal),
 		enabled: connection.data?.configured === true && displayedScope !== "active" && (activeSection === "inbox" || activeSection === "archive"),
 		staleTime: displayedScope === "queue" ? 2000 : 0,
 		refetchInterval: displayedScope === "history" ? 20000 : realtimeConnected ? 12000 : 3000,
@@ -782,7 +802,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
 						/>
 						{archiving && conversations.data?.searchTruncated && <p role="status" className="border-b border-border px-3 py-2 text-xs text-muted">
-							Показана часть совпадений. Уточните запрос или найдите диалог по номеру.
+							Показана часть совпадений. Уточните текст поиска или укажите полный email либо номер диалога.
 						</p>}
 						{addingChat && <div className="chat-window-choose">
 							<p role="status">Выберите чат для нового окна <span className="whitespace-nowrap">({chatWindows.panes.length + 1} из {MAX_CHAT_WINDOWS})</span></p>
@@ -1323,13 +1343,14 @@ function ConversationRow({
 				<span className="chat-list-main">
 					<span className="chat-list-line">
 						<span className="chat-list-project truncate" title={source}>{source}</span>
-						{Number.isFinite(displayTime) && displayTime > 0 ? <time className="chat-list-time" title={`${archived ? "Обновлён" : "Поступил"} ${new Date(displayTime).toLocaleString("ru-RU")}`}>{archived ? archiveListDate.format(displayTime) : dateLabel(timestamp)}</time> : <span className="chat-list-number">#{conversation.id}</span>}
+						{Number.isFinite(displayTime) && displayTime > 0 && <time className="chat-list-time" title={`${archived ? "Обновлён" : "Поступил"} ${new Date(displayTime).toLocaleString("ru-RU")}`}>{archived ? archiveListDate.format(displayTime) : dateLabel(timestamp)}</time>}
 					</span>
 					<span className="chat-list-line">
 						<span className="chat-list-player truncate" title={name}>{name}</span>
 						{waitingSince ? <WaitingTime timestamp={waitingSince} firstReply={firstReplyPending(conversation, waitingSince)} className="chat-list-time chat-text-warning" /> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					{login && <span className="chat-list-meta truncate" title={`Логин игрока ${login}`}>Логин · {login}</span>}
+					{archived && sender?.email && sender.email !== name && <span className="chat-list-meta truncate" title={sender.email}>{sender.email}</span>}
 					{archived && <span className="chat-list-meta truncate">
 						{conversationStatusLabels[conversation.status]}
 						{conversation.meta?.assignee?.name ? ` · ${conversation.meta.assignee.name}` : ""}

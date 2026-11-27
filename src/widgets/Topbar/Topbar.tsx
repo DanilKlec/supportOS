@@ -20,6 +20,7 @@ import { Inbox } from "@/features/shared-binds/Inbox";
 import { SharedBindEditor } from "@/features/shared-binds/SharedBindEditor";
 import { type SpaceItem, spaces } from "@/features/spaces/navigation";
 import { knowledgeService } from "@/services/knowledge.service";
+import { mailService } from "@/services/mail.service";
 import { contentApi } from "@/services/shared-content.service";
 import { supabaseService } from "@/services/supabase.service";
 import { useToast } from "@/shared/hooks/useToast";
@@ -27,6 +28,7 @@ import { getBindTitle, searchBinds } from "@/shared/lib/bind-search";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { isKeyboardCode, isTypingTarget } from "@/shared/lib/keyboard";
 import { getLabelForLanguage } from "@/shared/lib/languages";
+import type { WorkspaceSearchDestination } from "@/shared/lib/workspace-search";
 import { BaseModal } from "@/shared/modals/BaseModal";
 import { getBindTranslation } from "@/shared/modals/knowledge-modal-helpers";
 import { modalManager } from "@/shared/modals/modal.store";
@@ -37,6 +39,11 @@ import { can, canAccessPage } from "../../../shared/access.js";
 import { type CatalogResult, catalogResults } from "./search-catalog";
 import { type SearchCommand, searchCommands } from "./search-commands";
 import { ToolsMenu } from "./ToolsMenu";
+
+type SearchSection = SpaceItem & {
+	group: string;
+	destination?: WorkspaceSearchDestination;
+};
 
 function getShortcutLabel() {
 	if (
@@ -241,6 +248,18 @@ export function Topbar() {
 	const access = authSession?.user.access;
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const enabled = searchFocused || mobileSearchOpen;
+	const searchValue = useKnowledgeStore((s) => s.search);
+	const setSearch = useKnowledgeStore((s) => s.setSearch);
+	const queryText = searchValue.trim();
+	const mailSearch =
+		(kind === "all" || kind === "email") && queryText.length >= 2;
+	const mailboxes = useQuery({
+		queryKey: ["mail", "list", authSession?.user.id],
+		queryFn: ({ signal }) => mailService.list(signal),
+		enabled: enabled && mailSearch && canAccessPage(access, "/mail"),
+		staleTime: 15_000,
+		retry: false,
+	});
 	const emails = useQuery({
 		queryKey: ["shared-publication", authSession?.user.id, "emails", "shared"],
 		enabled: enabled && can(access, "projects.read"),
@@ -280,8 +299,6 @@ export function Topbar() {
 			),
 		[access, emails.data, bonuses.data, emails.error, bonuses.error],
 	);
-	const searchValue = useKnowledgeStore((s) => s.search);
-	const setSearch = useKnowledgeStore((s) => s.setSearch);
 	const language = useKnowledgeStore((s) => s.language);
 	const categories = useKnowledgeStore((s) => s.categories);
 	const folders = useKnowledgeStore((s) => s.folders);
@@ -336,7 +353,38 @@ export function Topbar() {
 			).slice(0, 9)
 		: [];
 
-	const sectionResults = spaces
+	const addressQuery = queryText.toLowerCase();
+	const mailboxResults: SearchSection[] =
+		mailSearch && canAccessPage(access, "/mail")
+			? (mailboxes.data?.mailboxes ?? [])
+					.filter(({ address }) => address.toLowerCase().includes(addressQuery))
+					.sort(
+						(a, b) =>
+							Number(b.address.toLowerCase() === addressQuery) -
+							Number(a.address.toLowerCase() === addressQuery),
+					)
+					.slice(0, 5)
+					.map(({ id, address }) => ({
+						to: "/mail",
+						label: address,
+						group: "Почтовый ящик",
+						destination: { mailboxId: id },
+					}))
+			: [];
+	const archiveResult: SearchSection[] =
+		mailSearch &&
+		canAccessPage(access, "/inbox") &&
+		/^[^\s@]*@[^\s@]*$/.test(queryText)
+			? [
+					{
+						to: "/inbox",
+						label: "Найти диалоги по email",
+						group: queryText,
+						destination: { archiveEmail: queryText.slice(0, 254) },
+					},
+				]
+			: [];
+	const matchingSections = spaces
 		.flatMap((g) =>
 			(g.items as readonly SpaceItem[]).map((i) => ({ ...i, group: g.title })),
 		)
@@ -348,6 +396,11 @@ export function Topbar() {
 					.toLowerCase()
 					.includes(searchValue.trim().toLowerCase()),
 		);
+	const sectionResults: SearchSection[] = [
+		...mailboxResults,
+		...archiveResult,
+		...matchingSections,
+	];
 	const commands = searchCommands(access, searchValue);
 	const contentOffset = commands.length + sectionResults.length;
 	const resultCount = contentOffset + searchResults.length;
@@ -397,8 +450,14 @@ export function Topbar() {
 			))}
 		</div>
 	);
-	const openSection = (item: SpaceItem) => {
-		void navigate({ to: item.to, hash: item.hash ?? "" });
+	const openSection = (item: SearchSection) => {
+		void navigate({
+			to: item.to,
+			hash: item.hash ?? "",
+			...(item.destination
+				? { state: { workspaceSearch: item.destination } }
+				: {}),
+		});
 		setSearchFocused(false);
 		setMobileSearchOpen(false);
 	};
@@ -410,14 +469,18 @@ export function Topbar() {
 					type="button"
 					role="option"
 					aria-selected={commands.length + index === activeIndex}
-					key={i.to + (i.hash ?? "")}
-					className={`flex w-full justify-between p-3 text-left text-sm hover:bg-surface-elevated ${commands.length + index === activeIndex ? "bg-accent/10" : ""}`}
+					key={i.to + (i.hash ?? "") + (i.destination ? i.label : "")}
+					className={`flex w-full min-w-0 justify-between gap-3 p-3 text-left text-sm hover:bg-surface-elevated ${commands.length + index === activeIndex ? "bg-accent/10" : ""}`}
 					onMouseDown={(e) => e.preventDefault()}
 					onMouseEnter={() => setActiveResultIndex(commands.length + index)}
 					onClick={() => openSection(i)}
 				>
-					{i.label}
-					<span className="text-xs text-muted">{i.group}</span>
+					<span className="truncate">{i.label}</span>
+					<span
+						className={`truncate text-xs text-muted ${i.destination && "mailboxId" in i.destination ? "shrink-0" : "max-w-[45%]"}`}
+					>
+						{i.group}
+					</span>
 				</button>
 			))}
 		</div>
@@ -431,7 +494,7 @@ export function Topbar() {
 					...(can(access, "binds.read")
 						? [{ id: "bind", label: "Бинды" }]
 						: []),
-					...(can(access, "projects.read")
+					...(can(access, "projects.read") || canAccessPage(access, "/mail")
 						? [{ id: "email", label: "Почты" }]
 						: []),
 					...(can(access, "bonuses.read")

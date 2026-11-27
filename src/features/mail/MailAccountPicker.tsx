@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Mail, Search, ShieldAlert } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { Mailbox, MailStats } from "@/services/mail.service";
+import { MailFolderCount } from "./MailFolderTree";
 
 export function MailAccountPicker({
 	active,
@@ -16,31 +17,39 @@ export function MailAccountPicker({
 	const id = useId();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
-	const container = useRef<HTMLDivElement>(null);
 	const trigger = useRef<HTMLButtonElement>(null);
-	const input = useRef<HTMLInputElement>(null);
+	const list = useRef<HTMLUListElement>(null);
+	const selectedId = `${id}-mailbox-${active.id}`;
+	const query = search.trim().toLowerCase();
 	const visible = mailboxes.filter(({ address }) =>
-		address.toLowerCase().includes(search.trim().toLowerCase()),
+		address.toLowerCase().includes(query),
 	);
 
 	useEffect(() => {
-		if (!open) return;
-		if (!window.matchMedia("(max-width: 780px)").matches)
-			input.current?.focus({ preventScroll: true });
-		const outside = (event: PointerEvent) => {
-			if (
-				event.target instanceof Node &&
-				!container.current?.contains(event.target)
-			) {
-				setOpen(false);
-			}
-		};
-		document.addEventListener("pointerdown", outside);
-		return () => document.removeEventListener("pointerdown", outside);
-	}, [open]);
+		const viewport = list.current;
+		if (
+			query ||
+			(!open && trigger.current?.getClientRects().length) ||
+			!viewport?.clientHeight
+		)
+			return;
+		const row = document.getElementById(selectedId);
+		if (!row) return;
+		const bounds = viewport.getBoundingClientRect();
+		const selected = row.getBoundingClientRect();
+		if (selected.top < bounds.top)
+			viewport.scrollTop += selected.top - bounds.top;
+		else if (selected.bottom > bounds.bottom)
+			viewport.scrollTop += selected.bottom - bounds.bottom;
+	}, [selectedId, open, query]);
+
+	const close = () => {
+		setOpen(false);
+		trigger.current?.focus({ preventScroll: true });
+	};
 
 	return (
-		<div ref={container} className="mail-account-switch">
+		<div className="mail-account-switch" data-expanded={open}>
 			<button
 				type="button"
 				ref={trigger}
@@ -48,7 +57,7 @@ export function MailAccountPicker({
 				aria-label="Почтовый ящик"
 				aria-describedby={`${id}-active`}
 				aria-expanded={open}
-				aria-controls={open ? id : undefined}
+				aria-controls={id}
 				onClick={() => {
 					setSearch("");
 					setOpen(!open);
@@ -65,70 +74,81 @@ export function MailAccountPicker({
 				</span>
 				<ChevronDown size={15} aria-hidden="true" />
 			</button>
-			{open && (
-				<section
-					id={id}
-					aria-label="Выбор почтового ящика"
-					className="mail-account-options mail-float"
-					onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.preventDefault();
-							setOpen(false);
-							trigger.current?.focus();
-						}
-					}}
-				>
+			<section
+				id={id}
+				aria-label="Выбор почтового ящика"
+				className="mail-account-options"
+				onKeyDown={(event) => {
+					if (event.key === "Escape" && open) {
+						event.preventDefault();
+						close();
+					}
+				}}
+			>
+				<header className="mail-accounts-heading">
+					<h2>Ящики</h2>
+					<span title={`Доступно ящиков: ${mailboxes.length}`}>
+						{mailboxes.length}
+					</span>
+				</header>
+				{mailboxes.length > 5 && (
 					<label className="mail-search">
 						<Search size={15} aria-hidden="true" />
 						<input
-							ref={input}
+							type="search"
 							aria-label="Найти ящик"
 							placeholder="Найти ящик"
 							value={search}
 							onChange={(event) => setSearch(event.target.value)}
 						/>
 					</label>
-					<ul className="supportos-scroll">
+				)}
+				{visible.length > 0 ? (
+					<ul ref={list} className="supportos-scroll">
 						{visible.map((item) => {
 							const status = statusByMailbox.get(item.id);
 							const selected = active.id === item.id;
 							return (
-								<li key={item.id}>
+								<li key={item.id} id={`${id}-mailbox-${item.id}`}>
 									<button
 										type="button"
 										className="mail-nav mail-account-option"
 										aria-pressed={selected}
 										onClick={() => {
-											onChange(item.id);
-											setOpen(false);
-											trigger.current?.focus();
+											if (!selected) onChange(item.id);
+											if (open) close();
 										}}
 										title={item.address}
 									>
+										<Mail
+											size={14}
+											aria-hidden="true"
+											className="mail-account-row-icon"
+										/>
 										<span>{item.address}</span>
-										{status?.reconnect ? (
+										{status?.reconnect && (
 											<ShieldAlert
-												size={13}
+												size={14}
 												aria-label="Нужно переподключить"
 											/>
-										) : status?.unread ? (
-											<b className="mail-mailbox-count">
-												<span className="sr-only">Непрочитанных: </span>
-												{status.unread}
-											</b>
-										) : selected ? (
-											<Check size={14} aria-hidden="true" />
-										) : null}
+										)}
+										<MailFolderCount count={status?.unread} />
+										{selected && !status?.unread && !status?.reconnect && (
+											<Check
+												size={14}
+												aria-hidden="true"
+												className="mail-account-selected"
+											/>
+										)}
 									</button>
 								</li>
 							);
 						})}
 					</ul>
-					{!visible.length && (
-						<p className="mail-picker-empty">Ящики не найдены</p>
-					)}
-				</section>
-			)}
+				) : (
+					<output className="mail-picker-empty">Ящики не найдены</output>
+				)}
+			</section>
 		</div>
 	);
 }

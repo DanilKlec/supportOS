@@ -2,6 +2,83 @@ import { renderMailLayout } from "../../shared/mail-layout.js";
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
+test("expand an HTML email in the reading pane and load its photo only on request", async ({ context, page }, info) => {
+	const mailbox = { id: "reader", address: "reader@example.invalid", provider: "gmail" };
+	const photo = "https://media.example.invalid/reader-photo.svg";
+	let photoRequests = 0;
+	let finishPhoto = () => {};
+	const photoReady = new Promise<void>((resolve) => { finishPhoto = resolve; });
+	const message = {
+		id: "long-mail",
+		threadId: "history",
+		date: Date.UTC(2026, 10, 27, 10),
+		labels: ["INBOX"],
+		from: "sender@example.invalid",
+		to: mailbox.address,
+		subject: "Длинное письмо с фотографией",
+		snippet: "Текст письма",
+		count: 1,
+		text: "",
+		html: `<h1>Начало письма</h1><img src="${photo}" alt="Фотография"/>${"<p>Абзац письма для проверки высоты области чтения.</p>".repeat(35)}<p>Конец письма</p>`,
+		attachments: [],
+	};
+	await context.route("**/api/binds?action=workspace", (route) =>
+		route.fulfill({ json: { ...knowledge, branches: { choices: {}, incoming: [], outgoing: [] } } }),
+	);
+	await context.route(photo, async (route) => {
+		photoRequests++;
+		await photoReady;
+		return route.fulfill({
+			contentType: "image/svg+xml",
+			body: '<svg xmlns="http://www.w3.org/2000/svg" width="250" height="140"><rect width="250" height="140" fill="#475569" /></svg>',
+		});
+	});
+	await context.route("**/api/mail?**", (route) => {
+		const action = new URL(route.request().url()).searchParams.get("action");
+		switch (action) {
+			case "list": return route.fulfill({ json: { configured: true, admin: false, mailboxes: [mailbox] } });
+			case "folder": return route.fulfill({ json: { rows: [{ ...message, html: undefined }], next: null } });
+			case "thread": return route.fulfill({ json: { messages: [message], before: null } });
+			case "labels": return route.fulfill({ json: { labels: [] } });
+			case "folder-counts": return route.fulfill({ json: { counts: {} } });
+			case "stats": return route.fulfill({ json: { stats: [] } });
+			default: return route.fallback();
+		}
+	});
+	try {
+		await page.goto("/mail");
+		const list = page.getByRole("region", { name: "Список писем" });
+		await expect(list.getByText(message.subject)).toBeVisible();
+		expect(photoRequests).toBe(0);
+		await list.getByText(message.subject).click();
+		const thread = page.getByRole("region", { name: "Переписка" });
+		const preview = thread.locator('iframe[title="Содержимое письма"]');
+		const frame = thread.frameLocator('iframe[title="Содержимое письма"]');
+		await expect(frame.getByRole("heading", { name: "Начало письма" })).toBeVisible();
+		const dimensions = await preview.evaluate((iframe) => ({
+			height: iframe.clientHeight,
+			body: iframe.closest(".mail-message")?.clientWidth ?? 0,
+			pane: iframe.closest(".mail-messages")?.clientWidth ?? 0,
+		}));
+		expect(dimensions.height).toBeGreaterThan(800);
+		expect(dimensions.body / dimensions.pane).toBeGreaterThan(0.85);
+		const end = frame.getByText("Конец письма", { exact: true });
+		await end.scrollIntoViewIfNeeded();
+		await expect(end).toBeInViewport();
+		expect(await frame.locator("html").evaluate((doc) => doc.scrollHeight - doc.clientHeight)).toBeLessThanOrEqual(1);
+		expect(photoRequests).toBe(0);
+		await thread.getByRole("button", { name: "Показать изображения" }).click();
+		await expect.poll(() => photoRequests).toBe(1);
+		await expect(frame.getByRole("heading", { name: "Начало письма" })).toBeVisible();
+		finishPhoto();
+		await expect.poll(() => frame.getByRole("img", { name: "Фотография" }).evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(250);
+		await expect.poll(() => preview.evaluate((iframe) => iframe.clientHeight)).toBeGreaterThan(dimensions.height + 80);
+		await page.screenshot({ path: info.outputPath("full-html-email.png"), animations: "disabled" });
+	} finally {
+		finishPhoto();
+	}
+});
+
 test("connect and delegate a mailbox from administration", async ({ context, page, isMobile }, info) => {
 	const mailbox = { id: "shared-support", address: "support@example.invalid", provider: "gmail" };
 	const mailboxes = [{ id: "other-box", address: "existing@example.invalid", provider: "gmail" }];
@@ -418,9 +495,10 @@ test("browse shared Gmail, organize mail and reuse a recipient", async ({
 		name: "Почтовый ящик",
 		exact: true,
 	});
-	await boxPicker.click();
+	if (isMobile) await boxPicker.click();
 	const boxes = mail.getByRole("region", { name: "Выбор почтового ящика" });
-	await boxes.getByRole("textbox", { name: "Найти ящик" }).fill("desk31");
+	const mailboxSearch = boxes.getByRole("searchbox", { name: "Найти ящик" });
+	await mailboxSearch.fill("desk31");
 	await page.screenshot({
 		path: info.outputPath("mail-accounts.png"),
 		animations: "disabled",
@@ -428,9 +506,19 @@ test("browse shared Gmail, organize mail and reuse a recipient", async ({
 	await boxes
 		.getByRole("button", { name: "desk31@example.invalid", exact: true })
 		.click();
-	await expect(boxes).toHaveCount(0);
+	if (isMobile) await expect(boxes).toBeHidden();
+	else {
+		await expect(boxes.getByRole("button", { name: "desk31@example.invalid", exact: true })).toHaveAttribute("aria-pressed", "true");
+		await mailboxSearch.clear();
+	}
 	const folderNav = mail.getByRole("navigation", { name: "Папки ящика" });
 	const systemNav = mail.getByRole("navigation", { name: "Папки Gmail" });
+	if (!isMobile) {
+		const mailboxColumn = await boxes.boundingBox();
+		const folderColumn = await systemNav.boundingBox();
+		expect(mailboxColumn?.x).toBeLessThan(folderColumn?.x ?? 0);
+		expect(mailboxColumn?.height).toBeGreaterThan(200);
+	}
 	const inboxCount = systemNav
 		.getByRole("button", { name: /^Входящие/ })
 		.getByTitle("Непрочитанных: 2");
@@ -753,11 +841,13 @@ test("browse shared Gmail, organize mail and reuse a recipient", async ({
 	await expect(
 		mail.getByText("Новая почта в desk31@example.invalid", { exact: true }),
 	).toBeVisible();
-	await boxPicker.click();
-	await boxes.getByRole("textbox", { name: "Найти ящик" }).fill("desk0");
-	await boxes
-		.getByRole("button", { name: "desk0@example.invalid", exact: true })
+	if (isMobile) await page.getByRole("button", { name: "Поиск", exact: true }).click();
+	await page.getByRole("textbox", { name: "Глобальный поиск", exact: true }).fill("desk0@");
+	await page
+		.getByRole("option", { name: /desk0@example\.invalid.*Почтовый ящик/ })
 		.click();
+	if (isMobile) await expect(boxPicker).toHaveAccessibleDescription("desk0@example.invalid");
+	else await expect(boxes.getByRole("button", { name: "desk0@example.invalid", exact: true })).toHaveAttribute("aria-pressed", "true");
 	await mail.getByRole("button", { name: "Написать", exact: true }).click();
 	await newComposer
 		.getByRole("button", { name: "Шаблоны", exact: true })

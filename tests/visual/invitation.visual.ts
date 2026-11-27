@@ -72,3 +72,52 @@ test("enter Google Authenticator digits in the sign-in screen", async ({ context
 	await expect(digits.first()).toHaveValue("");
 	await expect(digits.first()).toBeFocused();
 });
+
+test("set and confirm a new password in the recovery screen", async ({ context, page }, info) => {
+	let submissions = 0;
+	await context.route("https://supportos-visual.invalid/auth/v1/user", (route) => {
+		if (route.request().method() !== "PUT") return route.fallback();
+		expect(route.request().postDataJSON()).toMatchObject({ password: "Synthetic-password-2026" });
+		submissions++;
+		return route.fulfill({ status: 422, json: { code: "weak_password", message: "Тестовый ответ сервера" } });
+	});
+	await page.goto("/login?recovery=1");
+	await expect(page.getByRole("heading", { name: "Новый пароль" })).toBeVisible();
+	const password = page.getByLabel("Новый пароль", { exact: true }).and(page.locator("input"));
+	const confirmation = page.getByLabel("Повторите пароль", { exact: true });
+	const save = page.getByRole("button", { name: "Сохранить пароль" });
+	await expect(password).toHaveAttribute("type", "password");
+	await page.screenshot({ path: info.outputPath("new-password.png"), animations: "disabled" });
+	await password.fill("Synthetic-password-2026");
+	await page.getByRole("button", { name: /Показать поле «Новый пароль»/ }).click();
+	await expect(password).toHaveAttribute("type", "text");
+	await page.getByRole("button", { name: /Скрыть поле «Новый пароль»/ }).click();
+	await confirmation.fill("Different-password-2026");
+	await save.click();
+	await expect(page.getByRole("alert")).toHaveText("Пароли не совпадают");
+	expect(submissions).toBe(0);
+	await confirmation.fill("Synthetic-password-2026");
+	await save.click();
+	await expect(page.getByRole("alert")).toHaveText("Тестовый ответ сервера");
+	expect(submissions).toBe(1);
+});
+
+test("show the new password form from an invitation link", async ({ context, page }) => {
+	const invitedUser = {
+		...authUser,
+		app_metadata: { ...authUser.app_metadata, supportos_invitation: true },
+	};
+	await context.route("https://supportos-visual.invalid/auth/v1/user", (route) =>
+		route.fulfill({ json: invitedUser }),
+	);
+	const fragment = new URLSearchParams({
+		access_token: accessToken,
+		refresh_token: "visual-invite-token",
+		expires_in: "3600",
+		token_type: "bearer",
+		type: "invite",
+	});
+	await page.goto(`/login?invite=1#${fragment}`);
+	await expect(page.getByRole("heading", { name: "Активируйте аккаунт SupportOS" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Сохранить пароль" })).toBeVisible();
+});

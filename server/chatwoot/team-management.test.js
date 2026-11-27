@@ -120,6 +120,52 @@ test('keeps My Chats in arrival order after newer message activity', async () =>
 	expect(JSON.parse(response.end.mock.calls[0][0]).payload.map(({ id }) => id)).toEqual([1, 2, 3]);
 });
 
+test.each(['email', 'q'])('searches past chats by player email from %s and combines archive filters before pagination', async (field) => {
+	vi.stubEnv('CHATWOOT_BASE_URL', 'https://archive-email.example');
+	const list = vi.fn(async (url, init) => {
+		const { pathname, searchParams } = new URL(url);
+		if (pathname.endsWith('/contacts/search')) {
+			expect(searchParams.get('q')).toBe('player+vip@example.com');
+			expect(searchParams.get('include_contact_inboxes')).toBe('false');
+			if (searchParams.get('page') === '1') return Response.json({
+				meta: { has_more: true },
+				payload: [{ id: 87, name: 'player+vip@example.com', email: 'other@example.com' }],
+			});
+			expect(searchParams.get('page')).toBe('2');
+			return Response.json({ meta: { has_more: false }, payload: [{ id: 92, email: 'Player+VIP@example.com' }] });
+		}
+		expect(pathname).toBe('/api/v1/accounts/3/conversations/filter');
+		expect(searchParams.get('page')).toBe('2');
+		const receivedFilters = JSON.parse(init.body).payload;
+		expect(receivedFilters.map(({ attribute_key, filter_operator, values }) => [attribute_key, filter_operator, values])).toEqual([
+			['status', 'equal_to', ['resolved']],
+			['assignee_id', 'equal_to', ['12']],
+			['inbox_id', 'equal_to', ['9']],
+			['labels', 'equal_to', ['billing']],
+			['contact_id', 'equal_to', [92]],
+			['created_at', 'is_greater_than', ['2026-10-31']],
+			['created_at', 'is_less_than', ['2026-11-28']],
+		]);
+		expect(receivedFilters.at(-1).query_operator).toBeNull();
+		const row = { id: 23, status: 'resolved', assignee_id: 12, inbox_id: 9, contact_id: 92 };
+		return Response.json({ meta: { all_count: 51 }, payload: [
+			row, { ...row, id: 24, assignee_id: 13 }, { ...row, id: 25, contact_id: 87 },
+		] });
+	});
+	stubFetch(list);
+	const params = new URLSearchParams({
+		action: 'conversations', scope: 'history', page: '2', agent_id: '12', inbox_id: '9',
+		label: 'billing', from: '2026-11-01', to: '2026-11-27', [field]: ' Player+VIP@example.com ',
+	});
+	const response = { setHeader: vi.fn(), end: vi.fn() };
+	await handler({ url: `/api/chatwoot?${params}`, method: 'GET' }, response);
+	expect(response.statusCode).toBe(200);
+	const body = JSON.parse(response.end.mock.calls[0][0]);
+	expect(body.payload.map(({ id }) => id)).toEqual([23]);
+	expect(body.hasMore).toBe(true);
+	expect(list).toHaveBeenCalledTimes(3);
+});
+
 async function replyToPlayer(options = {}) {
 	const response = { setHeader: vi.fn(), end: vi.fn() };
 	await handler({ url: '/api/chatwoot?action=message', method: 'POST', body: { conversationId: 10, content: 'Ответ', ...options } }, response);

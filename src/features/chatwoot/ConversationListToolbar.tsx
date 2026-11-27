@@ -2,12 +2,17 @@ import {
 	Archive,
 	Building2,
 	Clock3,
+	Search,
 	Tag,
 	UserRound,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ChatwootAgent, ChatwootInbox } from "@/services/chatwoot.service";
-import { projectTagScope, searchProjectTags, tagsForProject } from "./chat-tags";
+import {
+	projectTagScope,
+	searchProjectTags,
+	tagsForProject,
+} from "./chat-tags";
 import {
 	ChatFilterPanel,
 	ChatFilterSelect,
@@ -20,6 +25,7 @@ import { ChatSavedViews, readViewFields } from "./ChatSavedViews";
 
 export const emptyConversationFilters = {
 	search: "",
+	email: "",
 	inboxId: "",
 	agentId: "",
 	label: "",
@@ -50,7 +56,7 @@ const viewFields = [
 	"to",
 	"historyStatus",
 ] as const;
-type ListView = Omit<ConversationFilters, "search"> &
+type ListView = Omit<ConversationFilters, "search" | "email"> &
 	Pick<Props, "historyStatus">;
 
 function decodeListView(input: unknown): ListView | null {
@@ -74,6 +80,7 @@ export function countConversationFilters(filters: ConversationFilters) {
 		filters.inboxId,
 		filters.agentId,
 		filters.label,
+		filters.email.trim(),
 		filters.from || filters.to,
 	].filter(Boolean).length;
 }
@@ -95,10 +102,48 @@ export function ConversationListToolbar({
 }: Props) {
 	const filterPanelId = useId();
 	const [expanded, setExpanded] = useState(false);
-	const [tagSearch, setTagSearch] = useState("");
+	const [tagSearch, setTagSearch] = useState<string | null>(null);
+	const [agentSearch, setAgentSearch] = useState<string | null>(null);
+	const tagSearchId = `${filterPanelId}-tag`;
+	const agentSearchId = `${filterPanelId}-agent`;
+	const agentSearchOpen = agentSearch !== null;
+	const tagSearchOpen = tagSearch !== null;
+	const closeFilters = () => {
+		setExpanded(false);
+		setTagSearch(null);
+		setAgentSearch(null);
+	};
+	useEffect(() => {
+		if (expanded && tagSearchOpen)
+			document.getElementById(tagSearchId)?.focus();
+	}, [expanded, tagSearchId, tagSearchOpen]);
+	useEffect(() => {
+		if (expanded && agentSearchOpen)
+			document.getElementById(agentSearchId)?.focus();
+	}, [expanded, agentSearchId, agentSearchOpen]);
 	const source = inboxes.find((inbox) => String(inbox.id) === project);
 	const projectName = source?.name;
-	const matchingLabels = searchProjectTags(labels, projectTagScope(source), tagSearch, filters.label);
+	const matchingLabels = searchProjectTags(
+		labels,
+		projectTagScope(source),
+		tagSearch ?? "",
+		filters.label,
+	);
+	const selectedAgent = agents.find(
+		(agent) => String(agent.id) === filters.agentId,
+	);
+	const agentQuery = (agentSearch ?? "").trim().toLocaleLowerCase("ru");
+	const matchingAgents = agents
+		.filter((agent) =>
+			[agent.name, agent.available_name, agent.email].some((value) =>
+				value?.toLocaleLowerCase("ru").includes(agentQuery),
+			),
+		)
+		.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+	const agentOptions =
+		selectedAgent && !matchingAgents.includes(selectedAgent)
+			? [selectedAgent, ...matchingAgents]
+			: matchingAgents;
 	const chips: FilterChip[] = [];
 	if (filters.inboxId)
 		chips.push({
@@ -118,10 +163,15 @@ export function ConversationListToolbar({
 		chips.push({
 			key: "agent",
 			label: "Агент",
-			value:
-				agents.find((agent) => String(agent.id) === filters.agentId)?.name ??
-				`#${filters.agentId}`,
+			value: selectedAgent?.name ?? `#${filters.agentId}`,
 			remove: () => update({ agentId: "" }),
+		});
+	if (scope === "history" && filters.email.trim())
+		chips.push({
+			key: "email",
+			label: "Почта игрока",
+			value: filters.email.trim(),
+			remove: () => update({ email: "" }),
 		});
 	if (filters.from || filters.to) {
 		const range = [
@@ -138,7 +188,13 @@ export function ConversationListToolbar({
 		});
 	}
 	return (
-		<div className="chat-list-toolbar">
+		<div
+			className={
+				scope === "history"
+					? "chat-list-toolbar chat-archive-toolbar"
+					: "chat-list-toolbar"
+			}
+		>
 			{scope === "history" && (
 				<fieldset className="chat-menu-tabs grid min-w-0 grid-cols-2">
 					<legend className="sr-only">Статус в архиве</legend>
@@ -161,7 +217,9 @@ export function ConversationListToolbar({
 			<div className="chat-list-searchbar">
 				<ChatSearch
 					label="Поиск диалогов"
-					placeholder="Игрок, текст или №"
+					placeholder={
+						scope === "history" ? "Имя, email, текст, №" : "Игрок, текст или №"
+					}
 					value={filters.search}
 					onChange={(search) => update({ search })}
 				/>
@@ -169,7 +227,7 @@ export function ConversationListToolbar({
 					open={expanded}
 					panel={filterPanelId}
 					count={chips.length}
-					onToggle={() => setExpanded(!expanded)}
+					onToggle={() => (expanded ? closeFilters() : setExpanded(true))}
 				/>
 			</div>
 			{userId && (
@@ -177,7 +235,7 @@ export function ConversationListToolbar({
 					key={scope}
 					storageKey={`supportos:chats:views:${userId}:${scope}`}
 					canSave={
-						chips.length > 0 ||
+						chips.some((chip) => chip.key !== "email") ||
 						(scope === "history" && historyStatus === "snoozed")
 					}
 					value={{
@@ -190,21 +248,25 @@ export function ConversationListToolbar({
 					}}
 					decode={decodeListView}
 					onApply={({ historyStatus: status, ...saved }) => {
-						update({ ...saved, search: "" });
+						setAgentSearch(null);
+						setTagSearch(null);
+						update({ ...saved, search: "", email: "" });
 						if (scope === "history") onHistoryStatus(status);
 					}}
 				/>
 			)}
 			<ChatFilterSummary
 				chips={chips}
-				onReset={() =>
-					update({ ...emptyConversationFilters, search: filters.search })
-				}
+				onReset={() => {
+					setAgentSearch(null);
+					setTagSearch(null);
+					update({ ...emptyConversationFilters, search: filters.search });
+				}}
 			/>
 			<ChatFilterPanel
 				id={filterPanelId}
 				open={expanded}
-				onClose={() => setExpanded(false)}
+				onClose={closeFilters}
 			>
 				<ChatFilterSelect
 					icon={Building2}
@@ -216,8 +278,13 @@ export function ConversationListToolbar({
 						label: inbox.name,
 					}))}
 					onChange={(inboxId) => {
-						const tagScope = projectTagScope(inboxes.find((inbox) => String(inbox.id) === inboxId));
-						update({ inboxId, label: tagsForProject([filters.label], tagScope)[0] ?? "" });
+						const tagScope = projectTagScope(
+							inboxes.find((inbox) => String(inbox.id) === inboxId),
+						);
+						update({
+							inboxId,
+							label: tagsForProject([filters.label], tagScope)[0] ?? "",
+						});
 					}}
 				/>
 				<div className="min-w-0 space-y-1.5">
@@ -225,47 +292,134 @@ export function ConversationListToolbar({
 						icon={Tag}
 						label="Тег"
 						value={filters.label}
-						empty={matchingLabels.length || !tagSearch ? "Все теги" : "Теги не найдены"}
+						empty={
+							matchingLabels.length || !tagSearch
+								? "Все теги"
+								: "Теги не найдены"
+						}
+						searchControl={
+							labels.length > 0 && (
+								<button
+									type="button"
+									className="chat-filter-icon"
+									title="Поиск по тегам"
+									aria-label="Поиск по тегам"
+									aria-expanded={tagSearchOpen}
+									aria-controls={tagSearchOpen ? tagSearchId : undefined}
+									onClick={() => {
+										setAgentSearch(null);
+										setTagSearch(tagSearchOpen ? null : "");
+									}}
+								>
+									<Search size={13} aria-hidden="true" />
+								</button>
+							)
+						}
 						options={matchingLabels.map((label) => ({ value: label, label }))}
-						onChange={(label) => { update({ label }); setTagSearch(""); }}
+						onChange={(label) => {
+							update({ label });
+							setTagSearch(null);
+						}}
 					/>
-					{labels.length > 0 && <ChatSearch label="Найти тег для фильтра" placeholder="Найти тег…" value={tagSearch} onChange={setTagSearch} />}
+					{tagSearch !== null && (
+						<ChatSearch
+							id={tagSearchId}
+							label="Найти тег для фильтра"
+							placeholder="Найти тег…"
+							value={tagSearch}
+							onChange={setTagSearch}
+						/>
+					)}
 				</div>
 				{scope === "history" && (
 					<>
 						{canFilterByAgent && (
-							<div className="col-span-2">
+							<div className="chat-archive-agent">
 								<ChatFilterSelect
 									icon={UserRound}
 									label="Агент"
 									value={filters.agentId}
-									empty="Все агенты"
-									options={agents.map((agent) => ({
+									empty={
+										agentQuery && !matchingAgents.length
+											? "Агенты не найдены"
+											: "Все агенты"
+									}
+									searchControl={
+										agents.length > 0 && (
+											<button
+												type="button"
+												className="chat-filter-icon"
+												title="Поиск по агентам"
+												aria-label="Поиск по агентам"
+												aria-expanded={agentSearchOpen}
+												aria-controls={
+													agentSearchOpen ? agentSearchId : undefined
+												}
+												onClick={() => {
+													setTagSearch(null);
+													setAgentSearch(agentSearchOpen ? null : "");
+												}}
+											>
+												<Search size={13} aria-hidden="true" />
+											</button>
+										)
+									}
+									options={agentOptions.map((agent) => ({
 										value: String(agent.id),
-										label: agent.name,
+										label: agent.email
+											? `${agent.name} · ${agent.email}`
+											: agent.name,
 									}))}
-									onChange={(agentId) => update({ agentId })}
+									onChange={(agentId) => {
+										update({ agentId });
+										setAgentSearch(null);
+									}}
 								/>
+								{agentSearch !== null && (
+									<ChatSearch
+										id={agentSearchId}
+										label="Найти агента в списке"
+										placeholder="Имя или почта агента…"
+										value={agentSearch}
+										onChange={setAgentSearch}
+									/>
+								)}
 							</div>
 						)}
-						<label className="chat-filter-field">
-							<span>С даты</span>
+						<label className="chat-filter-field chat-archive-email">
+							<span>Почта игрока</span>
 							<input
-								type="date"
-								value={filters.from}
-								max={filters.to || undefined}
-								onChange={(event) => update({ from: event.target.value })}
+								type="text"
+								inputMode="email"
+								autoComplete="off"
+								spellCheck={false}
+								maxLength={254}
+								placeholder="Email или его часть"
+								value={filters.email}
+								onChange={(event) => update({ email: event.target.value })}
 							/>
 						</label>
-						<label className="chat-filter-field">
-							<span>По дату</span>
-							<input
-								type="date"
-								value={filters.to}
-								min={filters.from || undefined}
-								onChange={(event) => update({ to: event.target.value })}
-							/>
-						</label>
+						<fieldset className="chat-archive-dates">
+							<legend>Дата создания диалога</legend>
+							<label className="chat-filter-field">
+								<span>С даты</span>
+								<input
+									type="date"
+									value={filters.from}
+									max={filters.to || undefined}
+									onChange={(event) => update({ from: event.target.value })}
+								/>
+							</label>
+							<label className="chat-filter-field">
+								<span>По дату</span>
+								<input
+									type="date"
+									value={filters.to}
+									min={filters.from || undefined}
+									onChange={(event) => update({ to: event.target.value })}
+								/>
+							</label>
+						</fieldset>
 					</>
 				)}
 			</ChatFilterPanel>

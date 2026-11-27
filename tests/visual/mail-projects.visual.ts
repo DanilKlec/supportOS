@@ -1,7 +1,7 @@
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
-test("organize accessible mailboxes into project folders", async ({ context, page }, info) => {
+test("organize accessible mailboxes into project folders", async ({ context, isMobile, page }, info) => {
 	const mailboxes = Array.from({ length: 50 }, (_, index) => ({
 		id: `mailbox-${index}`,
 		address: `desk${index}@example.invalid`,
@@ -67,7 +67,15 @@ test("organize accessible mailboxes into project folders", async ({ context, pag
 	await expect(group("VIP-поддержка").getByRole("button", { name: /desk49@example/ })).toBeVisible();
 	await page.screenshot({ path: info.outputPath("mail-project-folders.png"), animations: "disabled" });
 	await group("VIP-поддержка").getByRole("button", { name: /desk49@example/ }).click();
-	await expect(page.getByRole("button", { name: "Почтовый ящик", exact: true })).toHaveAccessibleDescription(second);
+	if (isMobile) {
+		await expect(page.getByRole("button", { name: "Почтовый ящик", exact: true })).toHaveAccessibleDescription(second);
+	} else {
+		const column = page.getByRole("region", { name: "Выбор почтового ящика" });
+		const selected = column.getByRole("button", { name: /desk49@example/ });
+		await expect(selected).toHaveAttribute("aria-pressed", "true");
+		await expect(selected).toBeInViewport();
+		await expect(selected.getByTitle("Непрочитанных: 5")).toBeVisible();
+	}
 	await expect.poll(() => [...requestedFolders]).toEqual(["mailbox-0", "mailbox-49"]);
 
 	await newFolder("Вторая линия", [second]);

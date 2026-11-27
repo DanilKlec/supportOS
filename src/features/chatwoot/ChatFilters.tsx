@@ -6,7 +6,7 @@ import {
 	SlidersHorizontal,
 	X,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import "./chat-filters.css";
 
 export type FilterChip = {
@@ -17,12 +17,14 @@ export type FilterChip = {
 };
 
 export function ChatSearch({
+	id,
 	label,
 	placeholder,
 	value,
 	onChange,
 	maxLength,
 }: {
+	id?: string;
 	label: string;
 	placeholder: string;
 	value: string;
@@ -33,6 +35,7 @@ export function ChatSearch({
 		<div className="chat-search">
 			<Search size={15} aria-hidden="true" />
 			<input
+				id={id}
 				aria-label={label}
 				type="text"
 				placeholder={placeholder}
@@ -137,6 +140,7 @@ export function ChatFilterSelect({
 	value,
 	options,
 	empty,
+	searchControl,
 	onChange,
 }: {
 	icon: LucideIcon;
@@ -144,14 +148,20 @@ export function ChatFilterSelect({
 	value: string;
 	options: { value: string; label: string }[];
 	empty?: string;
+	searchControl?: ReactNode;
 	onChange: (value: string) => void;
 }) {
+	const id = useId();
 	return (
-		<label className="chat-filter-field">
-			<span>{label}</span>
+		<div className="chat-filter-field">
+			<div className="chat-filter-label">
+				<label htmlFor={id}>{label}</label>
+				{searchControl}
+			</div>
 			<span className="chat-filter-select">
 				<Icon size={14} aria-hidden="true" />
 				<select
+					id={id}
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
 				>
@@ -164,7 +174,7 @@ export function ChatFilterSelect({
 				</select>
 				<ChevronDown size={12} aria-hidden="true" />
 			</span>
-		</label>
+		</div>
 	);
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mailAssetUrl, mailLinkUrl } from "../../../shared/mail-layout.js";
 
-function mailFragment(value: string, showLinks = false) {
+function mailFragment(value: string, showLinks = false, reading = false) {
 	const template = document.createElement("template");
 	template.innerHTML = value;
 	for (const element of template.content.querySelectorAll(
@@ -21,6 +21,12 @@ function mailFragment(value: string, showLinks = false) {
 			}
 			if (showLinks && attr.name === "href" && mailLinkUrl(attr.value))
 				element.append(document.createTextNode(` (${attr.value})`));
+		}
+	}
+	if (reading) {
+		for (const image of template.content.querySelectorAll("img")) {
+			image.loading = "lazy";
+			image.decoding = "async";
 		}
 	}
 	return template;
@@ -85,61 +91,109 @@ function fitMailDocument(
 	};
 }
 
+function sizeMailDocument(frame: HTMLIFrameElement, content: HTMLDivElement) {
+	let pending = 0;
+	const measure = () => {
+		pending = 0;
+		const height = Math.ceil(
+			Math.max(content.scrollHeight, content.getBoundingClientRect().height),
+		);
+		const border = frame.offsetHeight - frame.clientHeight;
+		const size = `${Math.min(height, 24_000) + border}px`;
+		if (frame.style.height !== size) frame.style.height = size;
+	};
+	const observer = new ResizeObserver(() => {
+		if (!pending) pending = requestAnimationFrame(measure);
+	});
+	observer.observe(content);
+	measure();
+	return () => {
+		observer.disconnect();
+		cancelAnimationFrame(pending);
+	};
+}
+
 export function MailHtmlPreview({
 	html,
 	title = "Предпросмотр HTML-письма",
 	flush = false,
 	fit,
+	reading = false,
 }: {
 	html: string;
 	title?: string;
 	flush?: boolean;
 	fit?: "desktop" | "mobile";
+	reading?: boolean;
 }) {
 	const [showImages, setShowImages] = useState(false);
 	const frameRef = useRef<HTMLIFrameElement>(null);
 	const viewport = useRef<HTMLDivElement>(null);
-	const stopFitting = useRef<(() => void) | undefined>(undefined);
-	useEffect(() => () => stopFitting.current?.(), []);
-	const fragment = useMemo(() => mailFragment(html).innerHTML, [html]);
+	const stopMeasuring = useRef<(() => void) | undefined>(undefined);
+	const painted = useRef<
+		{ content: HTMLDivElement; fragment: string } | undefined
+	>(undefined);
+	useEffect(
+		() => () => {
+			stopMeasuring.current?.();
+			painted.current = undefined;
+		},
+		[],
+	);
+	const fragment = useMemo(
+		() => mailFragment(html, false, reading).innerHTML,
+		[html, reading],
+	);
 	const hasImages =
 		/(?:\bsrc\s*=|\bbackground\s*=|background(?:-image)?\s*:[^;]*url\()/i.test(
 			fragment,
 		);
 	const padding = flush ? "0" : "12px";
-	const fitKey = fit ? `${fit}-${showImages}-${flush}` : "";
-	const paintFittedPreview = useCallback(() => {
+	const documentKey =
+		fit || reading ? `${fit ?? "reading"}-${showImages}-${flush}` : "";
+	const paintMeasuredDocument = useCallback(() => {
 		const frame = frameRef.current;
 		const area = viewport.current;
-		if (!fitKey || !frame || !area) return;
+		if (!documentKey || !frame || (!reading && !area)) return;
 		const content = frame.contentDocument?.querySelector<HTMLDivElement>(
-			`[data-mail-fit-content="${fitKey}"]`,
+			`[data-mail-measured-content="${documentKey}"]`,
 		);
 		if (!content) return;
-		stopFitting.current?.();
+		if (
+			painted.current?.content === content &&
+			painted.current.fragment === fragment
+		)
+			return;
+		painted.current = { content, fragment };
+		stopMeasuring.current?.();
 		content.style.removeProperty("transform");
-		// Populate the isolated document after load so slow images never delay the first fit.
+		// Populate the isolated document after load so slow images never delay measurement of the text.
 		content.innerHTML = fragment;
-		stopFitting.current = fitMailDocument(frame, area, content);
-	}, [fitKey, fragment]);
-	useEffect(() => paintFittedPreview(), [paintFittedPreview]);
+		stopMeasuring.current = area
+			? fitMailDocument(frame, area, content)
+			: sizeMailDocument(frame, content);
+	}, [documentKey, fragment, reading]);
+	useEffect(() => paintMeasuredDocument(), [paintMeasuredDocument]);
 	const styles = `
-		body { font: 14px/1.55 system-ui; margin:0; padding:${fit ? "0" : padding}; overflow-wrap:anywhere; color:#172231; background:${fit ? "transparent" : "#fff"}; }
+		body { font: ${reading ? 16 : 14}px/1.55 system-ui; margin:0; padding:${documentKey ? "0" : padding}; overflow-wrap:anywhere; color:#172231; background:${fit ? "transparent" : "#fff"}; }
 		img { max-width:100%; } pre { white-space:pre-wrap; }
 		${fit ? "html, body { overflow: hidden; }" : ""}
+		${reading ? "img { height: auto; } table { max-width: 100%; }" : ""}
 	`;
 	const content = fit
-		? `<div data-mail-fit-content="${fitKey}" style="display:flow-root;box-sizing:border-box;width:${fit === "mobile" ? 376 : 640}px;padding:${padding};transform-origin:top left;visibility:hidden"></div>`
-		: fragment;
+		? `<div data-mail-measured-content="${documentKey}" style="display:flow-root;box-sizing:border-box;width:${fit === "mobile" ? 376 : 640}px;padding:${padding};transform-origin:top left;visibility:hidden"></div>`
+		: reading
+			? `<div data-mail-measured-content="${documentKey}" style="display:flow-root;box-sizing:border-box;padding:clamp(12px,2vw,24px)"></div>`
+			: fragment;
 	const preview = (
 		<iframe
-			className="mail-html"
+			className={reading ? "mail-html mail-html-reading" : "mail-html"}
 			title={title}
 			ref={frameRef}
 			// Only the parent measures the preview. The sandbox and CSP keep scripts disabled.
-			sandbox={fit ? "allow-same-origin" : ""}
+			sandbox={documentKey ? "allow-same-origin" : ""}
 			referrerPolicy="no-referrer"
-			onLoad={paintFittedPreview}
+			onLoad={paintMeasuredDocument}
 			srcDoc={`<!doctype html><meta charset="UTF-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src ${showImages ? "https:" : "'none'"}; base-uri 'none'; form-action 'none'"><style>${styles}</style>${content}`}
 		/>
 	);

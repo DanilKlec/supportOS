@@ -32,7 +32,9 @@ export function plainMailBody(message: MailMessage) {
 
 function MailBody({ message }: { message: MailMessage }) {
 	if (message.html)
-		return <MailHtmlPreview html={message.html} title="Содержимое письма" />;
+		return (
+			<MailHtmlPreview html={message.html} title="Содержимое письма" reading />
+		);
 	if (message.text)
 		return <div className="mail-message-body">{message.text}</div>;
 	return <p className="mail-muted">Письмо без текста</p>;

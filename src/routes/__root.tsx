@@ -170,9 +170,7 @@ function RootComponent() {
 						onSignOut={() => supabaseService.signOut()}
 					/>
 				) : passwordRecovery && session ? (
-					<div className="min-h-screen bg-background px-6 py-16">
-						<PasswordForm invitation={passwordInvitation} />
-					</div>
+					<PasswordForm invitation={passwordInvitation} />
 				) : isLoginRoute ? (
 					<Outlet />
 				) : accessGranted ? (
