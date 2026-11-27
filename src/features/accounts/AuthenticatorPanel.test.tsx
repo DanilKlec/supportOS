@@ -45,7 +45,7 @@ it("activates 2FA only after an explicit settings action and a verified code", a
 	await screen.findByAltText("QR-код подключения Google Authenticator");
 	expect(screen.queryByText(/2FA включена\./)).toBeNull();
 	mock.factors.mockResolvedValue([{ id: "new" }]);
-	fireEvent.change(screen.getByLabelText("Код Google Authenticator"), {
+	fireEvent.change(screen.getByLabelText("Цифра 1 из 6"), {
 		target: { value: "123456" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Подтвердить код" }));

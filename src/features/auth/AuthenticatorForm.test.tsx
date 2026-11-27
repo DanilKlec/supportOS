@@ -36,10 +36,12 @@ it("keeps enrollment in settings when the account has no second factor", async (
 it("requires a valid code and does not enroll over an existing authenticator", async () => {
 	const done = vi.fn();
 	render(<AuthenticatorForm onVerified={done} />);
-	const input = await screen.findByLabelText("Код Google Authenticator");
+	const input = (
+		await screen.findAllByRole("textbox", { name: /Цифра \d из 6/ })
+	)[0];
 	expect(mfa.enroll).not.toHaveBeenCalled();
 	expect(done).not.toHaveBeenCalled();
-	fireEvent.change(input, { target: { value: "123456" } });
+	fireEvent.paste(input, { clipboardData: { getData: () => "123 456" } });
 	fireEvent.click(screen.getByText("Подтвердить код"));
 	await waitFor(() =>
 		expect(mfa.verify).toHaveBeenCalledWith("verified-factor", "123456"),
@@ -58,15 +60,35 @@ it("shows QR and manual key only after explicit enrollment and requires verifica
 	await screen.findByAltText("QR-код подключения Google Authenticator");
 	expect(screen.getByText("SYNTHETIC-SECRET")).toBeTruthy();
 	expect(done).not.toHaveBeenCalled();
-	fireEvent.change(screen.getByLabelText("Код Google Authenticator"), {
+	const firstDigit = screen.getByLabelText("Цифра 1 из 6");
+	fireEvent.change(firstDigit, {
 		target: { value: "123456" },
 	});
 	mfa.verify.mockRejectedValueOnce(new Error("Неверный код"));
 	fireEvent.click(screen.getByText("Подтвердить код"));
 	await screen.findByText("Неверный код");
 	expect(done).not.toHaveBeenCalled();
-	expect(screen.getByLabelText("Код Google Authenticator")).toHaveProperty(
-		"value",
-		"",
-	);
+	expect(firstDigit).toHaveProperty("value", "");
+	expect(document.activeElement).toBe(firstDigit);
+});
+
+it("advances while typing and keeps a missing digit from submitting", async () => {
+	render(<AuthenticatorForm onVerified={vi.fn()} submitLabel="Войти" />);
+	const cells = await screen.findAllByRole("textbox", {
+		name: /Цифра \d из 6/,
+	});
+	expect(document.activeElement).toBe(cells[0]);
+	fireEvent.change(cells[0], { target: { value: "0" } });
+	expect(document.activeElement).toBe(cells[1]);
+	fireEvent.keyDown(cells[1], { key: "Backspace" });
+	expect(document.activeElement).toBe(cells[0]);
+	expect(cells[0]).toHaveProperty("value", "");
+	fireEvent.paste(cells[2], { clipboardData: { getData: () => "012345" } });
+	fireEvent.change(cells[2], { target: { value: "" } });
+	const signIn = screen.getByRole("button", { name: "Войти" });
+	expect(signIn).toHaveProperty("disabled", true);
+	fireEvent.change(cells[2], { target: { value: "2" } });
+	fireEvent.click(signIn);
+	await waitFor(() => expect(mfa.verify).toHaveBeenCalledOnce());
+	expect(mfa.verify).toHaveBeenCalledWith("verified-factor", "012345");
 });

@@ -1,3 +1,5 @@
+import type { InvitationTemplate } from "../../../shared/staff-invitation.js";
+
 export type ManagedRole = {
 	id: string;
 	name: string;
@@ -50,6 +52,16 @@ export type AccessResponses = {
 	users: { users: User[]; total: number; hasMore?: boolean };
 	audit: { rows: Audit[]; hasMore: boolean };
 	invitation: { pending: boolean; canResend: boolean; sentAt: string | null };
+	"invitation-template": InvitationSettings;
+};
+export type InvitationDraft = {
+	senderId: string | null;
+	template: InvitationTemplate;
+	revision: number;
+};
+export type InvitationSettings = InvitationDraft & {
+	senders: { id: string; address: string }[];
+	gmailConfigured: boolean;
 };
 export type AccessMutationResponse = {
 	ok?: boolean;

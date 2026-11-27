@@ -1,5 +1,9 @@
 import { authenticatedFetch } from "@/services/authenticated-fetch";
-import type { AccessMutationResponse, AccessResponses } from "./account-types";
+import type {
+	AccessMutationResponse,
+	AccessResponses,
+	InvitationDraft,
+} from "./account-types";
 
 export function accessApi<Action extends keyof AccessResponses>(
 	action: Action,
@@ -7,6 +11,10 @@ export function accessApi<Action extends keyof AccessResponses>(
 	params?: Record<string, string>,
 	signal?: AbortSignal,
 ): Promise<AccessResponses[Action]>;
+export function accessApi(
+	action: "invitation-template",
+	body: InvitationDraft,
+): Promise<InvitationDraft>;
 export function accessApi(
 	action: string,
 	body: unknown,

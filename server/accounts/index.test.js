@@ -59,6 +59,7 @@ it('creates an unconfirmed account without a temporary password and invites only
  expect(mock.inviteUserByEmail).toHaveBeenCalledExactlyOnceWith('new@example.test',{redirectTo:'https://support-os-psi.vercel.app/login?invite=1'});
 });
 it('retries delivery for the same unconfirmed employee without creating another account',async()=>{
+ mock.db.mockResolvedValue([]);
  mock.loadAccess.mockResolvedValue({status:'active',roles:[{id:'support'}],permissions:['work']});
  mock.getUserById.mockResolvedValue({data:{user:{id:historyOther,email:'agent@example.test',app_metadata:{supportos_invitation:true}}}});
  mock.inviteUserByEmail.mockResolvedValue({error:{code:'over_email_send_rate_limit'}});
@@ -74,6 +75,15 @@ it('retries delivery for the same unconfirmed employee without creating another 
  await handler(req({action:'user.invite.resend',id:historyOther,confirmed:true}),blocked);
  expect(blocked.statusCode).toBe(409);
  expect(mock.inviteUserByEmail).toHaveBeenCalledTimes(1);
+});
+it('protects invitation settings with the verified account-management permission',async()=>{
+ mock.requireUser.mockResolvedValue({id:historyUser,access:{status:'active',roles:[],permissions:['work']}});
+ for(const method of ['GET','POST']){
+  const res=response();
+  await handler({...req({}),method,url:'/api/accounts?action=invitation-template'},res);
+  expect(res.statusCode).toBe(403);
+ }
+ expect(mock.db).not.toHaveBeenCalled();
 });
 it('rejects cross-origin writes before authentication or database access',async()=>{
  const res=response();await handler({...req({}),headers:{origin:'https://evil.test',host:'app.test'}},res);expect(res.statusCode).toBe(403);expect(mock.requireUser).not.toHaveBeenCalled();

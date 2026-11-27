@@ -9,6 +9,7 @@ import {displayIdentity} from '../../shared/login-identity.js';
 import {criticalAction,criticalSpec,executeCritical} from '../critical-confirmation.js';
 import {randomUUID} from 'node:crypto';
 import {securityMetadata} from '../security-metadata.js';
+import {getInvitationSettings,lastCustomInvitation,loadInvitationSettings,saveInvitationSettings,sendCustomInvitation} from './invitation.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export function adminClient(env=process.env) {
  const resolved=config(env);
@@ -54,6 +55,15 @@ async function sendStaffInvitation(env, actor, user, name, redirectTo) {
    return { invited: false, warning: 'Сотрудник создан. Настройка Chatwoot не завершилась. Повторите отправку из карточки сотрудника.' };
   }
  }
+ try {
+  const settings=await loadInvitationSettings(env);
+  if(settings.senderId) {
+   await sendCustomInvitation(env,settings,admin,user,name,redirectTo);
+   return {invited:true,warning};
+  }
+ } catch(error) {
+  return {invited:false,warning:error.status&&error.status!==502?error.message:'Не удалось отправить приглашение. Проверьте подключение почтового ящика и повторите отправку из карточки сотрудника.'};
+ }
  const { data, error } = await admin.inviteUserByEmail(user.email, { redirectTo });
  if (error || data?.user?.id !== user.id) {
   const limited = ['over_email_send_rate_limit', 'over_request_rate_limit'].includes(error?.code);
@@ -77,6 +87,11 @@ export default async function handler(req,res) {
    return send(200,{id:actor.id,access:actor.access,mfaEnabled:actor.mfaEnabled===true});
   }
   const env=config();
+  if(action==='invitation-template') {
+   if(!can(actor.access,'users.manage'))throw fail('Настройки приглашений доступны администратору.',403);
+   if(req.method==='GET')return send(200,await getInvitationSettings(env));
+   return send(200,await saveInvitationSettings(env,typeof req.body==='string'?JSON.parse(req.body):req.body??{}));
+  }
   if(action==='critical') {
    if(req.method!=='POST')throw fail('Используйте POST',405);
    return send(200,await criticalAction(req,actor,typeof req.body==='string'?JSON.parse(req.body):req.body??{},env));
@@ -133,7 +148,9 @@ export default async function handler(req,res) {
   if(req.method==='GET') {
    if(action==='invitation') {
     const invitation=await pendingInvitation(env,actor,url.searchParams.get('target'));
-    return send(200,{pending:invitation.pending,canResend:invitation.pending&&invitation.access.status==='active',sentAt:invitation.pending?invitation.user.invited_at??null:null});
+    const customSentAt=invitation.pending?await lastCustomInvitation(env,invitation.user.id):null;
+    const sentAt=invitation.pending?[customSentAt,invitation.user.invited_at].filter(Boolean).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??null:null;
+    return send(200,{pending:invitation.pending,canResend:invitation.pending&&invitation.access.status==='active',sentAt});
    }
    if(action==='users'&&url.searchParams.get('purpose')==='share') {
     if(!can(actor.access,'binds.read'))throw fail('Нет доступа к биндам',403);

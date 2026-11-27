@@ -41,6 +41,11 @@ const MailboxSettings = lazy(() =>
 		default: module.MailboxSettings,
 	})),
 );
+const InvitationSettings = lazy(() =>
+	import("./InvitationSettings").then((module) => ({
+		default: module.InvitationSettings,
+	})),
+);
 
 type RolesTab = "roles" | "access" | "audit";
 
@@ -133,6 +138,8 @@ export function AdminWorkspace() {
 					<AccessReviewPage onUser={onUser} />
 				) : active === "mailboxes" ? (
 					<MailboxSettings oauthReturn={mailboxReturn ?? ""} />
+				) : active === "invitation-template" ? (
+					<InvitationSettings />
 				) : active === "platform-projects" ? (
 					<ProjectsPage />
 				) : active === "system-health" ? (
