@@ -104,15 +104,6 @@ export function MailWorkspace() {
 	const box = mailboxes.find((item) => item.id === selectedBox) ?? mailboxes[0];
 	const boxId = box?.id ?? "";
 	const admin = list.data?.admin === true;
-	const stats = useQuery({
-		queryKey: ["mail", "stats", userId],
-		queryFn: ({ signal }) => mailService.stats(signal),
-		enabled: Boolean(boxId),
-		refetchInterval: 75_000,
-		refetchIntervalInBackground: true,
-		staleTime: 30_000,
-		retry: false,
-	});
 	const labels = useQuery({
 		queryKey: ["mail", "labels", boxId],
 		queryFn: ({ signal }) => mailService.labels(boxId, signal),
@@ -127,6 +118,15 @@ export function MailWorkspace() {
 		enabled: Boolean(boxId),
 		staleTime: 25_000,
 		gcTime: 45_000,
+	});
+	const stats = useQuery({
+		queryKey: ["mail", "stats", userId],
+		queryFn: ({ signal }) => mailService.stats(signal),
+		enabled: Boolean(boxId && folder.isFetched),
+		refetchInterval: 75_000,
+		refetchIntervalInBackground: true,
+		staleTime: 30_000,
+		retry: false,
 	});
 	const resultRows = folder.data?.rows ?? [];
 	const statusByMailbox = new Map(
@@ -152,6 +152,7 @@ export function MailWorkspace() {
 					queryKey: ["mail", "folder-counts", boxId, ids],
 					queryFn: ({ signal }: { signal: AbortSignal }) =>
 						mailService.folderCounts(boxId, ids, signal),
+					enabled: folder.isFetched,
 					staleTime: 15_000,
 					refetchInterval: 30_000,
 				}))
@@ -188,7 +189,7 @@ export function MailWorkspace() {
 	const colors = useQuery({
 		queryKey: ["mail", "label-colors", boxId, colorIds],
 		queryFn: ({ signal }) => mailService.labelColors(boxId, colorIds, signal),
-		enabled: Boolean(boxId && colorIds),
+		enabled: Boolean(boxId && folder.isFetched && colorIds),
 		staleTime: 4 * 60_000,
 		retry: false,
 	});

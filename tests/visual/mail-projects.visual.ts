@@ -2,15 +2,18 @@ import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
 test("organize accessible mailboxes into project folders", async ({ context, page }, info) => {
-	const mailboxes = Array.from({ length: 32 }, (_, index) => ({
+	const mailboxes = Array.from({ length: 50 }, (_, index) => ({
 		id: `mailbox-${index}`,
 		address: `desk${index}@example.invalid`,
 		provider: "gmail",
 	}));
+	const requestedFolders = new Set<string>();
+	let releaseStats = () => {};
+	const waitingForStats = new Promise<void>((resolve) => { releaseStats = resolve; });
 	await context.route("**/api/binds?action=workspace", (route) =>
 		route.fulfill({ json: { ...knowledge, branches: { choices: {}, incoming: [], outgoing: [] } } }),
 	);
-	await context.route("**/api/mail?**", (route) => {
+	await context.route("**/api/mail?**", async (route) => {
 		const request = route.request();
 		const url = new URL(request.url());
 		if (
@@ -20,17 +23,27 @@ test("organize accessible mailboxes into project folders", async ({ context, pag
 		expect(request.method()).toBe("GET");
 		switch (url.searchParams.get("action")) {
 			case "list": return route.fulfill({ json: { configured: true, admin: false, mailboxes } });
-			case "stats": return route.fulfill({ json: { stats: mailboxes.map(({ id }, index) => ({
-				id, unread: index === 0 ? 2 : index === 12 ? 5 : 0, recentDate: null,
-			})) } });
+			case "stats":
+				await waitingForStats;
+				return route.fulfill({ json: { stats: mailboxes.map(({ id }, index) => ({
+					id, unread: index === 0 ? 2 : index === 49 ? 5 : 0, recentDate: null,
+				})) } });
 			case "labels": return route.fulfill({ json: { labels: [] } });
 			case "label-colors": return route.fulfill({ json: { colors: {} } });
-			case "folder": return route.fulfill({ json: { rows: [], next: null } });
+			case "folder":
+				requestedFolders.add(url.searchParams.get("box") ?? "");
+				return route.fulfill({ json: { rows: [], next: null } });
 			case "folder-counts": return route.fulfill({ json: { counts: {} } });
 			default: return route.fulfill({ status: 404, json: { error: "Unexpected request" } });
 		}
 	});
-	await page.goto("/mail");
+	try {
+		await page.goto("/mail");
+		await expect(page.getByText("Здесь пока нет писем")).toBeVisible();
+		expect([...requestedFolders]).toEqual(["mailbox-0"]);
+	} finally {
+		releaseStats();
+	}
 	const rail = page.getByRole("complementary", { name: "Папки проектов" });
 	const group = (name: string) => rail.getByRole("region", { name, exact: true });
 	const shortcut = (name: RegExp) => rail.getByRole("navigation", { name: "Проекты" }).getByRole("button", { name });
@@ -47,19 +60,20 @@ test("organize accessible mailboxes into project folders", async ({ context, pag
 		await expect(group(name)).toBeVisible();
 	};
 	const first = "desk0@example.invalid";
-	const second = "desk12@example.invalid";
+	const second = "desk49@example.invalid";
 	await newFolder("VIP-поддержка", [first, second]);
 	await expect(shortcut(/^VIP-поддержка · 7 непрочитанных$/)).toBeVisible();
 	await expect(shortcut(/^VIP-поддержка/).locator(".mail-project-mark")).toHaveText("VIP");
-	await expect(group("VIP-поддержка").getByRole("button", { name: /desk12@example/ })).toBeVisible();
+	await expect(group("VIP-поддержка").getByRole("button", { name: /desk49@example/ })).toBeVisible();
 	await page.screenshot({ path: info.outputPath("mail-project-folders.png"), animations: "disabled" });
-	await group("VIP-поддержка").getByRole("button", { name: /desk12@example/ }).click();
+	await group("VIP-поддержка").getByRole("button", { name: /desk49@example/ }).click();
 	await expect(page.getByRole("button", { name: "Почтовый ящик", exact: true })).toHaveAccessibleDescription(second);
+	await expect.poll(() => [...requestedFolders]).toEqual(["mailbox-0", "mailbox-49"]);
 
 	await newFolder("Вторая линия", [second]);
 	await expect(shortcut(/^Вторая линия · 5 непрочитанных$/)).toHaveAttribute("data-active", "true");
 	await shortcut(/^VIP-поддержка · 2 непрочитанных$/).click();
-	await expect(group("VIP-поддержка").getByRole("button", { name: /desk12@example/ })).toHaveCount(0);
+	await expect(group("VIP-поддержка").getByRole("button", { name: /desk49@example/ })).toHaveCount(0);
 	await group("VIP-поддержка").getByRole("button", { name: "Настроить папку", exact: true }).click();
 	const editor = page.getByRole("dialog", { name: "Настроить папку проекта" });
 	await editor.getByRole("textbox", { name: "Название папки" }).fill("Первый проект");

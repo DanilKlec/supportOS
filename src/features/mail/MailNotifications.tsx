@@ -50,9 +50,15 @@ export function MailNotifications() {
 function MailNotificationsSession({ userId }: { userId: string }) {
 	const { showToast } = useToast();
 	const baseline = useRef(new Map<string, number>());
+	const [started, setStarted] = useState(false);
+	useEffect(() => {
+		const timer = window.setTimeout(() => setStarted(true), 3_000);
+		return () => window.clearTimeout(timer);
+	}, []);
 	const list = useQuery({
 		queryKey: ["mail", "list", userId],
 		queryFn: ({ signal }) => mailService.list(signal),
+		enabled: started,
 		staleTime: 15_000,
 		refetchInterval: 75_000,
 		retry: false,
@@ -61,7 +67,7 @@ function MailNotificationsSession({ userId }: { userId: string }) {
 	const stats = useQuery({
 		queryKey: ["mail", "stats", userId],
 		queryFn: ({ signal }) => mailService.stats(signal),
-		enabled: hasMail,
+		enabled: started && hasMail,
 		refetchInterval: 75_000,
 		refetchIntervalInBackground: true,
 		staleTime: 30_000,

@@ -12,6 +12,10 @@ const pageSize = 16;
 const senderTable = 'supportos_mail_senders';
 const statsCache = new Map();
 const labelColorCache = new Map();
+const folderPages = new Map();
+const snapshotWaiters = [];
+const snapshotConcurrency = 8;
+let runningSnapshots = 0;
 
 function labelColor(input) {
 	const { backgroundColor, textColor } = input ?? {};
@@ -119,24 +123,94 @@ async function folder(env, boxId, g, url) {
 	return { rows: messages.map(({ threadLabels, ...row }) => ({ ...row, labels: threadLabels })), next: result.nextPageToken ?? null };
 }
 
-async function unreadSnapshot(cfg, mailbox) {
+function folderPage(env, cfg, box, url) {
+	const load = async () => {
+		const token = await mailboxToken(cfg, box);
+		return folder(env, box.id, (path) => gmail(token, path), url);
+	};
+	const label = url.searchParams.get('label') ?? 'INBOX';
+	if (label === 'DRAFT' || url.searchParams.get('page') || url.searchParams.get('q')?.trim()) return load();
+	safeId(label);
+	let mailbox = folderPages.get(box.id);
+	if (mailbox?.version !== box.encrypted_token) {
+		if (!mailbox && folderPages.size >= 200) folderPages.delete(folderPages.keys().next().value);
+		mailbox = { version: box.encrypted_token, pages: new Map() };
+		folderPages.set(box.id, mailbox);
+	}
+	const { pages } = mailbox;
+	const cached = pages.get(label);
+	if (cached?.expires > Date.now()) return cached.promise;
+	if (!cached && pages.size >= 6) pages.delete(pages.keys().next().value);
+	const entry = { expires: Infinity };
+	entry.promise = load().then((result) => {
+		entry.expires = Date.now() + 8_000;
+		return result;
+	}).catch((error) => {
+		if (pages.get(label) === entry) pages.delete(label);
+		throw error;
+	});
+	pages.set(label, entry);
+	return entry.promise;
+}
+
+async function withSnapshotSlot(read) {
+	if (runningSnapshots < snapshotConcurrency) runningSnapshots++;
+	else await new Promise((resolve) => snapshotWaiters.push(resolve));
+	try {
+		return await read();
+	} finally {
+		const next = snapshotWaiters.shift();
+		if (next) next();
+		else runningSnapshots--;
+	}
+}
+
+async function readSnapshot(cfg, mailbox, previous) {
+	const signal = AbortSignal.timeout(4_000);
+	const expired = new Promise((_, reject) => {
+		signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+	});
+	const token = await Promise.race([mailboxToken(cfg, mailbox), expired]);
+	const g = (path) => gmail(token, path, { signal });
+	const [label, latest] = await Promise.allSettled([
+		g('/labels/INBOX?fields=messagesUnread'),
+		g('/messages?labelIds=INBOX&maxResults=1&fields=messages(id)'),
+	]);
+	if (label.status === 'rejected') throw label.reason;
+	if (latest.status === 'rejected') throw latest.reason;
+	const recentId = latest.value.messages?.[0]?.id;
+	let recentDate = null;
+	if (recentId) {
+		recentDate = previous?.recentId === recentId && previous.recentDate != null
+			? previous.recentDate
+			: Number((await g(`/messages/${safeId(recentId)}?format=minimal&fields=internalDate`)).internalDate) || null;
+	}
+	return { id: mailbox.id, unread: label.value.messagesUnread ?? 0, recentId, recentDate };
+}
+
+function unreadSnapshot(cfg, mailbox) {
 	const cached = statsCache.get(mailbox.id);
-	if (cached?.version === mailbox.encrypted_token && cached.expires > Date.now()) return cached.promise;
-	const entry = { version: mailbox.encrypted_token, expires: Date.now() + 30_000 };
-	entry.promise = (async () => {
+	const sameMailbox = cached?.version === mailbox.encrypted_token;
+	if (sameMailbox && cached.expires > Date.now()) return cached.promise;
+	const entry = { version: mailbox.encrypted_token, expires: Infinity, previous: sameMailbox ? cached.previous : undefined };
+	entry.promise = withSnapshotSlot(async () => {
 		try {
-			const token = await mailboxToken(cfg, mailbox);
-			const [unread, latest] = await Promise.all([
-				folderCount((path) => gmail(token, path), mailbox, 'INBOX'),
-				gmail(token, '/messages?labelIds=INBOX&maxResults=1&fields=messages(id)'),
-			]);
-			const recentId = latest.messages?.[0]?.id;
-			let recentDate = null;
-			if (recentId) recentDate = Number((await gmail(token, `/messages/${safeId(recentId)}?format=minimal&fields=internalDate`)).internalDate) || null;
-			return { id: mailbox.id, unread, recentId, recentDate };
-		} catch (error) { return { id: mailbox.id, unread: null, reconnect: error.code === 'reconnect' }; }
-	})();
-	if (statsCache.size >= 200) statsCache.delete(statsCache.keys().next().value);
+			entry.previous = await readSnapshot(cfg, mailbox, entry.previous);
+			entry.expires = Date.now() + 30_000;
+			return entry.previous;
+		} catch (error) {
+			const reconnect = error.code === 'reconnect';
+			entry.expires = Date.now() + (reconnect ? 75_000 : 15_000);
+			return { id: mailbox.id, unread: null, reconnect };
+		}
+	});
+	if (!cached && statsCache.size >= 200) {
+		for (const [id, value] of statsCache) {
+			if (value.expires === Infinity) continue;
+			statsCache.delete(id);
+			break;
+		}
+	}
 	statsCache.set(mailbox.id, entry);
 	return entry.promise;
 }
@@ -188,7 +262,7 @@ export default async function handler(req, res) {
 		}
 		if (action === 'stats') {
 			const mailboxes = await accessMailboxes(env, user.id, admin, true);
-			return send(200, { stats: await collect(mailboxes, (mailbox) => unreadSnapshot(cfg, mailbox), 8) });
+			return send(200, { stats: await Promise.all(mailboxes.map((mailbox) => unreadSnapshot(cfg, mailbox))) });
 		}
 		const box = await accessMailbox(env, user.id, admin, url.searchParams.get('box'));
 		if (action === 'import-template-html') return send(200, importTemplateHtml(body.html));
@@ -212,6 +286,7 @@ export default async function handler(req, res) {
 			}
 			return send(200, { ok: true });
 		}
+		if (action === 'folder') return send(200, await folderPage(env, cfg, box, url));
 		const token = await mailboxToken(cfg, box);
 		const g = (path, options) => gmail(token, path, options);
 		if (action === 'labels') return send(200, await g('/labels?fields=labels(id,name,type)'));
@@ -262,7 +337,6 @@ export default async function handler(req, res) {
 			labelColorCache.delete(`${box.id}:${id}`);
 			return send(200, edited);
 		}
-		if (action === 'folder') return send(200, await folder(env, box.id, g, url));
 		if (action === 'thread') {
 			const id = safeId(url.searchParams.get('id'));
 			const thread = await g(`/threads/${id}?format=full`);
@@ -342,6 +416,7 @@ export default async function handler(req, res) {
 			}
 			invalidateFolderCounts(box.id, affected);
 			statsCache.delete(box.id);
+			folderPages.delete(box.id);
 			return send(200, { ok: true });
 		}
 		if (action === 'delete-draft') {
@@ -384,6 +459,8 @@ export default async function handler(req, res) {
 					console.error('Mail sender recording failed', error.storageCode ?? error.name);
 					return send(200, { ...result, staffSenderMissing: true });
 				}
+			} finally {
+				folderPages.delete(box.id);
 			}
 			return send(200, result);
 		}

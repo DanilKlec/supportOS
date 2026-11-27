@@ -6,8 +6,8 @@ import { plainFromMailHtml, sanitizeMailHtml } from './mail-html.js';
 import { defaultMailLayout, normalizeMailLayout, renderMailLayout } from '../../shared/mail-layout.js';
 import handler from './index.js';
 
-const identities = vi.hoisted(() => ({ actor: undefined }));
-vi.mock('../_auth.js', () => ({ requireUser: async () => identities.actor }));
+const identities = vi.hoisted(() => ({ actor: undefined, sessions: new Map() }));
+vi.mock('../_auth.js', () => ({ requireUser: async (request) => identities.sessions.get(request.headers?.authorization) ?? identities.actor }));
 const address = 'queue@gmail.example';
 const mailboxId = '40000000-0000-4000-8000-000000000001';
 const userId = '40000000-0000-4000-8000-000000000002';
@@ -17,7 +17,7 @@ const testEnv = {
 	SUPABASE_URL: 'https://database.invalid', SUPABASE_SERVICE_ROLE_KEY: 'test-only',
 };
 
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { identities.sessions.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 test('Google authorization binds the intended mailbox, actor, expiration and PKCE', async () => {
 	const cfg = googleConfig(testEnv);
@@ -64,11 +64,98 @@ test('reads both MIME body alternatives and names inline downloads', () => {
 	expect(message).toMatchObject({ subject: 'Original', text: 'hello', html: '<p>hello</p>', attachments: [{ id: 'inline-2', name: 'a.txt' }] });
 });
 
-async function call(method, action, query = '', body) {
+async function call(method, action, query = '', body, authorization) {
 	const res = { setHeader() {}, end(text) { this.body = JSON.parse(text); } };
-	await handler({ method, url: `/api/mail?action=${action}${query}`, body }, res);
+	await handler({ method, url: `/api/mail?action=${action}${query}`, body, headers: { authorization } }, res);
 	return { status: res.statusCode, body: res.body };
 }
+
+test('50 employees can open a shared inbox while counters refresh for 50 mailboxes', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
+	const cfg = googleConfig(testEnv);
+	const boxes = Array.from({ length: 50 }, (_, index) => {
+		const id = `40000000-0000-4000-8100-${String(index + 1).padStart(12, '0')}`;
+		const address = `desk-${index}@example.invalid`;
+		return { id, address, encrypted_token: seal(cfg, String(index), `gmail:${address}`) };
+	});
+	const sessions = boxes.map(({ id }, index) => {
+		const authorization = `test-session-${index}`;
+		identities.sessions.set(authorization, { ...identities.actor, id });
+		return authorization;
+	});
+	const deniedId = '40000000-0000-4000-8300-000000000001';
+	identities.sessions.set('denied-session', { ...identities.actor, id: deniedId });
+	const threads = Array.from({ length: 16 }, (_, index) => ({ id: `thread-${index}` }));
+	const calls = { list: 0, metadata: 0, counters: 0 };
+	let concurrentCounters = 0;
+	let peakCounters = 0;
+	let unread = true;
+	const fetch = vi.fn(async (url, options) => {
+		const parsed = new URL(url);
+		if (parsed.hostname === 'database.invalid') {
+			if (parsed.searchParams.get('select') === 'user_id') {
+				const actor = parsed.searchParams.get('user_id').slice(3);
+				return Response.json(actor === deniedId ? [] : [{ user_id: actor }]);
+			}
+			if (parsed.searchParams.has('id')) return Response.json([boxes[0]]);
+			return Response.json(boxes.map((mailbox) => ({ mailbox })));
+		}
+		if (parsed.hostname === 'oauth2.googleapis.com') return Response.json({
+			access_token: options.body.get('refresh_token'), expires_in: 3600,
+		});
+		const path = parsed.pathname.replace('/gmail/v1/users/me', '');
+		const token = options.headers.Authorization.slice(7);
+		if (path === '/threads' || path.startsWith('/threads/')) {
+			await new Promise((resolve) => setTimeout(resolve, 8));
+			if (options.method === 'POST') {
+				unread = false;
+				return Response.json({ messages: [{ labelIds: ['INBOX'] }] });
+			}
+			if (path === '/threads') { calls.list++; return Response.json({ threads }); }
+			calls.metadata++;
+			const id = path.split('/').at(-1);
+			return Response.json({ messages: [{ id, threadId: id, internalDate: '1500000000000',
+				labelIds: unread ? ['INBOX', 'UNREAD'] : ['INBOX'] }] });
+		}
+		calls.counters++;
+		peakCounters = Math.max(peakCounters, ++concurrentCounters);
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			if (token === '49') return Response.json({}, { status: 429 });
+			if (path.startsWith('/labels/')) return Response.json({ messagesUnread: 5 });
+			if (path === '/messages') return Response.json({ messages: [{ id: 'recent' }] });
+			if (path === '/messages/recent') return Response.json({ internalDate: '1500000000000' });
+			throw new Error(`Unexpected request ${path}`);
+		} finally { concurrentCounters--; }
+	});
+	vi.stubGlobal('fetch', fetch);
+	const query = `&box=${boxes[0].id}`;
+	const counters = Promise.all(sessions.map((session) => call('GET', 'stats', '', undefined, session)));
+	const inboxes = await Promise.all(sessions.map((session) => call('GET', 'folder', query, undefined, session)));
+	for (const { status, body } of inboxes) {
+		expect(status).toBe(200);
+		expect(body.rows).toHaveLength(16);
+	}
+	const snapshots = await counters;
+	for (const { status, body } of snapshots) {
+		expect(status).toBe(200);
+		expect(body.stats).toHaveLength(50);
+		expect(body.stats[0].unread).toBe(5);
+		expect(body.stats.find(({ id }) => id === boxes[49].id)?.unread).toBeNull();
+	}
+	expect(calls).toEqual({ list: 1, metadata: 16, counters: 149 });
+	expect(peakCounters).toBeLessThanOrEqual(16);
+	expect((await call('GET', 'folder', query, undefined, 'denied-session')).status).toBe(403);
+	const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+	await call('GET', 'stats');
+	clock.mockRestore();
+	expect(calls.counters).toBe(249);
+	await call('POST', 'change-thread', query, { id: 'thread-0', operation: 'read' });
+	const refreshed = await call('GET', 'folder', query);
+	expect(refreshed.body.rows[0].labels).not.toContain('UNREAD');
+	expect(calls.list).toBe(2);
+});
 
 test('mailbox membership is checked before mail is read or sent and support cannot grant access', async () => {
 	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);

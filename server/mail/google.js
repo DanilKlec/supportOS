@@ -89,10 +89,10 @@ export async function mailboxToken(cfg, mailbox) {
 	return record.promise;
 }
 
-export async function gmail(token, path, { method = 'GET', body } = {}) {
+export async function gmail(token, path, { method = 'GET', body, signal } = {}) {
 	const result = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
 		method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-		body: body && JSON.stringify(body), signal: AbortSignal.timeout(12_000), redirect: 'error',
+		body: body && JSON.stringify(body), signal: signal ?? AbortSignal.timeout(12_000), redirect: 'error',
 	});
 	const status = result.status;
 	if (!result.ok) {
