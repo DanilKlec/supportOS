@@ -124,6 +124,9 @@
 	min-height: 0;
 	grid-template-columns: 3.35rem minmax(0, 1fr);
 }
+.mail-empty-project {
+	grid-column: 3 / -1;
+}
 .mail-sidebar,
 .mail-list,
 .mail-thread {
@@ -1639,6 +1642,19 @@
 	outline: 2px solid var(--color-accent);
 	outline-offset: 2px;
 }
+.mail-custom-icon-color {
+	width: 1.75rem;
+	height: 1.55rem;
+	padding: 0.15rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.38rem;
+	background: var(--mail-control);
+	cursor: pointer;
+}
+.mail-custom-icon-color:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
 .mail-icon-editor-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -1759,6 +1775,29 @@
 	}
 	.mail-account-options > ul {
 		max-height: min(35dvh, 15rem);
+	}
+	.mail-account-options[data-mode="mobile"] > ul {
+		grid-template-columns: repeat(auto-fill, minmax(2.45rem, 1fr));
+		justify-items: center;
+	}
+	.mail-account-options[data-mode="mobile"] .mail-account-option {
+		position: relative;
+		display: grid;
+		width: 2.4rem;
+		min-height: 2.4rem;
+		place-items: center;
+		padding: 0;
+	}
+	.mail-account-options[data-mode="mobile"] .mail-account-option > svg,
+	.mail-account-options[data-mode="mobile"] .mail-account-option > b {
+		position: absolute;
+		inset-block-start: 0;
+		inset-inline-end: 0;
+	}
+	.mail-account-options[data-mode="mobile"] .mail-account-option > b {
+		min-width: 0.9rem;
+		padding: 0.06rem 0.15rem;
+		font-size: 0.57rem;
 	}
 	.mail-folders {
 		display: flex;

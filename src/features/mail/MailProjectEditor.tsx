@@ -39,7 +39,7 @@ export function MailProjectEditor({
 	const trimmedName = name.trim();
 	const comparableName = trimmedName.toLocaleLowerCase("ru");
 	const duplicate =
-		comparableName === "без проекта" ||
+		["без проекта", "все ящики"].includes(comparableName) ||
 		folders.some(
 			(item) =>
 				item.id !== folder?.id &&

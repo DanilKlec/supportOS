@@ -201,10 +201,11 @@ test('updates a mailbox icon with administrator access and rejects non-image pay
 	});
 	vi.stubGlobal('fetch', fetch);
 	const query = `&box=${mailboxId}`;
-	expect(await call('POST', 'set-mailbox-icon', query, { icon: { text: 'vip', tone: 5 } }))
-		.toMatchObject({ status: 200, body: { icon: { text: 'VIP', tone: 5 } } });
+	expect(await call('POST', 'set-mailbox-icon', query, { icon: { text: 'vip', tone: 5, color: '#37AaF2' } }))
+		.toMatchObject({ status: 200, body: { icon: { text: 'VIP', tone: 5, color: '#37aaf2' } } });
 	expect((await call('POST', 'set-mailbox-icon', query, { icon: { text: 'VIP', tone: 5, image: 'https://images.example.invalid/a.png' } })).status).toBe(400);
 	expect((await call('POST', 'set-mailbox-icon', query, { icon: { text: 'VIP', tone: 8 } })).status).toBe(400);
+	expect((await call('POST', 'set-mailbox-icon', query, { icon: { text: 'VIP', tone: 5, color: 'transparent' } })).status).toBe(400);
 	expect((await call('POST', 'set-mailbox-icon', query, { icon: null })).body.icon).toBeNull();
 	expect(fetch).toHaveBeenCalledTimes(2);
 });

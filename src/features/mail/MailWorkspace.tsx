@@ -39,7 +39,7 @@ import { emptyMailDraft, MailComposer } from "./MailComposer";
 import { MailFolderCount, MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
 import { useMailNotificationPreference } from "./MailNotifications";
-import { MailProjectFolders } from "./MailProjectFolders";
+import { MailProjectFolders, useMailProjects } from "./MailProjectFolders";
 import { MailThread, mailDate, plainMailBody } from "./MailThread";
 import { MailThreadActions } from "./MailThreadActions";
 import "./mail.css";
@@ -86,6 +86,7 @@ export function MailWorkspace() {
 			: "";
 	});
 	const [showMoreFolders, setShowMoreFolders] = useState(false);
+	const [projectId, setProjectId] = useState<string | null>(null);
 	const [label, setLabel] = useState("INBOX");
 	const [search, setSearch] = useState("");
 	const [query, setQuery] = useState("");
@@ -104,7 +105,16 @@ export function MailWorkspace() {
 		refetchOnWindowFocus: true,
 	});
 	const mailboxes = list.data?.mailboxes ?? [];
-	const box = mailboxes.find((item) => item.id === selectedBox) ?? mailboxes[0];
+	const projects = useMailProjects(mailboxes);
+	const project = projects.folders.find(({ id }) => id === projectId);
+	const projectScope = project?.id ?? (projectId === "" ? "" : null);
+	const scopedMailboxes =
+		projectScope === null
+			? mailboxes
+			: (projects.groups.get(projectScope) ?? []);
+	const box =
+		scopedMailboxes.find((item) => item.id === selectedBox) ??
+		scopedMailboxes[0];
 	const boxId = box?.id ?? "";
 	const admin = list.data?.admin === true;
 	const labels = useQuery({
@@ -231,6 +241,7 @@ export function MailWorkspace() {
 	);
 	useEffect(() => {
 		if (!destination || !("mailboxId" in destination)) return;
+		setProjectId(null);
 		chooseBox(destination.mailboxId);
 		void navigate({
 			to: "/mail",
@@ -238,6 +249,10 @@ export function MailWorkspace() {
 			state: (previous) => ({ ...previous, workspaceSearch: undefined }),
 		});
 	}, [destination, chooseBox, navigate]);
+	const chooseProject = (id: string | null) => {
+		setProjectId(id);
+		chooseBox(boxId);
+	};
 	const refreshFolder = (mailbox: string) => {
 		void client.invalidateQueries({ queryKey: ["mail", "folder", mailbox] });
 		void client.invalidateQueries({ queryKey: ["mail", "thread", mailbox] });
@@ -564,7 +579,7 @@ export function MailWorkspace() {
 						</Link>
 					)}
 				</div>
-			) : !box ? (
+			) : !mailboxes.length ? (
 				<div className="mail-empty">
 					<Inbox size={30} />
 					<h2>
@@ -592,349 +607,377 @@ export function MailWorkspace() {
 				<div className="mail-grid">
 					<MailProjectFolders
 						key={userId}
-						active={box}
+						projects={projects}
+						selected={projectScope}
 						mailboxes={mailboxes}
 						statusByMailbox={statusByMailbox}
-						onChange={chooseBox}
+						onSelect={chooseProject}
 					/>
 					<div className="mail-navigation">
 						<MailAccountPicker
+							key={projectScope === null ? "all" : `project:${projectScope}`}
 							active={box}
-							mailboxes={mailboxes}
+							mailboxes={scopedMailboxes}
 							statusByMailbox={statusByMailbox}
 							onChange={chooseBox}
 						/>
-						<aside
-							className="mail-sidebar supportos-scroll"
-							aria-label="Папки и действия ящика"
-						>
-							<button
-								type="button"
-								className="mail-button mail-compose-trigger"
-								data-primary="true"
-								onClick={() => setComposer({ box, draft: emptyMailDraft })}
+						{box && (
+							<aside
+								className="mail-sidebar supportos-scroll"
+								aria-label="Папки и действия ящика"
 							>
-								<Pencil size={15} /> Написать
-							</button>
-							{admin && statusByMailbox.get(boxId)?.reconnect && (
-								<Link to="/admin" hash="mailboxes" className="mail-button">
-									Переподключение ящика
-								</Link>
-							)}
-							<nav
-								aria-label="Папки Gmail"
-								className="mail-folders"
-								data-show-extra={showMoreFolders || activeExtraFolder}
-							>
-								{folders.map(({ id, title, icon: Icon }, index) => (
-									<button
-										type="button"
-										key={id}
-										className="mail-nav"
-										data-extra={index >= 5}
-										aria-pressed={id === "INBOX" ? isInbox : id === label}
-										onClick={() => changeFolder(id)}
-									>
-										<Icon size={15} aria-hidden="true" />
-										<span>{title}</span>
-										<MailFolderCount
-											count={
-												folderCounts[id] ??
-												(id === "INBOX"
-													? statusByMailbox.get(boxId)?.unread
-													: undefined)
-											}
-											drafts={id === "DRAFT"}
-										/>
-									</button>
-								))}
 								<button
 									type="button"
-									className="mail-nav mail-system-more"
-									aria-expanded={showMoreFolders || activeExtraFolder}
-									onClick={() => setShowMoreFolders((shown) => !shown)}
-									hidden={activeExtraFolder}
+									className="mail-button mail-compose-trigger"
+									data-primary="true"
+									onClick={() => setComposer({ box, draft: emptyMailDraft })}
 								>
-									<ChevronDown size={14} aria-hidden="true" />
-									<span>
-										{showMoreFolders ? "Свернуть" : "Ещё папки Gmail"}
-									</span>
+									<Pencil size={15} /> Написать
 								</button>
-							</nav>
-							<MailFolderNavigation
-								key={box.id}
-								labels={userLabels}
-								active={label}
-								loading={labels.isPending}
-								error={labels.isError}
-								counts={folderCounts}
-								onSelect={changeFolder}
-								onCreate={(name, color) =>
-									createLabel.mutateAsync({ box: box.id, name, color })
-								}
-							/>
-						</aside>
-					</div>
-					<section className="mail-list" aria-label="Список писем">
-						<header className="mail-list-header">
-							<div>
-								<h2>{currentTitle}</h2>
-							</div>
-							<form
-								className="mail-search"
-								onSubmit={(event) => {
-									event.preventDefault();
-									setQuery(search.trim());
-									reset();
-								}}
-							>
-								<Search size={15} />
-								<input
-									aria-label="Поиск в выбранной папке"
-									placeholder="Поиск по письмам"
-									maxLength={300}
-									value={search}
-									onChange={(event) => {
-										setSearch(event.target.value);
-										if (!event.target.value && query) {
-											setQuery("");
-											reset();
-										}
-									}}
-								/>
-								<button type="submit" className="mail-icon" aria-label="Найти">
-									<ChevronRight size={16} />
-								</button>
-							</form>
-						</header>
-						{isInbox && (
-							<nav
-								className="mail-categories supportos-scroll"
-								aria-label="Категории входящих"
-							>
-								{categories.map(([id, title]) => (
-									<button
-										key={id}
-										type="button"
-										className="mail-category"
-										aria-pressed={id === label}
-										onClick={() => changeFolder(id)}
-									>
-										{title}
-									</button>
-								))}
-							</nav>
-						)}
-						<div className="mail-list-scroll supportos-scroll">
-							{folder.isPending ? (
-								<p className="mail-empty">Загружаем письма…</p>
-							) : folder.error && !folder.data ? (
-								<div className="mail-empty">
-									<p role="alert" className="mail-error">
-										{folder.error.message}
-									</p>
+								{admin && statusByMailbox.get(boxId)?.reconnect && (
+									<Link to="/admin" hash="mailboxes" className="mail-button">
+										Переподключение ящика
+									</Link>
+								)}
+								<nav
+									aria-label="Папки Gmail"
+									className="mail-folders"
+									data-show-extra={showMoreFolders || activeExtraFolder}
+								>
+									{folders.map(({ id, title, icon: Icon }, index) => (
+										<button
+											type="button"
+											key={id}
+											className="mail-nav"
+											data-extra={index >= 5}
+											aria-pressed={id === "INBOX" ? isInbox : id === label}
+											onClick={() => changeFolder(id)}
+										>
+											<Icon size={15} aria-hidden="true" />
+											<span>{title}</span>
+											<MailFolderCount
+												count={
+													folderCounts[id] ??
+													(id === "INBOX"
+														? statusByMailbox.get(boxId)?.unread
+														: undefined)
+												}
+												drafts={id === "DRAFT"}
+											/>
+										</button>
+									))}
 									<button
 										type="button"
-										className="mail-button"
-										onClick={() => void folder.refetch()}
+										className="mail-nav mail-system-more"
+										aria-expanded={showMoreFolders || activeExtraFolder}
+										onClick={() => setShowMoreFolders((shown) => !shown)}
+										hidden={activeExtraFolder}
 									>
-										Повторить
+										<ChevronDown size={14} aria-hidden="true" />
+										<span>
+											{showMoreFolders ? "Свернуть" : "Ещё папки Gmail"}
+										</span>
 									</button>
-									{admin && (
-										<Link to="/admin" hash="mailboxes" className="mail-button">
-											Управление ящиками
-										</Link>
-									)}
-								</div>
-							) : resultRows.length === 0 ? (
-								<p className="mail-empty">
-									{query
-										? "Письма по запросу не найдены"
-										: "Здесь пока нет писем"}
-								</p>
-							) : (
-								<ul>
-									{resultRows.map((row) => {
-										const applied = userLabels.filter(
-											({ id }) => id !== label && row.labels.includes(id),
-										);
-										return (
-											<li key={row.draftId ?? row.id}>
-												<button
-													type="button"
-													className="mail-row"
-													data-unread={row.labels.includes("UNREAD")}
-													aria-pressed={row.threadId === selected?.threadId}
-													onClick={() => {
-														if (row.draftId) {
-															if (!openDraft.isPending)
-																openDraft.mutate({
-																	mailbox: box,
-																	id: row.draftId,
-																});
-															return;
-														}
-														setOpenRow({ boxId: box.id, row });
-														if (
-															row.labels.includes("UNREAD") &&
-															!threadAction.isPending
-														)
-															threadAction.mutate({
-																box: box.id,
-																id: row.threadId,
-																action: "read",
-															});
-													}}
-												>
-													<span className="mail-row-top">
-														<span>
-															{label === "SENT" || label === "DRAFT"
-																? row.to || "Без адресата"
-																: row.from || "Без отправителя"}
-														</span>
-														<time>{mailDate(row.date)}</time>
-													</span>
-													<span className="mail-row-details">
-														<span className="mail-row-subject">
-															{row.labels.includes("STARRED") && (
-																<Star
-																	size={12}
-																	fill="currentColor"
-																	aria-label="Помечено"
-																/>
-															)}
-															{row.subject || "Без темы"}
-															{row.count > 1 && <small>{row.count}</small>}
-														</span>
-														{row.labels.includes("UNREAD") && (
-															<span className="mail-row-unread">
-																Непрочитано
-															</span>
-														)}
-													</span>
-													<span className="mail-row-preview">
-														{row.snippet}
-													</span>
-													{row.staffSender && (
-														<span
-															className="mail-staff-sender"
-															title={`Отправил: ${row.staffSender}`}
-														>
-															<UserRound size={12} aria-hidden="true" />
-															<span>Отправил: {row.staffSender}</span>
-														</span>
-													)}
-													{applied.length > 0 && (
-														<span className="mail-row-tags">
-															{applied.slice(0, 2).map((label) => (
-																<MailLabelChip key={label.id} label={label} />
-															))}
-															{applied.length > 2 && (
-																<span className="mail-tag">
-																	+{applied.length - 2}
-																</span>
-															)}
-														</span>
-													)}
-												</button>
-											</li>
-										);
-									})}
-								</ul>
-							)}
-						</div>
-						{(folder.data?.next || pages.length > 1) && (
-							<footer className="mail-pagination">
-								<span>Страница {pages.length}</span>
-								<button
-									type="button"
-									className="mail-icon"
-									aria-label="Предыдущая страница"
-									disabled={pages.length === 1}
-									onClick={() => {
-										setPages(pages.slice(0, -1));
-										setOpenRow(undefined);
-									}}
-								>
-									<ChevronLeft size={17} />
-								</button>
-								<button
-									type="button"
-									className="mail-icon"
-									aria-label="Следующая страница"
-									disabled={!folder.data?.next}
-									onClick={() => {
-										if (folder.data?.next)
-											setPages([...pages, folder.data.next]);
-										setOpenRow(undefined);
-									}}
-								>
-									<ChevronRight size={17} />
-								</button>
-							</footer>
-						)}
-					</section>
-					{selected ? (
-						<MailThread
-							key={`${boxId}-${selected.threadId}`}
-							box={boxId}
-							address={box.address}
-							row={selected}
-							onBack={() => setOpenRow(undefined)}
-							onCompose={(draft) => setComposer({ box, draft })}
-							organizer={
-								<MailLabelControls
+								</nav>
+								<MailFolderNavigation
+									key={box.id}
 									labels={userLabels}
-									applied={selected.labels}
-									source={moveSource}
-									disabled={threadAction.isPending}
-									canMove={
-										!selected.labels.some(
-											(id) => id === "TRASH" || id === "SPAM",
-										) &&
-										label !== "TRASH" &&
-										label !== "SPAM"
-									}
-									onApply={(labels) =>
-										threadAction.mutateAsync({
-											box: boxId,
-											id: selected.threadId,
-											action: "set-labels",
-											labels,
-										})
-									}
-									onMove={(label) =>
-										threadAction.mutateAsync({
-											box: boxId,
-											id: selected.threadId,
-											action: "move-label",
-											label,
-											source: moveSource,
-										})
-									}
+									active={label}
+									loading={labels.isPending}
+									error={labels.isError}
+									counts={folderCounts}
+									onSelect={changeFolder}
 									onCreate={(name, color) =>
 										createLabel.mutateAsync({ box: box.id, name, color })
 									}
-									onColor={(id, color) =>
-										updateColor.mutateAsync({ box: boxId, id, color })
-									}
 								/>
-							}
-							toolbar={
-								<MailThreadActions
-									labels={selected.labels}
-									folder={label}
-									busy={threadAction.isPending}
-									onAction={onThread}
-								/>
-							}
-						/>
-					) : (
-						<div className="mail-empty mail-thread-placeholder">
-							<span className="mail-empty-icon">
-								<Mail size={23} aria-hidden="true" />
-							</span>
-							<h2>Выберите письмо</h2>
+							</aside>
+						)}
+					</div>
+					{box && (
+						<section className="mail-list" aria-label="Список писем">
+							<header className="mail-list-header">
+								<div>
+									<h2>{currentTitle}</h2>
+								</div>
+								<form
+									className="mail-search"
+									onSubmit={(event) => {
+										event.preventDefault();
+										setQuery(search.trim());
+										reset();
+									}}
+								>
+									<Search size={15} />
+									<input
+										aria-label="Поиск в выбранной папке"
+										placeholder="Поиск по письмам"
+										maxLength={300}
+										value={search}
+										onChange={(event) => {
+											setSearch(event.target.value);
+											if (!event.target.value && query) {
+												setQuery("");
+												reset();
+											}
+										}}
+									/>
+									<button
+										type="submit"
+										className="mail-icon"
+										aria-label="Найти"
+									>
+										<ChevronRight size={16} />
+									</button>
+								</form>
+							</header>
+							{isInbox && (
+								<nav
+									className="mail-categories supportos-scroll"
+									aria-label="Категории входящих"
+								>
+									{categories.map(([id, title]) => (
+										<button
+											key={id}
+											type="button"
+											className="mail-category"
+											aria-pressed={id === label}
+											onClick={() => changeFolder(id)}
+										>
+											{title}
+										</button>
+									))}
+								</nav>
+							)}
+							<div className="mail-list-scroll supportos-scroll">
+								{folder.isPending ? (
+									<p className="mail-empty">Загружаем письма…</p>
+								) : folder.error && !folder.data ? (
+									<div className="mail-empty">
+										<p role="alert" className="mail-error">
+											{folder.error.message}
+										</p>
+										<button
+											type="button"
+											className="mail-button"
+											onClick={() => void folder.refetch()}
+										>
+											Повторить
+										</button>
+										{admin && (
+											<Link
+												to="/admin"
+												hash="mailboxes"
+												className="mail-button"
+											>
+												Управление ящиками
+											</Link>
+										)}
+									</div>
+								) : resultRows.length === 0 ? (
+									<p className="mail-empty">
+										{query
+											? "Письма по запросу не найдены"
+											: "Здесь пока нет писем"}
+									</p>
+								) : (
+									<ul>
+										{resultRows.map((row) => {
+											const applied = userLabels.filter(
+												({ id }) => id !== label && row.labels.includes(id),
+											);
+											return (
+												<li key={row.draftId ?? row.id}>
+													<button
+														type="button"
+														className="mail-row"
+														data-unread={row.labels.includes("UNREAD")}
+														aria-pressed={row.threadId === selected?.threadId}
+														onClick={() => {
+															if (row.draftId) {
+																if (!openDraft.isPending)
+																	openDraft.mutate({
+																		mailbox: box,
+																		id: row.draftId,
+																	});
+																return;
+															}
+															setOpenRow({ boxId: box.id, row });
+															if (
+																row.labels.includes("UNREAD") &&
+																!threadAction.isPending
+															)
+																threadAction.mutate({
+																	box: box.id,
+																	id: row.threadId,
+																	action: "read",
+																});
+														}}
+													>
+														<span className="mail-row-top">
+															<span>
+																{label === "SENT" || label === "DRAFT"
+																	? row.to || "Без адресата"
+																	: row.from || "Без отправителя"}
+															</span>
+															<time>{mailDate(row.date)}</time>
+														</span>
+														<span className="mail-row-details">
+															<span className="mail-row-subject">
+																{row.labels.includes("STARRED") && (
+																	<Star
+																		size={12}
+																		fill="currentColor"
+																		aria-label="Помечено"
+																	/>
+																)}
+																{row.subject || "Без темы"}
+																{row.count > 1 && <small>{row.count}</small>}
+															</span>
+															{row.labels.includes("UNREAD") && (
+																<span className="mail-row-unread">
+																	Непрочитано
+																</span>
+															)}
+														</span>
+														<span className="mail-row-preview">
+															{row.snippet}
+														</span>
+														{row.staffSender && (
+															<span
+																className="mail-staff-sender"
+																title={`Отправил: ${row.staffSender}`}
+															>
+																<UserRound size={12} aria-hidden="true" />
+																<span>Отправил: {row.staffSender}</span>
+															</span>
+														)}
+														{applied.length > 0 && (
+															<span className="mail-row-tags">
+																{applied.slice(0, 2).map((label) => (
+																	<MailLabelChip key={label.id} label={label} />
+																))}
+																{applied.length > 2 && (
+																	<span className="mail-tag">
+																		+{applied.length - 2}
+																	</span>
+																)}
+															</span>
+														)}
+													</button>
+												</li>
+											);
+										})}
+									</ul>
+								)}
+							</div>
+							{(folder.data?.next || pages.length > 1) && (
+								<footer className="mail-pagination">
+									<span>Страница {pages.length}</span>
+									<button
+										type="button"
+										className="mail-icon"
+										aria-label="Предыдущая страница"
+										disabled={pages.length === 1}
+										onClick={() => {
+											setPages(pages.slice(0, -1));
+											setOpenRow(undefined);
+										}}
+									>
+										<ChevronLeft size={17} />
+									</button>
+									<button
+										type="button"
+										className="mail-icon"
+										aria-label="Следующая страница"
+										disabled={!folder.data?.next}
+										onClick={() => {
+											if (folder.data?.next)
+												setPages([...pages, folder.data.next]);
+											setOpenRow(undefined);
+										}}
+									>
+										<ChevronRight size={17} />
+									</button>
+								</footer>
+							)}
+						</section>
+					)}
+					{box &&
+						(selected ? (
+							<MailThread
+								key={`${boxId}-${selected.threadId}`}
+								box={boxId}
+								address={box.address}
+								row={selected}
+								onBack={() => setOpenRow(undefined)}
+								onCompose={(draft) => setComposer({ box, draft })}
+								organizer={
+									<MailLabelControls
+										labels={userLabels}
+										applied={selected.labels}
+										source={moveSource}
+										disabled={threadAction.isPending}
+										canMove={
+											!selected.labels.some(
+												(id) => id === "TRASH" || id === "SPAM",
+											) &&
+											label !== "TRASH" &&
+											label !== "SPAM"
+										}
+										onApply={(labels) =>
+											threadAction.mutateAsync({
+												box: boxId,
+												id: selected.threadId,
+												action: "set-labels",
+												labels,
+											})
+										}
+										onMove={(label) =>
+											threadAction.mutateAsync({
+												box: boxId,
+												id: selected.threadId,
+												action: "move-label",
+												label,
+												source: moveSource,
+											})
+										}
+										onCreate={(name, color) =>
+											createLabel.mutateAsync({ box: box.id, name, color })
+										}
+										onColor={(id, color) =>
+											updateColor.mutateAsync({ box: boxId, id, color })
+										}
+									/>
+								}
+								toolbar={
+									<MailThreadActions
+										labels={selected.labels}
+										folder={label}
+										busy={threadAction.isPending}
+										onAction={onThread}
+									/>
+								}
+							/>
+						) : (
+							<div className="mail-empty mail-thread-placeholder">
+								<span className="mail-empty-icon">
+									<Mail size={23} aria-hidden="true" />
+								</span>
+								<h2>Выберите письмо</h2>
+							</div>
+						))}
+					{!box && (
+						<div className="mail-empty mail-empty-project">
+							<Inbox size={26} aria-hidden="true" />
+							<h2>В папке нет доступных ящиков</h2>
+							<button
+								type="button"
+								className="mail-button"
+								onClick={() => chooseProject(null)}
+							>
+								Все ящики
+							</button>
 						</div>
 					)}
 				</div>

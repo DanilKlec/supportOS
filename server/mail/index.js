@@ -29,10 +29,12 @@ function labelColor(input) {
 
 function mailboxIcon(value) {
 	if (value === null) return null;
-	const { text, tone, image } = value ?? {};
+	const { text, tone, color, image } = value ?? {};
 	if (typeof text !== 'string' || !/^[\p{L}\p{N}]{0,3}$/u.test(text.trim().toUpperCase()) ||
 		!Number.isInteger(tone) || tone < 0 || tone > 6)
 		throw mailError('Выберите цвет значка и укажите до трёх букв или цифр.');
+	if (color != null && (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)))
+		throw mailError('Введите цвет значка в формате RGB.');
 	if (image != null) {
 		const prefix = 'data:image/png;base64,';
 		if (typeof image !== 'string' || image.length > 7800 || !image.startsWith(prefix) ||
@@ -43,7 +45,7 @@ function mailboxIcon(value) {
 			png.readUInt32BE(16) !== 36 || png.readUInt32BE(20) !== 36)
 			throw mailError('Выберите изображение для значка заново.');
 	}
-	return { text: text.trim().toUpperCase(), tone, ...(image ? { image } : {}) };
+	return { text: text.trim().toUpperCase(), tone, ...(color ? { color: color.toLowerCase() } : {}), ...(image ? { image } : {}) };
 }
 
 function safeId(raw) {

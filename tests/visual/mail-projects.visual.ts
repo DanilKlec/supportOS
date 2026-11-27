@@ -45,8 +45,17 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 		releaseStats();
 	}
 	const rail = page.getByRole("complementary", { name: "Папки проектов" });
-	const group = (name: string) => rail.getByRole("region", { name, exact: true });
 	const shortcut = (name: RegExp) => rail.getByRole("navigation", { name: "Проекты" }).getByRole("button", { name });
+	const mobilePicker = page.getByRole("button", { name: "Почтовый ящик", exact: true });
+	const mailboxesColumn = isMobile
+		? page.getByRole("region", { name: "Выбор почтового ящика" })
+		: page.getByRole("navigation", { name: "Ящики", exact: true });
+	const mailbox = (address: string) => mailboxesColumn.getByRole("button", { name: new RegExp(address.replaceAll(".", "\\.")) });
+	const visibleMailboxes = async (count: number) => {
+		if (isMobile) await mobilePicker.click();
+		await expect(mailboxesColumn.getByRole("list").getByRole("button")).toHaveCount(count);
+		await expect(mailboxesColumn).not.toContainText("@example.invalid");
+	};
 	const newFolder = async (name: string, addresses: string[]) => {
 		await rail.getByRole("button", { name: "Создать папку проекта", exact: true }).click();
 		const dialog = page.getByRole("dialog", { name: "Новая папка проекта" });
@@ -57,21 +66,22 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 			await dialog.getByRole("checkbox", { name: address, exact: true }).check();
 		}
 		await dialog.getByRole("button", { name: "Создать папку", exact: true }).click();
-		await expect(group(name)).toBeVisible();
+		await expect(dialog).toBeHidden();
 	};
 	const first = "desk0@example.invalid";
 	const second = "desk49@example.invalid";
 	await newFolder("VIP-поддержка", [first, second]);
 	await expect(shortcut(/^VIP-поддержка · 7 непрочитанных$/)).toBeVisible();
 	await expect(shortcut(/^VIP-поддержка/).locator(".mail-project-mark")).toHaveText("VIP");
-	await expect(group("VIP-поддержка").getByRole("button", { name: /desk49@example/ })).toBeVisible();
+	await visibleMailboxes(2);
+	await expect(mailbox(second)).toBeVisible();
+	await expect(mailbox("desk1@example.invalid")).toHaveCount(0);
 	await page.screenshot({ path: info.outputPath("mail-project-folders.png"), animations: "disabled" });
-	await group("VIP-поддержка").getByRole("button", { name: /desk49@example/ }).click();
+	await mailbox(second).click();
 	if (isMobile) {
-		await expect(page.getByRole("button", { name: "Почтовый ящик", exact: true })).toHaveAccessibleDescription(second);
+		await expect(mobilePicker).toHaveAccessibleDescription(second);
 	} else {
-		const column = page.getByRole("navigation", { name: "Ящики", exact: true });
-		const selected = column.getByRole("button", { name: /desk49@example/ });
+		const selected = mailbox(second);
 		await expect(selected).toHaveAttribute("aria-pressed", "true");
 		await expect(selected).toBeInViewport();
 		await expect(selected).toHaveAccessibleName(/Непрочитанных: 5/);
@@ -81,21 +91,34 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	await newFolder("Вторая линия", [second]);
 	await expect(shortcut(/^Вторая линия · 5 непрочитанных$/)).toHaveAttribute("data-active", "true");
 	await shortcut(/^VIP-поддержка · 2 непрочитанных$/).click();
-	await expect(group("VIP-поддержка").getByRole("button", { name: /desk49@example/ })).toHaveCount(0);
-	await group("VIP-поддержка").getByRole("button", { name: "Настроить папку", exact: true }).click();
+	await visibleMailboxes(1);
+	await expect(mailbox(second)).toHaveCount(0);
+	if (isMobile) await mobilePicker.click();
+	await rail.getByRole("button", { name: "Настроить папку", exact: true }).click();
 	const editor = page.getByRole("dialog", { name: "Настроить папку проекта" });
 	await editor.getByRole("textbox", { name: "Название папки" }).fill("Первый проект");
 	await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
 
 	await page.reload();
 	await shortcut(/^Первый проект · 2 непрочитанных$/).click();
-	await expect(group("Первый проект").getByRole("button", { name: /desk0@example/ })).toBeVisible();
-	await group("Первый проект").getByRole("button", { name: "Настроить папку", exact: true }).click();
+	await visibleMailboxes(1);
+	await expect(mailbox(first)).toBeVisible();
+	if (isMobile) await mobilePicker.click();
+	await rail.getByRole("button", { name: "Настроить папку", exact: true }).click();
 	await editor.getByRole("button", { name: "Удалить настройки папки", exact: true }).click();
 	await editor.getByRole("button", { name: "Удалить папку", exact: true }).click();
-	const unassigned = group("Без проекта");
-	await unassigned.getByRole("searchbox", { name: "Найти ящик в папке" }).fill(first);
-	await expect(unassigned.getByRole("button", { name: /desk0@example/ })).toBeVisible();
+	await expect(shortcut(/^Без проекта/)).toHaveAttribute("aria-pressed", "true");
+	await visibleMailboxes(49);
+	await expect(mailbox(first)).toBeVisible();
+	if (isMobile) await mobilePicker.click();
 	await expect(shortcut(/^Первый проект/)).toHaveCount(0);
 	await expect(shortcut(/^Вторая линия · 5 непрочитанных$/)).toBeVisible();
+	await shortcut(/^Все ящики$/).click();
+	await visibleMailboxes(50);
+	if (isMobile) await mobilePicker.click();
+	await newFolder("Пустой проект", []);
+	await expect(page.getByRole("heading", { name: "В папке нет доступных ящиков" })).toBeVisible();
+	await expect(page.getByRole("region", { name: "Список писем" })).toHaveCount(0);
+	await shortcut(/^Все ящики$/).click();
+	await expect(page.getByRole("region", { name: "Список писем" })).toBeVisible();
 });

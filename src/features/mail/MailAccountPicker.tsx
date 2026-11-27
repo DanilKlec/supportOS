@@ -10,7 +10,7 @@ export function MailAccountPicker({
 	statusByMailbox,
 	onChange,
 }: {
-	active: Mailbox;
+	active?: Mailbox;
 	mailboxes: Mailbox[];
 	statusByMailbox: ReadonlyMap<string, MailStats>;
 	onChange: (id: string) => void;
@@ -23,7 +23,7 @@ export function MailAccountPicker({
 	const searchTrigger = useRef<HTMLButtonElement>(null);
 	const searchInput = useRef<HTMLInputElement>(null);
 	const list = useRef<HTMLUListElement>(null);
-	const selectedId = `${id}-mailbox-${active.id}`;
+	const selectedId = `${id}-mailbox-${active?.id ?? ""}`;
 	const query = search.trim().toLowerCase();
 	const visible = mailboxes.filter(({ address }) =>
 		address.toLowerCase().includes(query),
@@ -77,6 +77,7 @@ export function MailAccountPicker({
 						title="Найти почтовый ящик"
 						aria-expanded={open === "search"}
 						aria-controls={open === "search" ? id : undefined}
+						disabled={!mailboxes.length}
 						onClick={() => toggle("search")}
 					>
 						<Search size={17} aria-hidden="true" />
@@ -100,9 +101,9 @@ export function MailAccountPicker({
 									className="mail-account-shortcut"
 									title={label}
 									aria-label={label}
-									aria-pressed={active.id === box.id}
+									aria-pressed={active?.id === box.id}
 									onClick={() => {
-										if (box.id !== active.id) onChange(box.id);
+										if (box.id !== active?.id) onChange(box.id);
 									}}
 								>
 									<MailboxMark address={box.address} icon={box.icon} />
@@ -135,14 +136,15 @@ export function MailAccountPicker({
 				aria-describedby={`${id}-active`}
 				aria-expanded={open === "mobile"}
 				aria-controls={open === "mobile" ? id : undefined}
+				disabled={!mailboxes.length}
 				onClick={() => toggle("mobile")}
 			>
-				<MailboxMark address={active.address} icon={active.icon} />
+				<MailboxMark address={active?.address ?? ""} icon={active?.icon} />
 				<span className="mail-account-caption">
-					<span>Почтовый ящик</span>
-					<strong id={`${id}-active`} title={active.address}>
-						{active.address}
-					</strong>
+					<strong>Ящики</strong>
+					<span id={`${id}-active`} className="sr-only">
+						{active?.address}
+					</span>
 				</span>
 				<ChevronDown size={15} aria-hidden="true" />
 			</button>
@@ -181,14 +183,25 @@ export function MailAccountPicker({
 											type="button"
 											className="mail-nav mail-account-option"
 											title={box.address}
-											aria-pressed={active.id === box.id}
+											aria-label={
+												open === "mobile"
+													? [
+															box.address,
+															status?.unread &&
+																`Непрочитанных: ${status.unread}`,
+														]
+															.filter(Boolean)
+															.join(" · ")
+													: undefined
+											}
+											aria-pressed={active?.id === box.id}
 											onClick={() => {
-												if (box.id !== active.id) onChange(box.id);
+												if (box.id !== active?.id) onChange(box.id);
 												close();
 											}}
 										>
 											<MailboxMark address={box.address} icon={box.icon} />
-											<span>{box.address}</span>
+											{open === "search" && <span>{box.address}</span>}
 											{status?.reconnect && (
 												<ShieldAlert
 													size={14}

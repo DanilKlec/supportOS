@@ -122,7 +122,7 @@ test("connect and delegate a mailbox from administration", async ({ context, pag
 			case "set-mailbox-icon": {
 				expect(url.searchParams.get("box")).toBe(mailbox.id);
 				const { icon } = request.postDataJSON();
-				expect(icon).toMatchObject({ text: "SUP", tone: 5 });
+				expect(icon).toMatchObject({ text: "SUP", tone: 5, color: "#123abc" });
 				const png = Buffer.from(icon.image.split(",")[1], "base64");
 				expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([36, 36]);
 				mailbox.icon = icon;
@@ -166,6 +166,8 @@ test("connect and delegate a mailbox from administration", async ({ context, pag
 	const iconDialog = page.getByRole("dialog", { name: "Значок ящика" });
 	await expect(iconDialog.getByRole("textbox", { name: "Буквы или цифры" })).toHaveValue("VIP");
 	await iconDialog.getByRole("textbox", { name: "Буквы или цифры" }).fill("sup");
+	await iconDialog.locator('input[type="color"]').fill("#123abc");
+	await expect(iconDialog.locator(".mail-mailbox-mark")).toHaveCSS("background-color", "rgb(18, 58, 188)");
 	const logo = await page.evaluate(() => {
 		const canvas = document.createElement("canvas");
 		canvas.width = 150;

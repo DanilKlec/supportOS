@@ -11,8 +11,20 @@ function fallbackTone(address: string) {
 	);
 }
 
-function iconStyle(tone: number) {
+function iconStyle(tone: number, custom?: string) {
 	const color = labelPalette[tone] ?? labelPalette[0];
+	if (custom && /^#[0-9a-f]{6}$/i.test(custom)) {
+		const channels = [1, 3, 5].map((index) => {
+			const unit = Number.parseInt(custom.slice(index, index + 2), 16) / 255;
+			return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+		});
+		const luminance =
+			0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+		return {
+			"--mailbox-color": custom,
+			"--mailbox-ink": luminance > 0.179 ? "#000" : "#fff",
+		} as CSSProperties;
+	}
 	return {
 		"--mailbox-color": color.backgroundColor,
 		"--mailbox-ink": color.textColor,
@@ -35,7 +47,7 @@ export function MailboxMark({
 	return (
 		<span
 			className="mail-mailbox-mark"
-			style={iconStyle(icon?.tone ?? fallbackTone(address))}
+			style={iconStyle(icon?.tone ?? fallbackTone(address), icon?.color)}
 			aria-hidden="true"
 		>
 			{icon?.image ? (
@@ -120,11 +132,23 @@ export function MailboxIconFields({
 							key={color.name}
 							title={color.name}
 							aria-label={color.name}
-							aria-pressed={icon.tone === tone}
+							aria-pressed={!icon.color && icon.tone === tone}
 							style={iconStyle(tone)}
-							onClick={() => update({ ...icon, tone })}
+							onClick={() => update({ ...icon, tone, color: undefined })}
 						/>
 					))}
+					<input
+						type="color"
+						className="mail-custom-icon-color"
+						aria-label="Свой RGB-цвет"
+						title="Свой RGB-цвет"
+						value={
+							icon.color ??
+							labelPalette[icon.tone]?.backgroundColor ??
+							labelPalette[0].backgroundColor
+						}
+						onChange={(event) => update({ ...icon, color: event.target.value })}
+					/>
 				</fieldset>
 			</div>
 			<div className="mail-icon-editor-actions">
@@ -159,7 +183,7 @@ export function MailboxIconFields({
 					<button
 						type="button"
 						className="mail-button"
-						onClick={() => update({ text: icon.text, tone: icon.tone })}
+						onClick={() => update({ ...icon, image: undefined })}
 					>
 						Убрать логотип
 					</button>

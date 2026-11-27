@@ -1,7 +1,12 @@
 import type { MailLayout } from "../../shared/mail-layout.js";
 import { authenticatedFetch } from "./authenticated-fetch";
 
-export type MailboxIcon = { text: string; tone: number; image?: string };
+export type MailboxIcon = {
+	text: string;
+	tone: number;
+	color?: string;
+	image?: string;
+};
 export type Mailbox = {
 	id: string;
 	address: string;

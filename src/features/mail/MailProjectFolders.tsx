@@ -1,20 +1,11 @@
-import {
-	Folder,
-	FolderPlus,
-	Mail,
-	Pencil,
-	Search,
-	ShieldAlert,
-	X,
-} from "lucide-react";
-import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
+import { Folder, FolderPlus, Inbox, Pencil } from "lucide-react";
+import { type CSSProperties, useState } from "react";
 import { usePreference } from "@/features/productivity/preferences";
 import type { Mailbox, MailStats } from "@/services/mail.service";
-import { labelPalette, MailFolderCount } from "./MailFolderTree";
+import { labelPalette } from "./MailFolderTree";
 import { MailProjectEditor, type MailProjectFolder } from "./MailProjectEditor";
 
 const emptyProjects: MailProjectFolder[] = [];
-const searchKey = (value: string) => value.trim().toLocaleLowerCase("ru");
 const number = new Intl.NumberFormat("ru");
 
 function isProject(value: unknown): value is MailProjectFolder {
@@ -28,6 +19,27 @@ function isProject(value: unknown): value is MailProjectFolder {
 		Array.isArray(folder.mailboxIds) &&
 		folder.mailboxIds.every((id) => typeof id === "string")
 	);
+}
+
+export function useMailProjects(mailboxes: Mailbox[]) {
+	const [stored, setFolders] = usePreference(
+		"mail-project-folders",
+		emptyProjects,
+	);
+	const folders = Array.isArray(stored)
+		? stored.filter(isProject)
+		: emptyProjects;
+	const owners = new Map<string, MailProjectFolder>();
+	for (const folder of folders)
+		for (const id of folder.mailboxIds) owners.set(id, folder);
+	const groups = new Map<string, Mailbox[]>();
+	for (const mailbox of mailboxes) {
+		const key = owners.get(mailbox.id)?.id ?? "";
+		const group = groups.get(key) ?? [];
+		group.push(mailbox);
+		groups.set(key, group);
+	}
+	return { folders, setFolders, owners, groups };
 }
 
 function markText(name: string) {
@@ -53,80 +65,32 @@ function ProjectMark({ folder }: { folder?: MailProjectFolder }) {
 				"--mail-project-ink": colors.textColor,
 			} as CSSProperties)
 		: undefined;
-	const initials = folder && markText(folder.name);
 	return (
 		<span className="mail-project-mark" style={style} aria-hidden="true">
-			{initials || <Folder size={17} />}
+			{(folder && markText(folder.name)) || <Folder size={17} />}
 		</span>
 	);
 }
 
 export function MailProjectFolders({
-	active,
+	projects,
+	selected,
 	mailboxes,
 	statusByMailbox,
-	onChange,
+	onSelect,
 }: {
-	active: Mailbox;
+	projects: ReturnType<typeof useMailProjects>;
+	selected: string | null;
 	mailboxes: Mailbox[];
 	statusByMailbox: ReadonlyMap<string, MailStats>;
-	onChange: (id: string) => void;
+	onSelect: (id: string | null) => void;
 }) {
-	const [stored, setFolders] = usePreference(
-		"mail-project-folders",
-		emptyProjects,
-	);
-	const folders = Array.isArray(stored)
-		? stored.filter(isProject)
-		: emptyProjects;
-	const [opened, setOpened] = useState<string | null>(null);
-	const [search, setSearch] = useState("");
+	const { folders, setFolders, owners, groups } = projects;
 	const [editing, setEditing] = useState<{ folder?: MailProjectFolder }>();
-	const rail = useRef<HTMLElement>(null);
-	const panel = useRef<HTMLElement>(null);
-	const panelId = useId();
-	const selectedButton = useRef<HTMLButtonElement>(null);
-
-	const accountsByFolder = new Map<string, Mailbox[]>();
-	const owners = new Map<string, MailProjectFolder>();
-	for (const folder of folders) {
-		for (const id of folder.mailboxIds) {
-			owners.set(id, folder);
-		}
-	}
-	for (const mailbox of mailboxes) {
-		const key = owners.get(mailbox.id)?.id ?? "";
-		const accounts = accountsByFolder.get(key) ?? [];
-		accounts.push(mailbox);
-		accountsByFolder.set(key, accounts);
-	}
-	const project = folders.find(({ id }) => id === opened);
-	const accounts = accountsByFolder.get(opened ?? "") ?? [];
-	const filtered = accounts.filter(({ address }) =>
-		searchKey(address).includes(searchKey(search)),
-	);
+	const project = folders.find(({ id }) => id === selected);
 	const sorted = folders.toSorted((left, right) =>
 		left.name.localeCompare(right.name, "ru", { numeric: true }),
 	);
-
-	const closePanel = (returnFocus = false) => {
-		setOpened(null);
-		if (returnFocus) {
-			if (selectedButton.current?.isConnected) selectedButton.current.focus();
-			else rail.current?.querySelector("button")?.focus();
-		}
-	};
-
-	useEffect(() => {
-		if (opened === null) return;
-		panel.current?.focus({ preventScroll: true });
-		const outside = (event: PointerEvent) => {
-			if (event.target instanceof Node && !rail.current?.contains(event.target))
-				setOpened(null);
-		};
-		document.addEventListener("pointerdown", outside);
-		return () => document.removeEventListener("pointerdown", outside);
-	}, [opened]);
 
 	const saveFolder = (draft: MailProjectFolder) => {
 		const accessible = new Set(mailboxes.map(({ id }) => id));
@@ -147,22 +111,18 @@ export function MailProjectFolders({
 			saved,
 		]);
 		setEditing(undefined);
-		setSearch("");
-		setOpened(saved.id);
+		onSelect(saved.id);
 	};
 
 	return (
-		<aside ref={rail} className="mail-project-rail" aria-label="Папки проектов">
+		<aside className="mail-project-rail" aria-label="Папки проектов">
 			<div className="mail-project-rail-heading">
 				<button
 					type="button"
 					className="mail-icon mail-project-add"
 					aria-label="Создать папку проекта"
 					title="Создать папку проекта"
-					onClick={(event) => {
-						selectedButton.current = event.currentTarget;
-						setEditing({});
-					}}
+					onClick={() => setEditing({})}
 				>
 					<FolderPlus size={18} aria-hidden="true" />
 				</button>
@@ -171,10 +131,25 @@ export function MailProjectFolders({
 				className="mail-project-shortcuts supportos-scroll"
 				aria-label="Проекты"
 			>
+				<button
+					type="button"
+					className="mail-project-shortcut"
+					aria-label="Все ящики"
+					title="Все ящики"
+					aria-pressed={selected === null}
+					data-active={selected === null}
+					onClick={() => {
+						if (selected !== null) onSelect(null);
+					}}
+				>
+					<span className="mail-project-mark" aria-hidden="true">
+						<Inbox size={17} />
+					</span>
+				</button>
 				{[undefined, ...sorted].map((folder) => {
 					const key = folder?.id ?? "";
 					const name = folder?.name ?? "Без проекта";
-					const statuses = (accountsByFolder.get(key) ?? []).map(({ id }) =>
+					const statuses = (groups.get(key) ?? []).map(({ id }) =>
 						statusByMailbox.get(id),
 					);
 					const unread = statuses.reduce(
@@ -194,13 +169,10 @@ export function MailProjectFolders({
 							className="mail-project-shortcut"
 							aria-label={hint}
 							title={hint}
-							aria-expanded={opened === key}
-							aria-controls={opened === key ? panelId : undefined}
-							data-active={(owners.get(active.id)?.id ?? "") === key}
-							onClick={(event) => {
-								selectedButton.current = event.currentTarget;
-								setSearch("");
-								setOpened(opened === key ? null : key);
+							aria-pressed={selected === key}
+							data-active={selected === key}
+							onClick={() => {
+								if (selected !== key) onSelect(key);
 							}}
 						>
 							<ProjectMark folder={folder} />
@@ -223,101 +195,18 @@ export function MailProjectFolders({
 					);
 				})}
 			</nav>
-			{opened !== null && (
-				<section
-					ref={panel}
-					tabIndex={-1}
-					id={panelId}
-					aria-label={project?.name ?? "Без проекта"}
-					className="mail-project-panel mail-float"
-					onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.preventDefault();
-							closePanel(true);
-						}
-					}}
-				>
-					<header className="mail-project-panel-heading">
-						<ProjectMark folder={project} />
-						<div>
-							<h2>{project?.name ?? "Без проекта"}</h2>
-							<span className="mail-project-meta">
-								Почтовые ящики · {accounts.length}
-							</span>
-						</div>
-						{project && (
-							<button
-								type="button"
-								className="mail-icon"
-								title="Настроить папку"
-								aria-label="Настроить папку"
-								onClick={() => setEditing({ folder: project })}
-							>
-								<Pencil size={15} aria-hidden="true" />
-							</button>
-						)}
-						<button
-							type="button"
-							className="mail-icon"
-							aria-label="Закрыть папку"
-							title="Закрыть папку"
-							onClick={() => closePanel(true)}
-						>
-							<X size={16} aria-hidden="true" />
-						</button>
-					</header>
-					{accounts.length > 5 && (
-						<label className="mail-search mail-project-search">
-							<Search size={15} aria-hidden="true" />
-							<input
-								aria-label="Найти ящик в папке"
-								placeholder="Найти ящик"
-								type="search"
-								value={search}
-								onChange={(event) => setSearch(event.target.value)}
-							/>
-						</label>
-					)}
-					{filtered.length ? (
-						<ul className="mail-project-accounts supportos-scroll">
-							{filtered.map((mailbox) => {
-								const status = statusByMailbox.get(mailbox.id);
-								return (
-									<li key={mailbox.id}>
-										<button
-											type="button"
-											className="mail-nav mail-project-account"
-											aria-pressed={active.id === mailbox.id}
-											title={mailbox.address}
-											onClick={() => {
-												onChange(mailbox.id);
-												closePanel(true);
-											}}
-										>
-											<Mail size={15} aria-hidden="true" />
-											<span>{mailbox.address}</span>
-											{status?.reconnect && (
-												<ShieldAlert
-													size={14}
-													aria-label="Нужно переподключить"
-												/>
-											)}
-											<MailFolderCount count={status?.unread} />
-										</button>
-									</li>
-								);
-							})}
-						</ul>
-					) : (
-						<p className="mail-project-empty">
-							{search
-								? "Ящики не найдены"
-								: project
-									? "Добавьте ящики в настройках папки."
-									: "Все ящики уже распределены по проектам."}
-						</p>
-					)}
-				</section>
+			{project && (
+				<div className="mail-project-rail-heading mail-project-rail-settings">
+					<button
+						type="button"
+						className="mail-icon"
+						aria-label="Настроить папку"
+						title={`Настроить папку «${project.name}»`}
+						onClick={() => setEditing({ folder: project })}
+					>
+						<Pencil size={17} aria-hidden="true" />
+					</button>
+				</div>
 			)}
 			{editing && (
 				<MailProjectEditor
@@ -325,14 +214,13 @@ export function MailProjectFolders({
 					folders={folders}
 					mailboxes={mailboxes}
 					owners={owners}
-					onClose={() => setEditing(undefined)}
 					onSave={saveFolder}
 					onRemove={(id) => {
 						setFolders(folders.filter((folder) => folder.id !== id));
 						setEditing(undefined);
-						setSearch("");
-						setOpened("");
+						onSelect("");
 					}}
+					onClose={() => setEditing(undefined)}
 				/>
 			)}
 		</aside>
