@@ -4,6 +4,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
 	Archive,
 	Bell,
@@ -14,7 +15,6 @@ import {
 	Inbox,
 	Mail,
 	Pencil,
-	Plus,
 	RefreshCw,
 	Search,
 	Send,
@@ -22,7 +22,6 @@ import {
 	Star,
 	Trash2,
 	UserRound,
-	Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -36,7 +35,6 @@ import {
 } from "@/services/mail.service";
 import { useAuthStore } from "@/store/auth.store";
 import { MailAccountPicker } from "./MailAccountPicker";
-import { MailAdministration, oauthSessionKey } from "./MailAdministration";
 import { emptyMailDraft, MailComposer } from "./MailComposer";
 import { MailFolderCount, MailLabelChip } from "./MailFolderTree";
 import { MailFolderNavigation, MailLabelControls } from "./MailLabelControls";
@@ -86,12 +84,9 @@ export function MailWorkspace() {
 	const [pages, setPages] = useState<string[]>([""]);
 	const [openRow, setOpenRow] = useState<{ boxId: string; row: MailRow }>();
 	const [composer, setComposer] = useState<OpenComposer>();
-	const [adminMode, setAdminMode] = useState<"connect" | "access">();
 	const [notice, setNotice] = useState("");
-	const [oauthIssue, setOauthIssue] = useState("");
 	const [desktopAlerts, setDesktopAlerts] =
 		useMailNotificationPreference(userId);
-	const checkedOauth = useRef(false);
 	const lastDates = useRef(new Map<string, number>());
 	const list = useQuery({
 		queryKey: ["mail", "list", userId],
@@ -387,47 +382,6 @@ export function MailWorkspace() {
 				},
 			}),
 	});
-	const finish = useMutation({
-		mutationFn: ({ code, state }: { code: string; state: string }) =>
-			mailService.finish(code, state),
-		onSuccess: (mailbox) => {
-			client.setQueryData<Awaited<ReturnType<typeof mailService.list>>>(
-				["mail", "list", userId],
-				(current) =>
-					current && {
-						...current,
-						mailboxes: [
-							...current.mailboxes.filter(({ id }) => id !== mailbox.id),
-							mailbox,
-						],
-					},
-			);
-			setSelectedBox(mailbox.id);
-			setNotice(`Подключён ящик ${mailbox.address}`);
-			void client.invalidateQueries({ queryKey: ["mail"] });
-		},
-	});
-	useEffect(() => {
-		if (checkedOauth.current || !userId) return;
-		checkedOauth.current = true;
-		const params = new URLSearchParams(window.location.hash.slice(1));
-		const code = params.get("mail_code");
-		if (!code && !params.has("mail_error")) return;
-		window.history.replaceState(
-			window.history.state,
-			"",
-			window.location.pathname,
-		);
-		const state = sessionStorage.getItem(oauthSessionKey);
-		sessionStorage.removeItem(oauthSessionKey);
-		if (!code || !state || state !== params.get("mail_state")) {
-			setOauthIssue(
-				"Подключение не завершено. Начните его ещё раз из SupportOS.",
-			);
-			return;
-		}
-		finish.mutate({ code, state });
-	}, [userId, finish]);
 	useEffect(() => {
 		if (!stats.data) return;
 		const arrivals: string[] = [];
@@ -478,11 +432,9 @@ export function MailWorkspace() {
 	};
 	const pickerAction = threadAction.variables?.action;
 	const operationError =
-		finish.error ??
 		(pickerAction === "set-labels" || pickerAction === "move-label"
 			? undefined
-			: threadAction.error) ??
-		openDraft.error;
+			: threadAction.error) ?? openDraft.error;
 	return (
 		<section
 			className="mail-workspace"
@@ -543,23 +495,6 @@ export function MailWorkspace() {
 							<Bell size={18} />
 						</button>
 					)}
-					{admin && list.data?.configured && (
-						<button
-							type="button"
-							className="mail-button"
-							aria-label="Подключить Gmail"
-							onClick={() => {
-								setOauthIssue("");
-								setAdminMode("connect");
-							}}
-						>
-							<Plus size={15} aria-hidden="true" />
-							<span className="mail-connect-label">Подключить Gmail</span>
-							<span className="mail-connect-short" aria-hidden="true">
-								Gmail
-							</span>
-						</button>
-					)}
 				</div>
 			</header>
 			{notice && (
@@ -574,13 +509,10 @@ export function MailWorkspace() {
 					</button>
 				</output>
 			)}
-			{(oauthIssue || operationError) && (
+			{operationError && (
 				<p className="mail-banner mail-error" role="alert">
-					{oauthIssue || operationError?.message}
+					{operationError.message}
 				</p>
-			)}
-			{finish.isPending && (
-				<output className="mail-banner">Подключаем Gmail…</output>
 			)}
 			{list.isPending ? (
 				<p className="mail-empty">Загружаем доступные ящики…</p>
@@ -603,9 +535,14 @@ export function MailWorkspace() {
 					<h2>Подключение Gmail ожидает настройки</h2>
 					<p>
 						{admin
-							? "Добавьте настройки Google OAuth на сервере, чтобы подключать ящики."
+							? "Настройки подключения находятся в разделе «Администрирование»."
 							: "Администратор сможет выдать доступ после настройки почты."}
 					</p>
+					{admin && (
+						<Link to="/admin" hash="mailboxes" className="mail-button">
+							Управление ящиками
+						</Link>
+					)}
 				</div>
 			) : !box ? (
 				<div className="mail-empty">
@@ -617,18 +554,18 @@ export function MailWorkspace() {
 					</h2>
 					<p>
 						{admin
-							? "Администратор проходит вход и проверку Google для каждого рабочего адреса."
+							? "Подключите Gmail в разделе «Администрирование»."
 							: "Доступ появится после назначения администратором."}
 					</p>
 					{admin && (
-						<button
-							type="button"
+						<Link
+							to="/admin"
+							hash="mailboxes"
 							className="mail-button"
 							data-primary="true"
-							onClick={() => setAdminMode("connect")}
 						>
-							Подключить Gmail
-						</button>
+							Управление ящиками
+						</Link>
 					)}
 				</div>
 			) : (
@@ -658,23 +595,10 @@ export function MailWorkspace() {
 							statusByMailbox={statusByMailbox}
 							onChange={chooseBox}
 						/>
-						{admin && (
-							<button
-								type="button"
-								className="mail-nav mail-sidebar-manage"
-								onClick={() => setAdminMode("access")}
-							>
-								<Users size={14} /> Доступ к ящику
-							</button>
-						)}
 						{admin && statusByMailbox.get(boxId)?.reconnect && (
-							<button
-								type="button"
-								className="mail-button"
-								onClick={() => setAdminMode("connect")}
-							>
-								Переподключить ящик
-							</button>
+							<Link to="/admin" hash="mailboxes" className="mail-button">
+								Переподключение ящика
+							</Link>
 						)}
 						<nav
 							aria-label="Папки Gmail"
@@ -793,13 +717,9 @@ export function MailWorkspace() {
 										Повторить
 									</button>
 									{admin && (
-										<button
-											type="button"
-											className="mail-button"
-											onClick={() => setAdminMode("connect")}
-										>
-											Переподключить ящик
-										</button>
+										<Link to="/admin" hash="mailboxes" className="mail-button">
+											Управление ящиками
+										</Link>
 									)}
 								</div>
 							) : resultRows.length === 0 ? (
@@ -994,13 +914,6 @@ export function MailWorkspace() {
 						</div>
 					)}
 				</div>
-			)}
-			{adminMode && admin && (
-				<MailAdministration
-					box={box}
-					mode={adminMode}
-					onClose={() => setAdminMode(undefined)}
-				/>
 			)}
 			{composer && mailboxes.some(({ id }) => composer.box.id === id) && (
 				<MailComposer

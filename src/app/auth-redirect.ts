@@ -14,6 +14,11 @@ export function safeAuthRedirect(value: unknown): string {
 			url.pathname.replace(/\/+$/, "") === "/login"
 		)
 			return "/";
+		if (
+			url.pathname.replace(/\/+$/, "") === "/admin" &&
+			url.hash.startsWith("#mailboxes?")
+		)
+			return "/admin#mailboxes";
 		return `${url.pathname}${url.search}${url.hash}`;
 	} catch {
 		return "/";

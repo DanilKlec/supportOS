@@ -7,7 +7,7 @@ export default function callback(req, res) {
 	const state = params.get('state');
 	const target = code && state && code.length <= 2048 && state.length <= 1800 ? new URLSearchParams({ mail_code: code, mail_state: state })
 		: new URLSearchParams({ mail_error: 'denied' });
-	res.setHeader('Location', `/mail#${target}`);
+	res.setHeader('Location', `/admin#mailboxes?${target}`);
 	res.statusCode = 303;
 	return res.end();
 }

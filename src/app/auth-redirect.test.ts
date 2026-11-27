@@ -6,6 +6,11 @@ it("preserves an internal deep link", () => {
 		"/agent-monitor?day=2026-09-08#history",
 	);
 });
+it("does not forward the Gmail return code or state to the login URL", () => {
+	expect(
+		safeAuthRedirect("/admin#mailboxes?mail_code=test&mail_state=sample"),
+	).toBe("/admin#mailboxes");
+});
 it.each([
 	"https://evil.test",
 	"//evil.test",

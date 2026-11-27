@@ -36,6 +36,11 @@ const IntegrationSettingsPanel = lazy(() =>
 		default: module.IntegrationsPanel,
 	})),
 );
+const MailboxSettings = lazy(() =>
+	import("@/features/mail/MailAdministration").then((module) => ({
+		default: module.MailboxSettings,
+	})),
+);
 
 type RolesTab = "roles" | "access" | "audit";
 
@@ -80,9 +85,14 @@ export function AdminWorkspace() {
 			(s) => !s.hiddenFromNavigation && canAccessPage(access, "/admin", s.id),
 		)?.id || "overview";
 	const redirectedHash = hash ? adminHashRedirects[hash] : undefined;
+	const mailboxReturn = hash.startsWith("mailboxes?")
+		? hash.slice("mailboxes?".length)
+		: null;
 	const requestedSection = hash.startsWith("integrations-")
 		? "integrations"
-		: (redirectedHash ?? (hash || fallbackSection));
+		: mailboxReturn !== null
+			? "mailboxes"
+			: (redirectedHash ?? (hash || fallbackSection));
 	const active = canAccessPage(access, "/admin", requestedSection)
 		? requestedSection
 		: fallbackSection;
@@ -121,6 +131,8 @@ export function AdminWorkspace() {
 					/>
 				) : active === "access" ? (
 					<AccessReviewPage onUser={onUser} />
+				) : active === "mailboxes" ? (
+					<MailboxSettings oauthReturn={mailboxReturn ?? ""} />
 				) : active === "platform-projects" ? (
 					<ProjectsPage />
 				) : active === "system-health" ? (

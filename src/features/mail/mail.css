@@ -1,4 +1,5 @@
-.mail-workspace {
+.mail-workspace,
+.mail-admin-dialog {
 	--mail-line: color-mix(in srgb, var(--color-border) 65%, transparent);
 	--mail-control: color-mix(
 		in srgb,
@@ -17,6 +18,8 @@
 	);
 	--mail-float-shadow:
 		0 20px 54px rgb(0 0 0 / 22%), 0 3px 10px rgb(0 0 0 / 12%);
+}
+.mail-workspace {
 	display: flex;
 	flex: 1;
 	min-width: 0;
@@ -76,7 +79,6 @@
 	height: 3rem;
 	border-radius: 0.95rem;
 }
-.mail-connect-short,
 .mail-draft-short {
 	display: none;
 }
@@ -400,9 +402,6 @@
 	padding: 0.05rem 0.32rem;
 	color: var(--color-foreground);
 	font-size: 0.68rem;
-}
-.mail-sidebar-manage {
-	color: var(--color-muted);
 }
 .mail-folders {
 	display: grid;
@@ -1065,6 +1064,14 @@
 	background: var(--color-surface);
 	box-shadow: var(--mail-float-shadow);
 }
+.mail-admin-dialog {
+	width: min(calc(100% - 1.25rem), 34rem);
+	margin: auto;
+	color: var(--color-foreground);
+}
+.mail-admin-dialog::backdrop {
+	background: rgb(0 0 0 / 48%);
+}
 .mail-composer {
 	width: min(100%, 44rem);
 }
@@ -1650,11 +1657,9 @@
 	}
 }
 @media (max-width: 380px) {
-	.mail-connect-label,
 	.mail-draft-label {
 		display: none;
 	}
-	.mail-connect-short,
 	.mail-draft-short {
 		display: inline;
 	}

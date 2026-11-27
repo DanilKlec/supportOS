@@ -5,6 +5,7 @@ import { completeGoogle, composeRaw, googleConfig, readMessage, seal, startGoogl
 import { plainFromMailHtml, sanitizeMailHtml } from './mail-html.js';
 import { defaultMailLayout, normalizeMailLayout, renderMailLayout } from '../../shared/mail-layout.js';
 import handler from './index.js';
+import callback from './callback.js';
 
 const identities = vi.hoisted(() => ({ actor: undefined, sessions: new Map() }));
 vi.mock('../_auth.js', () => ({ requireUser: async (request) => identities.sessions.get(request.headers?.authorization) ?? identities.actor }));
@@ -43,6 +44,17 @@ test('Google authorization binds the intended mailbox, actor, expiration and PKC
 	fetch.mockImplementationOnce(async () => Response.json({ access_token: 'test', refresh_token: 'test', scope: consent.searchParams.get('scope') }));
 	fetch.mockImplementationOnce(async () => Response.json({ emailAddress: 'wrong@example.invalid' }));
 	await expect(completeGoogle(cfg, 'actor', 'different-code', state)).rejects.toMatchObject({ status: 409 });
+});
+
+test('Google authorization returns to mailbox settings with the payload in the fragment', () => {
+	const headers = new Map();
+	const res = { setHeader: (name, value) => headers.set(name, value), end() {} };
+	callback({ method: 'GET', url: '/api/mail/callback?code=google%2Bcode%2Fsample&state=sample-state' }, res);
+	expect(res.statusCode).toBe(303);
+	expect(headers.get('Location')).toBe('/admin#mailboxes?mail_code=google%2Bcode%2Fsample&mail_state=sample-state');
+	expect(headers.get('Cache-Control')).toBe('no-store');
+	callback({ method: 'GET', url: '/api/mail/callback?error=access_denied' }, res);
+	expect(headers.get('Location')).toBe('/admin#mailboxes?mail_error=denied');
 });
 
 test('compose generates threaded MIME and rejects header injection', () => {

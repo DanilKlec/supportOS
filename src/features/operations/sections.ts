@@ -33,6 +33,12 @@ export const adminSections: WorkspaceSection[] = [
 		"Проверка доступов по реальным данным аккаунтов и ролей.",
 	],
 	[
+		"mailboxes",
+		"Почтовые ящики",
+		"Платформа",
+		"Подключение Gmail и Google Workspace, управление доступом сотрудников.",
+	],
+	[
 		"platform-projects",
 		"Проекты",
 		"Платформа",

@@ -35,6 +35,24 @@ it("does not infer account management or AI editing from technical or QC access"
 	expect(canAccessPage(access(["ai.train"]), "/admin", "glossary")).toBe(true);
 	expect(canAccessPage(access(["technical"]), "/qc", "unknown")).toBe(false);
 });
+it("requires user management permission for mailbox administration and the Gmail return", () => {
+	const returned = "mailboxes?mail_code=test&mail_state=sample";
+	for (const hash of ["mailboxes", returned]) {
+		expect(
+			canAccessPage(access(["work", "users.manage"]), "/admin", hash),
+		).toBe(true);
+		expect(canAccessPage(access(["work", "technical"]), "/admin", hash)).toBe(
+			false,
+		);
+		expect(
+			canAccessPage(access(["work", "knowledge.write"]), "/admin", hash),
+		).toBe(false);
+	}
+	expect(canonicalPage("/admin", returned)).toEqual({
+		to: "/admin",
+		hash: returned,
+	});
+});
 it("preserves old AI and review destinations without duplicating their editors", () => {
 	expect(canonicalPage("/admin", "projects")).toEqual({
 		to: "/admin",

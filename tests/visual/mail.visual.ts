@@ -2,7 +2,95 @@ import { renderMailLayout } from "../../shared/mail-layout.js";
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
-test("browse shared Gmail, organize mail, reuse a recipient and grant access", async ({
+test("connect and delegate a mailbox from administration", async ({ context, page, isMobile }, info) => {
+	const mailbox = { id: "shared-support", address: "support@example.invalid", provider: "gmail" };
+	const mailboxes = [{ id: "other-box", address: "existing@example.invalid", provider: "gmail" }];
+	const agent = { id: "agent", email: "agent@example.invalid", display_name: "Тестовый сотрудник почты" };
+	let members: typeof agent[] = [];
+	let attempts = 0;
+	let completed = 0;
+	await context.route("**/api/binds?action=workspace", (route) =>
+		route.fulfill({ json: { ...knowledge, branches: { choices: {}, incoming: [], outgoing: [] } } }),
+	);
+	await context.route("https://accounts.google.com/o/oauth2/v2/auth?**", (route) => {
+		const state = new URL(route.request().url()).searchParams.get("state");
+		expect(state).toBe(`state-${attempts}`);
+		const callback = attempts === 1
+			? new URLSearchParams({ mail_code: "google+code", mail_state: state ?? "" })
+			: new URLSearchParams({ mail_error: "denied" });
+		return route.fulfill({ status: 303, headers: { location: `http://127.0.0.1:4173/admin#mailboxes?${callback}` } });
+	});
+	await context.route("**/api/mail?**", (route) => {
+		const request = route.request();
+		const url = new URL(request.url());
+		expect(request.headers().authorization).toBe(`Bearer ${accessToken}`);
+		switch (url.searchParams.get("action")) {
+			case "list":
+				return route.fulfill({ json: { configured: true, admin: true, mailboxes } });
+			case "oauth-start":
+				expect(request.postDataJSON()).toEqual({ address: mailbox.address });
+				attempts++;
+				return route.fulfill({ json: { state: `state-${attempts}`, url: `https://accounts.google.com/o/oauth2/v2/auth?state=state-${attempts}` } });
+			case "oauth-finish":
+				expect(request.postDataJSON()).toEqual({ code: "google+code", state: "state-1" });
+				completed++;
+				mailboxes.push(mailbox);
+				return route.fulfill({ json: mailbox });
+			case "members":
+				expect(url.searchParams.get("box")).toBe(mailbox.id);
+				return route.fulfill({ json: { members } });
+			case "grant":
+				expect(url.searchParams.get("box")).toBe(mailbox.id);
+				expect(request.postDataJSON()).toEqual({ email: agent.email });
+				members = [agent];
+				return route.fulfill({ json: { ok: true } });
+			case "revoke":
+				expect(url.searchParams.get("box")).toBe(mailbox.id);
+				expect(request.postDataJSON()).toEqual({ userId: agent.id });
+				members = [];
+				return route.fulfill({ json: { ok: true } });
+			default:
+				throw new Error(`Unexpected mail request ${url.searchParams.get("action")}`);
+		}
+	});
+	await page.goto("/admin#mailboxes");
+	await expect(page.getByRole("heading", { name: "Почтовые ящики", exact: true })).toBeVisible();
+	if (isMobile) await expect(page.getByRole("combobox", { name: "Раздел" })).toHaveValue("mailboxes");
+	else await expect(page.getByRole("button", { name: "Почтовые ящики", exact: true })).toHaveAttribute("aria-current", "page");
+	await page.getByRole("button", { name: "Подключить Gmail", exact: true }).click();
+	const google = page.getByRole("dialog", { name: "Подключение Gmail" });
+	await expect(google.getByText(/администратор вводит код/)).toBeVisible();
+	await expect(google).toBeInViewport({ ratio: 1 });
+	await page.screenshot({ path: info.outputPath("gmail-connect.png"), animations: "disabled" });
+	await google.getByRole("textbox", { name: "Рабочий адрес" }).fill(mailbox.address);
+	await google.getByRole("button", { name: "Продолжить в Google" }).click();
+	await expect(page.getByRole("status").filter({ hasText: `Подключён ящик ${mailbox.address}` })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Подключённые ящики · 2" })).toBeVisible();
+	await expect(page).toHaveURL(/\/admin#mailboxes$/);
+	expect(completed).toBe(1);
+	await page.getByRole("button", { name: "Настроить доступ" }).click();
+	const access = page.getByRole("dialog", { name: "Доступ к ящику" });
+	await expect(access.getByText(mailbox.address, { exact: true })).toBeVisible();
+	await access.getByRole("textbox", { name: "Адрес сотрудника" }).fill(agent.email);
+	await access.getByRole("button", { name: "Выдать доступ" }).click();
+	await expect(access.getByText(agent.display_name)).toBeVisible();
+	await access.getByRole("button", { name: "Отозвать", exact: true }).click();
+	await access.getByRole("button", { name: "Подтвердить отзыв" }).click();
+	await expect(access.getByText(agent.display_name)).toHaveCount(0);
+	await page.keyboard.press("Escape");
+	await expect(access).toHaveCount(0);
+	await page.getByRole("searchbox", { name: "Найти почтовый ящик" }).fill("support");
+	await expect(page.getByText(mailboxes[0].address, { exact: true })).toHaveCount(0);
+	await page.getByRole("button", { name: `Переподключить ${mailbox.address}`, exact: true }).click({ timeout: 10_000 });
+	await expect(google.getByRole("textbox", { name: "Рабочий адрес" })).toHaveValue(mailbox.address);
+	await expect(google.getByRole("textbox", { name: "Рабочий адрес" })).not.toBeEditable();
+	await google.getByRole("button", { name: "Продолжить в Google" }).click();
+	await expect(page.getByRole("alert").getByText(/Подключение не завершено/)).toBeVisible();
+	await expect(page).toHaveURL(/\/admin#mailboxes$/);
+	expect(completed).toBe(1);
+});
+
+test("browse shared Gmail, organize mail and reuse a recipient", async ({
 	context,
 	page,
 	isMobile,
@@ -75,7 +163,6 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 		staffSender: "Анна Корнеева",
 		text: "Тестовый ответ",
 	};
-	const recipients: { id: string; email: string; display_name: string }[] = [];
 	await context.route("**/api/binds?action=workspace", (route) =>
 		route.fulfill({
 			json: {
@@ -317,18 +404,6 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 				expect(box).toBe("test-31");
 				expect(request.postDataJSON()).toEqual({ id: templateId, revision: 2 });
 				template = undefined;
-				return route.fulfill({ json: { ok: true } });
-			case "members":
-				return route.fulfill({ json: { members: recipients } });
-			case "grant":
-				expect(request.postDataJSON()).toMatchObject({
-					email: "agent@example.invalid",
-				});
-				recipients.push({
-					id: "agent",
-					email: "agent@example.invalid",
-					display_name: "Тестовый сотрудник почты",
-				});
 				return route.fulfill({ json: { ok: true } });
 			default:
 				return route.fulfill({
@@ -671,14 +746,6 @@ test("browse shared Gmail, organize mail, reuse a recipient and grant access", a
 	await newComposer
 		.getByRole("button", { name: "Закрыть без сохранения" })
 		.click();
-	await mail.getByRole("button", { name: "Доступ к ящику" }).click();
-	const admin = mail.getByRole("region", { name: "Доступ к ящику" });
-	await admin
-		.getByRole("textbox", { name: "Адрес сотрудника" })
-		.fill("agent@example.invalid");
-	await admin.getByRole("button", { name: "Выдать доступ" }).click();
-	await expect(admin.getByText("Тестовый сотрудник почты")).toBeVisible();
-	await admin.getByRole("button", { name: "Закрыть настройки почты" }).click();
 	await expect.poll(() => activeMailboxes).toBeGreaterThan(0);
 	received = true;
 	recentDate += 10_000;
