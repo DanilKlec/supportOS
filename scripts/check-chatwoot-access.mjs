@@ -31,6 +31,8 @@ const chats = new Map([
 	[5, makeChat(5, 10, 1, 'resolved')], [6, makeChat(6, 10, 5, 'resolved')],
 ]);
 for (const id of [2, 3, 5, 6]) chats.get(id).meta.sender.id = 101;
+chats.get(5).created_at = '2026-11-18';
+chats.get(6).created_at = '2026-11-19';
 chats.get(1).meta.assignee = { id: 1, name: 'support', access_token: 'not-for-browser', pubsub_token: 'not-for-browser' };
 chats.get(1).meta.sender.email = 'player@example.invalid';
 chats.get(1).additional_attributes = { referer: 'https://project.example.invalid/play?token=private' };
@@ -107,13 +109,21 @@ async function mockFetch(input, init = {}) {
 		if (path === 'inbox_members/10') return response({ payload: [{ id: 1 }, { id: 3 }] });
 		if (path === 'inbox_members/20') return response({ payload: [{ id: 2 }, { id: 4 }] });
 		if (path === 'inbox_members/30') return response({ payload: [{ id: 1 }] });
+		if (path === 'search/conversations') return response({ payload: {
+			conversations: url.searchParams.get('q') === 'archive player' ? [{ id: 5 }, { id: 6 }] : [],
+		} });
+		if (path === 'search/messages') return response({ payload: {
+			messages: url.searchParams.get('q') === 'older sentence' ? [{ id: 51, conversation_id: 5 }, { id: 52, conversation_id: 6 }] : [],
+		} });
 		if (path === 'conversations/filter') {
 			const sort = url.searchParams.get('sort_by');
 			if (!sort) return response({ data: { payload: [...chats.values()] } });
 			const fields = { display_id: 'id', contact_id: 'contact_id' };
-			const rows = [...chats.values()].filter((chat) => body.payload.every(({ attribute_key, values }) => {
+			const rows = [...chats.values()].filter((chat) => body.payload.every(({ attribute_key, filter_operator, values }) => {
 				const value = attribute_key === 'contact_id' ? chat.meta.sender.id : chat[fields[attribute_key] ?? attribute_key];
-				return values.includes(value);
+				if (filter_operator === 'is_greater_than') return value > values[0];
+				if (filter_operator === 'is_less_than') return value < values[0];
+				return values.some((entry) => String(entry) === String(value));
 			}));
 			if (sort === 'created_at_asc') rows.reverse();
 			return response({ payload: rows, meta: { all_count: rows.length } });
@@ -264,6 +274,18 @@ try {
 	assert.ok(archives.payload.some((item) => item.id === 5));
 	assert.ok(archives.payload.every((item) => item.assignee_id === 1 && item.inbox_id === 10));
 	assert.equal(archives.data, undefined, 'No unfiltered nested result may be returned');
+	for (const q of ['%235', 'archive%20player', 'older%20sentence']) {
+		const found = await expectStatus('support', 'conversations', 200, { query: `&scope=history&q=${q}` });
+		assert.deepEqual(found.payload.map((item) => item.id), [5]);
+		assert.equal(found.searchTruncated, false);
+	}
+	const hiddenArchive = await expectStatus('support', 'conversations', 200, { query: '&scope=history&q=%236' });
+	assert.deepEqual(hiddenArchive.payload, []);
+	const allArchives = await expectStatus('admin', 'conversations', 200, { query: '&scope=history&q=older%20sentence' });
+	assert.deepEqual(allArchives.payload.map((item) => item.id), [5, 6]);
+	const singleDay = await expectStatus('admin', 'conversations', 200, { query: '&scope=history&from=2026-11-18&to=2026-11-18&q=older%20sentence' });
+	assert.deepEqual(singleDay.payload.map((item) => item.id), [5]);
+	await expectStatus('admin', 'conversations', 400, { query: '&scope=history&from=2026-02-30' });
 	await expectStatus('support', 'take', 200, post({ conversationId: 3, assigneeId: 2 }));
 	assert.equal(chats.get(3).assignee_id, 1);
 	await expectStatus('support', 'chat-supervisor', 403);

@@ -78,6 +78,12 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 			created_at: 1791799200,
 		},
 	];
+	const archiveMessages = Array.from({ length: 20 }, (_, index) => ({
+		id: 31 + index,
+		content: `Архивное сообщение ${index + 1}`,
+		message_type: 0,
+		created_at: 1791799200 + index,
+	}));
 	await context.routeWebSocket(
 		"wss://supportos-visual.invalid/realtime/v1/websocket?**",
 		(socket) => socket.close(),
@@ -179,6 +185,14 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				const scope = url.searchParams.get("scope");
 				const status = url.searchParams.get("status");
 				const query = url.searchParams.get("q");
+				if (scope === "history" && status === "resolved" && query === `#${otherChat.id}`) {
+					return route.fulfill({ json: { payload: [{
+						...conversation,
+						id: otherChat.id,
+						status,
+						meta: { ...conversation.meta, sender: { ...conversation.meta.sender, name: otherChat.name } },
+					}] } });
+				}
 				return route.fulfill({
 					json: {
 						payload:
@@ -368,8 +382,22 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 				expect(agentView).toBe(true);
 				sentMessages.push(request.postDataJSON());
 				return route.fulfill({ json: { id: 41 + sentMessages.length } });
-			case "messages":
+			case "messages": {
+				if (url.searchParams.get("id") === String(otherChat.id)) {
+					const before = url.searchParams.get("before");
+					if (before) {
+						expect(before).toBe("31");
+						return route.fulfill({ json: { payload: [{
+							id: 3,
+							content: "Самое раннее сообщение",
+							message_type: 0,
+							created_at: 1791799100,
+						}] } });
+					}
+					return route.fulfill({ json: { payload: archiveMessages } });
+				}
 				return route.fulfill({ json: { payload: readMessages } });
+			}
 			case "coaching-notes":
 				if (request.method() === "POST") {
 					const body = request.postDataJSON();
@@ -496,6 +524,13 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		.toBe(String(row.inboxId));
 	await expect.poll(() => activeParameters.get("label")).toBe("billing");
 	await active.getByRole("button", { name: "Сбросить фильтры" }).click();
+	const previewPane = page.getByRole("complementary", { name: "Просмотр диалога" });
+	await table.getByRole("button", { name: /Просмотреть диалог #14/ }).click();
+	await expect(previewPane.getByText("Первое обращение")).toBeVisible();
+	await expect(previewPane.getByRole("textbox", { name: "Ответ игроку" })).toHaveCount(0);
+	await expect(previewPane.getByRole("textbox", { name: "Подсказка агенту" })).toHaveCount(0);
+	expect(watching).toBe(false);
+	await previewPane.getByRole("button", { name: "Закрыть просмотр" }).click();
 	await table.getByRole("button", { name: "Наблюдать" }).click();
 	const observation = page.getByRole("complementary", {
 		name: "Наблюдение за диалогом",
@@ -565,16 +600,16 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		.getByRole("button", { name: new RegExp(`#${otherChat.id}`) })
 		.click();
 	await expect(
-		observation.getByRole("heading", { name: otherChat.name }),
+		previewPane.getByRole("heading", { name: otherChat.name }),
 	).toBeVisible();
 	await expect(
-		observation.getByRole("textbox", { name: "Ответ игроку" }),
+		previewPane.getByRole("textbox", { name: "Ответ игроку" }),
 	).toHaveCount(0);
 	await expect(
-		observation.getByRole("button", { name: "Отправить игроку" }),
+		previewPane.getByRole("button", { name: "Отправить игроку" }),
 	).toHaveCount(0);
 	expect(sentMessages).toHaveLength(0);
-	await observation.getByRole("button", { name: "Закрыть наблюдение" }).click();
+	await previewPane.getByRole("button", { name: "Закрыть просмотр" }).click();
 	await page.getByRole("button", { name: /Наблюдаемые/ }).click();
 	await expect(table.getByText(row.player)).toBeVisible();
 	await table
@@ -809,6 +844,22 @@ test("fit the chat workspace, dismiss its menus and deliver a private coaching n
 		"aria-pressed",
 		"true",
 	);
+	await expect(page.getByRole("heading", { name: row.player })).toBeVisible();
+	await page.getByRole("button", { name: "Архив", exact: true }).click();
+	await expect(page.getByRole("heading", { name: row.player })).toHaveCount(0);
+	const archiveSearch = archive.getByRole("textbox", { name: "Поиск диалогов" });
+	await archiveSearch.fill(`#${otherChat.id}`);
+	await archive.getByRole("button", { name: new RegExp(otherChat.name) }).click();
+	await expect(page.getByRole("heading", { name: otherChat.name })).toBeVisible();
+	await expect(page.getByRole("textbox", { name: "Ответ игроку" })).toHaveCount(0);
+	await expect(page.getByText("Архивное сообщение 20", { exact: true })).toBeVisible();
+	await page.getByRole("button", { name: "Загрузить более ранние сообщения" }).click();
+	await expect(page.getByText("Самое раннее сообщение", { exact: true })).toBeVisible();
+	if (isMobile) {
+		await page.getByRole("button", { name: "К списку архива" }).click();
+		await expect(archiveSearch).toHaveValue(`#${otherChat.id}`);
+	}
+	await page.getByRole("button", { name: "Диалоги", exact: true }).click();
 	await expect(page.getByRole("heading", { name: row.player })).toBeVisible();
 	if (isMobile) {
 		await page.getByRole("button", { name: /^Мои/ }).click();

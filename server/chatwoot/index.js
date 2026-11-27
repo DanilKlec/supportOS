@@ -980,7 +980,13 @@ async function loadChatPages(cfg, assigneeType, maxPages, inboxId) {
 	};
 }
 
-function conversationFilters({ status, assigneeId, agentId, inboxId, label, from, to }) {
+function shiftFilterDate(date, days) {
+	const shifted = new Date(`${date}T00:00:00.000Z`);
+	shifted.setUTCDate(shifted.getUTCDate() + days);
+	return shifted.toISOString().slice(0, 10);
+}
+
+function conversationFilters({ status, assigneeId, agentId, inboxId, label, from, to, displayIds }) {
 	const filters = [];
 	const add = (attribute_key, filter_operator, values) => filters.push({ attribute_key, filter_operator, values: Array.isArray(values) ? values : [values], query_operator: 'AND' });
 	if (status) add('status', 'equal_to', status);
@@ -988,10 +994,39 @@ function conversationFilters({ status, assigneeId, agentId, inboxId, label, from
 	if (agentId) add('assignee_id', 'equal_to', agentId);
 	if (inboxId) add('inbox_id', 'equal_to', inboxId);
 	if (label) add('labels', 'equal_to', label);
-	if (from) add('created_at', 'is_greater_than', Math.floor(new Date(`${from}T00:00:00.000Z`).getTime() / 1000));
-	if (to) add('created_at', 'is_less_than', Math.floor(new Date(`${to}T23:59:59.999Z`).getTime() / 1000));
+	if (displayIds) add('display_id', 'equal_to', displayIds);
+	// Chatwoot compares calendar dates with strict operators. Include both days selected in the archive.
+	if (from && from > '0001-01-01') add('created_at', 'is_greater_than', shiftFilterDate(from, -1));
+	if (to && to < '9999-12-31') add('created_at', 'is_less_than', shiftFilterDate(to, 1));
 	if (filters.length) filters[filters.length - 1].query_operator = null;
 	return filters;
+}
+
+async function archiveSearch(cfg, search) {
+	const exactId = /^#?([1-9]\d{0,14})$/.exec(search);
+	if (exactId) return { ids: new Set([Number(exactId[1])]), truncated: false };
+
+	const ids = new Set();
+	const pageLimit = 4;
+	const sections = await Promise.all(['conversations', 'messages'].map(async (kind) => {
+		const seen = new Set();
+		for (let page = 1; page <= pageLimit; page++) {
+			const params = new URLSearchParams({ q: search, page: String(page) });
+			const result = await api(cfg, `/accounts/${cfg.accountId}/search/${kind}?${params}`);
+			const rows = result?.payload?.[kind] ?? itemList(result);
+			if (!Array.isArray(rows) || !rows.length) return false;
+			const before = seen.size;
+			for (const row of rows) {
+				seen.add(row.id);
+				const id = Number(kind === 'messages' ? row.conversation_id : row.id);
+				if (Number.isSafeInteger(id) && id > 0) ids.add(id);
+			}
+			if (rows.length < 15) return false;
+			if (seen.size === before) return true;
+		}
+		return true;
+	}));
+	return { ids, truncated: sections.some(Boolean) };
 }
 
 function scopeConversationQuery(query, inboxIds) {
@@ -1425,8 +1460,14 @@ export default async function handler(req, res) {
 			const label = url.searchParams.get('label');
 			const from = url.searchParams.get('from');
 			const to = url.searchParams.get('to');
-			const validDate = (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
-			if (!validDate(from) || !validDate(to)) return json(res, 400, { error: 'Некорректный диапазон дат' });
+			const validDate = (value) => {
+				if (!value) return true;
+				if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value < '0001-01-01') return false;
+				const parsed = new Date(`${value}T00:00:00.000Z`);
+				return Number.isFinite(parsed.getTime()) && parsed.toISOString().startsWith(`${value}T`);
+			};
+			if (!validDate(from) || !validDate(to) || from && to && from > to)
+				return json(res, 400, { error: 'Некорректный диапазон дат' });
 			const allowed = capabilities.supervise ? null : (await getDirectory()).map((inbox) => String(inbox.id));
 			if (allowed && inboxId && !allowed.includes(inboxId)) throw chatwootError('Источник недоступен.', 403);
 			if (allowed && !allowed.length) return json(res, 200, { payload: [], hasMore: false });
@@ -1488,19 +1529,28 @@ export default async function handler(req, res) {
 				assigneeId = String(agentId);
 			}
 			if (assigneeId && !validId(assigneeId)) return json(res, 400, { error: 'Некорректный агент' });
-			const filters = conversationFilters({ status: scope === 'mine' && status === 'open' ? activeStatuses : status, assigneeId, inboxId: inboxId || allowed, label, from, to });
 			const search = url.searchParams.get('q')?.trim().slice(0, 150);
+			const archiveMatches = scope === 'history' && search ? await archiveSearch(cfg, search) : null;
+			if (archiveMatches?.ids.size === 0)
+				return json(res, 200, { payload: [], hasMore: false, searchTruncated: archiveMatches.truncated });
+			const filters = conversationFilters({
+				status: scope === 'mine' && status === 'open' ? activeStatuses : status,
+				assigneeId, inboxId: inboxId || allowed, label, from, to,
+				displayIds: archiveMatches ? [...archiveMatches.ids] : undefined,
+			});
 			const filterQuery = new URLSearchParams({ page: String(page) });
-			if (search) filterQuery.set('q', search);
+			if (search && !archiveMatches) filterQuery.set('q', search);
 			if (scope === 'mine') filterQuery.set('sort_by', 'created_at_asc');
+			if (scope === 'history') filterQuery.set('sort_by', 'last_activity_at_desc');
 			const result = await api(cfg, `${prefix}/filter?${filterQuery}`, { method: 'POST', body: { payload: filters } });
 			const received = itemList(result);
 			const payload = received.filter((row) => {
 				if (scope === 'history' && status !== 'all' && status !== row.status) return false;
+				if (archiveMatches && !archiveMatches.ids.has(Number(row.id))) return false;
 				return !allowed || (String(conversationAssignee(row)) === assigneeId && allowed.includes(String(conversationInbox(row))));
 			});
 			if (scope === 'mine') payload.sort(oldestFirst);
-			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: received.length >= 25 });
+			return json(res, 200, { payload: capabilities.supervise ? payload : stripIp(payload), hasMore: received.length >= 25, searchTruncated: archiveMatches?.truncated });
 		}
 		if (action === 'conversation' && req.method === 'GET') {
 			const id = url.searchParams.get('id');

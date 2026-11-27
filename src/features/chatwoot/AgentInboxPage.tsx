@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import {
 	Activity,
 	Archive,
+	ArrowLeft,
 	ArrowDownToLine,
 	Ban,
 	Bell,
@@ -162,12 +163,11 @@ function initials(name?: string) {
 		.toUpperCase();
 }
 const chatDay = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+const archiveListDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 
 function dateLabel(timestamp?: number) {
 	if (!timestamp) return "";
-	return new Date(
-		timestamp > 1e12 ? timestamp : timestamp * 1000,
-	).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+	return new Date(timestampMs(timestamp)).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
 function conversationWaitingSince(conversation: ChatwootConversation, last = conversation.last_non_activity_message) {
@@ -182,7 +182,11 @@ function conversationWaitingSince(conversation: ChatwootConversation, last = con
 	return since || undefined;
 }
 
-const timestampMs = (timestamp: number) => timestamp > 1e12 ? timestamp : timestamp * 1000;
+function timestampMs(timestamp: number) {
+	const numeric = Number(timestamp);
+	if (!Number.isFinite(numeric)) return Date.parse(String(timestamp));
+	return numeric > 1e12 ? numeric : numeric * 1000;
+}
 
 function firstReplyPending(conversation: ChatwootConversation, since?: number) {
 	const firstReply = conversation.first_reply_created_at;
@@ -192,7 +196,7 @@ function firstReplyPending(conversation: ChatwootConversation, since?: number) {
 
 function ReplyTime({ timestamp }: { timestamp?: number }) {
 	const now = useChatClock();
-	return timestamp ? <time title={new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}>
+	return timestamp ? <time title={new Date(timestampMs(timestamp)).toLocaleString("ru-RU")}>
 		{dateLabel(timestamp)} <span className="tabular-nums opacity-80">· {chatElapsedTime(timestamp, now)} назад</span>
 	</time> : null;
 }
@@ -252,6 +256,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 	const [bulkSelection, setBulkSelection] = useState<{ key: string; ids: Set<number> } | null>(null);
 	const [bulkBusy, setBulkBusy] = useState(false);
 	const [chatWindows, dispatchChatWindow] = useReducer(chatWindowsReducer, initialChatWindows);
+	const [archiveId, setArchiveId] = useState<number | null>(null);
 	const [addingChat, setAddingChat] = useState(false);
 	const [drafts, setDrafts] = useState(() => new Map<number, OperatorDraft>());
 	const updateOperatorDraft: UpdateOperatorDraft = useCallback((id, change) => {
@@ -270,6 +275,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 		dispatchChatWindow({ type: "title", id, title });
 	}, []);
 	const [supervisionId, setSupervisionId] = useState<number | null>(null);
+	const [previewing, setPreviewing] = useState(false);
 	const observationTrigger = useRef<HTMLElement | null>(null);
 	const supervisionDrafts = useRef(new Map<number, CoachingDraft>());
 	const rememberCoachingDraft = useCallback((id: number, draft: CoachingDraft) => {
@@ -395,7 +401,8 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 		enabled: connection.data?.configured === true,
 		refetchInterval: 5000,
 	});
-	const displayedScope: Scope = activeSection === "archive" ? "history" : scope;
+	const archiving = activeSection === "archive";
+	const displayedScope: Scope = archiving ? "history" : scope;
 	const listScope = displayedScope === "active" ? "mine" : displayedScope;
 	const filters = listFilters[listScope];
 	const { search, inboxId, agentId, label, from, to } = filters;
@@ -545,12 +552,23 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 			if (window.matchMedia("(width < 768px)").matches) setQueueOpen(true);
 		}
 	};
-	const openObservation = (id: number) => {
+	const openArchive = (id: number) => {
+		setArchiveId(id);
+		if (window.matchMedia("(width < 768px)").matches) setQueueOpen(false);
+	};
+	const closeArchive = () => {
+		setArchiveId(null);
+		setQueueOpen(true);
+	};
+	const openPreview = (id: number, rememberTrigger = true) => {
+		if (rememberTrigger) observationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		setPreviewing(true);
 		setSupervisionId(id);
 	};
 	const startObservation = (id: number) => {
 		observationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		openObservation(id);
+		setPreviewing(false);
+		setSupervisionId(id);
 		if (!watched.has(id) && !changeWatch.isPending) changeWatch.mutate({ id, enabled: true });
 	};
 	const closeObservation = () => {
@@ -583,11 +601,14 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 			return;
 		}
 		setBulkSelection(null);
+		setAddingChat(false);
 		if (section === "inbox") setScope("mine");
 		if (section === "archive") setScope("history");
-		if (section === "inbox" || section === "archive") {
+		if (section === "inbox" && activeSection === "archive" && chatWindows.panes.length > 0 && window.matchMedia("(width < 768px)").matches) {
+			setQueueOpen(false);
+		} else if (section === "inbox" || section === "archive") {
 			setQueueOpen(true);
-		} else setAddingChat(false);
+		}
 		setActivePage(1);
 	};
 	const selectScope = (next: Scope) => {
@@ -612,6 +633,10 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 		setScope("mine");
 		setActivePage(1);
 		placeConversation(id, placement);
+	};
+	const openWorkingChat = (id: number, title?: string) => {
+		selectSection("inbox");
+		placeConversation(id, { title });
 	};
 	const prefetchQueue = () => {
 		if (scope === "queue" || activeSection !== "inbox") return;
@@ -741,8 +766,8 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 				) : <>
 				{queueOpen && scope !== "active" && (
 					<aside aria-label={displayedScope === "history" ? "Архив диалогов" : "Список диалогов"} style={{ "--chat-list-width": `${listWidth}px` } as CSSProperties} className="chat-list flex w-full min-w-0 shrink-0 flex-col border-r border-border md:w-[var(--chat-list-width)] md:min-w-[260px] md:max-w-[min(520px,45%)]">
-						{chatWindows.panes.length > 0 && <button type="button" className="chat-window-list-back md:hidden" onClick={() => { setAddingChat(false); setQueueOpen(false); }}>
-							<PanelLeftClose size={14} /> К открытым чатам
+						{(archiving ? archiveId !== null : chatWindows.panes.length > 0) && <button type="button" className="chat-window-list-back md:hidden" onClick={() => { setAddingChat(false); setQueueOpen(false); }}>
+							<PanelLeftClose size={14} /> {archiving ? "К открытому диалогу" : "К открытым чатам"}
 						</button>}
 						<div className="chat-list-heading">
 							<div className="chat-list-heading-icon" aria-hidden="true">
@@ -756,6 +781,9 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 							inboxes={inboxes} agents={agents} labels={labels} canFilterByAgent={canSupervise}
 							historyStatus={historyStatus} onHistoryStatus={(value) => { setHistoryStatus(value); setActivePage(1); }}
 						/>
+						{archiving && conversations.data?.searchTruncated && <p role="status" className="border-b border-border px-3 py-2 text-xs text-muted">
+							Показана часть совпадений. Уточните запрос или найдите диалог по номеру.
+						</p>}
 						{addingChat && <div className="chat-window-choose">
 							<p role="status">Выберите чат для нового окна <span className="whitespace-nowrap">({chatWindows.panes.length + 1} из {MAX_CHAT_WINDOWS})</span></p>
 							<button type="button" className="shrink-0 rounded-md px-2 py-1.5 text-xs hover:bg-surface-elevated" onClick={() => setAddingChat(false)}>Отмена</button>
@@ -803,12 +831,16 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 										key={item.id}
 										conversation={item}
 										project={inboxes.find((project) => project.id === item.inbox_id)}
-										active={chatWindows.activeId === item.id}
-										opened={chatWindows.panes.some((pane) => pane.id === item.id)}
+										active={archiving ? archiveId === item.id : chatWindows.activeId === item.id}
+										opened={archiving ? archiveId === item.id : chatWindows.panes.some((pane) => pane.id === item.id)}
+										archived={archiving}
 										checked={selectedChats?.has(item.id)}
 										onCheck={selectedChats && !addingChat ? (checked) => updateSelectedChats(checked ? [...selectedChats, item.id] : [...selectedChats].filter((id) => id !== item.id)) : undefined}
 										checkBusy={bulkBusy}
-										onClick={() => placeConversation(item.id, { add: addingChat, title: item.meta?.sender?.name || item.meta?.sender?.email })}
+										onClick={() => {
+											if (archiving) openArchive(item.id);
+											else placeConversation(item.id, { add: addingChat, title: item.meta?.sender?.name || item.meta?.sender?.email });
+										}}
 										onTake={
 											displayedScope === "queue"
 												? () => takeConversation.mutate({ id: item.id, add: addingChat, replaceId: chatWindows.activeId ?? undefined })
@@ -833,7 +865,17 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 				)}
 				{queueOpen && scope !== "active" && <div className="chat-pane-divider hidden md:block"><ResizeHandle label="Изменить ширину списка" value={listWidth} min={260} max={520} onResize={resizeList} /></div>}
 				<main className={`relative min-h-0 min-w-0 flex-1 flex-col ${queueOpen && scope !== "active" ? "hidden md:flex" : "flex"}`}>
-					{scope === "active" && canSupervise ? (
+					{archiving ? (
+						<ConversationPane key={archiveId} id={archiveId} readOnly
+							listControl={archiveId !== null ? <button type="button" className="chat-window-control md:hidden" title="К списку архива" aria-label="К списку архива" onClick={openEmptyPane}><ArrowLeft size={16} /></button> : undefined}
+							canManageAllChats={canManageAllChats}
+							realtimeConnected={realtimeConnected} coachingRealtimeConnected={coachingRealtimeConnected}
+							agents={agents} teams={directory.data?.teams ?? []} inboxes={inboxes} labels={labels}
+							binds={[]} language={language} onLanguage={setLanguage}
+							onOpenRelated={openArchive} onOpenWorking={openWorkingChat}
+							onClose={closeArchive} onChanged={reload} onChoose={openEmptyPane}
+						/>
+					) : scope === "active" && canSupervise ? (
 						<div className="chat-observation-layout relative flex min-h-0 min-w-0 flex-1" data-observation-open={supervisionId !== null}>
 							<ActiveChatsTable userId={user?.id} agents={agents} inboxes={inboxes} teams={directory.data?.teams ?? []}
 								labels={labels} realtime={realtimeConnected} selectedId={supervisionId} watched={watched}
@@ -842,21 +884,22 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 								watchingError={(changeWatch.error ?? watching.error)?.message}
 								changingId={changeWatch.isPending ? changeWatch.variables?.id : undefined}
 								onOpen={startObservation}
+								onPreview={openPreview}
 								onStop={(id) => changeWatch.mutate({ id, enabled: false })}
 								onResolve={canManageAllChats ? resolveConversation.mutate : undefined}
 								resolvingId={resolveConversation.isPending ? resolveConversation.variables : undefined}
 								resolveError={resolveConversation.variables !== supervisionId ? resolveConversation.error?.message : undefined}
 							/>
 							{supervisionId !== null && (
-								<aside aria-label="Наблюдение за диалогом" className="chat-observation-panel absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[45%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
-									<ObservationHeader key={`header-${supervisionId}`} watching={watched.has(supervisionId)} watchPending={changeWatch.isPending}
+								<aside aria-label={previewing ? "Просмотр диалога" : "Наблюдение за диалогом"} className="chat-observation-panel absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col border-l border-border bg-surface shadow-xl xl:static xl:w-[45%] xl:min-w-[460px] xl:shrink-0 xl:shadow-none">
+									<ObservationHeader key={`${supervisionId}-${previewing}`} preview={previewing} watching={!previewing && watched.has(supervisionId)} watchPending={changeWatch.isPending}
 										onStop={() => changeWatch.mutate({ id: supervisionId, enabled: false })}
 										onClose={closeObservation} />
 									{changeWatch.isError && changeWatch.variables?.id === supervisionId && (
 										<p role="alert" className="border-b border-border px-3 py-2 text-xs chat-text-danger">{changeWatch.error.message}</p>
 									)}
 									<ConversationPane key={supervisionId} id={supervisionId}
-										supervising docked
+										supervising={!previewing} readOnly={previewing} docked
 										resolveObserved={canManageAllChats ? {
 											resolve: () => resolveConversation.mutate(supervisionId),
 											pending: resolveConversation.isPending,
@@ -864,7 +907,7 @@ function AgentInboxWorkspace({ notificationClient }: { notificationClient: Query
 										} : undefined}
 										coachingDraft={supervisionDrafts.current.get(supervisionId)}
 										onCoachingDraft={rememberCoachingDraft}
-										onOpenRelated={openObservation} realtimeConnected={realtimeConnected}
+										onOpenRelated={(id) => openPreview(id, false)} realtimeConnected={realtimeConnected}
 										coachingRealtimeConnected={coachingRealtimeConnected}
 										agents={agents} teams={directory.data?.teams ?? []} inboxes={inboxes} labels={labels}
 										binds={[]} language={language} onLanguage={setLanguage}
@@ -1238,6 +1281,7 @@ function ConversationRow({
 	project,
 	active,
 	opened,
+	archived,
 	checked,
 	onCheck,
 	checkBusy,
@@ -1250,6 +1294,7 @@ function ConversationRow({
 	project?: ChatwootInbox;
 	active: boolean;
 	opened: boolean;
+	archived: boolean;
 	checked?: boolean;
 	onCheck?: (checked: boolean) => void;
 	checkBusy: boolean;
@@ -1265,8 +1310,10 @@ function ConversationRow({
 	const login = (typeof loginValue === "string" || typeof loginValue === "number") && String(loginValue).trim() !== name ? String(loginValue).trim() : "";
 	const source = conversation.meta?.inbox?.name ?? project?.name ?? (conversation.inbox_id ? `Источник #${conversation.inbox_id}` : "Входящие");
 	const tags = tagsForProject(conversation.labels ?? [], projectTagScope(project, source));
-	const timestamp = conversation.created_at ?? last?.created_at ?? conversation.updated_at;
-	const waitingSince = conversationWaitingSince(conversation);
+	const receivedAt = conversation.created_at ?? last?.created_at;
+	const timestamp = archived ? conversation.updated_at || last?.created_at || receivedAt : receivedAt ?? conversation.updated_at;
+	const displayTime = timestamp ? timestampMs(timestamp) : 0;
+	const waitingSince = archived ? undefined : conversationWaitingSince(conversation);
 	return (
 		<div data-active={active} data-opened={opened} data-checked={checked} className="chat-list-row">
 			{onCheck && <input type="checkbox" checked={checked} disabled={checkBusy} aria-label={`Выбрать диалог #${conversation.id}`}
@@ -1276,13 +1323,17 @@ function ConversationRow({
 				<span className="chat-list-main">
 					<span className="chat-list-line">
 						<span className="chat-list-project truncate" title={source}>{source}</span>
-						{timestamp ? <time className="chat-list-time" title={`Поступил ${new Date(timestamp > 1e12 ? timestamp : timestamp * 1000).toLocaleString("ru-RU")}`}>{dateLabel(timestamp)}</time> : <span className="chat-list-number">#{conversation.id}</span>}
+						{Number.isFinite(displayTime) && displayTime > 0 ? <time className="chat-list-time" title={`${archived ? "Обновлён" : "Поступил"} ${new Date(displayTime).toLocaleString("ru-RU")}`}>{archived ? archiveListDate.format(displayTime) : dateLabel(timestamp)}</time> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					<span className="chat-list-line">
 						<span className="chat-list-player truncate" title={name}>{name}</span>
 						{waitingSince ? <WaitingTime timestamp={waitingSince} firstReply={firstReplyPending(conversation, waitingSince)} className="chat-list-time chat-text-warning" /> : <span className="chat-list-number">#{conversation.id}</span>}
 					</span>
 					{login && <span className="chat-list-meta truncate" title={`Логин игрока ${login}`}>Логин · {login}</span>}
+					{archived && <span className="chat-list-meta truncate">
+						{conversationStatusLabels[conversation.status]}
+						{conversation.meta?.assignee?.name ? ` · ${conversation.meta.assignee.name}` : ""}
+					</span>}
 					<span className="chat-list-preview truncate">{last?.content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ") || "Новое обращение"}</span>
 					{tags.length > 0 && <span className="chat-list-tags">
 						{tags.slice(0, 2).map((tag) => <span className="chat-context-tag truncate" title={tag} key={tag}>{tag}</span>)}
@@ -1304,6 +1355,7 @@ function ConversationPane({
 	listControl,
 	addControl,
 	supervising = false,
+	readOnly = false,
 	resolveObserved,
 	docked = false,
 	visible = true,
@@ -1326,6 +1378,7 @@ function ConversationPane({
 	onCoachingDraft,
 	onTitle,
 	onOpenRelated,
+	onOpenWorking,
 	inboxes,
 	labels,
 	binds,
@@ -1341,6 +1394,7 @@ function ConversationPane({
 	listControl?: ReactNode;
 	addControl?: ReactNode;
 	supervising?: boolean;
+	readOnly?: boolean;
 	resolveObserved?: { resolve: () => void; pending: boolean; error: Error | null };
 	docked?: boolean;
 	visible?: boolean;
@@ -1363,6 +1417,7 @@ function ConversationPane({
 	onCoachingDraft?: (id: number, value: CoachingDraft) => void;
 	onTitle?: (id: number, title: string) => void;
 	onOpenRelated: (id: number) => void;
+	onOpenWorking?: (id: number, title?: string) => void;
 	inboxes: ChatwootInbox[];
 	labels: string[];
 	binds: Bind[];
@@ -1396,6 +1451,7 @@ function ConversationPane({
 	const showCustomer = contextTab === "player";
 	const [editorExpanded, setEditorExpanded] = useState(true);
 	const editor = useRef<HTMLTextAreaElement>(null);
+	const viewTitle = useRef<HTMLHeadingElement>(null);
 	const editorId = useId();
 	const [autoEditorHeight, setAutoEditorHeight] = useState(minEditorHeight);
 	const [threadHeight, setThreadHeight] = useState(0);
@@ -1442,12 +1498,18 @@ function ConversationPane({
 		refetchInterval: realtimeConnected ? 12000 : 5000,
 	});
 	const conversation = query.data as ChatwootConversation | undefined;
+	const canRead = conversation?.access?.read === true && !query.isError;
+	useLayoutEffect(() => {
+		if (readOnly && !docked && canRead) viewTitle.current?.focus({ preventScroll: true });
+	}, [readOnly, docked, canRead]);
 	const conversationTitle = conversation?.access?.read ? conversation.meta?.sender?.name || conversation.meta?.sender?.email : undefined;
 	useEffect(() => {
 		if (id != null && conversationTitle) onTitle?.(id, conversationTitle);
 	}, [id, conversationTitle, onTitle]);
-	const canWrite = !supervising && conversation?.access?.write === true;
-	const canNote = !supervising && conversation?.access?.note === true;
+	const inactive = conversation?.status === "resolved" || conversation?.status === "snoozed";
+	const canChangeStatus = !docked && !supervising && conversation?.access?.write === true;
+	const canWrite = canChangeStatus && !readOnly && !inactive;
+	const canNote = !supervising && !readOnly && !inactive && conversation?.access?.note === true;
 	const editorVisible = visible && editorExpanded && !privateOnly && (canWrite || canNote);
 	const editorLimit = Math.max(minEditorHeight, Math.min(maxEditorHeight, Math.floor(threadHeight * (tiled ? 0.36 : 0.46))));
 	const displayedEditorHeight = Math.min(editorHeight ?? autoEditorHeight, editorLimit);
@@ -1465,7 +1527,7 @@ function ConversationPane({
 			editor.current?.focus({ preventScroll: true });
 		}
 	}, [visible, selected, editorExpanded, canWrite, canNote]);
-	const canTake = !supervising && conversation?.access?.take === true;
+	const canTake = !supervising && !readOnly && conversation?.access?.take === true;
 	const mode: ComposerMode = canNote && (!canWrite || operatorDraft.mode === "note") ? "note" : "reply";
 	const sendAsNote = mode === "note";
 	const autoTranslateDisabled = conversation?.additional_attributes?.auto_translate_disabled === true;
@@ -1486,7 +1548,7 @@ function ConversationPane({
 		queryKey: ["chatwoot", "messages", id, "latest"],
 		queryFn: () => chatwootService.conversationMessages(id as number),
 		enabled: visible && id != null,
-		refetchInterval: realtimeConnected ? 12000 : 3000,
+		refetchInterval: inactive ? false : realtimeConnected ? 12000 : 3000,
 	});
 	const latestMessages = latestMessagesQuery.data
 		? latestMessagesQuery.data.payload ??
@@ -1497,7 +1559,9 @@ function ConversationPane({
 	const messages = useMemo(() => {
 		const unique = new Map<number, ChatwootMessage>();
 		for (const message of [...olderMessages, ...latestMessages, ...(optimisticMessage ? [optimisticMessage] : [])]) unique.set(message.id, message);
-		return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+		return [...unique.values()].sort((a, b) =>
+			timestampMs(a.created_at ?? 0) - timestampMs(b.created_at ?? 0) || Number(a.id < 0) - Number(b.id < 0) || a.id - b.id,
+		);
 	}, [olderMessages, latestMessages, optimisticMessage]);
 	const latestMessageId = messages.at(-1)?.id;
 	const coachingKey = ["chatwoot", "coaching-notes", id] as const;
@@ -1512,7 +1576,7 @@ function ConversationPane({
 	const latestCoachingId = coachingNotes?.[0]?.id;
 	const timeline = useMemo(() => [
 		...messages.map((message) => ({
-			key: `message-${message.id}`, time: (message.created_at ?? 0) * 1000, message,
+			key: `message-${message.id}`, time: timestampMs(message.created_at ?? 0), message,
 		})),
 		...(coachingNotes ?? []).map((note) => ({
 			key: `coaching-${note.id}`, time: Date.parse(note.createdAt), note,
@@ -1594,7 +1658,7 @@ function ConversationPane({
 		if (!followMessages.current) return;
 		viewport.scrollTop = viewport.scrollHeight;
 	}, [latestMessageId, latestCoachingId, messages.length, privateOnly, visible]);
-	const conversationVisible = conversation?.access?.read === true && !query.isError;
+	const conversationVisible = canRead;
 	useEffect(() => {
 		if (!conversationVisible || !thread.current) return;
 		const observer = new ResizeObserver(([entry]) => {
@@ -1615,24 +1679,21 @@ function ConversationPane({
 		return () => observer.disconnect();
 	}, [conversationVisible, visible]);
 	const loadOlderMessages = async () => {
-		const firstId = messages[0]?.id;
-		if (!id || !firstId || olderMessagesRequest.current || !hasOlderMessages) return;
+		const firstId = messages.reduce((oldest, message) => message.id > 0 ? Math.min(oldest, message.id) : oldest, Infinity);
+		if (!id || !Number.isFinite(firstId) || olderMessagesRequest.current || !hasOlderMessages) return;
 		olderMessagesRequest.current = true;
 		setLoadingOlderMessages(true);
 		setOlderMessagesError("");
 		try {
-			const viewport = messageViewport.current;
-			if (viewport) previousScrollHeight.current = viewport.scrollHeight;
 			const result = await chatwootService.conversationMessages(id, firstId);
 			const page = result.payload ?? result.data?.payload ?? result.messages ?? [];
 			if (currentConversationId.current !== id) return;
 			const knownIds = new Set(messages.map((message) => message.id));
 			const unseen = page.filter((message) => !knownIds.has(message.id));
-			setOlderMessages((current) => {
-				const unique = new Map(current.map((message) => [message.id, message]));
-				for (const message of unseen) unique.set(message.id, message);
-				return [...unique.values()].sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
-			});
+			if (unseen.length) {
+				previousScrollHeight.current = messageViewport.current?.scrollHeight ?? null;
+				setOlderMessages((current) => [...current, ...unseen]);
+			}
 			setHasOlderMessages(page.length >= 20 && unseen.length > 0);
 		} catch (error) {
 			setOlderMessagesError(error instanceof Error ? error.message : "Не удалось загрузить историю");
@@ -1715,6 +1776,7 @@ function ConversationPane({
 		onSuccess: (_result, value) => {
 			if (id != null) updateConversationStatus(client, id, value.status);
 			onChanged();
+			if (id != null && readOnly && value.status === "open") onOpenWorking?.(id, conversationTitle);
 		},
 	});
 	const assign = useMutation({
@@ -1837,7 +1899,7 @@ function ConversationPane({
 				<div className="chat-empty-icon">
 					<MessageSquareText size={23} />
 				</div>
-				<h2 className="mt-4 text-sm font-semibold">Выберите диалог</h2>
+				<h2 className="mt-4 text-sm font-semibold">{readOnly ? "Выберите диалог в архиве" : "Выберите диалог"}</h2>
 				<button
 					type="button"
 					onClick={onChoose}
@@ -1860,8 +1922,7 @@ function ConversationPane({
 	const tagScope = projectTagScope(source, project);
 	const tags = tagsForProject(conversation.labels ?? [], tagScope);
 	const playerDepositTags = depositTags(tagsForProject([...new Set([...tags, ...(contact.data?.label_list ?? [])])], tagScope));
-	const inactive = ["resolved", "snoozed"].includes(conversation.status);
-	const canResolve = conversation.status !== "resolved" && (resolveObserved || (canWrite && (!inactive || canManageAllChats)));
+	const canResolve = conversation.status !== "resolved" && (resolveObserved || (canChangeStatus && (!inactive && !readOnly || canManageAllChats)));
 	const statusAction = "chat-thread-primary inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-2.5 text-xs font-medium hover:border-accent disabled:opacity-60";
 	const statusText = conversationStatusLabels[conversation.status];
 	const lastPublicMessage = messages.findLast((message) => !message.private && ["0", "1", "incoming", "outgoing"].includes(String(message.message_type)));
@@ -1882,7 +1943,7 @@ function ConversationPane({
 							{initials(sender?.name)}
 						</div>
 						<div className="min-w-0">
-							<h2 className="truncate text-sm font-semibold" title={sender?.name}>
+							<h2 ref={viewTitle} tabIndex={readOnly && !docked ? -1 : undefined} className="truncate text-sm font-semibold" title={sender?.name}>
 								{sender?.name || sender?.email || `Диалог #${id}`}
 							</h2>
 							<p className="flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted">
@@ -1892,7 +1953,7 @@ function ConversationPane({
 								</span>
 								{waitingSince ? <WaitingTime timestamp={waitingSince} firstReply={firstReplyPending(conversation, waitingSince)} className="shrink-0 whitespace-nowrap chat-text-warning" /> : null}
 							</p>
-							{supervising && <p className="truncate text-[11px] text-muted" title={conversation.meta?.assignee?.name}>
+							{(supervising || readOnly || inactive) && <p className="truncate text-[11px] text-muted" title={conversation.meta?.assignee?.name}>
 								{conversation.meta?.assignee?.name ? `Агент · ${conversation.meta.assignee.name}` : coachRecipient ? "Назначенный агент" : "Агент не назначен"}
 							</p>}
 						</div>
@@ -1925,7 +1986,7 @@ function ConversationPane({
 							<CheckCheck size={14} aria-hidden="true" />
 							<span>Завершить</span>
 						</button>}
-						{canWrite && inactive && <button
+						{canChangeStatus && inactive && <button
 							type="button"
 							title="Открыть снова"
 							aria-label="Открыть снова"
@@ -1935,6 +1996,11 @@ function ConversationPane({
 						>
 							<RefreshCw size={14} aria-hidden="true" />
 							<span>Открыть снова</span>
+						</button>}
+						{canChangeStatus && !inactive && onOpenWorking && <button type="button" className={statusAction}
+							aria-label="Перейти к работе с диалогом" title="Перейти к работе с диалогом"
+							onClick={() => onOpenWorking(id, conversationTitle)}>
+							<MessageSquareText size={14} aria-hidden="true" /><span>К диалогу</span>
 						</button>}
 						{onExpand && <button type="button" className="chat-window-control"
 							aria-label={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} title={expanded ? "Вернуть сетку чатов" : "Развернуть чат"} onClick={onExpand}>
@@ -2214,7 +2280,7 @@ function ConversationPane({
 								: "Не удалось отправить"}
 						</p>
 					)}
-				</footer> : <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted">
+				</footer> : readOnly || inactive ? null : <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted">
 					<span>{canTake ? "Возьмите диалог, чтобы ответить игроку." : "Диалог доступен для просмотра."}</span>
 					{canTake && <button type="button" disabled={takeDisabled || take.isPending} onClick={() => { if (onTake) onTake(id); else take.mutate(); }} className="rounded-md bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">Взять в работу</button>}
 				</footer>}

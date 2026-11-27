@@ -274,6 +274,7 @@ export const chatwootService = {
 			data?: { payload?: ChatwootConversation[]; meta?: unknown };
 			payload?: ChatwootConversation[];
 			hasMore?: boolean;
+			searchTruncated?: boolean;
 		}>(
 			"conversations",
 			undefined,

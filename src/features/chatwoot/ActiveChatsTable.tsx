@@ -171,6 +171,7 @@ export function ActiveChatsTable({
 	watchingError,
 	changingId,
 	onOpen,
+	onPreview,
 	onStop,
 	onResolve,
 	resolvingId,
@@ -189,6 +190,7 @@ export function ActiveChatsTable({
 	watchingError?: string;
 	changingId?: number;
 	onOpen: (id: number) => void;
+	onPreview: (id: number) => void;
 	onStop: (id: number) => void;
 	onResolve?: (id: number) => void;
 	resolvingId?: number;
@@ -684,25 +686,26 @@ export function ActiveChatsTable({
 										className="chat-active-row"
 									>
 										<td data-field="player" className="px-3 py-2">
-											<div className="flex items-center gap-2">
+											<button type="button" className="flex max-w-full items-center gap-2 rounded-md text-left hover:text-accent"
+												title="Просмотреть диалог" aria-label={`Просмотреть диалог #${row.id} · ${player}`} onClick={() => onPreview(row.id)}>
 												<span
 													className="chat-avatar chat-avatar-small"
 													data-tone={row.id % 4}
 												>
 													{player.trim().slice(0, 1).toUpperCase()}
 												</span>
-												<div className="min-w-0 leading-tight">
-													<div
-														className="max-w-36 truncate font-medium"
+												<span className="min-w-0 leading-tight">
+													<span
+														className="block max-w-36 truncate font-medium"
 														title={player}
 													>
 														{player}
-													</div>
+													</span>
 													<span className="text-[10px] text-muted">
 														#{row.id}
 													</span>
-												</div>
-											</div>
+												</span>
+											</button>
 										</td>
 										{cell("email", row.email, row.email)}
 										<td

@@ -16,17 +16,20 @@ import "./chat-coaching.css";
 export type CoachingRecipient = { id: number; name: string | null };
 
 export function ObservationHeader({
+	preview = false,
 	watching,
 	watchPending,
 	onStop,
 	onClose,
 }: {
+	preview?: boolean;
 	watching: boolean;
 	watchPending: boolean;
 	onStop: () => void;
 	onClose: () => void;
 }) {
 	const mode = useRef<HTMLDivElement>(null);
+	const closeLabel = preview ? "Закрыть просмотр" : "Закрыть наблюдение";
 	useEffect(() => {
 		mode.current?.focus({ preventScroll: true });
 	}, []);
@@ -35,15 +38,15 @@ export function ObservationHeader({
 			<button
 				type="button"
 				className="chat-observation-icon xl:hidden"
-				aria-label="Закрыть наблюдение"
+				aria-label={closeLabel}
 				title="К активным чатам"
 				onClick={onClose}
 			>
 				<ArrowLeft size={17} />
 			</button>
 			<div ref={mode} tabIndex={-1} className="chat-observation-mode">
-				<Eye size={17} />
-				<span>Наблюдение</span>
+				{preview ? <MessageSquareText size={17} /> : <Eye size={17} />}
+				<span>{preview ? "Просмотр диалога" : "Наблюдение"}</span>
 			</div>
 			<div className="chat-observation-actions">
 				{watching && (
@@ -61,7 +64,7 @@ export function ObservationHeader({
 				<button
 					type="button"
 					className="chat-observation-icon hidden xl:inline-grid"
-					aria-label="Закрыть наблюдение"
+					aria-label={closeLabel}
 					title="Закрыть панель"
 					onClick={onClose}
 				>
