@@ -4,7 +4,7 @@ import { chatCapabilities, chatConversationAccess } from '../../shared/chatwoot-
 import { activeOverview, changeSupervision, coachingNotes, sendCoachingNote, supervisedIds } from './supervision.js';
 import { requireUser } from '../_auth.js';
 import { loadAccess } from '../_rbac.js';
-import { allRows, config as serverConfig, db, equal } from '../agent-monitor/_server.js';
+import { allRows, config as serverConfig, db, equal } from '../supabase-rest.js';
 import { getOperations, onShift, saveOperations, slaSnapshot } from './operations.js';
 import { activityBySite, cachedSnapshot, countConnectedBots } from './activity.js';
 import { readPersonalToken, removePersonalToken, savePersonalToken } from './personal-profiles.js';

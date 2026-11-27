@@ -67,10 +67,6 @@ export function MainLayout({ children }: { children: ReactNode }) {
 		}
 	}, [pathname]);
 
-	if (pathname === "/livechat") {
-		return <main className="min-h-screen bg-background">{children}</main>;
-	}
-
 	if (pathname === "/login") {
 		return <main className="min-h-screen bg-background">{children}</main>;
 	}
@@ -140,7 +136,6 @@ export function MainLayout({ children }: { children: ReactNode }) {
 							"/bonuses",
 							"/bonus-tools",
 							"/project-emails",
-							"/agent-monitor",
 						].includes(pathname.replace(/\/+$/, ""))) && <WorkspaceDock />}
 				</div>
 				<SupportComposer key={actor} />

@@ -137,23 +137,12 @@ async function installResponsiveData(context: BrowserContext) {
 		const auth =
 			url.origin === "https://supportos-visual.invalid" &&
 			url.pathname === "/auth/v1/user";
-		const syntheticMonitorSync =
-			api &&
-			url.pathname === "/api/agent-monitor" &&
-			action === "sync" &&
-			request.method() === "POST";
 		if (
 			(!api && !auth) ||
-			(request.method() !== "GET" && !syntheticMonitorSync) ||
+			request.method() !== "GET" ||
 			request.headers().authorization !== `Bearer ${fixtureData.accessToken}`
 		)
 			return route.fallback();
-		if (syntheticMonitorSync) {
-			// Monitor sync runs on mount. Accept only its empty synthetic request;
-			// never call LiveChat, persist observations or forward a mutation.
-			expect(request.postDataJSON()).toEqual({});
-			return route.fulfill({ json: {} });
-		}
 		let data: unknown;
 		if (auth) data = { ...fixtureData.authUser, email };
 		if (url.pathname === "/api/projects") data = { projects: [project] };
@@ -171,6 +160,11 @@ async function installResponsiveData(context: BrowserContext) {
 			};
 		if (url.pathname === "/api/binds" && action === "knowledge")
 			data = knowledge;
+		if (url.pathname === "/api/binds" && action === "workspace")
+			data = {
+				...knowledge,
+				branches: { choices: {}, incoming: [], outgoing: [] },
+			};
 		if (url.pathname === "/api/binds" && action === "shared")
 			data = {
 				rows: knowledge.binds.map((bind, index) => ({
@@ -192,17 +186,6 @@ async function installResponsiveData(context: BrowserContext) {
 			};
 		if (url.pathname === "/api/ai/knowledge")
 			data = { version: 1, document: { entries: [], feedback: [], tests: [] } };
-		if (url.pathname === "/api/agent-monitor" && action === "data")
-			data = {
-				agents: [],
-				observations: [],
-				assignments: [],
-				audit: [],
-				totals: [],
-				historyLimited: false,
-				lastSync: null,
-				serverTime: Date.now(),
-			};
 		if (url.pathname === "/api/sports-betting/live")
 			data = {
 				provider: "Synthetic fixture",
@@ -231,7 +214,6 @@ async function installResponsiveData(context: BrowserContext) {
 						"ai.playground",
 						"ai.tests",
 						"monitor.read",
-						"monitor.write",
 					],
 				},
 			};
@@ -334,6 +316,14 @@ async function assertLayout(page: Page, screen: string) {
 	}
 }
 
+test("retired LiveChat routes resolve to the app's not-found page", async ({ context, page }) => {
+	await installResponsiveData(context);
+	for (const url of ["/livechat", "/agent-monitor", "/agent-monitor#schedule"]) {
+		await page.goto(url);
+		await expect(page.getByRole("heading", { name: "Страница не найдена" })).toBeVisible();
+	}
+});
+
 for (const theme of ["dark", "light"]) {
 	test(`responsive layouts contain long data and controlled table overflow (${theme})`, async ({
 		page,
@@ -384,23 +374,16 @@ for (const theme of ["dark", "light"]) {
 			["archive", "/archive", "Архив биндов"],
 			["import", "/import/google-sheets", "Импорт из Google-таблицы"],
 			["sports", "/sports-betting", "Спортивные ставки"],
-			["livechat", "/livechat", "База знаний SupportOS"],
 			["team", "/team", "Активность команды"],
-			["monitor", "/agent-monitor", "Контроль приёма чатов"],
-			["schedule", "/agent-monitor#schedule", "Контроль приёма чатов"],
 			["category-binds", "/binds?categoryId=visual-category", "Создать бинд"],
 		];
 		for (const [screen, url, heading] of screens) {
 			await page.goto(url);
-			// LiveChat is an embedded widget and intentionally has no workspace shell.
-			if (screen !== "livechat")
-				await expect(page.locator(".app-shell")).toBeVisible();
+			await expect(page.locator(".app-shell")).toBeVisible();
 			await expect(
 				screen === "category-binds"
 					? page.getByRole("button", { name: heading, exact: true })
-					: screen === "livechat"
-						? page.getByText(heading, { exact: true })
-						: page.getByRole("heading", { name: heading, exact: true }).first(),
+					: page.getByRole("heading", { name: heading, exact: true }).first(),
 			).toBeVisible();
 			if (screen.endsWith("emails")) {
 				await expect(

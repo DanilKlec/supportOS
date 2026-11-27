@@ -1,8 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Button, Input, Select, Tabs } from "@/components/ui";
 import type { Bind } from "@/entities/bind";
-import type { MonitorData } from "@/features/agent-monitor/live-model";
-import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { chatwootService } from "@/services/chatwoot.service";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { BaseModal } from "@/shared/modals/BaseModal";
@@ -165,7 +163,6 @@ function UserDetailsContent({
 	const [personalBinds, setPersonalBinds] = useState<Bind[]>([]);
 	const [tab, setTab] = useState("profile"),
 		[rows, setRows] = useState<Audit[]>([]),
-		[monitor, setMonitor] = useState<MonitorData>(),
 		[error, setError] = useState(""),
 		[loading, setLoading] = useState(false);
 	useEffect(() => {
@@ -186,15 +183,6 @@ function UserDetailsContent({
 						abort.signal,
 					);
 					if (!abort.signal.aborted) setRows(result.rows);
-				} else if (can(access, "monitor.read")) {
-					const response = await authenticatedFetch(
-						"/api/agent-monitor?action=data&day=" +
-							new Date(Date.now() - 6 * 3600000).toISOString().slice(0, 10),
-						{ signal: abort.signal },
-					);
-					if (!response.ok) throw new Error("Не удалось загрузить мониторинг");
-					const data = (await response.json()) as MonitorData;
-					if (!abort.signal.aborted) setMonitor(data);
 				}
 			} catch (e) {
 				if (!abort.signal.aborted) setError((e as Error).message);
@@ -204,9 +192,6 @@ function UserDetailsContent({
 		})();
 		return () => abort.abort();
 	}, [tab, user.id, access]);
-	const agent = monitor?.agents.find(
-		(a) => a.id.toLowerCase() === user.email.toLowerCase(),
-	);
 	return (
 		<div className="employee-content">
 			<div className="employee-identity">
@@ -235,9 +220,6 @@ function UserDetailsContent({
 					{ value: "activity", label: "Активность" },
 					...(can(access, "binds.manage")
 						? [{ value: "binds", label: "Личные бинды" }]
-						: []),
-					...(can(access, "monitor.read")
-						? [{ value: "monitor", label: "Мониторинг" }]
 						: []),
 				]}
 			/>
@@ -275,25 +257,6 @@ function UserDetailsContent({
 							{row.actor_label} · {row.action}
 						</p>
 					))}
-				</div>
-			)}
-			{tab === "monitor" && !loading && (
-				<div>
-					{agent ? (
-						<>
-							<p>
-								{agent.name}: {agent.status}
-							</p>
-							<p className="text-sm text-muted">
-								Последнее наблюдение:{" "}
-								{agent.observed_at
-									? new Date(agent.observed_at).toLocaleString("ru")
-									: "нет данных"}
-							</p>
-						</>
-					) : (
-						<p>В мониторинге нет агента с почтой {user.email}.</p>
-					)}
 				</div>
 			)}
 		</div>

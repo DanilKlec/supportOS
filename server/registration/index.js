@@ -1,4 +1,4 @@
-import { config } from '../agent-monitor/_server.js';
+import { config } from '../supabase-rest.js';
 import { logoutAction } from '../session-logout.js';
 import { requireUser } from '../_auth.js';
 

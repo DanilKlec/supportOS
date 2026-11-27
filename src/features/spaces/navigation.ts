@@ -31,8 +31,6 @@ export const spaces = [
 		title: "Команда",
 		items: [
 			{ label: "Активность", to: "/team" },
-			{ label: "Сейчас", to: "/agent-monitor" },
-			{ label: "Расписание", to: "/agent-monitor", hash: "schedule" },
 		],
 	},
 	{

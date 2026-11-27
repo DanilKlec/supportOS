@@ -1,6 +1,6 @@
 import { requireIdentity } from './_auth.js';
 import { adminClient } from './accounts/index.js';
-import { db } from './agent-monitor/_server.js';
+import { db } from './supabase-rest.js';
 import { securityMetadata } from './security-metadata.js';
 
 export async function logoutAction(req, env, scope = 'local') {

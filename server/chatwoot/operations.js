@@ -1,4 +1,4 @@
-import { db } from '../agent-monitor/_server.js';
+import { db } from '../supabase-rest.js';
 
 const empty = { agents: {}, inboxes: {}, revision: null };
 const timeFormat = /^(?:[01]\d|2[0-3]):[0-5]\d$/;

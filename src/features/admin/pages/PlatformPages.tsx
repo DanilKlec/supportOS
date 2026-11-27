@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { OverviewUser } from "@/features/accounts/AdminOverview";
 import {
-	readOperation,
 	useAccounts,
 	useAIRuntime,
 	useAIStatus,
@@ -23,28 +21,12 @@ export function IntegrationsPage() {
 	const user = useAuthStore((s) => s.session?.user),
 		configured = useAuthStore((s) => s.configured);
 	const ai = useAIStatus();
-	const monitor = useQuery({
-		queryKey: ["ops-monitor", user?.id],
-		enabled: can(user?.access, "monitor.read"),
-		queryFn: ({ signal }) =>
-			readOperation<{ lastSync?: string }>(
-				`/api/agent-monitor?action=data&day=${new Date(Date.now() - 21600000).toISOString().slice(0, 10)}`,
-				signal,
-			),
-		staleTime: 30000,
-	});
 	const canReadAI = can(user?.access, "tools");
-	const canReadMonitor = can(user?.access, "monitor.read");
 	const canManageIntegrations = can(user?.access, "technical");
 	const showAI =
 		canReadAI &&
 		(ai.isPending || Boolean(ai.error) || Boolean(ai.data?.configured));
-	const showMonitor =
-		canReadMonitor &&
-		(monitor.isPending ||
-			Boolean(monitor.error) ||
-			Boolean(monitor.data?.lastSync));
-	if (!showAI && !showMonitor && !configured && !canManageIntegrations)
+	if (!showAI && !configured && !canManageIntegrations)
 		return null;
 	return (
 		<Panel title="Подключения">
@@ -63,17 +45,6 @@ export function IntegrationsPage() {
 					</div>
 				</Row>
 			)}
-			{showMonitor && monitor.data?.lastSync && (
-				<Row
-					title="LiveChat"
-					detail={`Последний подтверждённый опрос: ${new Date(monitor.data.lastSync).toLocaleString("ru")}`}
-				>
-					<Link to="/agent-monitor" className="ui-button">
-						Мониторинг
-					</Link>
-				</Row>
-			)}
-			{showMonitor && <QueryState query={monitor} />}
 			{configured && (
 				<Row
 					title="Supabase"

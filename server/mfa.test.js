@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 const mocks=vi.hoisted(()=>({db:vi.fn()}));
-vi.mock('./agent-monitor/_server.js',()=>({config:env=>env,db:mocks.db}));
+vi.mock('./supabase-rest.js',()=>({config:env=>env,db:mocks.db}));
 import {requireMfa} from './mfa.js';
 afterEach(()=>vi.clearAllMocks());
 const user={id:'user',sessionId:'session',aal:'aal2'};

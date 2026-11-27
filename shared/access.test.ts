@@ -7,7 +7,7 @@ it('uses effective database permissions and never infers access from a role labe
  expect(can(undefined,'work')).toBe(false);
  expect(routePermission('/settings/ai/')).toBe('technical');
  expect(routePermission('/bonuses')).toBe('bonuses.read');
- expect(routePermission('/agent-monitor')).toBe('monitor.read');
+ expect(routePermission('/inbox')).toBe('work');
  expect(routePermission('/project-emails')).toBe('projects.read');
 });
 

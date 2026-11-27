@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { config as serverConfig, db } from '../agent-monitor/_server.js';
+import { config as serverConfig, db } from '../supabase-rest.js';
 import { config as chatwootConfig, routeWaitingConversations } from './index.js';
 import { readBytes } from './_body.js';
 

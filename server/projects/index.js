@@ -1,5 +1,5 @@
 import { requireUser } from "../_auth.js";
-import { config, db } from "../agent-monitor/_server.js";
+import { config, db } from "../supabase-rest.js";
 
 async function projectRows(env) {
 	const result = [];

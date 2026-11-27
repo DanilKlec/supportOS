@@ -51,7 +51,7 @@ const catalog = {
 		{ id: "work", name: "Вход", description: "", creator_only: false },
 		{
 			id: "monitor.read",
-			name: "Просмотр мониторинга",
+			name: "Наблюдение за чатами",
 			description: "",
 			creator_only: false,
 		},
@@ -124,7 +124,7 @@ it("shows Russian permission groups without changing permission ids", () => {
 	expect(screen.queryByRole("heading", { name: "Administration" })).toBeNull();
 	expect(screen.queryByRole("heading", { name: "Team" })).toBeNull();
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "Просмотр мониторинга" }),
+		screen.getByRole("checkbox", { name: "Наблюдение за чатами" }),
 	);
 	expect(onChange).toHaveBeenCalledWith(["work", "monitor.read"]);
 });
@@ -502,10 +502,10 @@ it("creates a custom role from permission checkboxes", async () => {
 		target: { value: "Reviewer" },
 	});
 	fireEvent.click(
-		screen.getByRole("checkbox", { name: "Просмотр мониторинга" }),
+		screen.getByRole("checkbox", { name: "Наблюдение за чатами" }),
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Сохранить роль" }));
-	expect(screen.getByText("+ Просмотр мониторинга")).toBeTruthy();
+	expect(screen.getByText("+ Наблюдение за чатами")).toBeTruthy();
 	fireEvent.click(
 		screen.getByRole("button", { name: "Подтвердить изменения" }),
 	);

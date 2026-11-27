@@ -97,7 +97,6 @@ it("keeps the Chatwoot proxy and webhook within the Hobby entry limit", () => {
 		.sort();
 	expect(entries).toEqual([
 		"accounts/index.js",
-		"agent-monitor/index.js",
 		"ai/[endpoint].js",
 		"binds/index.js",
 		"chatwoot/index.js",

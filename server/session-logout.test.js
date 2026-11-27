@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({identity:vi.fn(),signOut:vi.fn(),db:vi.fn()}));
 vi.mock('./_auth.js',()=>({requireIdentity:mock.identity}));
 vi.mock('./accounts/index.js',()=>({adminClient:()=>({signOut:mock.signOut})}));
-vi.mock('./agent-monitor/_server.js',()=>({db:mock.db}));
+vi.mock('./supabase-rest.js',()=>({db:mock.db}));
 import { logoutAction } from './session-logout.js';
 import { securityMetadata } from './security-metadata.js';
 const env={SECURITY_AUDIT_SECRET:'synthetic-key'};

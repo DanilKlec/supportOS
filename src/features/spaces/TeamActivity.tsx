@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { accessApi } from "@/features/accounts/access-api";
-import { workDay } from "@/features/agent-monitor/live-model";
-import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";
 import { useAuthStore } from "@/store/auth.store";
 import { can } from "../../../shared/access.js";
@@ -19,18 +17,6 @@ export function TeamActivity() {
 		enabled: can(user?.access, "binds.read"),
 		queryFn: () => sharedBindsService.proposalResults(),
 	});
-	const monitor = useQuery({
-		queryKey: ["team-events", user?.id],
-		enabled: can(user?.access, "monitor.read"),
-		queryFn: async () => {
-			const r = await authenticatedFetch(
-				"/api/agent-monitor?action=data&day=" + workDay(),
-			);
-			const d = await r.json();
-			if (!r.ok) throw new Error(d.error ?? "Мониторинг недоступен");
-			return d;
-		},
-	});
 	const sources = [
 		{
 			id: "access",
@@ -44,12 +30,6 @@ export function TeamActivity() {
 			query: content,
 			allowed: can(user?.access, "binds.read"),
 		},
-		{
-			id: "monitor",
-			label: "Мониторинг",
-			query: monitor,
-			allowed: can(user?.access, "monitor.read"),
-		},
 	].filter((s) => s.allowed);
 	const effectiveFilter = sources.some((s) => s.id === filter) ? filter : "all";
 	return (
@@ -62,7 +42,6 @@ export function TeamActivity() {
 					["all", "Все"],
 					["access", "Доступы"],
 					["content", "Контент"],
-					["monitor", "Мониторинг"],
 				]
 					.filter(([id]) => id === "all" || sources.some((s) => s.id === id))
 					.map(([id, label]) => (
@@ -107,26 +86,17 @@ export function TeamActivity() {
 	);
 }
 function ActivityRows({ kind, data }: { kind: string; data: any }) {
-	const rows: any[] =
-		kind === "content"
-			? (data ?? [])
-			: kind === "access"
-				? (data?.rows ?? [])
-				: (data?.audit ?? []);
+	const rows: any[] = kind === "content" ? (data ?? []) : (data?.rows ?? []);
 	return rows.length ? (
 		<ul className="divide-y divide-border">
 			{rows.map((r, i) => (
 				<li className="py-3 text-sm" key={r.id ?? i}>
 					<span>
-						{kind === "content"
-							? r.title
-							: kind === "access"
-								? r.actor_label
-								: r.agent_id}{" "}
-						· {r.action ?? r.operation ?? r.status ?? r.type ?? "Событие"}
+						{kind === "content" ? r.title : r.actor_label}{" "}
+						· {r.action ?? r.type ?? "Событие"}
 					</span>
 					<time className="block text-xs text-muted">
-						{r.created_at ?? r.resolvedAt ?? r.at}
+						{r.created_at ?? r.resolvedAt}
 					</time>
 				</li>
 			))}

@@ -17,21 +17,21 @@ it("blocks protected loaders on direct links and preserves return path", async (
 	const root = createRootRoute({ beforeLoad: requireAppAuth });
 	const protectedRoute = createRoute({
 		getParentRoute: () => root,
-		path: "/agent-monitor",
+		path: "/mail",
 		loader,
 	});
 	const login = createRoute({ getParentRoute: () => root, path: "/login" });
 	const router = createRouter({
 		routeTree: root.addChildren([protectedRoute, login]),
 		history: createMemoryHistory({
-			initialEntries: ["/agent-monitor?day=2026-09-08"],
+			initialEntries: ["/mail#inbox"],
 		}),
 	});
 	await router.load();
 	expect(loader).not.toHaveBeenCalled();
 	expect(router.state.redirect?.options).toMatchObject({
 		to: "/login",
-		search: { redirect: "/agent-monitor?day=2026-09-08" },
+		search: { redirect: "/mail#inbox" },
 	});
 });
 it("permits a signed-in route and the public login", async () => {

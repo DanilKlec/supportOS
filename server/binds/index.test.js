@@ -1,7 +1,7 @@
 import {beforeEach,afterEach,expect,it,vi} from 'vitest';
 const mocks=vi.hoisted(()=>({requireUser:vi.fn(),db:vi.fn(),allRows:vi.fn()}));
 vi.mock('../_auth.js',()=>({requireUser:mocks.requireUser}));
-vi.mock('../agent-monitor/_server.js',()=>({...mocks,config:()=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'test'})}));
+vi.mock('../supabase-rest.js',()=>({...mocks,config:()=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'test'})}));
 import handler from './index.js';
 const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:actor,access:{status:'active',permissions:['binds.read']}});});

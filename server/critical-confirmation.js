@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { can } from '../shared/access.js';
-import { config, db } from './agent-monitor/_server.js';
+import { config, db } from './supabase-rest.js';
 import { securityMetadata } from './security-metadata.js';
 
 const fail=(message,status=400,code)=>Object.assign(new Error(message),{status,code});

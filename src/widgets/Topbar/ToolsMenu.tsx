@@ -58,7 +58,6 @@ type AppRoute =
 	| "/sports-betting"
 	| "/bonus-tools"
 	| "/health"
-	| "/agent-monitor"
 	| "/archive"
 	| "/import/google-sheets"
 	| "/settings"

@@ -1,7 +1,7 @@
 import {expect,it,vi} from 'vitest';
 const mocks=vi.hoisted(()=>({logout:vi.fn()}));
 vi.mock('../session-logout.js',()=>({logoutAction:mocks.logout}));
-vi.mock('../agent-monitor/_server.js',()=>({config:()=>({})}));
+vi.mock('../supabase-rest.js',()=>({config:()=>({})}));
 import handler from './index.js';
 const res=()=>({setHeader(){},end(text){this.body=JSON.parse(text);}});
 it.each(['webhook','begin','complete','2fa-begin','password-begin'])('retires bot endpoint %s without calling any external service',async(action)=>{

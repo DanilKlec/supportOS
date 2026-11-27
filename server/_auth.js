@@ -25,7 +25,7 @@ export async function requireIdentity(request, env = process.env) {
  user.mfaVerifiedAt=Array.isArray(claims.amr)?Math.max(0,...claims.amr.filter(item=>item.method==='totp'&&Number.isSafeInteger(item.timestamp)).map(item=>item.timestamp)):0;
  return user;
 }
-export async function requireUser(request, { supervisor = false, permission = 'work', env = process.env } = {}) {
+export async function requireUser(request, { permission = 'work', env = process.env } = {}) {
  const user=await requireIdentity(request,env);
  // Both reads use the already verified identity. Neither authorizes the request
  // alone: wait for both and preserve session/MFA rejection before permission errors.
@@ -33,7 +33,7 @@ export async function requireUser(request, { supervisor = false, permission = 'w
  if(mfa.status==='rejected')throw mfa.reason;
  if(access.status==='rejected')throw access.reason;
  user.access=access.value;
- if(permission!==null && !can(user.access,supervisor?'monitor.read':permission)) throw Object.assign(new Error(user.access.status==='disabled'?'Доступ к аккаунту отключён':'Недостаточно прав для этого действия'), { status: 403 });
+ if(permission!==null && !can(user.access,permission)) throw Object.assign(new Error(user.access.status==='disabled'?'Доступ к аккаунту отключён':'Недостаточно прав для этого действия'), { status: 403 });
  return user;
 }
 export async function authorize(request, response) {

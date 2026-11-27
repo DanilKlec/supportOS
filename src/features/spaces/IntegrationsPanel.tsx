@@ -86,16 +86,6 @@ export function IntegrationsPanel() {
 				</p>
 			</section>
 			<section className="py-4">
-				<h3>LiveChat</h3>
-				{can(user?.access, "monitor.read") ? (
-					<Link className="space-tab" to="/agent-monitor">
-						Проверить связь в мониторинге →
-					</Link>
-				) : (
-					<p className="text-sm text-muted">Статус доступен руководителю.</p>
-				)}
-			</section>
-			<section className="py-4">
 				<h3>API спортивных событий</h3>
 				<p className="text-sm text-muted">
 					Доступность проверяется при загрузке событий.

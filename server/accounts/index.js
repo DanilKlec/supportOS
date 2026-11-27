@@ -4,7 +4,7 @@ import {can} from '../../shared/access.js';
 import {changeAccess,loadAccess} from '../_rbac.js';
 import {chatCapabilities} from '../../shared/chatwoot-access.js';
 import {config as chatwootConfig,normalizeStaffChatwoot,provisionStaffChatwoot} from '../chatwoot/index.js';
-import {config,db,allRows} from '../agent-monitor/_server.js';
+import {config,db,allRows} from '../supabase-rest.js';
 import {displayIdentity} from '../../shared/login-identity.js';
 import {criticalAction,criticalSpec,executeCritical} from '../critical-confirmation.js';
 import {randomUUID} from 'node:crypto';
@@ -144,7 +144,15 @@ export default async function handler(req,res) {
     return send(200,{users:rows.slice(0,50),hasMore:rows.length>50});
    }
    if(!can(actor.access,'users.manage')&&!can(actor.access,'roles.manage'))throw fail('Недостаточно прав',403);
-   if(action==='catalog')return send(200,await catalog(env));
+   if(action==='catalog'){
+    const {roles,permissions}=await catalog(env);
+    return send(200,{
+     roles:roles.map(role=>({...role,permissions:role.permissions.filter(id=>id!=='monitor.write')})),
+     permissions:permissions.filter(({id})=>id!=='monitor.write').map(permission=>permission.id==='monitor.read'
+      ? {...permission,name:'Наблюдение за чатами',description:'Активные диалоги и личные подсказки агентам в Chatwoot'}
+      : permission),
+    });
+   }
     if(action==='audit'){
      const target=url.searchParams.get('target');if(target&&!/^[a-zA-Z0-9_-]{1,100}$/.test(target))throw fail('Некорректный сотрудник');
     const before=url.searchParams.get('before');if(before&&!/^\d{1,18}$/.test(before))throw fail('Некорректный курсор');

@@ -1,6 +1,6 @@
 import {normalizeProjectEmail} from "../../shared/project-emails.js";
 import {requireUser} from '../_auth.js';
-import {config,db} from '../agent-monitor/_server.js';
+import {config,db} from '../supabase-rest.js';
 import {validContent} from './validation.js';
 
 const NORMALIZED_DATASETS=new Set(['emails','bonuses','bonus-tools']);

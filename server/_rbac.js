@@ -1,4 +1,4 @@
-import {config,db} from './agent-monitor/_server.js';
+import {config,db} from './supabase-rest.js';
 export async function loadAccess(id,env=process.env){
  const access=await db(config(env),'rpc/supportos_rbac_context',{subject:id});
  return access??{status:'pending',roles:[],permissions:[],version:0,display_name:''};

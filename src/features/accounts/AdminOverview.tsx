@@ -1,6 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import type { MonitorData } from "@/features/agent-monitor/live-model";
 import { BindProposals } from "@/features/shared-binds/BindProposals";
 import { authenticatedFetch } from "@/services/authenticated-fetch";
 import { sharedBindsService } from "@/services/shared-binds.service";
@@ -38,7 +36,6 @@ export function AdminOverview({
 }) {
 	const user = useAuthStore((s) => s.session?.user);
 	const access = user?.access;
-	const navigate = useNavigate();
 	const accounts = useQuery({
 		queryKey: ["admin-overview-users", user?.id],
 		enabled: can(access, "users.manage"),
@@ -77,27 +74,10 @@ export function AdminOverview({
 			),
 		staleTime: 30000,
 	});
-	const monitor = useQuery({
-		queryKey: ["admin-overview-monitor", user?.id],
-		refetchInterval: 30000,
-		enabled: can(access, "monitor.read"),
-		queryFn: ({ signal }) =>
-			get<Pick<MonitorData, "lastSync">>(
-				"/api/agent-monitor?action=data&day=" +
-					new Date(Date.now() - 6 * 3600000).toISOString().slice(0, 10),
-				signal,
-			),
-		staleTime: 30000,
-	});
 	if (!can(access, "users.manage")) return null;
 	const pending = accounts.data?.users.filter(needsAccess) ?? [];
 	const incomplete =
 		accounts.data && accounts.data.users.length < accounts.data.total;
-	const lastSync = monitor.data?.lastSync;
-	const recent =
-		lastSync &&
-		Number.isFinite(Date.parse(lastSync)) &&
-		Date.now() - Date.parse(lastSync) < 120000;
 	return (
 		<div className="space-y-5">
 			<div className="flex items-center justify-between gap-3">
@@ -114,7 +94,6 @@ export function AdminOverview({
 						void accounts.refetch();
 						if (can(access, "knowledge.write")) void proposals.refetch();
 						if (can(access, "tools")) void ai.refetch();
-						if (can(access, "monitor.read")) void monitor.refetch();
 					}}
 				>
 					Обновить обзор
@@ -223,32 +202,6 @@ export function AdminOverview({
 							<p className="mt-2 text-xs text-muted">
 								Проверка конфигурации, без тестового запроса к модели.
 							</p>
-						</div>
-					)}
-					{can(access, "monitor.read") && (
-						<div className="rounded-xl bg-background p-4">
-							<h4 className="text-sm">LiveChat</h4>
-							<p className="mt-2 text-xs text-muted">
-								{monitor.error
-									? monitor.error.message
-									: monitor.isPending
-										? "Проверка…"
-										: recent
-											? "Есть недавний успешный опрос"
-											: "Нет свежего подтверждения связи"}
-							</p>
-							{lastSync && (
-								<p className="mt-2 text-xs text-muted">
-									Последний опрос: {new Date(lastSync).toLocaleString("ru")}
-								</p>
-							)}
-							<button
-								type="button"
-								onClick={() => void navigate({ to: "/agent-monitor" })}
-								className="mt-3 text-xs underline"
-							>
-								Открыть мониторинг
-							</button>
 						</div>
 					)}
 				</div>

@@ -1,4 +1,4 @@
-import { config, db } from './agent-monitor/_server.js';
+import { config, db } from './supabase-rest.js';
 
 export async function requireMfa(user, env) {
  const state = await db(config(env), 'rpc/supportos_mfa_session_state', { subject: user.id, sid: user.sessionId });

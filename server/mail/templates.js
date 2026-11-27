@@ -1,4 +1,4 @@
-import { db } from '../agent-monitor/_server.js';
+import { db } from '../supabase-rest.js';
 import { mailHtmlLimit, normalizeMailLayout, renderMailLayout } from '../../shared/mail-layout.js';
 import { mailError } from './google.js';
 import { plainFromMailHtml, sanitizeMailHtml } from './mail-html.js';

@@ -45,8 +45,7 @@ insert into public.supportos_permissions(id,name,description,creator_only) value
  ('projects.read','Почты сайтов','Справочник сайтов и почт',false),
  ('bonuses.read','Просмотр бонусов','Депозитные бонусы и условия',false),
  ('tools','Рабочие инструменты','ИИ-помощник, переводчик, диагностика',false),
- ('monitor.read','Просмотр мониторинга','Статусы и журнал приёма чатов',false),
- ('monitor.write','Изменение графиков','Ручные назначения и импорт Excel',false),
+ ('monitor.read','Наблюдение за чатами','Активные диалоги и личные подсказки агентам в Chatwoot',false),
  ('knowledge.write','Общие бинды','Редактирование общих биндов и импорт базы',false),
  ('bonuses.write','Редактирование бонусов','Изменение бонусной информации',false),
  ('ai.train','Правила ИИ','Общие инструкции и примеры ответов',false),
@@ -65,7 +64,7 @@ insert into public.supportos_role_permissions(role_id,permission_id)
  select r.id,p.id from new_roles r cross join public.supportos_permissions p
  where r.id='creator' or (r.id='admin' and not p.creator_only)
  or (r.id='support' and p.id in ('work','binds.read','projects.read','bonuses.read'))
- or (r.id='shift' and p.id in ('work','binds.read','projects.read','bonuses.read','tools','monitor.read','monitor.write','knowledge.write','bonuses.write','ai.train'))
+ or (r.id='shift' and p.id in ('work','binds.read','projects.read','bonuses.read','tools','monitor.read','knowledge.write','bonuses.write','ai.train'))
  or (r.id='qc' and p.id in ('work','binds.read','projects.read','bonuses.read','tools','monitor.read','knowledge.write','bonuses.write'));
 
 -- The CTE limits role migration to profiles created by this run.

@@ -25,7 +25,7 @@
 | Roles & Permissions, Audit | Существующий AccountsPanel и API/RPC ролей, матрица разрешений, подтверждение diff, before/after аудит. |
 | Employee drawer | Существующий редактор прав, аудит сотрудника, мониторинг при monitor.read; личные бинды через sharedBindsService.personal при binds.manage. Назначения проектов пока отсутствуют. |
 | Projects | Проекты загруженного справочника бонусов. Они явно не приравниваются к назначениям сотрудников или инструкциям AI. |
-| Integrations, System Health | `/api/ai/status` — конфигурация провайдера/модели; `/api/agent-monitor?action=data` — lastSync при monitor.read; состояние клиентской конфигурации Supabase. Конфигурация не объявляется доказательством доступности сервиса. |
+| Integrations, System Health | `/api/ai/status` — конфигурация провайдера/модели и состояние клиентской конфигурации Supabase. Конфигурация не подтверждает доступность сервиса. |
 | AI Overview / AI Quality | Существующий AI runtime и его последние 100 оценок при AI-правах; отдельно knowledge feedback. Метрики принятия/редактирования/стоимости не выдумываются. |
 | Review Inbox / QC Overview | sharedBindsService.proposals и `/api/binds?action=quality-signals`. Устаревшие отметки группируются по bind_id; затем предложения и пробелы. Риск и confidence отсутствуют, пока нет классификатора. |
 | Agent Proposals | ProposalWorkflow и BindProposals: текущие pending/mine/accepted/rejected, сравнение, accept/reject. Inbox использует этот же компонент для выбранного предложения. |

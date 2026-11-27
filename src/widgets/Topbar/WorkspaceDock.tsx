@@ -1,17 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, BookOpen, Calculator, Gift, Mail } from "lucide-react";
+import { BookOpen, Calculator, Gift, Mail } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { canAccessPage } from "../../../shared/access.js";
 import "./workspace-navigation.css";
 
 const links = [
-	{
-		to: "/agent-monitor",
-		hash: "",
-		label: "Мониторинг",
-		short: "Монитор",
-		icon: Activity,
-	},
 	{ to: "/", hash: "", label: "Бинды", short: "Бинды", icon: BookOpen },
 	{
 		to: "/project-emails",

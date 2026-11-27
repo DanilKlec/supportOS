@@ -39,7 +39,7 @@ export function PendingApproval({
 			if (state.error) throw new Error(state.error);
 			const access = state.session?.user.access;
 			if (access?.status === "active") {
-				const to = ["/", "/admin", "/qc", "/agent-monitor", "/settings"].find(
+				const to = ["/", "/admin", "/qc", "/inbox", "/settings"].find(
 					(path) => canAccessPage(access, path),
 				);
 				if (to) await navigate({ to });

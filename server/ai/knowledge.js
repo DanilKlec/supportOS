@@ -1,6 +1,6 @@
 import {requireUser} from '../_auth.js';
 import {can,canTrain} from '../../shared/access.js';
-import {config,db} from '../agent-monitor/_server.js';
+import {config,db} from '../supabase-rest.js';
 import {readGuidance} from './_knowledge.js';
 import {readPublishedGlossary} from './_glossary.js';
 import {editRuntime} from './runtime.js';

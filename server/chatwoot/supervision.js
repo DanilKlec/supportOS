@@ -1,4 +1,4 @@
-import { db } from '../agent-monitor/_server.js';
+import { db } from '../supabase-rest.js';
 
 const active = ['open', 'pending'];
 const statuses = [...active, 'resolved', 'snoozed'];

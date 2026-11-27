@@ -2,7 +2,7 @@ import {requireUser} from '../_auth.js';
 import {createHash} from 'node:crypto';
 import {safeKnowledgeTopic} from '../../shared/knowledge-gap.js';
 import {can} from '../../shared/access.js';
-import {config,db,allRows} from '../agent-monitor/_server.js';
+import {config,db,allRows} from '../supabase-rest.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const knowledgeTables={category:'supportos_categories',folder:'supportos_folders',bind:'supportos_binds'};
 const validId=id=>typeof id==='string'&&/^[a-z0-9][a-z0-9:._-]{0,199}$/i.test(id);

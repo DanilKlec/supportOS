@@ -2,8 +2,8 @@ import { expect, it } from "vitest";
 import { safeAuthRedirect } from "./auth-redirect";
 
 it("preserves an internal deep link", () => {
-	expect(safeAuthRedirect("/agent-monitor?day=2026-09-08#history")).toBe(
-		"/agent-monitor?day=2026-09-08#history",
+	expect(safeAuthRedirect("/bonuses?project=demo#calculator")).toBe(
+		"/bonuses?project=demo#calculator",
 	);
 });
 it("does not forward the Gmail return code or state to the login URL", () => {

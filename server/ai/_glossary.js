@@ -1,4 +1,4 @@
-import { config, db } from "../agent-monitor/_server.js";
+import { config, db } from "../supabase-rest.js";
 
 export async function readPublishedGlossary() {
 	return db(

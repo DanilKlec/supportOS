@@ -18,7 +18,7 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => () => ({
-		useSearch: () => ({ redirect: "/agent-monitor" }),
+		useSearch: () => ({ redirect: "/mail" }),
 	}),
 	useNavigate: () => mock.navigate,
 }));
@@ -81,7 +81,7 @@ it("starts Google OAuth with the intended local destination", async () => {
 	render(<LoginPage />);
 	fireEvent.click(screen.getByText("Войти через Google"));
 	await waitFor(() =>
-		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/agent-monitor"),
+		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/mail"),
 	);
 });
 it("shows Google provider errors without granting access", async () => {
@@ -101,7 +101,7 @@ it("offers Google registration with the same provider icon", async () => {
 	expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
 	fireEvent.click(button);
 	await waitFor(() =>
-		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/agent-monitor"),
+		expect(mock.signInWithGoogle).toHaveBeenCalledWith("/mail"),
 	);
 });
 it("uses email recovery without a bot", async () => {

@@ -24,7 +24,6 @@ export function routePermission(path, hash='') {
  if(['/settings/ai','/settings/translator'].includes(path)) return 'technical';
  if(path==='/ai/knowledge') return 'ai.train';
  if(path==='/translator'||path==='/ai/translator')return 'translator.use';
- if(path==='/agent-monitor'||path.startsWith('/agent-monitor/')) return 'monitor.read';
  if(path==='/settings/users'||path.startsWith('/settings/users/')) return 'users.manage';
  if(path==='/import/google-sheets'||path.startsWith('/import/google-sheets/')) return 'knowledge.write';
  if(path==='/team')return 'monitor.read';

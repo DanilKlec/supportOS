@@ -3,7 +3,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { authorize } from "./server/_auth.js";
-import { agentMonitorPlugin } from "./server/agent-monitor/_vite.js";
+import { workspaceApiPlugin } from "./server/_vite.js";
 import { chatwootPlugin } from "./server/chatwoot/_vite.js";
 import { loadSportsBettingLive } from "./server/sports-betting/_live.js";
 
@@ -207,7 +207,7 @@ export default defineConfig({
 				});
 			},
 		},
-		agentMonitorPlugin(),
+		workspaceApiPlugin(),
 		chatwootPlugin(),
 		tanstackRouter({
 			target: "react",

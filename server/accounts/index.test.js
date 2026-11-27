@@ -2,7 +2,7 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({requireUser:vi.fn(),changeAccess:vi.fn(),loadAccess:vi.fn(),db:vi.fn(),allRows:vi.fn(),createUser:vi.fn(),signOut:vi.fn(),inviteUserByEmail:vi.fn(),getUserById:vi.fn()}));
 vi.mock('../_auth.js',()=>({requireUser:mock.requireUser}));
 vi.mock('../_rbac.js',()=>({changeAccess:mock.changeAccess,loadAccess:mock.loadAccess}));
-vi.mock('../agent-monitor/_server.js',()=>({config:()=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test'}),db:mock.db,allRows:mock.allRows}));
+vi.mock('../supabase-rest.js',()=>({config:()=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test'}),db:mock.db,allRows:mock.allRows}));
 vi.mock('@supabase/supabase-js',()=>({createClient:()=>({auth:{admin:{createUser:mock.createUser,signOut:mock.signOut,inviteUserByEmail:mock.inviteUserByEmail,getUserById:mock.getUserById}}})}));
 import handler from './index.js';
 const response=()=>({setHeader(){},end(text){this.body=JSON.parse(text);}});

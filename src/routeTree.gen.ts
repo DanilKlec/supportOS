@@ -18,7 +18,6 @@ import { Route as QcRouteImport } from './routes/qc'
 import { Route as ProjectEmailsRouteImport } from './routes/project-emails'
 import { Route as MailRouteImport } from './routes/mail'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as LivechatRouteImport } from './routes/livechat'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FavoritesRouteImport } from './routes/favorites'
@@ -27,7 +26,6 @@ import { Route as BonusesRouteImport } from './routes/bonuses'
 import { Route as BonusToolsRouteImport } from './routes/bonus-tools'
 import { Route as BindsRouteImport } from './routes/binds'
 import { Route as ArchiveRouteImport } from './routes/archive'
-import { Route as AgentMonitorRouteImport } from './routes/agent-monitor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -84,11 +82,6 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LivechatRoute = LivechatRouteImport.update({
-  id: '/livechat',
-  path: '/livechat',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const InboxRoute = InboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
@@ -127,11 +120,6 @@ const BindsRoute = BindsRouteImport.update({
 const ArchiveRoute = ArchiveRouteImport.update({
   id: '/archive',
   path: '/archive',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentMonitorRoute = AgentMonitorRouteImport.update({
-  id: '/agent-monitor',
-  path: '/agent-monitor',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -188,7 +176,6 @@ const AiAssistantRoute = AiAssistantRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
@@ -197,7 +184,6 @@ export interface FileRoutesByFullPath {
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/inbox': typeof InboxRoute
-  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -219,7 +205,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
@@ -228,7 +213,6 @@ export interface FileRoutesByTo {
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/inbox': typeof InboxRoute
-  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -251,7 +235,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/agent-monitor': typeof AgentMonitorRoute
   '/archive': typeof ArchiveRoute
   '/binds': typeof BindsRoute
   '/bonus-tools': typeof BonusToolsRoute
@@ -260,7 +243,6 @@ export interface FileRoutesById {
   '/favorites': typeof FavoritesRoute
   '/health': typeof HealthRoute
   '/inbox': typeof InboxRoute
-  '/livechat': typeof LivechatRoute
   '/login': typeof LoginRoute
   '/mail': typeof MailRoute
   '/project-emails': typeof ProjectEmailsRoute
@@ -284,7 +266,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
@@ -293,7 +274,6 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/health'
     | '/inbox'
-    | '/livechat'
     | '/login'
     | '/mail'
     | '/project-emails'
@@ -315,7 +295,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
@@ -324,7 +303,6 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/health'
     | '/inbox'
-    | '/livechat'
     | '/login'
     | '/mail'
     | '/project-emails'
@@ -346,7 +324,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/agent-monitor'
     | '/archive'
     | '/binds'
     | '/bonus-tools'
@@ -355,7 +332,6 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/health'
     | '/inbox'
-    | '/livechat'
     | '/login'
     | '/mail'
     | '/project-emails'
@@ -378,7 +354,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AgentMonitorRoute: typeof AgentMonitorRoute
   ArchiveRoute: typeof ArchiveRoute
   BindsRoute: typeof BindsRoute
   BonusToolsRoute: typeof BonusToolsRoute
@@ -387,7 +362,6 @@ export interface RootRouteChildren {
   FavoritesRoute: typeof FavoritesRoute
   HealthRoute: typeof HealthRoute
   InboxRoute: typeof InboxRoute
-  LivechatRoute: typeof LivechatRoute
   LoginRoute: typeof LoginRoute
   MailRoute: typeof MailRoute
   ProjectEmailsRoute: typeof ProjectEmailsRoute
@@ -472,13 +446,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/livechat': {
-      id: '/livechat'
-      path: '/livechat'
-      fullPath: '/livechat'
-      preLoaderRoute: typeof LivechatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/inbox': {
       id: '/inbox'
       path: '/inbox'
@@ -533,13 +500,6 @@ declare module '@tanstack/react-router' {
       path: '/archive'
       fullPath: '/archive'
       preLoaderRoute: typeof ArchiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agent-monitor': {
-      id: '/agent-monitor'
-      path: '/agent-monitor'
-      fullPath: '/agent-monitor'
-      preLoaderRoute: typeof AgentMonitorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -618,7 +578,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AgentMonitorRoute: AgentMonitorRoute,
   ArchiveRoute: ArchiveRoute,
   BindsRoute: BindsRoute,
   BonusToolsRoute: BonusToolsRoute,
@@ -627,7 +586,6 @@ const rootRouteChildren: RootRouteChildren = {
   FavoritesRoute: FavoritesRoute,
   HealthRoute: HealthRoute,
   InboxRoute: InboxRoute,
-  LivechatRoute: LivechatRoute,
   LoginRoute: LoginRoute,
   MailRoute: MailRoute,
   ProjectEmailsRoute: ProjectEmailsRoute,

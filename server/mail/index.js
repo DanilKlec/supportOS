@@ -1,5 +1,5 @@
 import { requireUser } from '../_auth.js';
-import { config, db } from '../agent-monitor/_server.js';
+import { config, db } from '../supabase-rest.js';
 import { can } from '../../shared/access.js';
 import { addressOf, completeGoogle, composeRaw, gmail, googleConfig, mailboxToken, mailError, mailMetadata, readMessage, startGoogle, validAddress } from './google.js';
 import { importTemplateHtml, mailTemplates } from './templates.js';

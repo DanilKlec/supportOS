@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
-import { db } from '../agent-monitor/_server.js';
+import { db } from '../supabase-rest.js';
 
 const table = 'supportos_chatwoot_personal_profiles';
 

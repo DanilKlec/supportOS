@@ -82,13 +82,9 @@ it("working references remain full width without QC navigation", () => {
 	expect(screen.queryByRole("navigation")).toBeNull();
 	expect(screen.getByText("Calculator")).toBeTruthy();
 });
-it("the monitor shortcut is only offered with monitor access", () => {
-	identity(["binds.read"]);
-	const view = render(<WorkspaceDock />);
-	expect(screen.queryByRole("link", { name: "Мониторинг" })).toBeNull();
+it("does not offer the retired monitor shortcut to chat supervisors", () => {
 	identity(["binds.read", "monitor.read"]);
-	view.rerender(<WorkspaceDock />);
-	expect(
-		screen.getByRole("link", { name: "Мониторинг" }).getAttribute("href"),
-	).toBe("/agent-monitor#");
+	render(<WorkspaceDock />);
+	expect(screen.queryByRole("link", { name: "Мониторинг" })).toBeNull();
+	expect(screen.getByRole("link", { name: "Бинды" })).toBeTruthy();
 });

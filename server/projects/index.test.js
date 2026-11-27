@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), db: vi.fn() }));
 vi.mock("../_auth.js", () => ({ requireUser: mocks.requireUser }));
-vi.mock("../agent-monitor/_server.js", () => ({
+vi.mock("../supabase-rest.js", () => ({
 	config: () => ({ SUPABASE_URL: "https://example.test" }),
 	db: mocks.db,
 }));

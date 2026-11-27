@@ -2,7 +2,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({requireUser:vi.fn(),db:vi.fn(),read:vi.fn(),generate:vi.fn(),authorize:vi.fn(),glossary:vi.fn()}));
 vi.mock('./_glossary.js',()=>({readPublishedGlossary:mock.glossary}));
 vi.mock('../_auth.js',()=>({requireUser:mock.requireUser,authorize:mock.authorize}));
-vi.mock('../agent-monitor/_server.js',()=>({config:()=>({}),db:mock.db}));
+vi.mock('../supabase-rest.js',()=>({config:()=>({}),db:mock.db}));
 vi.mock('./_knowledge.js',()=>({readGuidance:mock.read}));
 vi.mock('./_provider.js',()=>({generateAIReply:mock.generate}));
 import knowledge from './knowledge.js';
