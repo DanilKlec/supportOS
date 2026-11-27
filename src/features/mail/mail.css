@@ -424,6 +424,7 @@
 .mail-account-options > ul {
 	display: grid;
 	min-height: 0;
+	grid-template-columns: minmax(0, 1fr);
 	align-content: start;
 	gap: 0.125rem;
 	overflow: auto;

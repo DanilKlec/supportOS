@@ -2,7 +2,7 @@ import { renderMailLayout } from "../../shared/mail-layout.js";
 import { accessToken, knowledge } from "./data";
 import { expect, test } from "./fixture";
 
-test("expand an HTML email in the reading pane and load its photo only on request", async ({ context, page }, info) => {
+test("expand an HTML email in the reading pane and load its photo only on request", async ({ context, isMobile, page }, info) => {
 	const mailbox = { id: "reader", address: "reader@example.invalid", provider: "gmail" };
 	const photo = "https://media.example.invalid/reader-photo.svg";
 	let photoRequests = 0;
@@ -47,6 +47,11 @@ test("expand an HTML email in the reading pane and load its photo only on reques
 	});
 	try {
 		await page.goto("/mail");
+		if (!isMobile) {
+			const accounts = page.getByRole("region", { name: "Выбор почтового ящика" }).getByRole("list");
+			await expect(accounts).toBeVisible();
+			expect(await accounts.evaluate((list) => list.scrollWidth - list.clientWidth)).toBeLessThanOrEqual(1);
+		}
 		const list = page.getByRole("region", { name: "Список писем" });
 		await expect(list.getByText(message.subject)).toBeVisible();
 		expect(photoRequests).toBe(0);
