@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
 	ChevronDown,
 	ExternalLink,
-	Mail,
+	Image,
 	Plus,
 	Search,
 	Users,
@@ -13,11 +13,28 @@ import { useEffect, useRef, useState } from "react";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { Panel } from "@/features/operations/OperationsWorkspace";
 import { ShareRecipientPicker } from "@/features/shared-binds/ShareRecipientPicker";
-import { type Mailbox, mailService } from "@/services/mail.service";
+import {
+	type Mailbox,
+	type MailboxIcon,
+	mailService,
+} from "@/services/mail.service";
 import { useAuthStore } from "@/store/auth.store";
+import { MailboxIconFields, MailboxMark } from "./MailboxIcon";
 import "./mail.css";
 
 const oauthSessionKey = "supportos:mail:oauth";
+type MailDialogMode = "connect" | "access" | "icon";
+type PendingMailOAuth = { state: string; icon?: MailboxIcon | null };
+
+function readPendingOAuth(value: string | null): PendingMailOAuth | undefined {
+	if (!value) return;
+	if (!value.startsWith("{")) return { state: value };
+	try {
+		return JSON.parse(value);
+	} catch {
+		return;
+	}
+}
 
 export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 	const client = useQueryClient();
@@ -25,7 +42,7 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 	const userId = useAuthStore((state) => state.session?.user.id);
 	const [search, setSearch] = useState("");
 	const [dialog, setDialog] = useState<{
-		mode: "connect" | "access";
+		mode: MailDialogMode;
 		box?: Mailbox;
 	}>();
 	const [returnError, setReturnError] = useState("");
@@ -36,8 +53,8 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 		staleTime: 15_000,
 	});
 	const { mutate: finishOAuth, ...finish } = useMutation({
-		mutationFn: ({ code, state }: { code: string; state: string }) =>
-			mailService.finish(code, state),
+		mutationFn: ({ code, state, icon }: PendingMailOAuth & { code: string }) =>
+			mailService.finish(code, state, icon),
 		onSuccess: async (box) => {
 			const queryKey = ["mail", "list", userId];
 			await client.cancelQueries({ queryKey, exact: true });
@@ -48,7 +65,7 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 						...current,
 						mailboxes: [
 							...current.mailboxes.filter(({ id }) => id !== box.id),
-							box,
+							{ ...current.mailboxes.find(({ id }) => id === box.id), ...box },
 						].sort((a, b) => a.address.localeCompare(b.address)),
 					},
 			);
@@ -62,16 +79,20 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 		void navigate({ to: "/admin", hash: "mailboxes", replace: true });
 		const params = new URLSearchParams(oauthReturn);
 		const code = params.get("mail_code");
-		const state = sessionStorage.getItem(oauthSessionKey);
+		const pending = readPendingOAuth(sessionStorage.getItem(oauthSessionKey));
 		sessionStorage.removeItem(oauthSessionKey);
-		if (!code || !state || state !== params.get("mail_state")) {
+		if (
+			!code ||
+			!pending?.state ||
+			pending.state !== params.get("mail_state")
+		) {
 			setReturnError(
 				"Подключение не завершено. Нажмите «Подключить Gmail», чтобы повторить вход.",
 			);
 			return;
 		}
 		setReturnError("");
-		finishOAuth({ code, state });
+		finishOAuth({ code, ...pending });
 	}, [userId, oauthReturn, navigate, finishOAuth]);
 
 	const boxes = list.data?.mailboxes ?? [];
@@ -93,9 +114,9 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 			{finish.isPending && <LoadingState message="Подключаем Gmail…" />}
 			{finish.data && canConnect && (
 				<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface p-3">
-					<p className="min-w-0 break-words text-sm" role="status">
+					<output className="min-w-0 break-words text-sm">
 						Подключён ящик {finish.data.address}
-					</p>
+					</output>
 					<Button
 						size="small"
 						onClick={() => setDialog({ mode: "access", box: finish.data })}
@@ -178,9 +199,7 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 											className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3"
 										>
 											<div className="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-64">
-												<span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface-elevated text-muted">
-													<Mail size={16} aria-hidden="true" />
-												</span>
+												<MailboxMark address={box.address} icon={box.icon} />
 												<span
 													className="min-w-0 truncate text-sm font-medium"
 													title={box.address}
@@ -190,6 +209,13 @@ export function MailboxSettings({ oauthReturn }: { oauthReturn: string }) {
 											</div>
 											{canConnect && (
 												<div className="flex flex-wrap gap-2">
+													<Button
+														size="small"
+														aria-label={`Настроить значок ${box.address}`}
+														onClick={() => setDialog({ mode: "icon", box })}
+													>
+														<Image size={14} aria-hidden="true" /> Значок
+													</Button>
 													<Button
 														size="small"
 														aria-label={`Доступ к ${box.address}`}
@@ -232,10 +258,11 @@ function MailAdministration({
 	onClose,
 }: {
 	box?: Mailbox;
-	mode: "connect" | "access";
+	mode: MailDialogMode;
 	onClose: () => void;
 }) {
 	const client = useQueryClient();
+	const userId = useAuthStore((state) => state.session?.user.id);
 	const modal = useRef<HTMLDialogElement>(null);
 	const input = useRef<HTMLInputElement>(null);
 	useEffect(() => {
@@ -245,6 +272,8 @@ function MailAdministration({
 		return () => element?.close();
 	}, []);
 	const [address, setAddress] = useState(box?.address ?? "");
+	const [icon, setIcon] = useState<MailboxIcon | null>(box?.icon ?? null);
+	const [preparingIcon, setPreparingIcon] = useState(false);
 	const [recipient, setRecipient] = useState("");
 	const [revoke, setRevoke] = useState<string>();
 	const members = useQuery({
@@ -255,8 +284,27 @@ function MailAdministration({
 	const connect = useMutation({
 		mutationFn: async () => {
 			const { url, state } = await mailService.start(address.trim());
-			sessionStorage.setItem(oauthSessionKey, state);
+			sessionStorage.setItem(oauthSessionKey, JSON.stringify({ state, icon }));
 			window.location.assign(url);
+		},
+	});
+	const saveIcon = useMutation({
+		mutationFn: () => mailService.setIcon(box?.id ?? "", icon),
+		onSuccess: async (saved) => {
+			const queryKey = ["mail", "list", userId];
+			await client.cancelQueries({ queryKey, exact: true });
+			client.setQueryData<Awaited<ReturnType<typeof mailService.list>>>(
+				queryKey,
+				(current) =>
+					current && {
+						...current,
+						mailboxes: current.mailboxes.map((item) =>
+							item.id === saved.id ? saved : item,
+						),
+					},
+			);
+			void client.invalidateQueries({ queryKey, exact: true });
+			onClose();
 		},
 	});
 	const access = useMutation({
@@ -270,11 +318,21 @@ function MailAdministration({
 			void client.invalidateQueries({ queryKey: ["mail", "members", box?.id] });
 		},
 	});
+	const busy = connect.isPending || saveIcon.isPending || preparingIcon;
+	const title =
+		mode === "icon"
+			? "Значок ящика"
+			: mode === "access"
+				? "Доступ к ящику"
+				: box
+					? "Переподключить Gmail"
+					: "Подключить Gmail";
+	const error = mode === "icon" ? saveIcon.error : connect.error;
 	return (
 		<dialog
 			ref={modal}
 			className="mail-modal mail-admin-dialog"
-			aria-label={mode === "connect" ? "Подключение Gmail" : "Доступ к ящику"}
+			aria-label={mode === "connect" ? "Подключение Gmail" : title}
 			onCancel={(event) => {
 				event.preventDefault();
 				onClose();
@@ -282,14 +340,8 @@ function MailAdministration({
 		>
 			<header className="mail-modal-heading">
 				<div>
-					<h2>
-						{mode === "access"
-							? "Доступ к ящику"
-							: box
-								? "Переподключить Gmail"
-								: "Подключить Gmail"}
-					</h2>
-					{mode === "access" && <p>{box?.address}</p>}
+					<h2>{title}</h2>
+					{mode !== "connect" && <p>{box?.address}</p>}
 				</div>
 				<button
 					type="button"
@@ -300,44 +352,63 @@ function MailAdministration({
 					<X size={17} />
 				</button>
 			</header>
-			{mode === "connect" ? (
+			{mode !== "access" ? (
 				<form
 					className="mail-admin-body"
 					onSubmit={(event) => {
 						event.preventDefault();
-						connect.mutate();
+						if (busy) return;
+						if (mode === "icon") saveIcon.mutate();
+						else connect.mutate();
 					}}
 				>
-					<label className="mail-field">
-						Рабочий адрес
-						<input
-							ref={input}
-							type="email"
-							required
-							readOnly={Boolean(box)}
-							maxLength={254}
-							value={address}
-							onChange={(event) => setAddress(event.target.value)}
-							placeholder="support@example.com"
-						/>
-					</label>
-					<p className="mail-muted">
-						Войдите в рабочий ящик на странице Google. Если Google запросит
-						двухэтапную проверку (2FA), администратор вводит код или
-						подтверждает вход там же.
-					</p>
-					{connect.error && (
+					{mode === "connect" && (
+						<label className="mail-field">
+							Рабочий адрес
+							<input
+								ref={input}
+								type="email"
+								required
+								readOnly={Boolean(box)}
+								maxLength={254}
+								value={address}
+								onChange={(event) => setAddress(event.target.value)}
+								placeholder="support@example.com"
+							/>
+						</label>
+					)}
+					<MailboxIconFields
+						address={address}
+						value={icon}
+						update={setIcon}
+						busy={busy}
+						setBusy={setPreparingIcon}
+					/>
+					{mode === "connect" && (
+						<p className="mail-muted">
+							Войдите в рабочий ящик на странице Google. Если Google запросит
+							двухэтапную проверку (2FA), администратор вводит код или
+							подтверждает вход там же.
+						</p>
+					)}
+					{error && (
 						<p role="alert" className="mail-error">
-							{connect.error.message}
+							{error.message}
 						</p>
 					)}
 					<button
 						type="submit"
 						className="mail-button self-start"
 						data-primary="true"
-						disabled={connect.isPending}
+						disabled={busy}
 					>
-						<ExternalLink size={15} /> Продолжить в Google
+						{mode === "icon" ? (
+							"Сохранить значок"
+						) : (
+							<>
+								<ExternalLink size={15} /> Продолжить в Google
+							</>
+						)}
 					</button>
 				</form>
 			) : (

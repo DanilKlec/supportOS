@@ -70,11 +70,11 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	if (isMobile) {
 		await expect(page.getByRole("button", { name: "Почтовый ящик", exact: true })).toHaveAccessibleDescription(second);
 	} else {
-		const column = page.getByRole("region", { name: "Выбор почтового ящика" });
+		const column = page.getByRole("navigation", { name: "Ящики", exact: true });
 		const selected = column.getByRole("button", { name: /desk49@example/ });
 		await expect(selected).toHaveAttribute("aria-pressed", "true");
 		await expect(selected).toBeInViewport();
-		await expect(selected.getByTitle("Непрочитанных: 5")).toBeVisible();
+		await expect(selected).toHaveAccessibleName(/Непрочитанных: 5/);
 	}
 	await expect.poll(() => [...requestedFolders]).toEqual(["mailbox-0", "mailbox-49"]);
 

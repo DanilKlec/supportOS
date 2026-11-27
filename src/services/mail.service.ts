@@ -1,7 +1,13 @@
 import type { MailLayout } from "../../shared/mail-layout.js";
 import { authenticatedFetch } from "./authenticated-fetch";
 
-export type Mailbox = { id: string; address: string; provider: "gmail" };
+export type MailboxIcon = { text: string; tone: number; image?: string };
+export type Mailbox = {
+	id: string;
+	address: string;
+	provider: "gmail";
+	icon?: MailboxIcon | null;
+};
 export type MailStats = {
 	id: string;
 	unread: number | null;
@@ -127,8 +133,10 @@ export const mailService = {
 		),
 	start: (address: string) =>
 		request<{ url: string; state: string }>("oauth-start", {}, { address }),
-	finish: (code: string, state: string) =>
-		request<Mailbox>("oauth-finish", {}, { code, state }),
+	finish: (code: string, state: string, icon?: MailboxIcon | null) =>
+		request<Mailbox>("oauth-finish", {}, { code, state, icon }),
+	setIcon: (box: string, icon: MailboxIcon | null) =>
+		request<Mailbox>("set-mailbox-icon", { box }, { icon }),
 	members: (box: string) =>
 		request<{ members: StaffMember[] }>("members", { box }),
 	grant: (box: string, email: string) => request("grant", { box }, { email }),

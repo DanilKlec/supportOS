@@ -6,6 +6,7 @@ import { importTemplateHtml, mailTemplates } from './templates.js';
 import { folderCount, invalidateFolderCounts } from './folder-counts.js';
 
 const mailboxFields = 'id,address,provider,updated_at';
+const decoratedMailboxFields = `${mailboxFields},icon`;
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const idPattern = /^[a-z0-9_-]{1,1600}$/i;
 const pageSize = 16;
@@ -26,6 +27,25 @@ function labelColor(input) {
 	return { backgroundColor, textColor };
 }
 
+function mailboxIcon(value) {
+	if (value === null) return null;
+	const { text, tone, image } = value ?? {};
+	if (typeof text !== 'string' || !/^[\p{L}\p{N}]{0,3}$/u.test(text.trim().toUpperCase()) ||
+		!Number.isInteger(tone) || tone < 0 || tone > 6)
+		throw mailError('Выберите цвет значка и укажите до трёх букв или цифр.');
+	if (image != null) {
+		const prefix = 'data:image/png;base64,';
+		if (typeof image !== 'string' || image.length > 7800 || !image.startsWith(prefix) ||
+			!/^[a-z0-9+/]+={0,2}$/i.test(image.slice(prefix.length)))
+			throw mailError('Выберите изображение для значка заново.');
+		const png = Buffer.from(image.slice(prefix.length), 'base64');
+		if (png.length < 33 || png.subarray(0, 16).toString('hex') !== '89504e470d0a1a0a0000000d49484452' ||
+			png.readUInt32BE(16) !== 36 || png.readUInt32BE(20) !== 36)
+			throw mailError('Выберите изображение для значка заново.');
+	}
+	return { text: text.trim().toUpperCase(), tone, ...(image ? { image } : {}) };
+}
+
 function safeId(raw) {
 	if (typeof raw !== 'string' || !idPattern.test(raw)) throw mailError('Некорректный ID письма или ярлыка.');
 	return raw;
@@ -41,7 +61,7 @@ async function collect(items, worker, concurrency = 6) {
 }
 
 async function accessMailboxes(env, actor, admin, withToken = false) {
-	const select = withToken ? `${mailboxFields},encrypted_token` : mailboxFields;
+	const select = withToken ? `${mailboxFields},encrypted_token` : decoratedMailboxFields;
 	if (admin) return db(env, `supportos_mailboxes?select=${select}&order=address`);
 	const rows = await db(env, `supportos_mailbox_members?select=mailbox:supportos_mailboxes(${select})&user_id=eq.${actor}`);
 	return rows.map(({ mailbox }) => mailbox).filter(Boolean).sort((a, b) => a.address.localeCompare(b.address));
@@ -226,9 +246,9 @@ async function getAttachment(g, mid, id) {
 	return null;
 }
 
-const adminOnly = new Set(['oauth-start', 'oauth-finish', 'members', 'grant', 'revoke']);
+const adminOnly = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'members', 'grant', 'revoke']);
 const templateActions = new Set(['templates', 'save-template', 'delete-template']);
-const postActions = new Set(['oauth-start', 'oauth-finish', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
+const postActions = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
 
 export default async function handler(req, res) {
 	res.setHeader('Cache-Control', 'private, no-store');
@@ -256,9 +276,21 @@ export default async function handler(req, res) {
 			return send(200, startGoogle(cfg, `${user.id}:${user.sessionId}`, address));
 		}
 		if (action === 'oauth-finish') {
+			const icon = Object.hasOwn(body, 'icon') ? mailboxIcon(body.icon) : undefined;
 			const { address, sealedToken } = await completeGoogle(cfg, `${user.id}:${user.sessionId}`, body.code, body.state);
-			const id = await db(env, 'rpc/supportos_connect_gmail_mailbox', { mail_address: address, sealed_token: sealedToken, actor: user.id });
-			return send(200, { id, address, provider: 'gmail' });
+			const args = { mail_address: address, sealed_token: sealedToken, actor: user.id };
+			const id = icon === undefined
+				? await db(env, 'rpc/supportos_connect_gmail_mailbox', args)
+				: await db(env, 'rpc/supportos_connect_gmail_mailbox_with_icon', { ...args, mail_icon: icon });
+			return send(200, { id, address, provider: 'gmail', icon });
+		}
+		if (action === 'set-mailbox-icon') {
+			const id = url.searchParams.get('box');
+			if (!uuid.test(id ?? '')) throw mailError('Выберите почтовый ящик.');
+			const [mailbox] = await db(env, `supportos_mailboxes?select=${decoratedMailboxFields}&id=eq.${id}`,
+				{ icon: mailboxIcon(body.icon) }, 'PATCH', { returnRows: true });
+			if (!mailbox) throw mailError('Почтовый ящик не найден.', 404);
+			return send(200, mailbox);
 		}
 		if (action === 'stats') {
 			const mailboxes = await accessMailboxes(env, user.id, admin, true);

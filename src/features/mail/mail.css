@@ -61,8 +61,7 @@
 }
 .mail-title-icon,
 .mail-empty-icon,
-.mail-message-avatar,
-.mail-account-icon {
+.mail-message-avatar {
 	display: inline-grid;
 	place-items: center;
 	flex: none;
@@ -114,7 +113,7 @@
 	display: grid;
 	flex: 1;
 	min-height: 0;
-	grid-template-columns: 3.35rem minmax(19rem, 25rem) minmax(13rem, 22rem) minmax(
+	grid-template-columns: 3.35rem minmax(13.5rem, 16rem) minmax(13rem, 22rem) minmax(
 			0,
 			1fr
 		);
@@ -123,7 +122,7 @@
 	display: grid;
 	min-width: 0;
 	min-height: 0;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-columns: 3.35rem minmax(0, 1fr);
 }
 .mail-sidebar,
 .mail-list,
@@ -338,6 +337,7 @@
 	min-height: 2.45rem;
 }
 .mail-account-switch {
+	position: relative;
 	display: flex;
 	min-width: 0;
 	min-height: 0;
@@ -364,10 +364,83 @@
 		var(--color-border)
 	);
 }
-.mail-account-icon {
-	width: 1.8rem;
-	height: 1.8rem;
-	border-radius: 0.55rem;
+.mail-mailbox-mark {
+	display: grid;
+	width: 1.85rem;
+	height: 1.85rem;
+	place-items: center;
+	flex: none;
+	overflow: hidden;
+	border-radius: 0.54rem;
+	background: var(--mailbox-color);
+	color: var(--mailbox-ink);
+	font-size: 0.67rem;
+	font-weight: 750;
+	line-height: 1;
+}
+.mail-mailbox-mark img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.mail-account-rail {
+	display: flex;
+	min-width: 0;
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+}
+.mail-account-rail-heading {
+	display: grid;
+	flex: none;
+	place-items: center;
+	padding: 0.6rem 0 0.45rem;
+}
+.mail-account-rail > ul {
+	display: grid;
+	min-height: 0;
+	grid-template-columns: minmax(0, 1fr);
+	justify-items: center;
+	gap: 0.2rem;
+	overflow: auto;
+	padding-block: 0.2rem 0.65rem;
+	scrollbar-width: thin;
+}
+.mail-account-shortcut {
+	position: relative;
+	display: grid;
+	width: 2.5rem;
+	height: 2.5rem;
+	place-items: center;
+	border: 1px solid transparent;
+	border-radius: 0.72rem;
+}
+.mail-account-shortcut:hover,
+.mail-account-shortcut[aria-pressed="true"] {
+	background: var(--mail-selected);
+}
+.mail-account-shortcut[aria-pressed="true"] {
+	border-color: color-mix(in srgb, var(--color-accent) 40%, var(--mail-line));
+}
+.mail-account-badge {
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-end: 0;
+	min-width: 0.95rem;
+	padding: 0.1rem 0.18rem;
+	border: 1px solid var(--mail-panel);
+	border-radius: 999px;
+	background: var(--color-accent);
+	color: var(--color-accent-foreground);
+	font-size: 0.56rem;
+	font-weight: 750;
+	line-height: 1;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+.mail-account-badge[data-warning="true"] {
+	background: #ffd6a2;
+	color: #7a4706;
 }
 .mail-account-caption {
 	display: grid;
@@ -400,23 +473,22 @@
 	flex: 1;
 	flex-direction: column;
 	gap: 0.45rem;
-	padding: 0.9rem 0.55rem 0.55rem;
+	padding: 0.45rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.7rem;
+	background: var(--mail-panel);
 }
-.mail-accounts-heading {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.35rem;
-	padding-inline: 0.35rem;
+.mail-account-options[data-mode="search"] {
+	position: absolute;
+	z-index: 10;
+	inset-block-start: 0.6rem;
+	inset-inline-start: calc(100% + 0.35rem);
+	width: 19rem;
+	max-height: min(65dvh, 25rem);
+	box-shadow: var(--mail-float-shadow);
 }
-.mail-accounts-heading h2 {
-	font-size: 0.8rem;
-	font-weight: 650;
-}
-.mail-accounts-heading > span {
-	color: var(--color-muted);
-	font-size: 0.7rem;
-	font-variant-numeric: tabular-nums;
+.mail-account-options[data-mode="mobile"] {
+	display: none;
 }
 .mail-account-options .mail-search {
 	flex: none;
@@ -435,14 +507,13 @@
 .mail-account-option > svg {
 	flex: none;
 }
-.mail-account-row-icon {
-	color: var(--color-muted);
+.mail-account-option > .mail-mailbox-mark {
+	width: 1.6rem;
+	height: 1.6rem;
+	margin-block: 0.1rem;
+	flex: none;
 }
-.mail-account-option[aria-pressed="true"] .mail-account-row-icon,
-.mail-account-selected {
-	color: var(--color-accent);
-}
-.mail-account-option[aria-pressed="true"] > span {
+.mail-account-option[aria-pressed="true"] > span:not(.mail-mailbox-mark) {
 	font-weight: 650;
 }
 .mail-folders {
@@ -1518,6 +1589,61 @@
 	border-radius: 0.65rem;
 	background: var(--mail-panel);
 }
+.mail-icon-editor {
+	display: grid;
+	min-width: 0;
+	gap: 0.6rem;
+	padding: 0.65rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 0.7rem;
+}
+.mail-icon-editor > legend {
+	padding-inline: 0.3rem;
+	font-size: 0.8rem;
+	font-weight: 650;
+}
+.mail-icon-editor-main {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 0.65rem;
+}
+.mail-icon-editor-main > .mail-mailbox-mark {
+	width: 2.3rem;
+	height: 2.3rem;
+}
+.mail-icon-editor-main .mail-field {
+	width: 7.5rem;
+}
+.mail-icon-colors {
+	display: flex;
+	min-width: 0;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	padding-block: 0.24rem;
+}
+.mail-icon-colors > legend {
+	color: var(--color-muted);
+	font-size: 0.72rem;
+}
+.mail-icon-colors > button {
+	width: 1.55rem;
+	height: 1.55rem;
+	border: 1px solid var(--mail-line);
+	border-radius: 50%;
+	background: var(--mailbox-color);
+}
+.mail-icon-colors > button[aria-pressed="true"],
+.mail-icon-colors > button:focus-visible,
+.mail-icon-editor-actions label:focus-within {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+.mail-icon-editor-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
 .mail-directory-heading {
 	display: flex;
 	align-items: center;
@@ -1577,7 +1703,7 @@
 
 @media (max-width: 1050px) {
 	.mail-grid {
-		grid-template-columns: 3.35rem minmax(17rem, 20rem) minmax(11rem, 16rem) minmax(
+		grid-template-columns: 3.35rem minmax(12rem, 14rem) minmax(11rem, 16rem) minmax(
 				0,
 				1fr
 			);
@@ -1623,15 +1749,12 @@
 	.mail-account-trigger {
 		display: flex;
 	}
-	.mail-account-options {
+	.mail-account-options[data-mode="mobile"] {
+		display: flex;
 		margin-block-start: 0.35rem;
-		padding: 0.4rem;
-		border: 1px solid var(--mail-line);
-		border-radius: 0.7rem;
-		background: var(--mail-panel);
 	}
-	.mail-account-switch[data-expanded="false"] .mail-account-options,
-	.mail-accounts-heading {
+	.mail-account-rail,
+	.mail-account-options[data-mode="search"] {
 		display: none;
 	}
 	.mail-account-options > ul {

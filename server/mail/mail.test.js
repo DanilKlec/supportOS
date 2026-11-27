@@ -183,8 +183,30 @@ test('mailbox membership is checked before mail is read or sent and support cann
 	expect((await call('POST', 'send', `&box=${mailboxId}`, {})).status).toBe(403);
 	expect((await call('POST', 'grant', `&box=${mailboxId}`, { email: address })).status).toBe(403);
 	expect((await call('POST', 'oauth-start', '', { address })).status).toBe(403);
+	expect((await call('POST', 'set-mailbox-icon', `&box=${mailboxId}`, { icon: null })).status).toBe(403);
 	expect((await call('POST', 'create-label', `&box=${mailboxId}`, { name: 'Private' })).status).toBe(403);
 	expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('updates a mailbox icon with administrator access and rejects non-image payloads', async () => {
+	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+	identities.actor = { id: userId, access: { status: 'active', permissions: ['work', 'users.manage'] } };
+	const fetch = vi.fn(async (url, init) => {
+		const parsed = new URL(url);
+		expect(parsed.pathname).toBe('/rest/v1/supportos_mailboxes');
+		expect(parsed.searchParams.get('id')).toBe(`eq.${mailboxId}`);
+		expect(init.method).toBe('PATCH');
+		const { icon } = JSON.parse(init.body);
+		return Response.json([{ id: mailboxId, address, provider: 'gmail', icon }]);
+	});
+	vi.stubGlobal('fetch', fetch);
+	const query = `&box=${mailboxId}`;
+	expect(await call('POST', 'set-mailbox-icon', query, { icon: { text: 'vip', tone: 5 } }))
+		.toMatchObject({ status: 200, body: { icon: { text: 'VIP', tone: 5 } } });
+	expect((await call('POST', 'set-mailbox-icon', query, { icon: { text: 'VIP', tone: 5, image: 'https://images.example.invalid/a.png' } })).status).toBe(400);
+	expect((await call('POST', 'set-mailbox-icon', query, { icon: { text: 'VIP', tone: 8 } })).status).toBe(400);
+	expect((await call('POST', 'set-mailbox-icon', query, { icon: null })).body.icon).toBeNull();
+	expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 test('attributes new and drafted mail to the employee who sent it without changing the outgoing MIME', async () => {
@@ -574,6 +596,13 @@ test('migrations preserve shared templates and isolate private templates by owne
 		const second = await db.query('select public.supportos_connect_gmail_mailbox($1,$2,$3) as id', [address, 'encoded-token-b', userId]);
 		expect(second.rows[0].id).toBe(id);
 		expect((await db.query('select mailbox_id from public.supportos_mailbox_members')).rows).toEqual([{ mailbox_id: id }]);
+		await db.exec(await readFile(new URL('../../supabase/migrations/20261127210256_mail_mailbox_icons.sql', import.meta.url), 'utf8'));
+		const icon = { text: 'VIP', tone: 5 };
+		const decorated = await db.query('select public.supportos_connect_gmail_mailbox_with_icon($1,$2,$3,$4) as id', [address, 'encoded-token-c', userId, icon]);
+		expect(decorated.rows).toEqual([{ id }]);
+		await db.query('select public.supportos_connect_gmail_mailbox($1,$2,$3)', [address, 'encoded-token-d', userId]);
+		expect((await db.query('select icon from public.supportos_mailboxes where id=$1', [id])).rows).toEqual([{ icon }]);
+		expect((await db.query(`select has_function_privilege('authenticated','public.supportos_connect_gmail_mailbox_with_icon(text,text,uuid,jsonb)','execute') allowed`)).rows).toEqual([{ allowed: false }]);
 		const acl = await db.query(`select has_table_privilege('authenticated','public.supportos_mailboxes','select') as browser, has_table_privilege('service_role','public.supportos_mailboxes','select') as server, has_function_privilege('anon','public.supportos_connect_gmail_mailbox(text,text,uuid)','execute') as connect`);
 		expect(acl.rows[0]).toEqual({ browser: false, server: true, connect: false });
 		const insert = 'insert into public.supportos_mail_templates (mailbox_id,title,body) values ($1,$2,$3) returning revision';
