@@ -8,6 +8,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 		provider: "gmail",
 	}));
 	const requestedFolders = new Set<string>();
+	let gmailFolders = [{ id: "Label_1", type: "user", name: "Обращения" }];
 	let releaseStats = () => {};
 	const waitingForStats = new Promise<void>((resolve) => { releaseStats = resolve; });
 	await context.route("**/api/binds?action=workspace", (route) =>
@@ -20,7 +21,8 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 			url.origin !== "http://127.0.0.1:4173" ||
 			request.headers().authorization !== `Bearer ${accessToken}`
 		) return route.fallback();
-		expect(request.method()).toBe("GET");
+		const action = url.searchParams.get("action");
+		expect(request.method()).toBe(["edit-label", "delete-label"].includes(action ?? "") ? "POST" : "GET");
 		switch (url.searchParams.get("action")) {
 			case "list": return route.fulfill({ json: { configured: true, admin: false, mailboxes } });
 			case "stats":
@@ -28,7 +30,17 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 				return route.fulfill({ json: { stats: mailboxes.map(({ id }, index) => ({
 					id, unread: index === 0 ? 2 : index === 49 ? 5 : 0, recentDate: null,
 				})) } });
-			case "labels": return route.fulfill({ json: { labels: [] } });
+			case "labels": return route.fulfill({ json: { labels: gmailFolders } });
+			case "edit-label": {
+				const { id, name } = request.postDataJSON();
+				expect(id).toBe("Label_1");
+				gmailFolders = [{ id, type: "user", name }];
+				return route.fulfill({ json: gmailFolders[0] });
+			}
+			case "delete-label":
+				expect(request.postDataJSON()).toEqual({ id: "Label_1" });
+				gmailFolders = [];
+				return route.fulfill({ json: { ok: true } });
 			case "label-colors": return route.fulfill({ json: { colors: {} } });
 			case "folder":
 				requestedFolders.add(url.searchParams.get("box") ?? "");
@@ -94,7 +106,9 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	await visibleMailboxes(1);
 	await expect(mailbox(second)).toHaveCount(0);
 	if (isMobile) await mobilePicker.click();
-	await rail.getByRole("button", { name: "Настроить папку", exact: true }).click();
+	await shortcut(/^Все ящики$/).click();
+	await rail.getByRole("button", { name: "Управление папками" }).click();
+	await page.getByRole("button", { name: "Редактировать папку «VIP-поддержка»" }).click();
 	const editor = page.getByRole("dialog", { name: "Настроить папку проекта" });
 	await editor.getByRole("textbox", { name: "Название папки" }).fill("Первый проект");
 	await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
@@ -105,7 +119,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	await expect(mailbox(first)).toBeVisible();
 	if (isMobile) await mobilePicker.click();
 	await rail.getByRole("button", { name: "Настроить папку", exact: true }).click();
-	await editor.getByRole("button", { name: "Удалить настройки папки", exact: true }).click();
+	await editor.getByRole("button", { name: "Удалить папку", exact: true }).click();
 	await editor.getByRole("button", { name: "Удалить папку", exact: true }).click();
 	await expect(shortcut(/^Без проекта/)).toHaveAttribute("aria-pressed", "true");
 	await visibleMailboxes(49);
@@ -121,4 +135,15 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	await expect(page.getByRole("region", { name: "Список писем" })).toHaveCount(0);
 	await shortcut(/^Все ящики$/).click();
 	await expect(page.getByRole("region", { name: "Список писем" })).toBeVisible();
+	const navigation = page.getByRole("navigation", { name: "Папки ящика" });
+	if (isMobile) await navigation.getByRole("button", { name: "Папки", exact: true }).click();
+	await navigation.getByTitle("Изменить папку «Обращения»").click();
+	const edit = page.getByRole("dialog", { name: "Изменить папку" });
+	await edit.getByLabel("Название папки").fill("Заявки");
+	await edit.getByRole("button", { name: "Сохранить" }).click();
+	await navigation.getByTitle("Заявки", { exact: true }).click();
+	await navigation.getByTitle("Изменить папку «Заявки»").click();
+	await edit.getByRole("button", { name: "Удалить папку…" }).click();
+	await page.getByRole("dialog", { name: "Удалить папку?" }).getByRole("button", { name: "Удалить папку", exact: true }).click();
+	await expect(navigation.getByText("Нет пользовательских папок")).toBeVisible();
 });

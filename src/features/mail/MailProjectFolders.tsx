@@ -1,7 +1,8 @@
-import { Folder, FolderPlus, Inbox, Pencil } from "lucide-react";
+import { Folder, FolderCog, FolderPlus, Inbox, Pencil } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { usePreference } from "@/features/productivity/preferences";
 import type { Mailbox, MailStats } from "@/services/mail.service";
+import { BaseModal } from "@/shared/modals/BaseModal";
 import { labelPalette } from "./MailFolderTree";
 import { MailProjectEditor, type MailProjectFolder } from "./MailProjectEditor";
 
@@ -87,6 +88,7 @@ export function MailProjectFolders({
 }) {
 	const { folders, setFolders, owners, groups } = projects;
 	const [editing, setEditing] = useState<{ folder?: MailProjectFolder }>();
+	const [managing, setManaging] = useState(false);
 	const project = folders.find(({ id }) => id === selected);
 	const sorted = folders.toSorted((left, right) =>
 		left.name.localeCompare(right.name, "ru", { numeric: true }),
@@ -126,6 +128,11 @@ export function MailProjectFolders({
 				>
 					<FolderPlus size={18} aria-hidden="true" />
 				</button>
+				{folders.length > 0 && (
+					<button type="button" className="mail-icon" aria-label="Управление папками" title="Управление папками" onClick={() => setManaging(true)}>
+						<FolderCog size={18} aria-hidden="true" />
+					</button>
+				)}
 			</div>
 			<nav
 				className="mail-project-shortcuts supportos-scroll"
@@ -208,6 +215,24 @@ export function MailProjectFolders({
 					</button>
 				</div>
 			)}
+			{managing && (
+				<BaseModal title="Управление папками" onClose={() => setManaging(false)}>
+					<ul className="mail-project-management">
+						{sorted.map((folder) => (
+							<li key={folder.id}>
+								<button type="button" aria-label={`Редактировать папку «${folder.name}»`} onClick={() => {
+									setManaging(false);
+									setEditing({ folder });
+								}}>
+									<ProjectMark folder={folder} />
+									<span>{folder.name}</span>
+									<Pencil size={16} aria-hidden="true" />
+								</button>
+							</li>
+						))}
+					</ul>
+				</BaseModal>
+			)}
 			{editing && (
 				<MailProjectEditor
 					folder={editing.folder}
@@ -218,7 +243,7 @@ export function MailProjectFolders({
 					onRemove={(id) => {
 						setFolders(folders.filter((folder) => folder.id !== id));
 						setEditing(undefined);
-						onSelect("");
+						if (selected === id) onSelect("");
 					}}
 					onClose={() => setEditing(undefined)}
 				/>

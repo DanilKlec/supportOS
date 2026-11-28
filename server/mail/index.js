@@ -250,7 +250,7 @@ async function getAttachment(g, mid, id) {
 
 const adminOnly = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'members', 'grant', 'revoke']);
 const templateActions = new Set(['templates', 'save-template', 'delete-template']);
-const postActions = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'grant', 'revoke', 'create-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
+const postActions = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'grant', 'revoke', 'create-label', 'edit-label', 'delete-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
 
 export default async function handler(req, res) {
 	res.setHeader('Cache-Control', 'private, no-store');
@@ -356,10 +356,29 @@ export default async function handler(req, res) {
 			});
 			return send(200, { colors: Object.fromEntries(entries) });
 		}
-		if (action === 'create-label') {
+		if (action === 'delete-label' || action === 'edit-label') {
+			const id = safeId(body.id);
+			const label = await g(`/labels/${id}?fields=type`);
+			if (label.type !== 'user') throw mailError('Можно изменять только пользовательские папки.');
+			if (action === 'delete-label') {
+				await g(`/labels/${id}`, { method: 'DELETE' });
+				labelColorCache.delete(`${box.id}:${id}`);
+				invalidateFolderCounts(box.id, [id]);
+				folderPages.delete(box.id);
+				return send(200, { ok: true });
+			}
+		}
+		if (action === 'create-label' || action === 'edit-label') {
 			const name = typeof body.name === 'string' ? body.name.trim() : '';
 			if (!name || name.length > 225 || /[\r\n\t\0]/.test(name))
 				throw mailError('Введите название ярлыка длиной до 225 символов.');
+			if (action === 'edit-label') {
+				const edited = await g(`/labels/${safeId(body.id)}`, {
+					method: 'PATCH', body: { name, ...(body.color ? { color: labelColor(body.color) } : {}) },
+				});
+				labelColorCache.delete(`${box.id}:${body.id}`);
+				return send(200, edited);
+			}
 			return send(200, await g('/labels', {
 				method: 'POST',
 				body: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show', ...(body.color ? { color: labelColor(body.color) } : {}) },

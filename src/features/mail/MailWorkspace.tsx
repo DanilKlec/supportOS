@@ -690,6 +690,20 @@ export function MailWorkspace() {
 									onCreate={(name, color) =>
 										createLabel.mutateAsync({ box: box.id, name, color })
 									}
+									onEdit={async (id, name, color) => {
+										const edited = await mailService.editLabel(box.id, id, name, color);
+										updateLabelCache(box.id, edited);
+										void client.invalidateQueries({ queryKey: ["mail", "labels", box.id] });
+									}}
+									onDelete={async (id) => {
+										await mailService.deleteLabel(box.id, id);
+										if (label === id) changeFolder("INBOX");
+										const queryKey = ["mail", "labels", box.id];
+										client.setQueryData<{ labels: MailLabel[] }>(queryKey, (current) =>
+											current && { labels: current.labels.filter((item) => item.id !== id) });
+										void client.invalidateQueries({ queryKey });
+										refreshFolder(box.id);
+									}}
 								/>
 							</aside>
 						)}

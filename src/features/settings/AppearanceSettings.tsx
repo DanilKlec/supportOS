@@ -322,7 +322,7 @@ export function AppearanceSettings() {
 							<div className="text-sm font-medium">
 								Палитра рабочего пространства
 							</div>
-							<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+							<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 								{PALETTE_OPTIONS.map((option) => {
 									const active = appearance.palette === option.value;
 

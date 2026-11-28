@@ -16,9 +16,10 @@ import {
 type VisualAuth = "admin" | "support" | "anonymous" | "invalid";
 type Network = { reads: Set<string>; blocked: string[] };
 
-export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
+export const test = base.extend<{ network: Network; visualAuth: VisualAuth; seedAppearance: boolean }>({
 	visualAuth: ["admin", { option: true }],
-	network: async ({ context, baseURL, visualAuth }, use) => {
+	seedAppearance: [true, { option: true }],
+	network: async ({ context, baseURL, visualAuth, seedAppearance }, use) => {
 		if (baseURL !== "http://127.0.0.1:4173")
 			throw new Error("Visual fixture requires its isolated loopback preview");
 		const origin = new URL(baseURL).origin;
@@ -28,7 +29,7 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 				? supportPermissions
 				: permissions.map((p) => p.id);
 		await context.addInitScript(
-			({ session, origin }) => {
+			({ session, origin, seedAppearance }) => {
 				if (location.origin !== origin) return;
 				// Only seed the SDK session, not application auth/permission stores.
 				if (session)
@@ -36,6 +37,7 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 						"sb-supportos-visual-auth-token",
 						JSON.stringify(session),
 					);
+				if (!seedAppearance) return;
 				for (const [key, value] of Object.entries({
 					"supportos-theme-mode": "dark",
 					"supportos-palette": "slate",
@@ -46,7 +48,7 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 				}))
 					localStorage.setItem(key, value);
 			},
-			{ session: visualAuth === "anonymous" ? null : authSession, origin },
+			{ session: visualAuth === "anonymous" ? null : authSession, origin, seedAppearance },
 		);
 
 		await context.route("**/*", async (route) => {
@@ -134,6 +136,8 @@ export const test = base.extend<{ network: Network; visualAuth: VisualAuth }>({
 			}
 			if (path === "/api/binds") {
 				switch (action) {
+					case "workspace":
+						return json({ ...knowledge, branches: { choices: {}, incoming: [], outgoing: [] } });
 					case "quality-signals":
 						return json({ feedback: [], gaps: [] });
 					case "knowledge":

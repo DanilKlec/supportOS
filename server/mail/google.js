@@ -99,7 +99,7 @@ export async function gmail(token, path, { method = 'GET', body, signal } = {}) 
 		if (status === 401) throw mailError('Доступ Google истёк. Подключите ящик заново.', 409, 'reconnect');
 		if (status === 404) throw mailError('Письмо, ярлык или черновик больше недоступны.', 404);
 		if (status === 429 || status === 403) throw mailError('Gmail временно ограничил доступ. Повторите позже или проверьте разрешения ящика.', 429);
-		if (status === 409 && path === '/labels' && method === 'POST') throw mailError('Ярлык с таким названием уже существует.', 409);
+		if (status === 409 && (path === '/labels' || path.startsWith('/labels/'))) throw mailError('Ярлык с таким названием уже существует.', 409);
 		if (status === 400) throw mailError('Gmail не принял запрос. Проверьте данные письма или фильтр.', 400);
 		throw mailError('Gmail временно недоступен.', 502);
 	}

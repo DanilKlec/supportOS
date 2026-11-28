@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BaseModal } from "@/shared/modals/BaseModal";
+import { getAppearanceSettings, restoreWorkspaceDensity, saveAppearanceSettings } from "@/shared/lib/appearance";
 import { useAuthStore } from "@/store/auth.store";
 import { useBonusStore } from "@/store/bonus.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
@@ -35,19 +36,19 @@ export function WorkspaceContinuity() {
 		"composer-pixels",
 		336,
 	);
-	const [density, setDensity] = usePreference("density", "comfortable");
 	const [focus, setFocus] = useState(false);
 	useEffect(() => {
-		document.documentElement.dataset.density = density;
+		if (actor) restoreWorkspaceDensity(readPreference(actor, "density", null));
+	}, [actor]);
+	useEffect(() => {
 		document.documentElement.style.setProperty(
 			"--composer-width",
 			`${Math.min(720, Math.max(320, composerPixels))}px`,
 		);
 		return () => {
-			delete document.documentElement.dataset.density;
 			document.documentElement.style.removeProperty("--composer-width");
 		};
-	}, [density, composerPixels]);
+	}, [composerPixels]);
 	const [online, setOnline] = useState(navigator.onLine);
 	useEffect(() => {
 		if (!actor) return;
@@ -206,8 +207,11 @@ export function WorkspaceContinuity() {
 							Плотность
 							<select
 								className="ui-input ml-3 border border-border bg-background"
-								value={density}
-								onChange={(e) => setDensity(e.target.value)}
+								defaultValue={getAppearanceSettings().density}
+								onChange={(e) => saveAppearanceSettings({
+									...getAppearanceSettings(),
+									density: e.target.value === "compact" ? "compact" : "comfortable",
+								})}
 							>
 								<option value="comfortable">Комфортная</option>
 								<option value="compact">Компактная</option>

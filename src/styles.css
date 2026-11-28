@@ -9,7 +9,7 @@
   --color-surface-elevated: #e9edf3;
   --color-border: #dce2ea;
   --color-muted: #687384;
-  --color-accent: #8b9cff;
+  --color-accent: #a1a1aa;
   --color-accent-foreground: #101426;
 
   --animate-slide-up: slide-up 0.2s ease-out;
@@ -22,7 +22,7 @@
   --color-surface-elevated: #272c34;
   --color-border: #353b45;
   --color-muted: #a4acb8;
-  --color-accent: #8b9cff;
+  --color-accent: #a1a1aa;
   --color-accent-foreground: #101426;
 }
 
@@ -87,6 +87,31 @@ textarea {
 *::-webkit-scrollbar-corner { background: transparent; }
 .supportos-tree-scroll { scrollbar-gutter: stable; }
 .dark { color-scheme: dark; }
+
+html[data-palette="glass"] {
+  --glass-wash: radial-gradient(ellipse at 6% 0%, rgb(78 171 181 / 18%), transparent 54%),
+    radial-gradient(ellipse at 95% 12%, rgb(138 121 208 / 18%), transparent 52%);
+  --glass-panel: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  --glass-sheen: linear-gradient(120deg, rgb(255 255 255 / 9%), transparent 48%);
+}
+[data-palette="glass"] :is(.app-shell, .account-page, .mail-workspace, .supportos-inbox, .login-scene) {
+  background: var(--glass-wash), var(--color-background);
+}
+[data-palette="glass"] :is(.product-topbar, .workspace-library, .chat-rail, .mail-top, .mail-sidebar, .mail-project-rail, .account-sections > section, .login-card) {
+  background: var(--glass-sheen), var(--glass-panel);
+  box-shadow: inset 0 1px rgb(255 255 255 / 13%);
+}
+[data-palette="glass"] :is(.product-topbar, .login-card, .modal-dialog, .mail-modal) {
+  background: var(--glass-sheen), color-mix(in srgb, var(--color-surface) 90%, transparent);
+  backdrop-filter: blur(16px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  html[data-palette="glass"] { --glass-panel: var(--color-surface); --glass-sheen: none; }
+  [data-palette="glass"] :is(.product-topbar, .login-card, .modal-dialog, .mail-modal) {
+    background: var(--color-surface);
+    backdrop-filter: none;
+  }
+}
 ::selection { background: color-mix(in srgb,var(--color-accent) 38%,var(--color-surface)); color: var(--color-foreground); }
 input { accent-color: var(--color-accent); }
 .role-choice-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,210px),1fr)); gap: 12px; }

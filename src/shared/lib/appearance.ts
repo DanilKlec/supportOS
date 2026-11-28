@@ -1,6 +1,6 @@
 export type ThemeMode = "light" | "dark" | "system";
 export type DensityMode = "comfortable" | "compact";
-export type PaletteMode = "slate" | "neutral" | "contrast" | "custom";
+export type PaletteMode = "slate" | "glass" | "neutral" | "contrast" | "custom";
 export type RadiusMode = "sharp" | "balanced" | "rounded";
 export type FontScale = "small" | "normal" | "large";
 
@@ -23,9 +23,11 @@ export interface AppearanceSettings {
 	fontScale: FontScale;
 }
 
+const GRAPHITE_ACCENT = "#a1a1aa";
+
 export const ACCENT_COLORS = [
 	{ name: "Индиго", value: "#8b9cff" },
-	{ name: "Графит", value: "#a1a1aa" },
+	{ name: "Графит", value: GRAPHITE_ACCENT },
 	{ name: "Синий", value: "#3b82f6" },
 	{ name: "Голубой", value: "#06b6d4" },
 	{ name: "Изумрудный", value: "#10b981" },
@@ -38,6 +40,11 @@ export const PALETTE_OPTIONS = [
 		name: "Графитовый",
 		value: "slate",
 		description: "Мягкий графитовый фон и выразительные поверхности.",
+	},
+	{
+		name: "Стекло",
+		value: "glass",
+		description: "Полупрозрачные панели и мягкие цветные блики.",
 	},
 	{
 		name: "Нейтральный",
@@ -73,7 +80,7 @@ export const RADIUS_OPTIONS = [
 	{
 		name: "Сбалансированный",
 		value: "balanced",
-		description: "Форма по умолчанию.",
+		description: "Умеренное скругление элементов.",
 	},
 	{
 		name: "Закруглённый",
@@ -108,12 +115,12 @@ const DEFAULT_CUSTOM_PALETTE: PaletteColors = {
 
 const DEFAULT_APPEARANCE: AppearanceSettings = {
 	themeMode: "dark",
-	accent: ACCENT_COLORS[0].value,
-	density: "comfortable",
+	accent: GRAPHITE_ACCENT,
+	density: "compact",
 	palette: "slate",
 	customPalette: DEFAULT_CUSTOM_PALETTE,
-	radius: "balanced",
-	fontScale: "normal",
+	radius: "rounded",
+	fontScale: "small",
 };
 
 export function getDefaultAppearanceSettings(): AppearanceSettings {
@@ -123,10 +130,37 @@ export function getDefaultAppearanceSettings(): AppearanceSettings {
 	};
 }
 
+export const APPEARANCE_CHANGED = "supportos:appearance-changed";
+
+export function restoreWorkspaceDensity(value: unknown) {
+	if (getStoredValue(DENSITY_KEY) || (value !== "compact" && value !== "comfortable")) return;
+	window.localStorage.setItem(DENSITY_KEY, value);
+	applyAppearance();
+	window.dispatchEvent(new Event(APPEARANCE_CHANGED));
+}
+
 const PALETTES: Record<
 	Exclude<PaletteMode, "custom">,
 	Record<"light" | "dark", PaletteColors>
 > = {
+	glass: {
+		light: {
+			background: "#e8eff5",
+			foreground: "#192e43",
+			surface: "#f6faff",
+			surfaceElevated: "#dfeaf3",
+			border: "#b3c6d7",
+			muted: "#4b6277",
+		},
+		dark: {
+			background: "#101b2b",
+			foreground: "#edf5ff",
+			surface: "#203045",
+			surfaceElevated: "#2c4058",
+			border: "#42576d",
+			muted: "#afc1d4",
+		},
+	},
 	slate: {
 		light: {
 			background: "#f3f5f8",
@@ -227,6 +261,7 @@ function isDensityMode(value: string | null): value is DensityMode {
 function isPaletteMode(value: string | null): value is PaletteMode {
 	return (
 		value === "slate" ||
+		value === "glass" ||
 		value === "neutral" ||
 		value === "contrast" ||
 		value === "custom"
@@ -389,6 +424,7 @@ export function saveAppearanceSettings(settings: AppearanceSettings) {
 	}
 
 	applyAppearance(settings);
+	if (typeof window !== "undefined") window.dispatchEvent(new Event(APPEARANCE_CHANGED));
 }
 
 export function onSystemThemeChange(callback: () => void) {

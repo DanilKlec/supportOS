@@ -301,6 +301,8 @@ test('mailbox members create Gmail labels and move a thread without removing its
 		expect(parsed.hostname).toBe('gmail.googleapis.com');
 		const folders = [{ id: 'Label_1', type: 'user' }, { id: 'Label_2', type: 'user' }, { id: 'UNREAD', type: 'system' }];
 		if (options.method === 'GET') {
+			if (parsed.searchParams.get('fields') === 'type')
+				return Response.json(folders.find(({ id }) => parsed.pathname.endsWith('/' + id)));
 			if (parsed.pathname.endsWith('/labels/Label_1')) {
 				expect(parsed.searchParams.get('fields')).toBe('color');
 				return Response.json({ color: colors });
@@ -308,12 +310,17 @@ test('mailbox members create Gmail labels and move a thread without removing its
 			expect(parsed.searchParams.get('fields')).toBe('labels(id,type)');
 			return Response.json({ labels: folders });
 		}
+		if (options.method === 'DELETE') {
+			expect(options.body).toBeUndefined();
+			mutations.push([parsed.pathname, 'DELETE']);
+			return new Response(null, { status: 204 });
+		}
 		const payload = JSON.parse(options.body);
 		mutations.push([parsed.pathname, payload]);
 		if (parsed.pathname.endsWith('/labels'))
 			return Response.json({ ...folders[1], name: payload.name });
 		if (options.method === 'PATCH')
-			return Response.json({ id: 'Label_1', name: 'Проекты', type: 'user', color: payload.color });
+			return Response.json({ id: 'Label_1', name: payload.name ?? 'Проекты', type: 'user', color: payload.color });
 		return Response.json({ id: 'thread' });
 	}));
 	const query = `&box=${mailboxId}`;
@@ -333,11 +340,18 @@ test('mailbox members create Gmail labels and move a thread without removing its
 	expect(await call('POST', 'set-label-color', query, { id: 'Label_1', color: colors })).toMatchObject({
 		status: 200, body: { color: colors },
 	});
+	expect(await call('POST', 'edit-label', query, { id: 'Label_1', name: 'Архив VIP', color: colors }))
+		.toMatchObject({ status: 200, body: { id: 'Label_1', name: 'Архив VIP', color: colors } });
+	expect((await call('POST', 'delete-label', query, { id: 'UNREAD' })).status).toBe(400);
+	expect((await call('POST', 'edit-label', query, { id: 'UNREAD', name: 'VIP' })).status).toBe(400);
+	expect((await call('POST', 'delete-label', query, { id: 'Label_1' })).status).toBe(200);
 	expect(mutations).toEqual([
 		['/gmail/v1/users/me/labels', { name: 'Проекты/Разбор', labelListVisibility: 'labelShow', messageListVisibility: 'show' }],
 		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_2'], removeLabelIds: ['Label_1'] }],
 		['/gmail/v1/users/me/threads/thread/modify', { addLabelIds: ['Label_1'], removeLabelIds: ['Label_2'] }],
 		['/gmail/v1/users/me/labels/Label_1', { color: colors }],
+		['/gmail/v1/users/me/labels/Label_1', { name: 'Архив VIP', color: colors }],
+		['/gmail/v1/users/me/labels/Label_1', 'DELETE'],
 	]);
 });
 

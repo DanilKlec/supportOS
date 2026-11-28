@@ -9,6 +9,7 @@ import {
 	X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { BaseModal } from "@/shared/modals/BaseModal";
 import type {
 	MailLabel,
 	MailLabelChanges,
@@ -179,6 +180,58 @@ function MailLabelCreator({
 	);
 }
 
+type FolderActions = {
+	onEdit: (id: string, name: string, color?: MailLabelColor) => Promise<void>;
+	onDelete: (id: string) => Promise<void>;
+};
+
+function MailFolderEditor({ label, onEdit, onDelete, onClose }: FolderActions & {
+	label: MailLabel;
+	onClose: () => void;
+}) {
+	const [name, setName] = useState(label.name);
+	const [color, setColor] = useState<MailLabelColor>();
+	const [removing, setRemoving] = useState(false);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const save = async () => {
+		if (busy) return;
+		setBusy(true);
+		setError("");
+		try {
+			if (removing) await onDelete(label.id);
+			else await onEdit(label.id, name.trim(), color);
+			onClose();
+		} catch (issue) {
+			setError(issue instanceof Error ? issue.message : "Не удалось сохранить изменения.");
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<BaseModal title={removing ? "Удалить папку?" : "Изменить папку"} className="mail-admin-dialog" size="sm" onClose={onClose} closeDisabled={busy}>
+			<form className="mail-label-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+				{removing ? <p>Ярлык «{label.name}» будет снят со всех писем этого ящика. Сами письма сохранятся.</p> : (
+					<>
+						<label className="mail-field">Название папки
+							<input required maxLength={225} value={name} disabled={busy} onChange={(event) => setName(event.target.value)} />
+						</label>
+						<LabelPalette color={color ?? label.color} change={setColor} disabled={busy} />
+						<button type="button" className="mail-button mail-delete" disabled={busy} onClick={() => { setError(""); setRemoving(true); }}>Удалить папку…</button>
+					</>
+				)}
+				{error && <p role="alert" className="mail-error">{error}</p>}
+				<div className="mail-label-form-actions">
+					<button type="button" className="mail-button" disabled={busy} onClick={onClose}>Отмена</button>
+					<button type="submit" className={removing ? "mail-button mail-delete" : "mail-button"} data-primary={!removing} disabled={busy || (!removing && !name.trim())}>
+						{busy ? "Подождите…" : removing ? "Удалить папку" : "Сохранить"}
+					</button>
+				</div>
+			</form>
+		</BaseModal>
+	);
+}
+
 export function MailFolderNavigation({
 	labels,
 	active,
@@ -187,7 +240,9 @@ export function MailFolderNavigation({
 	counts,
 	onSelect,
 	onCreate,
-}: {
+	onEdit,
+	onDelete,
+}: FolderActions & {
 	labels: MailLabel[];
 	active: string;
 	loading: boolean;
@@ -198,6 +253,7 @@ export function MailFolderNavigation({
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [creating, setCreating] = useState(false);
+	const [editing, setEditing] = useState<MailLabel>();
 	const folderId = useId();
 	return (
 		<nav
@@ -249,6 +305,7 @@ export function MailFolderNavigation({
 						active={active}
 						onSelect={onSelect}
 						counts={counts}
+						onEdit={setEditing}
 					/>
 				) : (
 					<p className="mail-picker-empty">
@@ -260,6 +317,7 @@ export function MailFolderNavigation({
 					</p>
 				)}
 			</div>
+			{editing && <MailFolderEditor label={editing} onEdit={onEdit} onDelete={onDelete} onClose={() => setEditing(undefined)} />}
 		</nav>
 	);
 }

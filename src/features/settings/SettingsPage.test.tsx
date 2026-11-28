@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getDefaultAppearanceSettings } from "@/shared/lib/appearance";
+import { getAppearanceSettings } from "@/shared/lib/appearance";
 import { useAuthStore } from "@/store/auth.store";
 import { useKnowledgeStore } from "@/store/knowledge.store";
 import {
@@ -168,15 +168,30 @@ it("initializes appearance on any section and retains it while switching hashes"
 it("keeps appearance, language and workspace persistence keys and reset behavior", () => {
 	mock.hash = "appearance";
 	render(<SettingsPage />);
+	const graphiteAppearance = {
+		themeMode: "dark",
+		accent: "#a1a1aa",
+		density: "compact",
+		palette: "slate",
+		radius: "rounded",
+		fontScale: "small",
+	};
+	expect(getAppearanceSettings()).toMatchObject(graphiteAppearance);
+	expect(document.documentElement.style.getPropertyValue("--color-accent")).toBe(
+		graphiteAppearance.accent,
+	);
+	expect(
+		document.documentElement.style.getPropertyValue("--supportos-font-size"),
+	).toBe("14px");
 	fireEvent.click(screen.getByRole("button", { name: /Светлая/ }));
 	expect(
 		screen
 			.getByRole("option", { name: "Английский (EN)" })
 			.getAttribute("value"),
 	).toBe("en");
-	fireEvent.click(screen.getByRole("button", { name: "Компактная" }));
+	fireEvent.click(screen.getByRole("button", { name: "Комфортная" }));
 	fireEvent.click(screen.getByRole("button", { name: "Большой" }));
-	fireEvent.click(screen.getByRole("button", { name: /Закруглённый/ }));
+	fireEvent.click(screen.getByRole("button", { name: /Сбалансированный/ }));
 	fireEvent.click(
 		screen.getByRole("button", { name: /Свой Собственные цвета/ }),
 	);
@@ -189,9 +204,9 @@ it("keeps appearance, language and workspace persistence keys and reset behavior
 	expect(useKnowledgeStore.getState().language).toBe("en");
 	expect(localStorage.getItem("supportos-theme-mode")).toBe("light");
 	expect(localStorage.getItem("supportos-theme")).toBe("light");
-	expect(localStorage.getItem("supportos-density")).toBe("compact");
+	expect(localStorage.getItem("supportos-density")).toBe("comfortable");
 	expect(localStorage.getItem("supportos-font-scale")).toBe("large");
-	expect(localStorage.getItem("supportos-radius")).toBe("rounded");
+	expect(localStorage.getItem("supportos-radius")).toBe("balanced");
 	expect(localStorage.getItem("supportos-palette")).toBe("custom");
 	expect(
 		JSON.parse(localStorage.getItem("supportos-custom-palette")!).background,
@@ -208,12 +223,7 @@ it("keeps appearance, language and workspace persistence keys and reset behavior
 		"Макет рабочего пространства сброшен",
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Сбросить" }));
-	expect(localStorage.getItem("supportos-accent")).toBe(
-		getDefaultAppearanceSettings().accent,
-	);
-	expect(localStorage.getItem("supportos-theme-mode")).toBe(
-		getDefaultAppearanceSettings().themeMode,
-	);
+	expect(getAppearanceSettings()).toMatchObject(graphiteAppearance);
 });
 
 it("keeps the explicitly selected blue accent after reinitializing Settings", () => {

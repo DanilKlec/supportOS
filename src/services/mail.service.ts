@@ -190,6 +190,10 @@ export const mailService = {
 		),
 	createLabel: (box: string, name: string, color?: MailLabelColor) =>
 		request<MailLabel>("create-label", { box }, { name, color }),
+	editLabel: (box: string, id: string, name: string, color?: MailLabelColor) =>
+		request<MailLabel>("edit-label", { box }, { id, name, color }),
+	deleteLabel: (box: string, id: string) =>
+		request("delete-label", { box }, { id }),
 	setLabelColor: (box: string, id: string, color: MailLabelColor) =>
 		request<MailLabel>("set-label-color", { box }, { id, color }),
 	folder: (

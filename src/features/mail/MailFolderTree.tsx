@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, FolderOpen, Inbox } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, Inbox, Pencil } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { MailLabel, MailLabelColor } from "@/services/mail.service";
 
@@ -89,6 +89,7 @@ export function MailFolderTree({
 	search = "",
 	unavailable,
 	counts,
+	onEdit,
 }: {
 	labels: MailLabel[];
 	active?: string;
@@ -97,6 +98,7 @@ export function MailFolderTree({
 	search?: string;
 	unavailable?: string;
 	counts?: Record<string, number | null>;
+	onEdit?: (label: MailLabel) => void;
 }) {
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 	const tree = useMemo(() => folderTree(labels), [labels]);
@@ -148,6 +150,11 @@ export function MailFolderTree({
 							<span>{name}</span>
 							{label && counts && <MailFolderCount count={counts[label.id]} />}
 						</button>
+						{onEdit && label?.type === "user" && (
+							<button type="button" className="mail-icon" title={`Изменить папку «${path}»`} onClick={() => onEdit(label)}>
+								<Pencil size={14} aria-hidden="true" />
+							</button>
+						)}
 					</div>
 					{open && children.size > 0 && (
 						<ul className="mail-folder-branch">{render(children)}</ul>

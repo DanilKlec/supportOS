@@ -87,7 +87,7 @@ export function MailProjectEditor({
 				className="mail-project-form"
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (trimmedName && !duplicate) {
+					if (trimmedName && !duplicate && !confirmRemoval) {
 						onSave({
 							id: folder?.id ?? crypto.randomUUID(),
 							name: trimmedName,
@@ -218,12 +218,11 @@ export function MailProjectEditor({
 						{folder && (
 							<button
 								type="button"
-								className="mail-icon mail-delete"
-								aria-label="Удалить настройки папки"
-								title="Удалить папку"
+								className="mail-button mail-delete"
 								onClick={() => setConfirmRemoval(true)}
 							>
 								<Trash2 size={16} aria-hidden="true" />
+								Удалить папку
 							</button>
 						)}
 						<button type="button" className="mail-button" onClick={onClose}>

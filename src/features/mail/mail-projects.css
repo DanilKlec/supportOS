@@ -14,10 +14,25 @@
 }
 .mail-project-rail-heading {
 	display: grid;
+	gap: 0.3rem;
 	place-items: center;
 	flex: none;
 	padding: 0.6rem 0 0.45rem;
 }
+.mail-project-management { display: grid; gap: .35rem; }
+.mail-project-management button {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: .75rem;
+	width: 100%;
+	padding: .6rem .75rem;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	text-align: start;
+}
+.mail-project-management button:hover { background: var(--color-surface-elevated); }
+.mail-project-management button span { overflow-wrap: anywhere; }
 .mail-project-add.mail-icon {
 	width: 2.15rem;
 	min-height: 2.15rem;
@@ -228,6 +243,7 @@
 		border-block-end: 1px solid var(--mail-line);
 	}
 	.mail-project-rail-heading {
+		grid-auto-flow: column;
 		padding: 0.3rem 0.5rem;
 		border-inline-end: 1px solid var(--mail-line);
 	}

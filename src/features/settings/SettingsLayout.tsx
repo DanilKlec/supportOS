@@ -6,10 +6,12 @@ import {
 	type ReactNode,
 	type SetStateAction,
 	useContext,
+	useEffect,
 	useState,
 } from "react";
 import {
 	type AppearanceSettings,
+	APPEARANCE_CHANGED,
 	applyAppearance,
 	getAppearanceSettings,
 } from "@/shared/lib/appearance";
@@ -54,6 +56,12 @@ export function SettingsLayout({
 	});
 
 	const authSession = useAuthStore((state) => state.session);
+	useEffect(() => {
+		const update = () => setAppearance(getAppearanceSettings());
+		update();
+		window.addEventListener(APPEARANCE_CHANGED, update);
+		return () => window.removeEventListener(APPEARANCE_CHANGED, update);
+	}, []);
 	const current =
 		accountSections.find((item) => item.id === section) ?? accountSections[0];
 	const identity = accountIdentity(
