@@ -294,7 +294,7 @@ test("browse shared Gmail, organize mail and reuse a recipient", async ({
 		switch (url.searchParams.get("action")) {
 			case "list":
 				return route.fulfill({
-					json: { configured: true, admin: true, mailboxes },
+					json: { configured: true, admin: true, canManageFolders: true, mailboxes },
 				});
 			case "stats":
 				activeMailboxes++;

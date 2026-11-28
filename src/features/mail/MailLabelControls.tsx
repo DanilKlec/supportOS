@@ -233,6 +233,7 @@ function MailFolderEditor({ label, onEdit, onDelete, onClose }: FolderActions & 
 }
 
 export function MailFolderNavigation({
+	canManage,
 	labels,
 	active,
 	loading,
@@ -243,6 +244,7 @@ export function MailFolderNavigation({
 	onEdit,
 	onDelete,
 }: FolderActions & {
+	canManage: boolean;
 	labels: MailLabel[];
 	active: string;
 	loading: boolean;
@@ -276,7 +278,7 @@ export function MailFolderNavigation({
 					<FolderOpen size={16} aria-hidden="true" /> Папки
 					<ChevronDown size={14} aria-hidden="true" />
 				</button>
-				<button
+				{canManage && <button
 					type="button"
 					className="mail-icon"
 					title="Новая папка"
@@ -288,10 +290,10 @@ export function MailFolderNavigation({
 					}}
 				>
 					<Plus size={16} aria-hidden="true" />
-				</button>
+				</button>}
 			</div>
 			<div id={folderId} className="mail-custom-folder-content">
-				{creating && (
+				{canManage && creating && (
 					<MailLabelCreator
 						folder
 						create={onCreate}
@@ -305,7 +307,7 @@ export function MailFolderNavigation({
 						active={active}
 						onSelect={onSelect}
 						counts={counts}
-						onEdit={setEditing}
+						onEdit={canManage ? setEditing : undefined}
 					/>
 				) : (
 					<p className="mail-picker-empty">
@@ -317,12 +319,13 @@ export function MailFolderNavigation({
 					</p>
 				)}
 			</div>
-			{editing && <MailFolderEditor label={editing} onEdit={onEdit} onDelete={onDelete} onClose={() => setEditing(undefined)} />}
+			{canManage && editing && <MailFolderEditor label={editing} onEdit={onEdit} onDelete={onDelete} onClose={() => setEditing(undefined)} />}
 		</nav>
 	);
 }
 
 function MailThreadPicker({
+	canManage,
 	mode,
 	labels,
 	applied,
@@ -333,6 +336,7 @@ function MailThreadPicker({
 	onCreate,
 	onColor,
 }: {
+	canManage: boolean;
 	mode: "labels" | "move";
 	labels: MailLabel[];
 	applied: string[];
@@ -406,7 +410,7 @@ function MailThreadPicker({
 				</button>
 			</div>
 			<div className="mail-picker-body">
-				{creating ? (
+				{canManage && creating ? (
 					<MailLabelCreator
 						folder={isMove}
 						create={onCreate}
@@ -426,7 +430,7 @@ function MailThreadPicker({
 								onChange={(event) => setFilter(event.target.value)}
 							/>
 						</label>
-						{editingColor && (
+						{canManage && editingColor && (
 							<div className="mail-picker-color">
 								<span title={editingColor.name}>{editingColor.name}</span>
 								<LabelPalette
@@ -486,7 +490,7 @@ function MailThreadPicker({
 														{label.name}
 													</span>
 												</label>
-												<button
+												{canManage && <button
 													type="button"
 													className="mail-label-color-button"
 													aria-label={`Цвет ярлыка ${label.name}`}
@@ -499,7 +503,7 @@ function MailThreadPicker({
 													}
 												>
 													<span />
-												</button>
+												</button>}
 											</li>
 										);
 									})}
@@ -522,7 +526,7 @@ function MailThreadPicker({
 			</div>
 			{!creating && (
 				<div className="mail-picker-footer">
-					<button
+					{canManage && <button
 						type="button"
 						className="mail-button mail-picker-add"
 						onClick={() => {
@@ -533,7 +537,7 @@ function MailThreadPicker({
 					>
 						<Plus size={15} aria-hidden="true" />{" "}
 						{isMove ? "Новая папка" : "Новый ярлык"}
-					</button>
+					</button>}
 					<button
 						type="button"
 						className="mail-button"
@@ -557,6 +561,7 @@ function MailThreadPicker({
 }
 
 export function MailLabelControls({
+	canManage,
 	labels,
 	applied,
 	source,
@@ -567,6 +572,7 @@ export function MailLabelControls({
 	onCreate,
 	onColor,
 }: {
+	canManage: boolean;
 	labels: MailLabel[];
 	applied: string[];
 	source?: string;
@@ -658,6 +664,7 @@ export function MailLabelControls({
 						aria-label={panel === "move" ? "Выбор папки" : "Выбор ярлыков"}
 					>
 						<MailThreadPicker
+							canManage={canManage}
 							key={panel}
 							mode={panel}
 							labels={labels}

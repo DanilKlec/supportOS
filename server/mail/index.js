@@ -249,6 +249,7 @@ async function getAttachment(g, mid, id) {
 }
 
 const adminOnly = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'members', 'grant', 'revoke']);
+const folderManagement = new Set(['create-label', 'edit-label', 'delete-label', 'set-label-color']);
 const templateActions = new Set(['templates', 'save-template', 'delete-template']);
 const postActions = new Set(['oauth-start', 'oauth-finish', 'set-mailbox-icon', 'grant', 'revoke', 'create-label', 'edit-label', 'delete-label', 'set-label-color', 'change-thread', 'save-draft', 'send', 'delete-draft', 'save-template', 'delete-template', 'import-template-html']);
 
@@ -263,15 +264,17 @@ export default async function handler(req, res) {
 		if (req.method !== (postActions.has(action) ? 'POST' : 'GET')) return send(405, { error: 'Метод не поддерживается.' });
 		const user = await requireUser(req);
 		const admin = can(user.access, 'users.manage');
+		const canManageFolders = user.access?.roles?.some(role => role.id === 'admin') === true;
+		if (folderManagement.has(action) && !canManageFolders) throw mailError('Управление папками доступно только администратору.', 403);
 		if (adminOnly.has(action) && !admin) throw mailError('Подключение и выдача доступа доступны администратору.', 403);
 		const cfg = googleConfig();
 		if (!cfg) {
-			if (action === 'list') return send(200, { configured: false, admin, mailboxes: [] });
+			if (action === 'list') return send(200, { configured: false, admin, canManageFolders, mailboxes: [] });
 			throw mailError('Подключение Gmail ещё не настроено на сервере.', 503);
 		}
 		const env = config();
 		const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body ?? {});
-		if (action === 'list') return send(200, { configured: true, admin, mailboxes: await accessMailboxes(env, user.id, admin) });
+		if (action === 'list') return send(200, { configured: true, admin, canManageFolders, mailboxes: await accessMailboxes(env, user.id, admin) });
 		if (action === 'oauth-start') {
 			const address = addressOf(body.address);
 			if (!validAddress(address)) throw mailError('Введите адрес Gmail или Google Workspace.');

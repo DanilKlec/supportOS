@@ -62,6 +62,12 @@
 .mail-project-shortcut:hover {
 	background: var(--mail-selected);
 }
+.mail-project-unassigned {
+	font-size: .67rem;
+	font-weight: 600;
+	line-height: 1.05;
+	color: var(--color-muted);
+}
 .mail-project-shortcut[data-active="true"] {
 	border-color: color-mix(
 		in srgb,

@@ -107,7 +107,7 @@ export function MailWorkspace() {
 	const mailboxes = list.data?.mailboxes ?? [];
 	const projects = useMailProjects(mailboxes);
 	const project = projects.folders.find(({ id }) => id === projectId);
-	const projectScope = project?.id ?? (projectId === "" ? "" : null);
+	const projectScope = project?.id ?? (projectId === "" && projects.folders.length && projects.groups.has("") ? "" : null);
 	const scopedMailboxes =
 		projectScope === null
 			? mailboxes
@@ -117,6 +117,7 @@ export function MailWorkspace() {
 		scopedMailboxes[0];
 	const boxId = box?.id ?? "";
 	const admin = list.data?.admin === true;
+	const canManageFolders = list.data?.canManageFolders === true;
 	const labels = useQuery({
 		queryKey: ["mail", "labels", boxId],
 		queryFn: ({ signal }) => mailService.labels(boxId, signal),
@@ -606,6 +607,7 @@ export function MailWorkspace() {
 			) : (
 				<div className="mail-grid">
 					<MailProjectFolders
+						canManage={canManageFolders}
 						key={userId}
 						projects={projects}
 						selected={projectScope}
@@ -680,6 +682,7 @@ export function MailWorkspace() {
 									</button>
 								</nav>
 								<MailFolderNavigation
+									canManage={canManageFolders}
 									key={box.id}
 									labels={userLabels}
 									active={label}
@@ -928,6 +931,7 @@ export function MailWorkspace() {
 								onCompose={(draft) => setComposer({ box, draft })}
 								organizer={
 									<MailLabelControls
+										canManage={canManageFolders}
 										labels={userLabels}
 										applied={selected.labels}
 										source={moveSource}

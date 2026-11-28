@@ -1,4 +1,4 @@
-import { Folder, FolderCog, FolderPlus, Inbox, Pencil } from "lucide-react";
+import { Folder, FolderCog, FolderPlus, Pencil } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { usePreference } from "@/features/productivity/preferences";
 import type { Mailbox, MailStats } from "@/services/mail.service";
@@ -74,12 +74,14 @@ function ProjectMark({ folder }: { folder?: MailProjectFolder }) {
 }
 
 export function MailProjectFolders({
+	canManage,
 	projects,
 	selected,
 	mailboxes,
 	statusByMailbox,
 	onSelect,
 }: {
+	canManage: boolean;
 	projects: ReturnType<typeof useMailProjects>;
 	selected: string | null;
 	mailboxes: Mailbox[];
@@ -118,7 +120,7 @@ export function MailProjectFolders({
 
 	return (
 		<aside className="mail-project-rail" aria-label="Папки проектов">
-			<div className="mail-project-rail-heading">
+			{canManage && <div className="mail-project-rail-heading">
 				<button
 					type="button"
 					className="mail-icon mail-project-add"
@@ -133,7 +135,7 @@ export function MailProjectFolders({
 						<FolderCog size={18} aria-hidden="true" />
 					</button>
 				)}
-			</div>
+			</div>}
 			<nav
 				className="mail-project-shortcuts supportos-scroll"
 				aria-label="Проекты"
@@ -150,10 +152,10 @@ export function MailProjectFolders({
 					}}
 				>
 					<span className="mail-project-mark" aria-hidden="true">
-						<Inbox size={17} />
+						Все
 					</span>
 				</button>
-				{[undefined, ...sorted].map((folder) => {
+				{(sorted.length && groups.has("") ? [undefined, ...sorted] : sorted).map((folder) => {
 					const key = folder?.id ?? "";
 					const name = folder?.name ?? "Без проекта";
 					const statuses = (groups.get(key) ?? []).map(({ id }) =>
@@ -182,7 +184,7 @@ export function MailProjectFolders({
 								if (selected !== key) onSelect(key);
 							}}
 						>
-							<ProjectMark folder={folder} />
+							{folder ? <ProjectMark folder={folder} /> : <span className="mail-project-unassigned">Без проекта</span>}
 							{unread > 0 ? (
 								<span className="mail-project-badge" aria-hidden="true">
 									{unread > 99 ? "99+" : unread}
@@ -202,7 +204,7 @@ export function MailProjectFolders({
 					);
 				})}
 			</nav>
-			{project && (
+			{canManage && project && (
 				<div className="mail-project-rail-heading mail-project-rail-settings">
 					<button
 						type="button"
@@ -215,7 +217,7 @@ export function MailProjectFolders({
 					</button>
 				</div>
 			)}
-			{managing && (
+			{canManage && managing && (
 				<BaseModal title="Управление папками" onClose={() => setManaging(false)}>
 					<ul className="mail-project-management">
 						{sorted.map((folder) => (
@@ -233,7 +235,7 @@ export function MailProjectFolders({
 					</ul>
 				</BaseModal>
 			)}
-			{editing && (
+			{canManage && editing && (
 				<MailProjectEditor
 					folder={editing.folder}
 					folders={folders}

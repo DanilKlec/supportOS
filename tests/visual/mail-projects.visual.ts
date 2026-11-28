@@ -9,6 +9,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	}));
 	const requestedFolders = new Set<string>();
 	let gmailFolders = [{ id: "Label_1", type: "user", name: "Обращения" }];
+	let canManageFolders = true;
 	let releaseStats = () => {};
 	const waitingForStats = new Promise<void>((resolve) => { releaseStats = resolve; });
 	await context.route("**/api/binds?action=workspace", (route) =>
@@ -24,7 +25,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 		const action = url.searchParams.get("action");
 		expect(request.method()).toBe(["edit-label", "delete-label"].includes(action ?? "") ? "POST" : "GET");
 		switch (url.searchParams.get("action")) {
-			case "list": return route.fulfill({ json: { configured: true, admin: false, mailboxes } });
+			case "list": return route.fulfill({ json: { configured: true, admin: canManageFolders, canManageFolders, mailboxes } });
 			case "stats":
 				await waitingForStats;
 				return route.fulfill({ json: { stats: mailboxes.map(({ id }, index) => ({
@@ -81,6 +82,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 		await expect(dialog).toBeHidden();
 	};
 	const first = "desk0@example.invalid";
+	await expect(shortcut(/^Без проекта/)).toHaveCount(0);
 	const second = "desk49@example.invalid";
 	await newFolder("VIP-поддержка", [first, second]);
 	await expect(shortcut(/^VIP-поддержка · 7 непрочитанных$/)).toBeVisible();
@@ -146,4 +148,14 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 	await edit.getByRole("button", { name: "Удалить папку…" }).click();
 	await page.getByRole("dialog", { name: "Удалить папку?" }).getByRole("button", { name: "Удалить папку", exact: true }).click();
 	await expect(navigation.getByText("Нет пользовательских папок")).toBeVisible();
+	canManageFolders = false;
+	gmailFolders = [{ id: "Label_2", type: "user", name: "Оплаты" }];
+	await page.reload();
+	await expect(shortcut(/^Вторая линия/)).toBeVisible();
+	await expect(rail.getByRole("button", { name: "Создать папку проекта" })).toHaveCount(0);
+	await expect(rail.getByRole("button", { name: "Управление папками" })).toHaveCount(0);
+	if (isMobile) await navigation.getByRole("button", { name: "Папки", exact: true }).click();
+	await expect(navigation.getByTitle("Оплаты", { exact: true })).toBeVisible();
+	await expect(navigation.getByTitle("Изменить папку «Оплаты»")).toHaveCount(0);
+	await expect(navigation.getByRole("button", { name: "Новая папка" })).toHaveCount(0);
 });

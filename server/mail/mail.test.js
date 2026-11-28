@@ -185,7 +185,7 @@ test('mailbox membership is checked before mail is read or sent and support cann
 	expect((await call('POST', 'oauth-start', '', { address })).status).toBe(403);
 	expect((await call('POST', 'set-mailbox-icon', `&box=${mailboxId}`, { icon: null })).status).toBe(403);
 	expect((await call('POST', 'create-label', `&box=${mailboxId}`, { name: 'Private' })).status).toBe(403);
-	expect(fetch).toHaveBeenCalledTimes(4);
+	expect(fetch).toHaveBeenCalledTimes(3);
 });
 
 test('updates a mailbox icon with administrator access and rejects non-image payloads', async () => {
@@ -283,7 +283,7 @@ test('attributes new and drafted mail to the employee who sent it without changi
 	expect(lookupCount).toBe(2);
 });
 
-test('mailbox members create Gmail labels and move a thread without removing its other labels', async () => {
+test('members organize threads while only admins manage Gmail folders', async () => {
 	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
 	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
 	const encrypted_token = seal(googleConfig(testEnv), 'example-refresh', `gmail:${address}`);
@@ -324,10 +324,18 @@ test('mailbox members create Gmail labels and move a thread without removing its
 		return Response.json({ id: 'thread' });
 	}));
 	const query = `&box=${mailboxId}`;
+	for (const role of ['support', 'shift', 'qc', 'creator']) {
+		identities.actor.access.roles = [{ id: role }];
+		for (const action of ['create-label', 'edit-label', 'delete-label', 'set-label-color']) {
+			expect((await call('POST', action, query, { id: 'Label_1', name: 'Разбор', color: colors })).status).toBe(403);
+		}
+	}
+	identities.actor.access.roles = [{ id: 'admin' }];
 	expect(await call('POST', 'create-label', query, { name: '  Проекты/Разбор  ' })).toMatchObject({
 		status: 200, body: { id: 'Label_2', name: 'Проекты/Разбор', type: 'user' },
 	});
 	const move = { id: 'thread', operation: 'move-label', label: 'Label_2', source: 'Label_1' };
+	identities.actor.access.roles = [{ id: 'support' }];
 	expect((await call('POST', 'change-thread', query, move)).status).toBe(200);
 	expect((await call('POST', 'change-thread', query, { ...move, label: 'UNREAD' })).status).toBe(400);
 	const changes = { id: 'thread', operation: 'set-labels', add: ['Label_1'], remove: ['Label_2'] };
@@ -337,6 +345,7 @@ test('mailbox members create Gmail labels and move a thread without removing its
 	expect(await call('GET', 'label-colors', `${query}&ids=Label_1`)).toMatchObject({
 		status: 200, body: { colors: { Label_1: colors } },
 	});
+	identities.actor.access.roles = [{ id: 'admin' }];
 	expect(await call('POST', 'set-label-color', query, { id: 'Label_1', color: colors })).toMatchObject({
 		status: 200, body: { color: colors },
 	});

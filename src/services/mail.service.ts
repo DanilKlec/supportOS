@@ -121,7 +121,7 @@ async function request<T>(
 
 export const mailService = {
 	list: (signal?: AbortSignal) =>
-		request<{ configured: boolean; admin: boolean; mailboxes: Mailbox[] }>(
+		request<{ configured: boolean; admin: boolean; canManageFolders: boolean; mailboxes: Mailbox[] }>(
 			"list",
 			{},
 			undefined,
