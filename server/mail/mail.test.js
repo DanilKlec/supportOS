@@ -283,7 +283,7 @@ test('attributes new and drafted mail to the employee who sent it without changi
 	expect(lookupCount).toBe(2);
 });
 
-test('members organize threads while only admins manage Gmail folders', async () => {
+test.each(['admin', 'creator'])('members organize threads while %s can manage Gmail folders', async (managerRole) => {
 	for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
 	identities.actor = { id: userId, access: { status: 'active', permissions: ['work'] } };
 	const encrypted_token = seal(googleConfig(testEnv), 'example-refresh', `gmail:${address}`);
@@ -324,13 +324,13 @@ test('members organize threads while only admins manage Gmail folders', async ()
 		return Response.json({ id: 'thread' });
 	}));
 	const query = `&box=${mailboxId}`;
-	for (const role of ['support', 'shift', 'qc', 'creator']) {
+	for (const role of ['support', 'shift', 'qc']) {
 		identities.actor.access.roles = [{ id: role }];
 		for (const action of ['create-label', 'edit-label', 'delete-label', 'set-label-color']) {
 			expect((await call('POST', action, query, { id: 'Label_1', name: 'Разбор', color: colors })).status).toBe(403);
 		}
 	}
-	identities.actor.access.roles = [{ id: 'admin' }];
+	identities.actor.access.roles = [{ id: managerRole }];
 	expect(await call('POST', 'create-label', query, { name: '  Проекты/Разбор  ' })).toMatchObject({
 		status: 200, body: { id: 'Label_2', name: 'Проекты/Разбор', type: 'user' },
 	});
@@ -345,7 +345,7 @@ test('members organize threads while only admins manage Gmail folders', async ()
 	expect(await call('GET', 'label-colors', `${query}&ids=Label_1`)).toMatchObject({
 		status: 200, body: { colors: { Label_1: colors } },
 	});
-	identities.actor.access.roles = [{ id: 'admin' }];
+	identities.actor.access.roles = [{ id: managerRole }];
 	expect(await call('POST', 'set-label-color', query, { id: 'Label_1', color: colors })).toMatchObject({
 		status: 200, body: { color: colors },
 	});

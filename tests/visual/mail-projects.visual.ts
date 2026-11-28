@@ -25,7 +25,7 @@ test("organize accessible mailboxes into project folders", async ({ context, isM
 		const action = url.searchParams.get("action");
 		expect(request.method()).toBe(["edit-label", "delete-label"].includes(action ?? "") ? "POST" : "GET");
 		switch (url.searchParams.get("action")) {
-			case "list": return route.fulfill({ json: { configured: true, admin: canManageFolders, canManageFolders, mailboxes } });
+			case "list": return route.fulfill({ json: { configured: true, admin: false, canManageFolders, mailboxes } });
 			case "stats":
 				await waitingForStats;
 				return route.fulfill({ json: { stats: mailboxes.map(({ id }, index) => ({

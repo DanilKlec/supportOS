@@ -264,8 +264,8 @@ export default async function handler(req, res) {
 		if (req.method !== (postActions.has(action) ? 'POST' : 'GET')) return send(405, { error: 'Метод не поддерживается.' });
 		const user = await requireUser(req);
 		const admin = can(user.access, 'users.manage');
-		const canManageFolders = user.access?.roles?.some(role => role.id === 'admin') === true;
-		if (folderManagement.has(action) && !canManageFolders) throw mailError('Управление папками доступно только администратору.', 403);
+		const canManageFolders = user.access?.roles?.some(role => role.id === 'admin' || role.id === 'creator') === true;
+		if (folderManagement.has(action) && !canManageFolders) throw mailError('Для управления папками нужна роль Admin или Creator.', 403);
 		if (adminOnly.has(action) && !admin) throw mailError('Подключение и выдача доступа доступны администратору.', 403);
 		const cfg = googleConfig();
 		if (!cfg) {
